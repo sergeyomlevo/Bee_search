@@ -1,0 +1,483 @@
+# .agent/decision-policy.yaml
+#
+# Decision policy for coding agents working on Bee Search.
+#
+# This file controls HOW an agent makes decisions when requirements,
+# implementation details, or available evidence leave room for choice.
+#
+# It does NOT define Bee Search product requirements or domain rules.
+# Project truth lives in docs/.
+#
+# AGENTS.md defines repository-wide agent behavior.
+# This file refines decision-making under ambiguity.
+
+version: 1
+
+policy:
+  principle: >
+    Make routine, reversible, low-impact implementation decisions autonomously.
+    Escalate decisions that change product behavior, domain semantics,
+    persistent data, accepted architecture, or create difficult-to-reverse
+    commitments.
+
+  default_when_uncertain: inspect_before_asking
+
+# ---------------------------------------------------------------------------
+# Sources and precedence
+# ---------------------------------------------------------------------------
+
+sources:
+  project_truth:
+    - docs/product-requirements.md
+    - docs/user-workflows.md
+    - docs/domain-model.md
+    - docs/data-model.md
+    - docs/architecture.md
+    - docs/decisions.md
+    - docs/glossary.md
+
+  user_preferences:
+    - .agent/preferences.yaml
+
+  preference_evidence:
+    - .agent/preference-evidence.md
+
+rules:
+  - id: project_truth_over_preferences
+    description: >
+      User preferences guide choices only where project requirements and
+      accepted decisions leave more than one valid option.
+    action: enforce
+
+  - id: no_requirement_invention
+    description: >
+      Do not convert assumptions, likely future needs, or implementation
+      convenience into product requirements.
+    action: enforce
+
+  - id: existing_code_is_not_authority
+    description: >
+      Existing implementation may be incomplete or wrong. When code conflicts
+      with documented project truth, investigate rather than preserving the
+      code automatically.
+    action: enforce
+
+# ---------------------------------------------------------------------------
+# Decision classes
+# ---------------------------------------------------------------------------
+
+decision_classes:
+
+  routine:
+    action: decide_and_continue
+    report: only_if_relevant
+
+    description: >
+      Small implementation choices that are local, reversible, and do not
+      alter documented behavior or architecture.
+
+    examples:
+      - local variable naming
+      - private helper extraction
+      - straightforward Kotlin idioms
+      - formatting
+      - small internal refactoring
+      - test helper organization
+      - Compose component extraction
+      - obvious null-safety improvements
+      - equivalent implementation details
+
+  low_impact:
+    action: decide_and_continue
+    report: summarize_afterwards
+
+    description: >
+      Decisions with more than one reasonable implementation where the choice
+      remains local and inexpensive to reverse.
+
+    examples:
+      - internal class organization
+      - package placement consistent with architecture
+      - choosing between equivalent Kotlin standard-library approaches
+      - minor UI implementation details not defined by workflows
+      - internal repository method shape
+      - local error representation
+      - test structure
+
+  significant_reversible:
+    action: propose_preferred_option
+    approval_required: false
+    report: before_implementation_when_practical
+
+    description: >
+      A meaningful choice that affects several files or future implementation
+      but remains reasonably reversible and does not change established
+      product/domain decisions.
+
+    behavior:
+      - inspect existing code and documentation first
+      - identify the preferred option
+      - briefly state why it is preferred
+      - mention an important alternative if one exists
+      - continue unless the user requests another direction
+
+    examples:
+      - introducing a small reusable abstraction
+      - reorganizing a feature package
+      - selecting a minor supporting library
+      - changing an internal API used in several places
+      - choosing a local state-management pattern
+
+  project_decision:
+    action: ask_before_implementation
+    approval_required: true
+
+    description: >
+      A choice that changes or establishes product behavior, domain semantics,
+      persistent data meaning, architecture, or another project-level rule.
+
+    examples:
+      - adding a new domain entity
+      - changing a domain relationship
+      - changing a documented workflow
+      - changing persistence semantics
+      - choosing the offline map format
+      - choosing the map data source
+      - changing the meaning of an existing field
+      - introducing mandatory network dependence
+      - changing the one-active-point assumption
+      - changing how repeated observations are represented
+
+  destructive:
+    action: ask_before_implementation
+    approval_required: true
+
+    description: >
+      A change that may destroy, overwrite, invalidate, or make existing user
+      data inaccessible.
+
+    examples:
+      - destructive Room migration
+      - deleting persistent fields containing real observations
+      - resetting a production or field database
+      - irreversible data transformation
+      - deleting user-created files
+      - replacing confirmed observations
+
+  accepted_decision_conflict:
+    action: stop_and_explain
+    approval_required: true
+
+    description: >
+      The requested implementation conflicts with an ACCEPTED decision in
+      docs/decisions.md.
+
+    behavior:
+      - identify the conflicting decision
+      - explain the practical consequence
+      - propose the smallest coherent resolution
+      - do not silently work around the decision
+
+# ---------------------------------------------------------------------------
+# Reversibility and impact assessment
+# ---------------------------------------------------------------------------
+
+assessment:
+
+  questions:
+    - Does this change alter user-visible behavior?
+    - Does it alter domain meaning or invariants?
+    - Does it change persistent data or its interpretation?
+    - Does it contradict an ACCEPTED decision?
+    - Does it introduce a new dependency or platform commitment?
+    - Does it affect offline-first operation?
+    - Could it cause loss or corruption of observations?
+    - Would reversing it later require a database migration?
+    - Would reversing it later require substantial rewrite?
+    - Is the choice intentionally left open in docs/decisions.md?
+
+  escalation:
+    if_user_visible_behavior_changes: project_decision
+    if_domain_semantics_change: project_decision
+    if_persistent_meaning_changes: project_decision
+    if_accepted_decision_conflicts: accepted_decision_conflict
+    if_data_loss_possible: destructive
+    if_open_project_decision_must_be_resolved: project_decision
+
+# ---------------------------------------------------------------------------
+# Ambiguity handling
+# ---------------------------------------------------------------------------
+
+ambiguity:
+
+  first:
+    action: inspect
+
+    inspect:
+      - relevant implementation
+      - relevant docs
+      - docs/decisions.md
+      - docs/glossary.md
+      - .agent/preferences.yaml
+
+  then:
+    if_one_option_clearly_follows_project_rules:
+      action: implement
+
+    if_multiple_equivalent_low_impact_options:
+      action: choose_using_preferences
+
+    if_missing_information_can_be_discovered_locally:
+      action: investigate
+
+    if_choice_establishes_new_project_behavior:
+      action: ask
+
+    if_choice_is_expensive_to_reverse:
+      action: ask
+
+    if_choice_is destructive:
+      action: ask
+
+  avoid:
+    - asking questions that can be answered by inspecting the repository
+    - asking the user to choose between technically equivalent trivial options
+    - silently inventing missing domain rules
+    - treating ambiguity as permission to expand scope
+
+# ---------------------------------------------------------------------------
+# Preference use
+# ---------------------------------------------------------------------------
+
+preferences:
+
+  source: .agent/preferences.yaml
+
+  evidence_source: .agent/preference-evidence.md
+
+  rule: >
+    Preferences are tie-breakers among solutions that already satisfy project
+    requirements. They must not override explicit requirements or ACCEPTED
+    decisions.
+
+  confidence:
+
+    high:
+      action: apply_by_default
+
+    medium:
+      action: apply_when_low_risk
+
+    low:
+      action: treat_as_hint
+
+  conflict:
+    explicit_current_user_instruction:
+      action: current_instruction_wins
+
+    project_requirement:
+      action: project_requirement_wins
+
+    accepted_decision:
+      action: accepted_decision_wins
+
+# ---------------------------------------------------------------------------
+# Preference learning
+# ---------------------------------------------------------------------------
+
+preference_learning:
+
+  enabled: true
+
+  principle: >
+    Repeated user choices may provide evidence for a stable development
+    preference, but a single situational choice should not automatically
+    become a permanent rule.
+
+  record_evidence_when:
+    - the user explicitly states a general preference
+    - the same choice is preferred repeatedly
+    - the user rejects an approach for a reusable reason
+    - the user explicitly corrects the agent's decision-making style
+
+  do_not_generalize_from:
+    - a single task-specific constraint
+    - temporary debugging choices
+    - emergency workarounds
+    - decisions forced by current platform limitations
+    - choices already dictated by project requirements
+
+  promotion:
+    low_to_medium:
+      condition: repeated_supporting_evidence
+
+    medium_to_high:
+      condition: explicit_preference_or_consistent_repeated_evidence
+
+  contradiction:
+    action: >
+      Record contradictory evidence rather than silently rewriting history.
+      Lower confidence or revise the preference when the newer evidence
+      clearly represents a changed preference.
+
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+
+dependencies:
+
+  routine_standard_dependency:
+    action: evaluate_and_continue
+    conditions:
+      - solves a current requirement
+      - actively maintained
+      - compatible with project architecture
+      - does not create a major platform commitment
+      - does not undermine offline-first behavior
+
+  major_dependency:
+    action: propose_before_adding
+
+    examples:
+      - database framework
+      - mapping engine
+      - dependency injection framework
+      - networking architecture
+      - synchronization framework
+      - large UI framework
+
+  speculative_dependency:
+    action: do_not_add
+
+# ---------------------------------------------------------------------------
+# Refactoring
+# ---------------------------------------------------------------------------
+
+refactoring:
+
+  local_and_required:
+    action: do
+
+  local_and_clearly_improves_requested_change:
+    action: do_if_low_risk
+
+  unrelated:
+    action: avoid
+
+  large_scale:
+    action: propose_first
+
+  changes_architecture:
+    action: ask_before_implementation
+
+# ---------------------------------------------------------------------------
+# Documentation
+# ---------------------------------------------------------------------------
+
+documentation:
+
+  update_when:
+    - product behavior changes
+    - workflow changes
+    - domain rule changes
+    - data model changes
+    - architecture changes
+    - a project decision is accepted, rejected, or superseded
+    - canonical terminology changes
+
+  do_not_update_for:
+    - formatting-only changes
+    - local refactoring with identical behavior
+    - private helper changes
+    - implementation details not represented in project documentation
+
+  new_decision:
+    rule: >
+      When an approved change establishes a durable project-level choice,
+      update docs/decisions.md rather than storing the decision only in agent
+      files.
+
+# ---------------------------------------------------------------------------
+# Scope
+# ---------------------------------------------------------------------------
+
+scope:
+
+  rule: >
+    Implement the smallest coherent change that satisfies the current task.
+
+  avoid:
+    - speculative features
+    - premature generalization
+    - future server code without a current requirement
+    - future synchronization code without a current requirement
+    - unnecessary domain entities
+    - unrelated cleanup
+
+  allowed:
+    - small supporting changes required for correctness
+    - tests needed to protect changed behavior
+    - documentation updates required to keep project truth consistent
+
+# ---------------------------------------------------------------------------
+# Verification
+# ---------------------------------------------------------------------------
+
+verification:
+
+  principle: >
+    Verification effort should be proportional to the risk of the change.
+
+  routine_change:
+    - relevant compile or static check when practical
+
+  domain_change:
+    - unit tests
+    - relevant existing tests
+
+  database_change:
+    - Room tests
+    - constraint tests
+    - migration tests when migrations are required
+
+  ui_change:
+    - compile
+    - relevant UI tests when available
+
+  map_location_sensor_change:
+    - compile
+    - automated tests where meaningful
+    - identify what still requires physical-device verification
+
+  never:
+    - claim a test passed if it was not run
+    - hide failing verification
+    - treat emulator sensor behavior as proof of real-device behavior
+
+# ---------------------------------------------------------------------------
+# Reporting
+# ---------------------------------------------------------------------------
+
+reporting:
+
+  routine:
+    style: concise
+
+  significant:
+    include:
+      - what changed
+      - why this approach was chosen
+      - verification performed
+      - remaining uncertainty if any
+
+  decision_required:
+    include:
+      - decision to be made
+      - recommended option
+      - main alternative
+      - important tradeoff
+
+  avoid:
+    - lengthy explanations of trivial implementation choices
+    - presenting every internal thought process
+    - asking for approval after a change that required approval beforehand
