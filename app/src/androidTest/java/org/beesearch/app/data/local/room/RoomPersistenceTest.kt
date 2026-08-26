@@ -147,6 +147,14 @@ class RoomPersistenceTest {
         assertEquals(bee.id, cycle.beeId)
     }
 
+    @Test
+    fun territoryCodeIsUniqueOnDevice() = runBlocking {
+        assertThrows(Exception::class.java) {
+            runBlocking { territoryRepository.createTerritory("KLYAZMA-01", "Дубликат") }
+        }
+        Unit
+    }
+
     private suspend fun createPoint() = observationRepository.createObservationPoint(
         point = NewObservationPoint(
             territoryId = territoryId,
