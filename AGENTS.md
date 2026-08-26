@@ -143,6 +143,23 @@ docs/glossary.md
 
 ---
 
+## Project handoff
+
+For continuation of ongoing work, read:
+
+```text
+.agent/handoff.md
+```
+
+It contains only the current milestone, verification status, unresolved items,
+and next task.
+
+Do not treat it as project truth when it conflicts with `docs/` or accepted
+decisions.
+
+Update it at the end of a significant milestone or before ending a development
+session.
+
 ## 5. Decision Precedence
 
 Use the following precedence when sources conflict:

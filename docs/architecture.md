@@ -745,6 +745,10 @@ LocationProvider
 
 UI получает уже структурированные данные положения.
 
+На текущем MapLibre/GPS milestone Android-реализация использует системный
+`LocationManager` за этой границей. Обновления запрашиваются только пока
+рабочий экран карты открыт; background location не используется.
+
 ---
 
 # 26. Location data

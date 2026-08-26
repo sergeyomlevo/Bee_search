@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import org.beesearch.app.domain.model.AppSettings
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.domain.location.LocationProvider
+import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.repository.ObservationRepository
 import org.beesearch.app.domain.repository.SettingsRepository
 import org.beesearch.app.domain.repository.TerritoryRepository
@@ -34,11 +36,15 @@ internal class MainViewModel(
     private val settingsRepository: SettingsRepository,
     private val territoryRepository: TerritoryRepository,
     observationRepository: ObservationRepository,
+    private val locationProvider: LocationProvider,
 ) : ViewModel() {
     private val manualRoute = MutableStateFlow<AppRoute?>(null)
     private val _feedback = MutableStateFlow<String?>(null)
+    private val _locationState = MutableStateFlow<LocationUiState>(LocationUiState.PermissionRequired)
+    private var locationJob: kotlinx.coroutines.Job? = null
 
     val feedback: StateFlow<String?> = _feedback.asStateFlow()
+    val locationState: StateFlow<LocationUiState> = _locationState.asStateFlow()
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -132,6 +138,29 @@ internal class MainViewModel(
         _feedback.value = null
     }
 
+    fun setLocationPermission(granted: Boolean) {
+        locationJob?.cancel()
+        locationJob = null
+        if (!granted) {
+            _locationState.value = LocationUiState.PermissionRequired
+            return
+        }
+        _locationState.value = LocationUiState.WaitingForFix
+        locationJob = viewModelScope.launch {
+            try {
+                locationProvider.updates().collect { reading ->
+                    _locationState.value = LocationUiState.Available(reading)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _locationState.value = LocationUiState.Unavailable(
+                    error.message ?: "Не удалось получить местоположение",
+                )
+            }
+        }
+    }
+
     private fun launchOperation(operation: suspend () -> Unit) {
         viewModelScope.launch {
             try {
@@ -142,6 +171,11 @@ internal class MainViewModel(
                 _feedback.value = error.message ?: "Не удалось сохранить изменения"
             }
         }
+    }
+
+    override fun onCleared() {
+        locationJob?.cancel()
+        super.onCleared()
     }
 
     private fun StartupDestination.toRoute(): AppRoute = when (this) {
@@ -160,6 +194,7 @@ internal class MainViewModel(
                         settingsRepository = application.container.settingsRepository,
                         territoryRepository = application.container.territoryRepository,
                         observationRepository = application.container.observationRepository,
+                        locationProvider = application.container.locationProvider,
                     ) as T
                 }
             }
