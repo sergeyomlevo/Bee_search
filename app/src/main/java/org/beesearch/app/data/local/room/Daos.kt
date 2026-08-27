@@ -65,6 +65,20 @@ internal interface BeeDao {
 
     @Query("SELECT * FROM bees WHERE observation_point_id = :pointId ORDER BY created_at, id")
     fun observeForPoint(pointId: UUID): Flow<List<BeeEntity>>
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM bees
+        WHERE observation_point_id = :pointId
+          AND mark_color = :markColor
+          AND mark_position = :markPosition
+        """,
+    )
+    suspend fun countByMark(
+        pointId: UUID,
+        markColor: String,
+        markPosition: org.beesearch.app.domain.model.MarkPosition,
+    ): Int
 }
 
 @Dao
@@ -103,6 +117,16 @@ internal interface FlightCycleDao {
         """,
     )
     suspend fun countForObservationPoint(pointId: UUID): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM flight_cycles
+        WHERE bee_id IN (
+            SELECT id FROM bees WHERE observation_point_id = :pointId
+        )
+        """,
+    )
+    fun observeCountForObservationPoint(pointId: UUID): Flow<Int>
 
     @Query(
         """

@@ -30,6 +30,10 @@ class BeeHasFlightHistoryException : IllegalStateException(
     "A bee with flight history cannot be removed as a prepared bee.",
 )
 
+class DuplicateBeeMarkException : IllegalStateException(
+    "A bee with the same mark already exists in this observation point.",
+)
+
 class OpenFlightCycleExistsException : IllegalStateException(
     "A bee cannot have more than one open flight cycle.",
 )

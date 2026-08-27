@@ -10,20 +10,28 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -42,7 +50,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -54,6 +66,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import org.beesearch.app.domain.location.LocationUiState
+import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeeMarkCatalog
+import org.beesearch.app.domain.model.BeeMarkCombination
+import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.ui.theme.Bee_searchTheme
@@ -121,6 +137,8 @@ private fun BeeSearchApp(
     val locationState by viewModel.locationState.collectAsStateWithLifecycle()
     val observationPointDraft by viewModel.observationPointDraft.collectAsStateWithLifecycle()
     val completingObservationPointId by viewModel.completingObservationPointId.collectAsStateWithLifecycle()
+    val beePreparation by viewModel.beePreparation.collectAsStateWithLifecycle()
+    val beeMutationInProgress by viewModel.beeMutationInProgress.collectAsStateWithLifecycle()
 
     LaunchedEffect(route, locationPermissionGranted) {
         if (route == AppRoute.CurrentTerritory) {
@@ -165,9 +183,15 @@ private fun BeeSearchApp(
                         onOpenSettings = viewModel::openSettings,
                         onOpenTerritories = viewModel::openTerritoryManagement,
                     )
-                    is AppRoute.ResumeObservation -> ResumeObservationScreen(
+                    is AppRoute.ResumeObservation -> BeePreparationScreen(
                         point = currentRoute.point,
+                        preparation = beePreparation,
+                        isMutating = beeMutationInProgress,
                         isCompleting = completingObservationPointId == currentRoute.point.id,
+                        onAddBee = { color, position ->
+                            viewModel.addPreparedBee(currentRoute.point.id, color, position)
+                        },
+                        onRemoveBee = viewModel::removePreparedBee,
                         onComplete = { viewModel.completeObservationPoint(currentRoute.point.id) },
                         onOpenTerritories = viewModel::openTerritoryManagement,
                     )
@@ -651,9 +675,13 @@ private fun BeeMap(
 private fun Double.formatMeters(): String = "%.1f".format(this)
 
 @Composable
-internal fun ResumeObservationScreen(
+internal fun BeePreparationScreen(
     point: ObservationPoint,
+    preparation: BeePreparationUiState,
+    isMutating: Boolean,
     isCompleting: Boolean,
+    onAddBee: (String, MarkPosition) -> Unit,
+    onRemoveBee: (UUID) -> Unit,
     onComplete: () -> Unit,
     onOpenTerritories: () -> Unit,
 ) {
@@ -675,6 +703,7 @@ internal fun ResumeObservationScreen(
                         onComplete()
                     },
                     enabled = !isCompleting,
+                    modifier = Modifier.testTag("confirm-complete-observation"),
                 ) { Text("Завершить") }
             },
             dismissButton = {
@@ -685,28 +714,265 @@ internal fun ResumeObservationScreen(
             },
         )
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("Незавершённое наблюдение") }) }) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+    val stateMatchesPoint = preparation.pointId == point.id
+    val bees = if (stateMatchesPoint) preparation.bees else emptyList()
+    val isLoading = preparation.isLoading || !stateMatchesPoint
+    val isReleaseStarted = stateMatchesPoint && preparation.isReleaseStarted
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Подготовка пчёл") },
+                actions = {
+                    TextButton(
+                        onClick = { showCompletionConfirmation = true },
+                        enabled = !isCompleting && !isMutating,
+                    ) { Text(if (isCompleting) "Завершение…" else "Завершить") }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).testTag("bee-preparation-list"),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Наблюдение восстановлено из Room.", style = MaterialTheme.typography.titleMedium)
-            Text("Код наблюдателя: ${point.observerCode}")
-            Text("Координаты: ${point.latitude}, ${point.longitude}")
-            point.code?.let { Text("Код точки: $it") }
-            Text("Рабочий экран регистрации событий будет следующим этапом. Сохранённая точка не потеряна.")
-            Button(
-                onClick = { showCompletionConfirmation = true },
-                enabled = !isCompleting,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (isCompleting) "Завершение…" else "Завершить наблюдение")
+            item {
+                Text(
+                    text = point.code?.let { "Активная точка $it" } ?: "Активная точка наблюдения",
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
-            Button(onClick = onOpenTerritories, modifier = Modifier.fillMaxWidth()) {
-                Text("Открыть территории")
+
+            if (isLoading) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                    ) { CircularProgressIndicator() }
+                }
+            } else {
+                item {
+                    PreparationReadinessCard(
+                        beeCount = bees.size,
+                        isReleaseStarted = isReleaseStarted,
+                    )
+                }
+
+                item {
+                    Text("Подготовленные пчёлы", style = MaterialTheme.typography.titleMedium)
+                }
+
+                if (bees.isEmpty()) {
+                    item { Text("Пока не добавлено ни одной пчелы.") }
+                } else {
+                    items(bees, key = { it.id }) { bee ->
+                        PreparedBeeRow(
+                            bee = bee,
+                            canRemove = !isReleaseStarted && !isMutating,
+                            onRemove = { onRemoveBee(bee.id) },
+                        )
+                    }
+                }
+
+                if (isReleaseStarted) {
+                    item {
+                        Text(
+                            "Первый выпуск уже начат. Состав пчёл зафиксирован.",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                } else {
+                    item {
+                        BeeSelector(
+                            bees = bees,
+                            enabled = !isMutating,
+                            onAddBee = onAddBee,
+                        )
+                    }
+                }
+
+                item {
+                    Button(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Выпустить всех") }
+                }
+                item {
+                    Text(
+                        if (bees.isEmpty()) {
+                            "Добавьте хотя бы одну пчелу. Первый выпуск будет реализован следующим этапом."
+                        } else {
+                            "Набор готов. Первый групповой выпуск будет реализован следующим этапом."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                item {
+                    TextButton(onClick = onOpenTerritories, modifier = Modifier.fillMaxWidth()) {
+                        Text("Управление территориями")
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun PreparationReadinessCard(beeCount: Int, isReleaseStarted: Boolean) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = when {
+                    isReleaseStarted -> "Первый выпуск начат"
+                    beeCount > 0 -> "Готово к выпуску: $beeCount"
+                    else -> "Набор ещё не готов"
+                },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (beeCount > 0) MaterialTheme.colorScheme.primary else Color.Unspecified,
+            )
+            if (!isReleaseStarted) {
+                Text("Добавляйте только фактически подготовленных пчёл.")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreparedBeeRow(bee: Bee, canRemove: Boolean, onRemove: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            MarkColorSwatch(bee.markColor)
+            Text(
+                BeeMarkCatalog.displayName(bee.markColor, bee.markPosition),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            TextButton(onClick = onRemove, enabled = canRemove) { Text("Удалить") }
+        }
+    }
+}
+
+@Composable
+internal fun BeeSelector(
+    bees: List<Bee>,
+    enabled: Boolean,
+    onAddBee: (String, MarkPosition) -> Unit,
+) {
+    val used = bees.mapTo(mutableSetOf()) { BeeMarkCombination(it.markColor, it.markPosition) }
+    val available = BeeMarkCatalog.availableCombinations(used)
+    var selectedColor by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedPositionName by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedColorValue = selectedColor
+    val selectedPosition = selectedPositionName?.let(MarkPosition::valueOf)
+    val selectedCombination = if (selectedColorValue != null && selectedPosition != null) {
+        BeeMarkCombination(selectedColorValue, selectedPosition)
+    } else {
+        null
+    }
+
+    LaunchedEffect(available) {
+        if (selectedCombination != null && selectedCombination !in available) {
+            selectedColor = null
+            selectedPositionName = null
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HorizontalDivider()
+        Text("Добавить пчелу", style = MaterialTheme.typography.titleMedium)
+        if (available.isEmpty()) {
+            Text("Все поддерживаемые сочетания меток уже добавлены.")
+        } else {
+            Text("Цвет", fontWeight = FontWeight.Bold)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                BeeMarkCatalog.colors.forEach { color ->
+                    val hasAvailablePosition = available.any { it.markColor == color.value }
+                    FilterChip(
+                        selected = selectedColor == color.value,
+                        onClick = {
+                            selectedColor = color.value
+                            if (selectedPosition?.let {
+                                    BeeMarkCombination(color.value, it) !in available
+                                } == true
+                            ) {
+                                selectedPositionName = null
+                            }
+                        },
+                        enabled = enabled && hasAvailablePosition,
+                        modifier = Modifier.testTag("mark-color-${color.value}"),
+                        label = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                MarkColorSwatch(color.value, size = 18)
+                                Text(color.displayName)
+                            }
+                        },
+                    )
+                }
+            }
+            Text("Положение метки", fontWeight = FontWeight.Bold)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                BeeMarkCatalog.positions.forEach { position ->
+                    val combination = selectedColor?.let { BeeMarkCombination(it, position) }
+                    FilterChip(
+                        selected = selectedPosition == position,
+                        onClick = { selectedPositionName = position.name },
+                        enabled = enabled && combination in available,
+                        modifier = Modifier.testTag("mark-position-${position.name}"),
+                        label = { Text(BeeMarkCatalog.positionDisplayName(position)) },
+                    )
+                }
+            }
+            Button(
+                onClick = {
+                    selectedCombination?.let { combination ->
+                        onAddBee(combination.markColor, combination.markPosition)
+                    }
+                },
+                enabled = enabled && selectedCombination in available,
+                modifier = Modifier.fillMaxWidth().testTag("add-bee"),
+            ) { Text(if (enabled) "Добавить" else "Сохранение…") }
+        }
+    }
+}
+
+@Composable
+private fun MarkColorSwatch(markColor: String, size: Int = 28) {
+    val color = when (markColor) {
+        "WHITE" -> Color.White
+        "YELLOW" -> Color(0xFFFFD54F)
+        "BLUE" -> Color(0xFF1976D2)
+        "RED" -> Color(0xFFD32F2F)
+        "GREEN" -> Color(0xFF388E3C)
+        else -> Color.Gray
+    }
+    Box(
+        modifier = Modifier
+            .size(size.dp)
+            .background(color, CircleShape)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), CircleShape)
+            .semantics { contentDescription = "Цвет метки: $markColor" },
+    )
 }
 
 @Preview(showBackground = true)

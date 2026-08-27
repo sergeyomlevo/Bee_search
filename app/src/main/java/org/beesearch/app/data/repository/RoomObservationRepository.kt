@@ -14,6 +14,7 @@ import org.beesearch.app.data.local.room.TerritoryDao
 import org.beesearch.app.data.local.room.toDomain
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.BeeHasFlightHistoryException
+import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.EntityNotFoundException
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.InitialFlightCycleRequiredException
@@ -46,6 +47,9 @@ internal class RoomObservationRepository(
 
     override fun observeBees(pointId: UUID): Flow<List<Bee>> = beeDao.observeForPoint(pointId)
         .map { bees -> bees.map(BeeEntity::toDomain) }
+
+    override fun observeHasFlightCycles(pointId: UUID): Flow<Boolean> =
+        cycleDao.observeCountForObservationPoint(pointId).map { count -> count > 0 }
 
     override fun observeFlightCycles(beeId: UUID): Flow<List<FlightCycle>> =
         cycleDao.observeForBee(beeId).map { cycles -> cycles.map(FlightCycleEntity::toDomain) }
@@ -87,6 +91,9 @@ internal class RoomObservationRepository(
         if (cycleDao.countForObservationPoint(pointId) != 0) {
             throw InitialReleaseAlreadyStartedException()
         }
+        if (beeDao.countByMark(pointId, markColor, markPosition) != 0) {
+            throw DuplicateBeeMarkException()
+        }
 
         val entity = BeeEntity(
             id = UUID.randomUUID(),
@@ -103,6 +110,9 @@ internal class RoomObservationRepository(
         database.withTransaction {
             val bee = requireBee(beeId)
             requireActivePoint(bee.observationPointId)
+            if (cycleDao.countForObservationPoint(bee.observationPointId) != 0) {
+                throw InitialReleaseAlreadyStartedException()
+            }
             if (cycleDao.countForBee(beeId) != 0) {
                 throw BeeHasFlightHistoryException()
             }

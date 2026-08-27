@@ -4,15 +4,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.beesearch.app.domain.model.AppSettings
+import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.DuplicateBeeMarkException
+import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
+import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.Territory
@@ -34,6 +41,13 @@ sealed interface AppRoute {
     data class ResumeObservation(val point: ObservationPoint) : AppRoute
 }
 
+data class BeePreparationUiState(
+    val pointId: UUID? = null,
+    val bees: List<Bee> = emptyList(),
+    val isReleaseStarted: Boolean = false,
+    val isLoading: Boolean = true,
+)
+
 internal class MainViewModel(
     private val settingsRepository: SettingsRepository,
     private val territoryRepository: TerritoryRepository,
@@ -46,6 +60,7 @@ internal class MainViewModel(
     private val _locationState = MutableStateFlow<LocationUiState>(LocationUiState.PermissionRequired)
     private val _observationPointDraft = MutableStateFlow<ObservationPointCreationDraft?>(null)
     private val _completingObservationPointId = MutableStateFlow<UUID?>(null)
+    private val _beeMutationInProgress = MutableStateFlow(false)
     private var locationJob: kotlinx.coroutines.Job? = null
 
     val feedback: StateFlow<String?> = _feedback.asStateFlow()
@@ -53,6 +68,7 @@ internal class MainViewModel(
     val observationPointDraft: StateFlow<ObservationPointCreationDraft?> =
         _observationPointDraft.asStateFlow()
     val completingObservationPointId: StateFlow<UUID?> = _completingObservationPointId.asStateFlow()
+    val beeMutationInProgress: StateFlow<Boolean> = _beeMutationInProgress.asStateFlow()
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -68,6 +84,24 @@ internal class MainViewModel(
         SharingStarted.WhileSubscribed(5_000),
         null,
     )
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val beePreparation: StateFlow<BeePreparationUiState> = activePoint.flatMapLatest { point ->
+        if (point == null) {
+            flowOf(BeePreparationUiState(isLoading = false))
+        } else {
+            combine(
+                observationRepository.observeBees(point.id),
+                observationRepository.observeHasFlightCycles(point.id),
+            ) { bees, isReleaseStarted ->
+                BeePreparationUiState(
+                    pointId = point.id,
+                    bees = bees,
+                    isReleaseStarted = isReleaseStarted,
+                    isLoading = false,
+                )
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BeePreparationUiState())
     val currentTerritory: StateFlow<Territory?> = combine(settings, territories) { appSettings, allTerritories ->
         appSettings.currentTerritoryId?.let { id -> allTerritories.firstOrNull { it.id == id } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -241,6 +275,30 @@ internal class MainViewModel(
         }
     }
 
+    fun addPreparedBee(pointId: UUID, markColor: String, markPosition: MarkPosition) {
+        val preparation = beePreparation.value
+        if (preparation.isLoading || preparation.pointId != pointId) return
+        if (preparation.isReleaseStarted) {
+            _feedback.value = "Первый выпуск уже начат: набор пчёл зафиксирован"
+            return
+        }
+        if (preparation.bees.any { it.markColor == markColor && it.markPosition == markPosition }) {
+            _feedback.value = "Такая метка уже добавлена"
+            return
+        }
+        launchBeeMutation {
+            observationRepository.addBee(pointId, markColor, markPosition)
+            _feedback.value = "Пчела добавлена"
+        }
+    }
+
+    fun removePreparedBee(beeId: UUID) {
+        launchBeeMutation {
+            observationRepository.removePreparedBee(beeId)
+            _feedback.value = "Пчела удалена из подготовки"
+        }
+    }
+
     fun clearFeedback() {
         _feedback.value = null
     }
@@ -276,6 +334,26 @@ internal class MainViewModel(
                 throw error
             } catch (error: Exception) {
                 _feedback.value = error.message ?: "Не удалось сохранить изменения"
+            }
+        }
+    }
+
+    private fun launchBeeMutation(operation: suspend () -> Unit) {
+        if (_beeMutationInProgress.value) return
+        _beeMutationInProgress.value = true
+        viewModelScope.launch {
+            try {
+                operation()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: DuplicateBeeMarkException) {
+                _feedback.value = "Такая метка уже добавлена"
+            } catch (error: InitialReleaseAlreadyStartedException) {
+                _feedback.value = "Первый выпуск уже начат: набор пчёл зафиксирован"
+            } catch (error: Exception) {
+                _feedback.value = error.message ?: "Не удалось изменить набор пчёл"
+            } finally {
+                _beeMutationInProgress.value = false
             }
         }
     }

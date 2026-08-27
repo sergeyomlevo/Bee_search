@@ -8,6 +8,8 @@ import kotlinx.coroutines.runBlocking
 import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomTerritoryRepository
 import org.beesearch.app.domain.model.InvalidAzimuthException
+import org.beesearch.app.domain.model.BeeMarkCatalog
+import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
@@ -128,7 +130,7 @@ class RoomPersistenceTest {
         val point = createPoint()
         observationRepository.addBee(point.id, "WHITE", MarkPosition.LEFT_WING)
 
-        assertThrows(Exception::class.java) {
+        assertThrows(DuplicateBeeMarkException::class.java) {
             runBlocking {
                 observationRepository.addBee(point.id, "WHITE", MarkPosition.LEFT_WING)
             }
@@ -145,6 +147,69 @@ class RoomPersistenceTest {
             runBlocking { database.beeDao().insert(orphan) }
         }
         Unit
+    }
+
+    @Test
+    fun everyMarkPositionAndIndependentMarkDimensionsCanBeAdded() = runBlocking {
+        val point = createPoint()
+
+        MarkPosition.entries.forEach { position ->
+            observationRepository.addBee(point.id, "WHITE", position)
+        }
+        observationRepository.addBee(point.id, "BLUE", MarkPosition.RIGHT_WING)
+
+        val restored = observationRepository.observeBees(point.id).first()
+        assertEquals(4, restored.size)
+        assertEquals(MarkPosition.entries.toSet(), restored.filter { it.markColor == "WHITE" }.map { it.markPosition }.toSet())
+        assertEquals(2, restored.count { it.markPosition == MarkPosition.RIGHT_WING })
+    }
+
+    @Test
+    fun duplicateMarkCombinationIsRejectedExplicitly() = runBlocking {
+        val point = createPoint()
+        observationRepository.addBee(point.id, "RED", MarkPosition.LEFT_WING)
+
+        assertThrows(DuplicateBeeMarkException::class.java) {
+            runBlocking { observationRepository.addBee(point.id, "RED", MarkPosition.LEFT_WING) }
+        }
+        Unit
+    }
+
+    @Test
+    fun preparedBeeCanBeRemovedAndRemainingBeesAreRestored() = runBlocking {
+        val point = createPoint()
+        val removed = observationRepository.addBee(point.id, "GREEN", MarkPosition.NONE)
+        val retained = observationRepository.addBee(point.id, "YELLOW", MarkPosition.RIGHT_WING)
+
+        observationRepository.removePreparedBee(removed.id)
+
+        assertEquals(listOf(retained), observationRepository.observeBees(point.id).first())
+    }
+
+    @Test
+    fun everySupportedCombinationCanCoexistWithoutNumericLimit() = runBlocking {
+        val point = createPoint()
+
+        BeeMarkCatalog.supportedCombinations.forEach { mark ->
+            observationRepository.addBee(point.id, mark.markColor, mark.markPosition)
+        }
+        val futureCatalogBee = observationRepository.addBee(point.id, "PURPLE", MarkPosition.NONE)
+
+        val restored = observationRepository.observeBees(point.id).first()
+        assertEquals(BeeMarkCatalog.supportedCombinations.size + 1, restored.size)
+        assertEquals("PURPLE", futureCatalogBee.markColor)
+    }
+
+    @Test
+    fun preparationCannotRemoveBeeAfterInitialReleaseStarts() = runBlocking {
+        val point = createPoint()
+        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        observationRepository.startInitialGroupRelease(point.id)
+
+        assertThrows(InitialReleaseAlreadyStartedException::class.java) {
+            runBlocking { observationRepository.removePreparedBee(bee.id) }
+        }
+        assertEquals(listOf(bee), observationRepository.observeBees(point.id).first())
     }
 
     @Test

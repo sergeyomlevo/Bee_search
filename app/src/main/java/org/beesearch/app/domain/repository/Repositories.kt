@@ -35,6 +35,7 @@ interface ObservationPointCreator {
 interface ObservationRepository : ObservationPointCreator {
     fun observeActivePoint(): Flow<ObservationPoint?>
     fun observeBees(pointId: UUID): Flow<List<Bee>>
+    fun observeHasFlightCycles(pointId: UUID): Flow<Boolean>
     fun observeFlightCycles(beeId: UUID): Flow<List<FlightCycle>>
 
     suspend fun addBee(pointId: UUID, markColor: String, markPosition: MarkPosition): Bee
