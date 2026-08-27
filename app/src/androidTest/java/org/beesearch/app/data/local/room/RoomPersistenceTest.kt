@@ -71,6 +71,20 @@ class RoomPersistenceTest {
     }
 
     @Test
+    fun correctedCoordinatesAndOriginalGpsMeasurementAreStoredSeparately() = runBlocking {
+        val point = createPoint()
+
+        assertEquals(56.1959786, point.latitude, 0.0)
+        assertEquals(42.7477116, point.longitude, 0.0)
+        assertEquals(56.1959000, point.gpsLatitude!!, 0.0)
+        assertEquals(42.7477000, point.gpsLongitude!!, 0.0)
+        assertEquals(4.5, point.gpsAccuracyM!!, 0.0)
+
+        val restored = observationRepository.observeActivePoint().first()
+        assertEquals(point, restored)
+    }
+
+    @Test
     fun initialReleaseIsAtomicAndOneOpenCycleIsEnforced() = runBlocking {
         val point = createPoint()
         val firstBee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)

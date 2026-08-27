@@ -14,12 +14,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.beesearch.app.domain.model.AppSettings
 import org.beesearch.app.domain.model.ObservationPoint
+import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.location.LocationProvider
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.repository.ObservationRepository
 import org.beesearch.app.domain.repository.SettingsRepository
 import org.beesearch.app.domain.repository.TerritoryRepository
+import org.beesearch.app.domain.usecase.CreateObservationPoint
 import org.beesearch.app.domain.usecase.StartupDestination
 import org.beesearch.app.domain.usecase.StartupRouter
 import java.util.UUID
@@ -35,16 +37,22 @@ sealed interface AppRoute {
 internal class MainViewModel(
     private val settingsRepository: SettingsRepository,
     private val territoryRepository: TerritoryRepository,
-    observationRepository: ObservationRepository,
+    private val observationRepository: ObservationRepository,
+    private val createObservationPoint: CreateObservationPoint,
     private val locationProvider: LocationProvider,
 ) : ViewModel() {
     private val manualRoute = MutableStateFlow<AppRoute?>(null)
     private val _feedback = MutableStateFlow<String?>(null)
     private val _locationState = MutableStateFlow<LocationUiState>(LocationUiState.PermissionRequired)
+    private val _observationPointDraft = MutableStateFlow<ObservationPointCreationDraft?>(null)
+    private val _completingObservationPointId = MutableStateFlow<UUID?>(null)
     private var locationJob: kotlinx.coroutines.Job? = null
 
     val feedback: StateFlow<String?> = _feedback.asStateFlow()
     val locationState: StateFlow<LocationUiState> = _locationState.asStateFlow()
+    val observationPointDraft: StateFlow<ObservationPointCreationDraft?> =
+        _observationPointDraft.asStateFlow()
+    val completingObservationPointId: StateFlow<UUID?> = _completingObservationPointId.asStateFlow()
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -134,6 +142,105 @@ internal class MainViewModel(
         }
     }
 
+    fun startObservationPointCreation() {
+        val existingPoint = activePoint.value
+        if (existingPoint != null) {
+            openResumeObservation(existingPoint)
+            return
+        }
+        val territory = currentTerritory.value
+        if (territory == null) {
+            _feedback.value = "Сначала выберите текущую территорию"
+            return
+        }
+        val reading = (locationState.value as? LocationUiState.Available)?.reading
+        if (reading == null) {
+            _feedback.value = "Дождитесь GPS-позиции"
+            return
+        }
+
+        _observationPointDraft.value = ObservationPointCreationDraft(
+            territoryId = territory.id,
+            originalGps = reading,
+            observerCodeInput = settings.value.observerCode.orEmpty(),
+        )
+        clearFeedback()
+    }
+
+    fun updateObservationPointCoordinates(latitude: Double, longitude: Double) {
+        if (!latitude.isFinite() || latitude !in -90.0..90.0) return
+        if (!longitude.isFinite() || longitude !in -180.0..180.0) return
+        _observationPointDraft.value = _observationPointDraft.value?.withSelectedCoordinates(
+            latitude = latitude,
+            longitude = longitude,
+        )
+    }
+
+    fun updateObservationPointObserverCode(value: String) {
+        _observationPointDraft.value = _observationPointDraft.value?.copy(observerCodeInput = value)
+    }
+
+    fun requestObservationPointGpsRecenter() {
+        _observationPointDraft.value = _observationPointDraft.value?.requestGpsRecenter()
+    }
+
+    fun cancelObservationPointCreation() {
+        _observationPointDraft.value = null
+        clearFeedback()
+    }
+
+    fun confirmObservationPointCreation() {
+        val draft = _observationPointDraft.value ?: return
+        if (draft.isSaving) return
+        val observerCodeMissing = settings.value.observerCode == null
+        if (observerCodeMissing && draft.observerCodeInput.isBlank()) {
+            _feedback.value = "Введите код наблюдателя"
+            return
+        }
+
+        _observationPointDraft.value = draft.copy(isSaving = true)
+        viewModelScope.launch {
+            try {
+                val point = draft.toNewObservationPoint()
+                if (observerCodeMissing) {
+                    createObservationPoint.saveObserverCodeAndCreate(draft.observerCodeInput, point)
+                } else {
+                    createObservationPoint.create(point)
+                }
+                _observationPointDraft.value = null
+                manualRoute.value = null
+                _feedback.value = "Точка наблюдения сохранена"
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: ObservationPointAlreadyActiveException) {
+                _observationPointDraft.value = null
+                manualRoute.value = activePoint.value?.let(AppRoute::ResumeObservation)
+                _feedback.value = error.message
+            } catch (error: Exception) {
+                _observationPointDraft.value = draft.copy(isSaving = false)
+                _feedback.value = error.message ?: "Не удалось сохранить точку наблюдения"
+            }
+        }
+    }
+
+    fun completeObservationPoint(pointId: UUID) {
+        if (_completingObservationPointId.value != null) return
+        _completingObservationPointId.value = pointId
+        viewModelScope.launch {
+            try {
+                observationRepository.completeObservationPoint(pointId)
+                manualRoute.value = null
+                _feedback.value = "Точка наблюдения завершена"
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _feedback.value = error.message ?: "Не удалось завершить точку наблюдения"
+            } finally {
+                _completingObservationPointId.value = null
+            }
+        }
+    }
+
     fun clearFeedback() {
         _feedback.value = null
     }
@@ -194,6 +301,7 @@ internal class MainViewModel(
                         settingsRepository = application.container.settingsRepository,
                         territoryRepository = application.container.territoryRepository,
                         observationRepository = application.container.observationRepository,
+                        createObservationPoint = application.container.createObservationPoint,
                         locationProvider = application.container.locationProvider,
                     ) as T
                 }
