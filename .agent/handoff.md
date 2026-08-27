@@ -2,15 +2,17 @@
 
 ## Current milestone
 
-ObservationPoint creation is uncommitted and remains open after the first manual Samsung test found two UX bugs. A corrective implementation is present in the working tree and awaits a focused phone retest.
+Bee preparation for an active ObservationPoint and the focused reliability-hardening follow-up are committed, automatically verified, and physically accepted on Samsung. ObservationPoint creation remains complete. No implementation milestone is currently in progress.
 
 ## Last completed commits
 
 - `ee54c16` — Room/DataStore persistence foundation
 - `53fc334` — Territory, settings and startup flow
 - `50829b4` — MapLibre, foreground GPS and project handoff
+- `656519a` — ObservationPoint map placement workflow
+- `0db416b` — Bee preparation workflow
 
-The ObservationPoint creation milestone is currently uncommitted in the working tree.
+The reliability-hardening follow-up is the current HEAD commit containing this handoff.
 
 ## Verified
 
@@ -24,6 +26,7 @@ The ObservationPoint creation milestone is currently uncommitted in the working 
 - Direct non-streaming instrumentation passes 10/10 on Samsung SM-S938B, including a Compose layout test that keeps the screen-space crosshair centered across camera-coordinate recomposition and a completion-confirmation UI test.
 - The corrective APK was installed with `-r`; the existing active ObservationPoint remained intact and was recovered from Room after cold launch.
 - The recovery screen now exposes explicit `Завершить наблюдение` / confirmation actions backed by the existing repository transaction. It routes to the Territory map only after Room reports successful completion, so the retained active point can be completed before creating the next one.
+- Physical use confirmed that completing the restored point returns to the current Territory map while retaining the completed observation in Room.
 - The ObservationPoint creation layout now uses a dedicated map-dominant mode: the AppBar and Territory summary are removed while editing, MapView fills the available safe area, and compact GPS/selection information plus `К GPS`, `Отмена`, and `Подтвердить точку` overlay the map without reducing its viewport.
 - The updated layout passes `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lint`; direct non-streaming instrumentation still passes 10/10 on Samsung SM-S938B.
 - The updated APK was installed with `--no-streaming -r`, and a physical-device screenshot confirms that the creation-mode MapView occupies approximately 80% of the full display height with the crosshair centered and all three actions visible at the current large system font scale.
@@ -31,15 +34,25 @@ The ObservationPoint creation milestone is currently uncommitted in the working 
 - The UI-polish build passes `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lint`; its direct non-streaming instrumentation passes 10/10 on Samsung SM-S938B, and the APK is installed over the retained app data.
 - JVM tests cover zero/geodesic offset and field formatting: one decimal below 10 m and whole meters from 10 m. The offset is derived in UI code and is not persisted.
 - A physical Samsung screenshot confirms the final compact overlay renders as two unwrapped lines (`Точность GPS: ±3,8 м`, `Смещение от GPS: 13 м`) while the map, fixed crosshair, secondary blue GPS marker, and all actions remain visible.
+- The user completed the focused Samsung field-UX checklist successfully: moving the map changes the derived offset without changing original GPS accuracy, the compact overlay leaves the map dominant, `К GPS` returns the offset near zero, and all three placement actions remain accessible.
+- Bee preparation uses the current visual-mark catalog: `WHITE`, `YELLOW`, `BLUE`, `RED`, `GREEN` with `NONE`, `RIGHT_WING`, `LEFT_WING`. Availability is calculated from unused `mark_color + mark_position` combinations; no numeric Bee limit or Room schema change was introduced.
+- Prepared Bee records are persisted immediately through the existing `ObservationRepository`. The screen restores its list from Room, blocks duplicate combinations, and disables add/remove after any FlightCycle exists for the active point.
+- The preparation screen provides direct color and position chips, readable text plus a color swatch, remove actions before first release, and a disabled visible `Выпустить всех` transition; it does not create FlightCycle records.
+- Final `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lint` pass. The debug APK was installed over retained Samsung data and the app was opened.
+- On Samsung, direct sequential instrumented execution passes 11/11 `RoomPersistenceTest` tests and 3/3 Bee-preparation Compose tests. A full `connectedDebugAndroidTest` run remains runner-flaky: after some classes it can lose the Compose hierarchy, including an existing crosshair test. Do not interpret that aggregate failure as a product failure.
+- Physical Samsung smoke test confirms that a prepared Bee can be removed before first release. After stopping the app and rebooting the phone, Bee Search restored the active ObservationPoint, reopened Bee preparation, and preserved the prepared Bee set from Room.
+- Reliability hardening removes `getLastKnownLocation` as an input to the creation draft, so an original GPS measurement always comes from a new location update. It also stops foreground location updates when the map screen is not visible or the Activity is stopped, releases MapLibre `MapView` when its Compose view leaves composition, maps a Territory-code SQLite uniqueness race to a user-facing domain error, checks the row count when saving flight azimuth, and requires an explicit valid Bee mark selection rather than silently replacing an unavailable one.
+- The reliability pass passes `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lint`. On Samsung SM-S938B, direct `RoomPersistenceTest` passes 11/11 and the isolated new BeeSelector test passes 1/1. The current debug APK was installed with `adb install -r`, preserving app data.
+- The focused reliability follow-up balances MapView shutdown when the Compose view is released while the Activity remains active: only lifecycle calls not already delivered are sent in `onPause` → `onStop` → `onDestroy` order. Lifecycle creation catch-up remains delegated to `Lifecycle.addObserver()`.
+- Location permission truth and tracking activity are now separate inputs. Leaving the map or stopping the Activity cancels updates and returns to `WaitingForFix` without claiming that permission was revoked; returning to an eligible foreground map starts a new collection and therefore still requires a fresh fix.
+- Location permission is requested only by the existing explicit `Разрешить доступ к местоположению` control. Lifecycle transitions no longer reopen the system dialog automatically.
+- `updateTerritory`, like `createTerritory`, maps the Room/SQLite unique-code constraint to `DuplicateTerritoryCodeException`. The database UNIQUE constraint remains authoritative, and the instrumented Room test covers both operations.
+- The focused follow-up passes `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lint`. Its targeted `RoomPersistenceTest` passes 11/11 on Samsung SM-S938B.
+- Physical Samsung verification confirms repeated map → other screen → map navigation does not blank or degrade the map; the map and current point restore after restart; granted location permission remains correct; the permission dialog does not reappear automatically; and the explicit `Разрешить доступ к местоположению` action still opens the system dialog when permission is needed. The reliability follow-up is physically accepted.
 
 ## Not yet verified
 
-- The first manual test reported that the apparent selected point moved with the map instead of remaining as an unmistakable fixed crosshair.
-- The first manual test reported that `К GPS` produced no visible camera movement.
-- The corrective build makes the selected-point reticle a larger high-contrast Compose screen overlay, removes the ambiguous original-GPS map ring, and sends `К GPS` through an explicit draft camera request using the original fix while preserving zoom. This still requires physical retest.
-- The completion action is visible in the installed Samsung build, but it has deliberately not been pressed by the agent; actual completion and return to the map still require the user's explicit confirmation.
-- The map-dominant creation layout is visually verified by screenshot, but precise pan/zoom ergonomics and button use still require the user's hands-on Samsung retest.
-- During screenshot collection the device subsequently displayed a restored active ObservationPoint. The agent did not complete or delete it; review the point on the phone before starting another creation attempt.
+- No remaining physical verification is required for the current Bee preparation and reliability-hardening milestone.
 
 ## Open items
 
@@ -50,18 +63,7 @@ The ObservationPoint creation milestone is currently uncommitted in the working 
 
 ## Next task
 
-Run the manual Samsung smoke test:
-
-1. on the restored active-point screen, press `Завершить наблюдение`, review the confirmation dialog, and confirm;
-2. verify the app returns to the existing Territory map only after successful completion;
-3. obtain a GPS fix and start `Новая точка`;
-4. pan the map and verify the high-contrast crosshair stays fixed in the viewport center;
-5. pinch-zoom and verify the crosshair stays fixed;
-6. verify `Смещение от GPS` changes as the map moves while original GPS accuracy remains unchanged;
-7. press `К GPS` and verify the camera returns to the original captured fix without resetting zoom and the displayed offset returns near zero;
-8. move the map again, confirm, and verify Room stores the coordinates under the crosshair.
-
-After this smoke test is accepted, continue with Bee preparation. Do not start that milestone before reviewing the phone result.
+The next planned milestone is the initial group release. Do not start it without an explicit user request.
 
 ## Important constraints
 

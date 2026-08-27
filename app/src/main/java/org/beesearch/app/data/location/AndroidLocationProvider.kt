@@ -45,10 +45,6 @@ internal class AndroidLocationProvider(context: Context) : LocationProvider {
             }
         }
 
-        providers.mapNotNull { provider ->
-            runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull()
-        }.maxByOrNull { it.time }?.let { trySend(it.toReading()) }
-
         providers.forEach { provider ->
             locationManager.requestLocationUpdates(
                 provider,

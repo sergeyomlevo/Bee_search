@@ -10,6 +10,7 @@ import org.beesearch.app.data.repository.RoomTerritoryRepository
 import org.beesearch.app.domain.model.InvalidAzimuthException
 import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.DuplicateBeeMarkException
+import org.beesearch.app.domain.model.DuplicateTerritoryCodeException
 import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
@@ -227,9 +228,16 @@ class RoomPersistenceTest {
     }
 
     @Test
-    fun territoryCodeIsUniqueOnDevice() = runBlocking {
-        assertThrows(Exception::class.java) {
+    fun territoryCodeConstraintMapsToDomainErrorForCreateAndUpdate() = runBlocking {
+        assertThrows(DuplicateTerritoryCodeException::class.java) {
             runBlocking { territoryRepository.createTerritory("KLYAZMA-01", "Дубликат") }
+        }
+
+        val other = territoryRepository.createTerritory("OTHER", "Другая")
+        assertThrows(DuplicateTerritoryCodeException::class.java) {
+            runBlocking {
+                territoryRepository.updateTerritory(other.id, "KLYAZMA-01", "Дубликат")
+            }
         }
         Unit
     }

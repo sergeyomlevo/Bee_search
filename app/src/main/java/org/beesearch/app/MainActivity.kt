@@ -92,22 +92,24 @@ class MainActivity : ComponentActivity() {
     ) { permissions ->
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        locationPermissionGranted = granted
         locationPermissionState.value = granted
     }
-    private var locationPermissionGranted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        locationPermissionGranted = hasLocationPermission()
-        locationPermissionState.value = locationPermissionGranted
+        locationPermissionState.value = hasLocationPermission()
         setContent {
             BeeSearchApp(
                 locationPermissionGranted = locationPermissionState.value,
                 requestLocationPermission = { locationPermissionLauncher.launch(LOCATION_PERMISSIONS) },
             )
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        locationPermissionState.value = hasLocationPermission()
     }
 
     private fun hasLocationPermission() = LOCATION_PERMISSIONS.any {
@@ -128,6 +130,10 @@ private fun BeeSearchApp(
     requestLocationPermission: () -> Unit,
 ) {
     val application = LocalContext.current.applicationContext as BeeSearchApplication
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var lifecycleState by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState)
+    }
     val viewModel: MainViewModel = viewModel(factory = MainViewModel.factory(application))
     val route by viewModel.route.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -140,13 +146,21 @@ private fun BeeSearchApp(
     val beePreparation by viewModel.beePreparation.collectAsStateWithLifecycle()
     val beeMutationInProgress by viewModel.beeMutationInProgress.collectAsStateWithLifecycle()
 
-    LaunchedEffect(route, locationPermissionGranted) {
-        if (route == AppRoute.CurrentTerritory) {
-            if (!locationPermissionGranted) requestLocationPermission()
-            viewModel.setLocationPermission(locationPermissionGranted)
-        } else {
-            viewModel.setLocationPermission(false)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, _ ->
+            lifecycleState = lifecycleOwner.lifecycle.currentState
         }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val locationTrackingActive = route == AppRoute.CurrentTerritory &&
+        lifecycleState.isAtLeast(Lifecycle.State.STARTED)
+    LaunchedEffect(locationPermissionGranted, locationTrackingActive) {
+        viewModel.setLocationTracking(
+            permissionGranted = locationPermissionGranted,
+            active = locationTrackingActive,
+        )
     }
 
     Bee_searchTheme {
@@ -445,6 +459,7 @@ private fun BeeMap(
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val mapViewLifecycle = remember { MapViewLifecycleController() }
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var locationSource by remember { mutableStateOf<GeoJsonSource?>(null) }
@@ -460,6 +475,7 @@ private fun BeeMap(
             factory = {
                 MapLibre.getInstance(it)
                 MapView(it).also { view ->
+                    mapViewLifecycle.attach(view)
                     mapView = view
                     view.onCreate(null)
                     view.getMapAsync { mapInstance ->
@@ -484,21 +500,22 @@ private fun BeeMap(
                     }
                 }
             },
+            onRelease = { releasedView ->
+                mapViewLifecycle.release(releasedView)
+            },
         )
 
         DisposableEffect(lifecycleOwner, mapView) {
-            val observer = LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_START -> mapView?.onStart()
-                    Lifecycle.Event.ON_RESUME -> mapView?.onResume()
-                    Lifecycle.Event.ON_PAUSE -> mapView?.onPause()
-                    Lifecycle.Event.ON_STOP -> mapView?.onStop()
-                    Lifecycle.Event.ON_DESTROY -> mapView?.onDestroy()
-                    else -> Unit
+            val currentMapView = mapView
+            if (currentMapView == null) {
+                onDispose { }
+            } else {
+                val observer = LifecycleEventObserver { _, event ->
+                    mapViewLifecycle.onEvent(currentMapView, event)
                 }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
             }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
         }
 
         LaunchedEffect(reading, locationSource, map) {
@@ -669,6 +686,58 @@ private fun BeeMap(
                 }
             }
         }
+    }
+}
+
+private class MapViewLifecycleController {
+    private var mapView: MapView? = null
+    private var started = false
+    private var resumed = false
+
+    fun attach(view: MapView) {
+        check(mapView == null || mapView === view) { "A MapView is already attached" }
+        mapView = view
+        started = false
+        resumed = false
+    }
+
+    fun onEvent(view: MapView, event: Lifecycle.Event) {
+        if (mapView !== view) return
+        when (event) {
+            Lifecycle.Event.ON_START -> if (!started) {
+                view.onStart()
+                started = true
+            }
+            Lifecycle.Event.ON_RESUME -> if (!resumed) {
+                view.onResume()
+                resumed = true
+            }
+            Lifecycle.Event.ON_PAUSE -> pauseIfNeeded(view)
+            Lifecycle.Event.ON_STOP -> stopIfNeeded(view)
+            Lifecycle.Event.ON_DESTROY -> release(view)
+            else -> Unit
+        }
+    }
+
+    fun release(view: MapView) {
+        if (mapView !== view) return
+        pauseIfNeeded(view)
+        stopIfNeeded(view)
+        view.onDestroy()
+        mapView = null
+    }
+
+    private fun pauseIfNeeded(view: MapView) {
+        if (!resumed) return
+        view.onPause()
+        resumed = false
+    }
+
+    private fun stopIfNeeded(view: MapView) {
+        pauseIfNeeded(view)
+        if (!started) return
+        view.onStop()
+        started = false
     }
 }
 

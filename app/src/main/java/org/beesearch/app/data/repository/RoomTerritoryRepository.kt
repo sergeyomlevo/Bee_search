@@ -1,11 +1,13 @@
 package org.beesearch.app.data.repository
 
+import android.database.sqlite.SQLiteConstraintException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.beesearch.app.data.local.room.TerritoryDao
 import org.beesearch.app.data.local.room.TerritoryEntity
 import org.beesearch.app.data.local.room.toDomain
 import org.beesearch.app.domain.model.EntityNotFoundException
+import org.beesearch.app.domain.model.DuplicateTerritoryCodeException
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.repository.TerritoryRepository
 import java.time.Clock
@@ -29,7 +31,11 @@ internal class RoomTerritoryRepository(
             createdAt = now,
             updatedAt = now,
         )
-        territoryDao.insert(territory)
+        try {
+            territoryDao.insert(territory)
+        } catch (_: SQLiteConstraintException) {
+            throw DuplicateTerritoryCodeException()
+        }
         return territory.toDomain()
     }
 
@@ -40,7 +46,11 @@ internal class RoomTerritoryRepository(
             name = name,
             updatedAt = clock.instant(),
         )
-        territoryDao.update(updated)
+        try {
+            territoryDao.update(updated)
+        } catch (_: SQLiteConstraintException) {
+            throw DuplicateTerritoryCodeException()
+        }
         return updated.toDomain()
     }
 }

@@ -10,6 +10,10 @@ class ObserverCodeRequiredException : IllegalStateException(
 
 class EntityNotFoundException(entity: String) : IllegalStateException("$entity does not exist.")
 
+class DuplicateTerritoryCodeException : IllegalStateException(
+    "A Territory with this code already exists on this device.",
+)
+
 class ObservationPointAlreadyActiveException : IllegalStateException(
     "Only one observation point may be active at a time.",
 )

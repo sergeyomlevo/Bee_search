@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import org.beesearch.app.domain.model.AppSettings
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.DuplicateBeeMarkException
+import org.beesearch.app.domain.model.DuplicateTerritoryCodeException
 import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.ObservationPoint
@@ -303,13 +304,18 @@ internal class MainViewModel(
         _feedback.value = null
     }
 
-    fun setLocationPermission(granted: Boolean) {
-        locationJob?.cancel()
-        locationJob = null
-        if (!granted) {
+    fun setLocationTracking(permissionGranted: Boolean, active: Boolean) {
+        if (!permissionGranted) {
+            stopLocationTracking()
             _locationState.value = LocationUiState.PermissionRequired
             return
         }
+        if (!active) {
+            stopLocationTracking()
+            _locationState.value = LocationUiState.WaitingForFix
+            return
+        }
+        if (locationJob?.isActive == true) return
         _locationState.value = LocationUiState.WaitingForFix
         locationJob = viewModelScope.launch {
             try {
@@ -326,12 +332,19 @@ internal class MainViewModel(
         }
     }
 
+    private fun stopLocationTracking() {
+        locationJob?.cancel()
+        locationJob = null
+    }
+
     private fun launchOperation(operation: suspend () -> Unit) {
         viewModelScope.launch {
             try {
                 operation()
             } catch (error: CancellationException) {
                 throw error
+            } catch (error: DuplicateTerritoryCodeException) {
+                _feedback.value = "Территория с таким кодом уже существует"
             } catch (error: Exception) {
                 _feedback.value = error.message ?: "Не удалось сохранить изменения"
             }
@@ -359,7 +372,7 @@ internal class MainViewModel(
     }
 
     override fun onCleared() {
-        locationJob?.cancel()
+        stopLocationTracking()
         super.onCleared()
     }
 

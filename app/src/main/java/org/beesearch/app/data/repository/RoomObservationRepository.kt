@@ -196,7 +196,9 @@ internal class RoomObservationRepository(
         val bee = requireBee(cycle.beeId)
         requireActivePoint(bee.observationPointId)
         val updatedAt = clock.instant()
-        cycleDao.setAzimuth(flightCycleId, azimuthDeg, updatedAt)
+        if (cycleDao.setAzimuth(flightCycleId, azimuthDeg, updatedAt) != 1) {
+            throw EntityNotFoundException("FlightCycle")
+        }
         cycle.copy(azimuthDeg = azimuthDeg, updatedAt = updatedAt).toDomain()
     }
 
