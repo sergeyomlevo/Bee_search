@@ -10,8 +10,18 @@
 #
 # AGENTS.md defines repository-wide agent behavior.
 # This file refines decision-making under ambiguity.
+#
+# NOTE ON ENFORCEMENT:
+# This file governs agent *intent*. It is read and followed by a model and is
+# not, by itself, a technical guarantee. Rules marked "should be backed by
+# external enforcement" below are candidates for a git pre-commit hook, a CI
+# check, or another independent verification mechanism.
+#
+# Prefer enforcement of observable outcomes over self-reported compliance.
+# For example, a database migration should be verified by migration tests
+# rather than trusted merely because an agent reports that it is safe.
 
-version: 1
+version: 2
 
 policy:
   principle: >
@@ -22,11 +32,13 @@ policy:
 
   default_when_uncertain: inspect_before_asking
 
+
 # ---------------------------------------------------------------------------
 # Sources and precedence
 # ---------------------------------------------------------------------------
 
 sources:
+
   project_truth:
     - docs/product-requirements.md
     - docs/user-workflows.md
@@ -42,7 +54,9 @@ sources:
   preference_evidence:
     - .agent/preference-evidence.md
 
+
 rules:
+
   - id: project_truth_over_preferences
     description: >
       User preferences guide choices only where project requirements and
@@ -61,6 +75,7 @@ rules:
       with documented project truth, investigate rather than preserving the
       code automatically.
     action: enforce
+
 
 # ---------------------------------------------------------------------------
 # Decision classes
@@ -87,6 +102,7 @@ decision_classes:
       - obvious null-safety improvements
       - equivalent implementation details
 
+
   low_impact:
     action: decide_and_continue
     report: summarize_afterwards
@@ -104,15 +120,24 @@ decision_classes:
       - local error representation
       - test structure
 
+
   significant_reversible:
     action: propose_preferred_option
     approval_required: false
-    report: before_implementation_when_practical
+    report: before_implementation
+
+    report_after_implementation_allowed_only_if:
+      - >
+        a hard tool, environment, or agent-harness limitation makes advance
+        reporting genuinely impossible, not merely inconvenient
+      - >
+        the exception itself is stated in the report and the limiting
+        condition is named explicitly
 
     description: >
       A meaningful choice that affects several files or future implementation
       but remains reasonably reversible and does not change established
-      product/domain decisions.
+      product or domain decisions.
 
     behavior:
       - inspect existing code and documentation first
@@ -124,9 +149,10 @@ decision_classes:
     examples:
       - introducing a small reusable abstraction
       - reorganizing a feature package
-      - selecting a minor supporting library
       - changing an internal API used in several places
       - choosing a local state-management pattern
+      - a reversible change whose later removal would require substantial work
+
 
   project_decision:
     action: ask_before_implementation
@@ -134,7 +160,8 @@ decision_classes:
 
     description: >
       A choice that changes or establishes product behavior, domain semantics,
-      persistent data meaning, architecture, or another project-level rule.
+      persistent data meaning, architecture, platform commitments, or another
+      durable project-level rule.
 
     examples:
       - adding a new domain entity
@@ -147,14 +174,24 @@ decision_classes:
       - introducing mandatory network dependence
       - changing the one-active-point assumption
       - changing how repeated observations are represented
+      - adopting a major framework or infrastructure dependency
+      - changing offline-first guarantees
+
 
   destructive:
+    # High cost-of-error class.
+    #
+    # External enforcement should verify observable safety properties wherever
+    # practical. For database changes, migration tests against realistic
+    # existing schemas/data are preferable to relying solely on an approval
+    # marker in an agent report or commit message.
+
     action: ask_before_implementation
     approval_required: true
 
     description: >
-      A change that may destroy, overwrite, invalidate, or make existing user
-      data inaccessible.
+      A change that may destroy, overwrite, invalidate, corrupt, or make
+      existing user data inaccessible.
 
     examples:
       - destructive Room migration
@@ -164,7 +201,16 @@ decision_classes:
       - deleting user-created files
       - replacing confirmed observations
 
+
   accepted_decision_conflict:
+    # This class is especially important because the user may intentionally
+    # request a change without remembering that an earlier accepted decision
+    # established the opposite rule.
+    #
+    # External checks may flag changes to domain/data/architecture documents
+    # that have no corresponding decision update, but such checks should
+    # supplement rather than replace this policy.
+
     action: stop_and_explain
     approval_required: true
 
@@ -178,11 +224,17 @@ decision_classes:
       - propose the smallest coherent resolution
       - do not silently work around the decision
 
+
 # ---------------------------------------------------------------------------
 # Reversibility and impact assessment
 # ---------------------------------------------------------------------------
 
 assessment:
+
+  principle: >
+    Evaluate impact and reversibility as separate dimensions. A change that
+    appears small by scope may still require escalation because of data risk,
+    architecture commitment, or difficulty of reversal.
 
   questions:
     - Does this change alter user-visible behavior?
@@ -197,12 +249,46 @@ assessment:
     - Is the choice intentionally left open in docs/decisions.md?
 
   escalation:
-    if_user_visible_behavior_changes: project_decision
-    if_domain_semantics_change: project_decision
-    if_persistent_meaning_changes: project_decision
-    if_accepted_decision_conflicts: accepted_decision_conflict
-    if_data_loss_possible: destructive
-    if_open_project_decision_must_be_resolved: project_decision
+
+    if_user_visible_behavior_changes:
+      class: project_decision
+
+    if_domain_semantics_change:
+      class: project_decision
+
+    if_persistent_meaning_changes:
+      class: project_decision
+
+    if_accepted_decision_conflicts:
+      class: accepted_decision_conflict
+
+    if_data_loss_possible:
+      class: destructive
+
+    if_open_project_decision_must_be_resolved:
+      class: project_decision
+
+    if_offline_first_behavior_changes:
+      class: project_decision
+
+    if_major_platform_commitment_introduced:
+      class: project_decision
+
+    if_reversal_requires_database_migration:
+      class: significant_reversible
+      note: >
+        Escalate further to project_decision if persistent meaning changes,
+        or to destructive if existing data may be lost, corrupted, or made
+        inaccessible.
+
+    if_reversal_requires_substantial_rewrite:
+      class: significant_reversible
+
+  rule_for_multiple_matches: >
+    When more than one escalation condition matches, use the class requiring
+    the greatest degree of user control. destructive and
+    accepted_decision_conflict must never be downgraded by another match.
+
 
 # ---------------------------------------------------------------------------
 # Ambiguity handling
@@ -221,6 +307,7 @@ ambiguity:
       - .agent/preferences.yaml
 
   then:
+
     if_one_option_clearly_follows_project_rules:
       action: implement
 
@@ -234,9 +321,9 @@ ambiguity:
       action: ask
 
     if_choice_is_expensive_to_reverse:
-      action: ask
+      action: classify_using_assessment
 
-    if_choice_is destructive:
+    if_choice_is_destructive:
       action: ask
 
   avoid:
@@ -244,6 +331,8 @@ ambiguity:
     - asking the user to choose between technically equivalent trivial options
     - silently inventing missing domain rules
     - treating ambiguity as permission to expand scope
+    - using ambiguity as justification for avoiding required escalation
+
 
 # ---------------------------------------------------------------------------
 # Preference use
@@ -272,6 +361,7 @@ preferences:
       action: treat_as_hint
 
   conflict:
+
     explicit_current_user_instruction:
       action: current_instruction_wins
 
@@ -280,6 +370,7 @@ preferences:
 
     accepted_decision:
       action: accepted_decision_wins
+
 
 # ---------------------------------------------------------------------------
 # Preference learning
@@ -292,7 +383,8 @@ preference_learning:
   principle: >
     Repeated user choices may provide evidence for a stable development
     preference, but a single situational choice should not automatically
-    become a permanent rule.
+    become a permanent rule. Explicit statements by the user are stronger
+    evidence than preferences inferred indirectly from behavior.
 
   record_evidence_when:
     - the user explicitly states a general preference
@@ -307,18 +399,81 @@ preference_learning:
     - decisions forced by current platform limitations
     - choices already dictated by project requirements
 
+
   promotion:
+
     low_to_medium:
       condition: repeated_supporting_evidence
+      action: promote
+      notify_user: false
 
     medium_to_high:
-      condition: explicit_preference_or_consistent_repeated_evidence
+
+      explicit_user_preference:
+        condition: >
+          the user explicitly states a reusable preference that is intended
+          to guide future decisions
+        action: promote
+        confirmation_required: false
+        notify_user: true
+
+      consistent_repeated_evidence:
+        condition: >
+          repeated independent evidence strongly suggests a stable preference
+          but the user has not explicitly stated it as a general rule
+        action: propose_promotion
+        confirmation_required: true
+        notify_user: true
+
+        proposal_content:
+          - the preference inferred
+          - the supporting evidence
+          - that promotion would cause it to apply by default
+          - that the user may confirm, reject, or narrow it
+
+  promotion_rule: >
+    A preference inferred solely from behavior must not become high-confidence
+    and apply silently by default until the user has confirmed the promotion.
+    An explicit reusable user preference may become high-confidence without
+    redundant confirmation.
+
 
   contradiction:
-    action: >
-      Record contradictory evidence rather than silently rewriting history.
-      Lower confidence or revise the preference when the newer evidence
-      clearly represents a changed preference.
+
+    explicit_user_correction:
+      condition: >
+        the user explicitly says that an existing preference is wrong,
+        outdated, too broad, or no longer desired
+      action: revise_preference
+      record_revision: true
+      record_in: .agent/preference-evidence.md
+
+    ambiguous_whether_exception_or_change:
+      condition: >
+        new evidence conflicts with an existing preference but does not clearly
+        establish whether this is a one-off exception or a durable change
+      action: treat_as_exception_and_flag
+      record_in: .agent/preference-evidence.md
+
+    repeated_conflicting_evidence:
+      condition: >
+        multiple independent choices conflict with an existing preference
+        without an explicit statement from the user
+      action: lower_confidence_and_flag
+      record_in: .agent/preference-evidence.md
+
+    clearly_represents_changed_preference:
+      condition: >
+        the newer evidence clearly establishes a durable preference change
+      action: revise_preference
+      record_revision: true
+      record_in: .agent/preference-evidence.md
+
+  history_rule: >
+    Do not silently rewrite preference history. Preserve contradictory evidence
+    and revisions so that future agents can distinguish an old preference from
+    a later change.
+
 
 # ---------------------------------------------------------------------------
 # Dependencies
@@ -328,15 +483,22 @@ dependencies:
 
   routine_standard_dependency:
     action: evaluate_and_continue
+
     conditions:
       - solves a current requirement
       - actively maintained
       - compatible with project architecture
       - does not create a major platform commitment
       - does not undermine offline-first behavior
+      - remains reasonably inexpensive to replace
 
   major_dependency:
-    action: propose_before_adding
+    action: classify_as_project_decision
+
+    reason: >
+      A major dependency normally creates an architectural or platform
+      commitment and therefore belongs to the same approval path as other
+      project-level decisions rather than using a separate approval system.
 
     examples:
       - database framework
@@ -348,6 +510,7 @@ dependencies:
 
   speculative_dependency:
     action: do_not_add
+
 
 # ---------------------------------------------------------------------------
 # Refactoring
@@ -365,10 +528,11 @@ refactoring:
     action: avoid
 
   large_scale:
-    action: propose_first
+    action: classify_as_significant_reversible
 
   changes_architecture:
-    action: ask_before_implementation
+    action: classify_as_project_decision
+
 
 # ---------------------------------------------------------------------------
 # Documentation
@@ -397,6 +561,13 @@ documentation:
       update docs/decisions.md rather than storing the decision only in agent
       files.
 
+  decision_status:
+    rule: >
+      Preserve the distinction between proposed, accepted, rejected, and
+      superseded decisions. Do not treat discussion or implementation history
+      as proof that a project decision was accepted.
+
+
 # ---------------------------------------------------------------------------
 # Scope
 # ---------------------------------------------------------------------------
@@ -419,6 +590,7 @@ scope:
     - tests needed to protect changed behavior
     - documentation updates required to keep project truth consistent
 
+
 # ---------------------------------------------------------------------------
 # Verification
 # ---------------------------------------------------------------------------
@@ -427,6 +599,8 @@ verification:
 
   principle: >
     Verification effort should be proportional to the risk of the change.
+    Prefer verification of observable behavior and preserved invariants over
+    trusting an agent's own description of what it changed.
 
   routine_change:
     - relevant compile or static check when practical
@@ -439,6 +613,10 @@ verification:
     - Room tests
     - constraint tests
     - migration tests when migrations are required
+    - >
+      when existing field data matters, verify migration behavior using a
+      database representing the previous schema rather than only testing
+      creation of a fresh database
 
   ui_change:
     - compile
@@ -453,6 +631,24 @@ verification:
     - claim a test passed if it was not run
     - hide failing verification
     - treat emulator sensor behavior as proof of real-device behavior
+    - treat creation of a fresh database as proof that an in-place migration works
+
+  reporting_success_requires:
+    - naming the specific command, test, or check that was run
+    - stating its actual result, not an assumed result
+    - distinguishing automated verification from manual verification
+    - identifying important verification that could not be performed
+
+  external_enforcement_preference:
+    rule: >
+      Where practical, external enforcement should verify the property that
+      matters rather than merely verify that an agent claimed compliance.
+
+    examples:
+      - migration test verifies preserved data instead of only requiring an approval marker
+      - CI reruns tests instead of trusting a reported success
+      - schema checks detect incompatible changes independently of agent narration
+
 
 # ---------------------------------------------------------------------------
 # Reporting
@@ -465,7 +661,7 @@ reporting:
 
   significant:
     include:
-      - what changed
+      - what is about to change or what changed
       - why this approach was chosen
       - verification performed
       - remaining uncertainty if any
@@ -477,7 +673,21 @@ reporting:
       - main alternative
       - important tradeoff
 
+  preference_promotion:
+    include:
+      - the preference proposed or now applied by default
+      - whether it was explicitly stated or inferred
+      - the evidence behind it
+      - how to correct, narrow, or reject it if wrong
+
+  preference_conflict:
+    include_when_relevant:
+      - the existing preference
+      - the conflicting evidence
+      - whether the conflict is being treated as an exception or possible change
+
   avoid:
     - lengthy explanations of trivial implementation choices
     - presenting every internal thought process
     - asking for approval after a change that required approval beforehand
+    - presenting an inferred preference as if the user explicitly stated it
