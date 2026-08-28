@@ -1,7 +1,10 @@
 package org.beesearch.app
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -9,8 +12,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.remember
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.ObservationPoint
@@ -168,22 +173,152 @@ class ResumeObservationScreenTest {
     }
 
     @Test
-    fun unavailableSelectionIsClearedInsteadOfBeingReplaced() {
+    fun successfulAddsAdvanceThroughColorBeforeNextCatalogColor() {
         composeRule.setContent {
             val bees = remember { mutableStateOf(emptyList<Bee>()) }
             Bee_searchTheme {
                 BeeSelector(
                     bees = bees.value,
                     enabled = true,
-                    onAddBee = { color, position -> bees.value = listOf(bee(color, position)) },
+                    onAddBee = { color, position -> bees.value = bees.value + bee(color, position) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("mark-color-WHITE").performClick()
+        composeRule.onNodeWithTag("mark-position-NONE").assertIsSelected()
+        composeRule.onNodeWithTag("add-bee").performClick()
+        composeRule.onNodeWithTag("mark-color-WHITE").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-NONE").assertIsNotEnabled()
+        composeRule.onNodeWithTag("mark-position-RIGHT_WING").assertIsSelected()
+
+        composeRule.onNodeWithTag("add-bee").performClick()
+        composeRule.onNodeWithTag("mark-color-WHITE").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-LEFT_WING").assertIsSelected()
+
+        composeRule.onNodeWithTag("add-bee").performClick()
+        composeRule.onNodeWithTag("mark-color-WHITE").assertIsNotEnabled()
+        composeRule.onNodeWithTag("mark-color-YELLOW").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-NONE").assertIsSelected()
+        composeRule.onNodeWithTag("add-bee").assertIsEnabled()
+    }
+
+    @Test
+    fun preparationScreenPreservesSelectorSequenceAsBeeRowsAreInserted() {
+        composeRule.setContent {
+            val preparation = remember {
+                mutableStateOf(BeePreparationUiState(pointId = pointId, isLoading = false))
+            }
+            Bee_searchTheme {
+                BeePreparationScreen(
+                    point = point(),
+                    preparation = preparation.value,
+                    isMutating = false,
+                    isCompleting = false,
+                    onAddBee = { color, position ->
+                        preparation.value = preparation.value.copy(
+                            bees = preparation.value.bees + bee(color, position),
+                            beePresenceResult = BeePresenceResult.BEES_FOUND,
+                        )
+                    },
+                    onRemoveBee = {},
+                    onRecordNoBeesFound = {},
+                    onComplete = {},
+                    onOpenTerritories = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("bee-preparation-list")
+            .performScrollToNode(hasTestTag("add-bee"))
+        composeRule.onNodeWithTag("mark-color-WHITE").performClick()
+        composeRule.onNodeWithTag("mark-position-NONE").assertIsSelected()
+        composeRule.onNodeWithTag("add-bee").performClick()
+
+        composeRule.onNodeWithTag("bee-preparation-list")
+            .performScrollToNode(hasTestTag("add-bee"))
+        composeRule.onNodeWithTag("mark-color-WHITE").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-RIGHT_WING").assertIsSelected()
+        composeRule.onNodeWithTag("add-bee").performClick()
+
+        composeRule.onNodeWithTag("bee-preparation-list")
+            .performScrollToNode(hasTestTag("add-bee"))
+        composeRule.onNodeWithTag("mark-color-WHITE").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-LEFT_WING").assertIsSelected()
+        composeRule.onNodeWithTag("add-bee").performClick()
+
+        composeRule.onNodeWithTag("bee-preparation-list")
+            .performScrollToNode(hasTestTag("add-bee"))
+        composeRule.onNodeWithTag("mark-color-YELLOW").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-NONE").assertIsSelected()
+    }
+
+    @Test
+    fun manualPositionIsAddedAndThenSequenceContinuesFromIt() {
+        composeRule.setContent {
+            val bees = remember {
+                mutableStateOf(listOf(bee("WHITE", MarkPosition.NONE)))
+            }
+            Bee_searchTheme {
+                BeeSelector(
+                    bees = bees.value,
+                    enabled = true,
+                    onAddBee = { color, position -> bees.value = bees.value + bee(color, position) },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("mark-color-WHITE").performClick()
+        composeRule.onNodeWithTag("mark-position-RIGHT_WING").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-LEFT_WING").performClick()
+        composeRule.onNodeWithTag("mark-position-LEFT_WING").assertIsSelected()
+        composeRule.onNodeWithTag("add-bee").performClick()
+
+        composeRule.onNodeWithTag("mark-color-WHITE").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-RIGHT_WING").assertIsSelected()
+    }
+
+    @Test
+    fun externalAvailabilityChangeClearsSelectionInsteadOfReplacingIt() {
+        lateinit var beesState: MutableState<List<Bee>>
+        composeRule.setContent {
+            val bees = remember { mutableStateOf(emptyList<Bee>()) }
+            beesState = bees
+            Bee_searchTheme {
+                BeeSelector(
+                    bees = bees.value,
+                    enabled = true,
+                    onAddBee = { _, _ -> },
                 )
             }
         }
 
         composeRule.onNodeWithTag("mark-color-GREEN").performClick()
-        composeRule.onNodeWithTag("mark-position-NONE").performClick()
-        composeRule.onNodeWithTag("add-bee").performClick()
+        composeRule.onNodeWithTag("mark-position-NONE").assertIsSelected()
+        composeRule.runOnIdle {
+            beesState.value = listOf(bee("GREEN", MarkPosition.NONE))
+        }
 
+        composeRule.onNodeWithTag("add-bee").assertIsNotEnabled()
+        composeRule.onNodeWithTag("mark-position-RIGHT_WING").assertIsNotSelected()
+    }
+
+    @Test
+    fun fullCatalogKeepsAddDisabledWithoutSelection() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeSelector(
+                    bees = BeeMarkCatalog.supportedCombinations.map { combination ->
+                        bee(combination.markColor, combination.markPosition)
+                    },
+                    enabled = true,
+                    onAddBee = { _, _ -> },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Все поддерживаемые сочетания меток уже добавлены.")
+            .assertIsDisplayed()
         composeRule.onNodeWithTag("add-bee").assertIsNotEnabled()
     }
 

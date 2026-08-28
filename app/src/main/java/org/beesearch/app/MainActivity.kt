@@ -905,7 +905,7 @@ internal fun BeePreparationScreen(
                         )
                     }
                 } else {
-                    item {
+                    item(key = "bee-selector") {
                         BeeSelector(
                             bees = bees,
                             enabled = !isMutating,
@@ -995,6 +995,8 @@ internal fun BeeSelector(
     val available = BeeMarkCatalog.availableCombinations(used)
     var selectedColor by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedPositionName by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingColor by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingPositionName by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedColorValue = selectedColor
     val selectedPosition = selectedPositionName?.let(MarkPosition::valueOf)
     val selectedCombination = if (selectedColorValue != null && selectedPosition != null) {
@@ -1002,11 +1004,33 @@ internal fun BeeSelector(
     } else {
         null
     }
+    val pendingCombination = if (pendingColor != null && pendingPositionName != null) {
+        BeeMarkCombination(pendingColor!!, MarkPosition.valueOf(pendingPositionName!!))
+    } else {
+        null
+    }
 
-    LaunchedEffect(available) {
-        if (selectedCombination != null && selectedCombination !in available) {
-            selectedColor = null
-            selectedPositionName = null
+    fun updateSelection(combination: BeeMarkCombination?) {
+        selectedColor = combination?.markColor
+        selectedPositionName = combination?.markPosition?.name
+    }
+
+    fun clearPendingAddition() {
+        pendingColor = null
+        pendingPositionName = null
+    }
+
+    LaunchedEffect(used) {
+        when {
+            pendingCombination != null && pendingCombination in used -> {
+                updateSelection(
+                    BeeSelectorSelectionLogic.nextAfterAdded(pendingCombination, available),
+                )
+                clearPendingAddition()
+            }
+            pendingCombination == null &&
+                selectedCombination != null &&
+                selectedCombination !in available -> updateSelection(null)
         }
     }
 
@@ -1015,6 +1039,11 @@ internal fun BeeSelector(
         Text("Добавить пчелу", style = MaterialTheme.typography.titleMedium)
         if (available.isEmpty()) {
             Text("Все поддерживаемые сочетания меток уже добавлены.")
+            Button(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.fillMaxWidth().testTag("add-bee"),
+            ) { Text("Добавить") }
         } else {
             Text("Цвет", fontWeight = FontWeight.Bold)
             FlowRow(
@@ -1026,13 +1055,13 @@ internal fun BeeSelector(
                     FilterChip(
                         selected = selectedColor == color.value,
                         onClick = {
-                            selectedColor = color.value
-                            if (selectedPosition?.let {
-                                    BeeMarkCombination(color.value, it) !in available
-                                } == true
-                            ) {
-                                selectedPositionName = null
-                            }
+                            clearPendingAddition()
+                            updateSelection(
+                                BeeSelectorSelectionLogic.firstAvailableForColor(
+                                    color.value,
+                                    available,
+                                ),
+                            )
                         },
                         enabled = enabled && hasAvailablePosition,
                         modifier = Modifier.testTag("mark-color-${color.value}"),
@@ -1057,7 +1086,18 @@ internal fun BeeSelector(
                     val combination = selectedColor?.let { BeeMarkCombination(it, position) }
                     FilterChip(
                         selected = selectedPosition == position,
-                        onClick = { selectedPositionName = position.name },
+                        onClick = {
+                            clearPendingAddition()
+                            selectedColor?.let { color ->
+                                updateSelection(
+                                    BeeSelectorSelectionLogic.manualPosition(
+                                        color,
+                                        position,
+                                        available,
+                                    ),
+                                )
+                            }
+                        },
                         enabled = enabled && combination in available,
                         modifier = Modifier.testTag("mark-position-${position.name}"),
                         label = { Text(BeeMarkCatalog.positionDisplayName(position)) },
@@ -1067,6 +1107,8 @@ internal fun BeeSelector(
             Button(
                 onClick = {
                     selectedCombination?.let { combination ->
+                        pendingColor = combination.markColor
+                        pendingPositionName = combination.markPosition.name
                         onAddBee(combination.markColor, combination.markPosition)
                     }
                 },

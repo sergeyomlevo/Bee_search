@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-The D057 no-bees UI milestone is implemented and automatically verified, but still awaits the requested manual field-flow check. An empty active ObservationPoint now offers an explicit confirmed `Пчёлы отсутствуют` action backed by the existing atomic `recordNoBeesFound` repository operation. Expected domain failures are shown as Russian user messages rather than raw exception text. Room schema remains v2.
+The Bee-preparation selector is optimized for sequential field entry and automatically verified, but still awaits the requested manual UX check. After a manual color choice it selects the first available position, advances only after the selected Bee appears in persisted state, retains manual position priority, and moves through the authoritative BeeMarkCatalog order. Room schema remains v2 and domain behavior is unchanged.
 
 ## Last completed commits
 
@@ -15,8 +15,9 @@ The D057 no-bees UI milestone is implemented and automatically verified, but sti
 - `3304e94` — Observation metadata, Bee presence result, and Room v2
 - `8db15b0` — Delayed departure analysis rule
 - `a689357` — Agent decision policy refinement
+- `a3ed1c2` — No-bees observation workflow
 
-The decision-policy refinement is the current HEAD commit; this no-bees UI milestone remains uncommitted for review.
+The no-bees observation workflow is the current HEAD commit; this selector optimization remains uncommitted for review.
 
 ## Verified
 
@@ -66,6 +67,10 @@ The decision-policy refinement is the current HEAD commit; this no-bees UI miles
 - Final `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lintDebug` pass. On Samsung SM-S938B, direct final execution passes the v1→v2 migration test 1/1, `RoomPersistenceTest` 24/24, and `ResumeObservationScreenTest` 6/6. The final debug and test APKs are installed.
 - Removing the explicit `debugRuntimeOnly(kotlinx-serialization-json)` was tested rather than inferred. Without it, the Samsung migration test fails with `AbstractMethodError`: DataStore contributes serialization 1.7.3 to the debug app while Room 2.8 MigrationTestHelper uses 1.8.x-generated serializers. The dependency remains at 1.8.1 with a Gradle comment documenting this runtime alignment.
 - Backup/export was not implemented. The risk is already tracked as open decision O007 and in the architecture backup section, so no duplicate idea entry was added.
+- BeeSelector now keeps a manually selected color and advances through free positions in `Обычная → КП → КЛ` order after each successfully persisted Bee. Once a color is exhausted, it moves to the next available color in `BeeMarkCatalog.colors`; manual color and position choices remain authoritative.
+- Selection progression is driven by the persisted Bee list: pressing `Добавить` records the currently displayed combination as pending, but the selector advances only when that exact combination appears in the used set. An unrelated availability change still clears an invalid selection instead of silently substituting another Bee.
+- Used position chips and exhausted color chips remain disabled. When the entire derived catalog is used, selection is empty, the existing full-catalog message remains visible, and `Добавить` is disabled. Repository duplicate protection is unchanged.
+- The new pure selection-logic suite passes 11/11 as part of `test`. Final `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lintDebug` pass. The final debug and test APKs are installed on Samsung SM-S938B. A stable LazyColumn item key now preserves BeeSelector state while persisted Bee rows are inserted; the focused full-screen regression test passes 1/1 and confirms `Белая: Обычная → КП → КЛ`, then `Жёлтая: Обычная`. The external-invalidation test also passes 1/1 in an isolated run. A combined 10-test class run passed 9 tests, including the new regression, and hit the known Compose runner `No compose hierarchies found` flake in the external-invalidation test; this was not a product assertion failure.
 
 ## Not yet verified
 
@@ -73,6 +78,7 @@ The decision-policy refinement is the current HEAD commit; this no-bees UI miles
 - The new year, number, and Bee presence values are not yet exposed by a new UI, so there is no additional visual field-UX claim in this milestone.
 - D058 has no dedicated UI yet because the initial group-release/observation screen is still a future milestone; its eventual field interaction therefore remains to be verified when that UI exists.
 - The new no-bees flow has not yet been manually exercised through both requested Samsung scenarios. Automated device tests cover persistence and Compose behavior, but a person still needs to verify the wording, cancellation, successful return to the map, cold-start routing, next-point creation, and action unavailability after adding a Bee.
+- Physical testing found that the initial selector optimization lost its highlighted color when a persisted Bee row was inserted above it in the preparation `LazyColumn`. The stable-item-key fix is installed and covered by a focused Samsung UI test, but a person still needs to confirm the corrected White ordinary/right/left sequence, automatic transition to Yellow, manual override, and availability after removing a prepared Bee at the device's field font scale.
 
 ## Open items
 
@@ -83,7 +89,7 @@ The decision-policy refinement is the current HEAD commit; this no-bees UI miles
 
 ## Next task
 
-Manually verify the two no-bees scenarios on Samsung before accepting or committing this milestone. Do not start the initial group-release milestone automatically. Ideas I001–I004 remain non-authoritative unless explicitly promoted.
+Manually verify the BeeSelector sequence on Samsung before accepting or committing this milestone. The earlier no-bees manual scenarios also remain pending. Do not start the initial group-release milestone automatically. Ideas I001–I004 remain non-authoritative unless explicitly promoted.
 
 ## Important constraints
 
