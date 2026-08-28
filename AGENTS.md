@@ -56,7 +56,8 @@ docs/
 ├── data-model.md
 ├── architecture.md
 ├── decisions.md
-└── glossary.md
+├── glossary.md
+└── ideas.md
 ```
 
 Responsibilities:
@@ -67,7 +68,8 @@ Responsibilities:
 - `data-model.md` — persistent entities, fields, constraints, and derived data;
 - `architecture.md` — technical architecture and component boundaries;
 - `decisions.md` — accepted, provisional, deferred, and superseded decisions;
-- `glossary.md` — canonical project terminology.
+- `glossary.md` — canonical project terminology;
+- `ideas.md` — non-authoritative backlog of ideas and possible future directions.
 
 Do not duplicate detailed project rules in `AGENTS.md`.
 
@@ -78,6 +80,17 @@ Do not duplicate detailed project rules in `AGENTS.md`.
 Do not mechanically read every project document for every task.
 
 Read the smallest set needed to perform the requested change safely.
+
+### Milestone planning and ideas
+
+Inspect `docs/ideas.md` when planning a new milestone. Ideas are not requirements
+and must not be implemented merely because they are recorded there. If current
+work makes an idea timely or technically natural, point this out and propose
+discussion or promotion. Moving an idea from `idea` or `proposed` to `accepted`
+requires explicit user approval, and accepted behavior must also be recorded in
+the relevant requirements, decisions, domain, data, workflow, architecture, or
+glossary documentation. Avoid duplicating large parts of those authoritative
+documents in `ideas.md`.
 
 ### UI or workflow
 
