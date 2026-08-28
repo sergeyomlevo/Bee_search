@@ -13,6 +13,9 @@ import org.beesearch.app.data.local.room.ObservationPointEntity
 import org.beesearch.app.data.local.room.TerritoryDao
 import org.beesearch.app.data.local.room.toDomain
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeePresenceResult
+import org.beesearch.app.domain.model.BeePresenceResultRequiredException
+import org.beesearch.app.domain.model.BeesAlreadyFoundException
 import org.beesearch.app.domain.model.BeeHasFlightHistoryException
 import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.EntityNotFoundException
@@ -24,6 +27,7 @@ import org.beesearch.app.domain.model.InvalidEventTimeException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.NoPreparedBeesException
+import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
@@ -32,6 +36,7 @@ import org.beesearch.app.domain.model.OpenFlightCycleNotFoundException
 import org.beesearch.app.domain.repository.ObservationRepository
 import org.beesearch.app.domain.validation.ObserverCode
 import java.time.Clock
+import java.time.ZoneId
 import java.util.UUID
 
 internal class RoomObservationRepository(
@@ -41,6 +46,7 @@ internal class RoomObservationRepository(
     private val beeDao: BeeDao,
     private val cycleDao: FlightCycleDao,
     private val clock: Clock,
+    private val observationZoneIdProvider: () -> ZoneId = { ZoneId.systemDefault() },
 ) : ObservationRepository {
     override fun observeActivePoint(): Flow<ObservationPoint?> = pointDao.observeActive()
         .map { point -> point?.toDomain() }
@@ -65,17 +71,28 @@ internal class RoomObservationRepository(
             throw ObservationPointAlreadyActiveException()
         }
 
+        val normalizedObserverCode = ObserverCode.normalize(observerCode)
+        val createdAt = clock.instant()
+        val observationYear = createdAt.atZone(observationZoneIdProvider()).year
+        val pointNumber = pointDao.getNextPointNumber(
+            territoryId = point.territoryId,
+            observationYear = observationYear,
+            observerCode = normalizedObserverCode,
+        )
         val entity = ObservationPointEntity(
             id = UUID.randomUUID(),
             territoryId = point.territoryId,
-            observerCode = ObserverCode.normalize(observerCode),
+            observerCode = normalizedObserverCode,
+            observationYear = observationYear,
+            pointNumber = pointNumber,
+            beePresenceResult = null,
             code = point.code,
             latitude = point.latitude,
             longitude = point.longitude,
             gpsLatitude = point.gpsLatitude,
             gpsLongitude = point.gpsLongitude,
             gpsAccuracyM = point.gpsAccuracyM,
-            createdAt = clock.instant(),
+            createdAt = createdAt,
             completedAt = null,
         )
         pointDao.insert(entity)
@@ -87,7 +104,10 @@ internal class RoomObservationRepository(
         markColor: String,
         markPosition: MarkPosition,
     ): Bee = database.withTransaction {
-        requireActivePoint(pointId)
+        val point = requireActivePoint(pointId)
+        if (point.beePresenceResult == BeePresenceResult.NO_BEES_FOUND) {
+            throw NoBeesFoundAlreadyRecordedException()
+        }
         if (cycleDao.countForObservationPoint(pointId) != 0) {
             throw InitialReleaseAlreadyStartedException()
         }
@@ -103,6 +123,13 @@ internal class RoomObservationRepository(
             createdAt = clock.instant(),
         )
         beeDao.insert(entity)
+        if (point.beePresenceResult != BeePresenceResult.BEES_FOUND) {
+            if (
+                pointDao.setBeePresenceResult(pointId, BeePresenceResult.BEES_FOUND) != 1
+            ) {
+                throw ObservationPointNotActiveException()
+            }
+        }
         entity.toDomain()
     }
 
@@ -116,16 +143,26 @@ internal class RoomObservationRepository(
             if (cycleDao.countForBee(beeId) != 0) {
                 throw BeeHasFlightHistoryException()
             }
-            beeDao.delete(bee)
+            if (beeDao.delete(bee) != 1) {
+                throw EntityNotFoundException("Bee")
+            }
+            if (beeDao.countForPoint(bee.observationPointId) == 0) {
+                if (pointDao.setBeePresenceResult(bee.observationPointId, null) != 1) {
+                    throw ObservationPointNotActiveException()
+                }
+            }
         }
     }
 
     override suspend fun startInitialGroupRelease(pointId: UUID): List<FlightCycle> =
         database.withTransaction {
-            requireActivePoint(pointId)
+            val point = requireActivePoint(pointId)
             val bees = beeDao.getForPoint(pointId)
             if (bees.isEmpty()) {
                 throw NoPreparedBeesException()
+            }
+            if (point.beePresenceResult != BeePresenceResult.BEES_FOUND) {
+                throw BeePresenceResultRequiredException()
             }
             if (cycleDao.countForObservationPoint(pointId) != 0) {
                 throw InitialReleaseAlreadyStartedException()
@@ -205,6 +242,9 @@ internal class RoomObservationRepository(
     override suspend fun completeObservationPoint(pointId: UUID): ObservationPoint =
         database.withTransaction {
             val point = requireActivePoint(pointId)
+            if (point.beePresenceResult == null) {
+                throw BeePresenceResultRequiredException()
+            }
             val completedAt = clock.instant()
             if (completedAt < point.createdAt) {
                 throw InvalidEventTimeException()
@@ -213,6 +253,34 @@ internal class RoomObservationRepository(
                 throw ObservationPointNotActiveException()
             }
             point.copy(completedAt = completedAt).toDomain()
+        }
+
+    override suspend fun recordNoBeesFound(pointId: UUID): ObservationPoint =
+        database.withTransaction {
+            val point = requireActivePoint(pointId)
+            if (
+                point.beePresenceResult == BeePresenceResult.BEES_FOUND ||
+                beeDao.countForPoint(pointId) != 0
+            ) {
+                throw BeesAlreadyFoundException()
+            }
+            val completedAt = clock.instant()
+            if (completedAt < point.createdAt) {
+                throw InvalidEventTimeException()
+            }
+            if (
+                pointDao.recordNoBeesAndComplete(
+                    id = pointId,
+                    result = BeePresenceResult.NO_BEES_FOUND,
+                    completedAt = completedAt,
+                ) != 1
+            ) {
+                throw ObservationPointNotActiveException()
+            }
+            point.copy(
+                beePresenceResult = BeePresenceResult.NO_BEES_FOUND,
+                completedAt = completedAt,
+            ).toDomain()
         }
 
     private suspend fun requireActivePoint(pointId: UUID): ObservationPointEntity {

@@ -6,6 +6,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import org.beesearch.app.domain.model.MarkPosition
+import org.beesearch.app.domain.model.BeePresenceResult
 import java.time.Instant
 import java.util.UUID
 
@@ -32,12 +33,21 @@ internal data class TerritoryEntity(
             onUpdate = ForeignKey.NO_ACTION,
         ),
     ],
-    indices = [Index(value = ["territory_id"])],
+    indices = [
+        Index(value = ["territory_id"]),
+        Index(
+            value = ["territory_id", "observation_year", "observer_code", "point_number"],
+            unique = true,
+        ),
+    ],
 )
 internal data class ObservationPointEntity(
     @PrimaryKey val id: UUID,
     @ColumnInfo(name = "territory_id") val territoryId: UUID,
     @ColumnInfo(name = "observer_code") val observerCode: String,
+    @ColumnInfo(name = "observation_year", defaultValue = "0") val observationYear: Int,
+    @ColumnInfo(name = "point_number", defaultValue = "0") val pointNumber: Int,
+    @ColumnInfo(name = "bee_presence_result") val beePresenceResult: BeePresenceResult?,
     val code: String?,
     val latitude: Double,
     val longitude: Double,

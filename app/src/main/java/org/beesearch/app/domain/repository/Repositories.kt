@@ -45,4 +45,5 @@ interface ObservationRepository : ObservationPointCreator {
     suspend fun startNextFlight(beeId: UUID): FlightCycle
     suspend fun setFlightAzimuth(flightCycleId: UUID, azimuthDeg: Double?): FlightCycle
     suspend fun completeObservationPoint(pointId: UUID): ObservationPoint
+    suspend fun recordNoBeesFound(pointId: UUID): ObservationPoint
 }

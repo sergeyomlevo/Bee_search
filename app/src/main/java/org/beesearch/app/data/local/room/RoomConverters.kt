@@ -2,6 +2,7 @@ package org.beesearch.app.data.local.room
 
 import androidx.room.TypeConverter
 import org.beesearch.app.domain.model.MarkPosition
+import org.beesearch.app.domain.model.BeePresenceResult
 import java.time.Instant
 import java.util.UUID
 
@@ -23,4 +24,10 @@ internal class RoomConverters {
 
     @TypeConverter
     fun stringToMarkPosition(value: String): MarkPosition = MarkPosition.valueOf(value)
+
+    @TypeConverter
+    fun beePresenceResultToString(value: BeePresenceResult): String = value.name
+
+    @TypeConverter
+    fun stringToBeePresenceResult(value: String): BeePresenceResult = BeePresenceResult.valueOf(value)
 }

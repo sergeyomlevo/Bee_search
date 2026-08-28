@@ -13,7 +13,7 @@ import androidx.room.TypeConverters
         BeeEntity::class,
         FlightCycleEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -30,6 +30,8 @@ internal abstract class BeeSearchDatabase : RoomDatabase() {
             context.applicationContext,
             BeeSearchDatabase::class.java,
             DATABASE_NAME,
-        ).build()
+        )
+            .addMigrations(MIGRATION_1_2)
+            .build()
     }
 }

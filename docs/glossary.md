@@ -164,6 +164,42 @@ ObservationPoint содержит:
 
 ---
 
+# 8.1. Observation Year
+
+**Русский:** год наблюдения
+
+**Техническое имя:** `observation_year` / `observationYear`
+
+Сохранённый локальный календарный год, назначенный ObservationPoint при создании. Не пересчитывается позднее из `created_at`.
+
+---
+
+# 8.2. Point Number
+
+**Русский:** номер точки
+
+**Техническое имя:** `point_number` / `pointNumber`
+
+Последовательный человекочитаемый номер ObservationPoint внутри области `Territory + observationYear + observerCode`. Нумерация начинается с 1. Номер не является идентичностью; identity точки задаёт UUID.
+
+---
+
+# 8.3. Bee Presence Result
+
+**Русский:** результат присутствия пчёл
+
+**Техническое имя:** `bee_presence_result` / `BeePresenceResult`
+
+Явный nullable-результат ObservationPoint:
+
+- `null` — результат не установлен;
+- `BEES_FOUND` — пчёлы найдены;
+- `NO_BEES_FOUND` — наблюдатель явно подтвердил отсутствие пчёл.
+
+Пустой список Bee сам по себе не является `NO_BEES_FOUND`.
+
+---
+
 # 9. Point
 
 **Русский:** точка
@@ -1038,6 +1074,9 @@ MVP не требует наличия сервера, web-интерфейса 
 | текущая территория | `current_territory_id` |
 | точка наблюдения | `ObservationPoint` |
 | код наблюдателя | `observer_code` |
+| год наблюдения | `observation_year` |
+| номер точки | `point_number` |
+| результат присутствия пчёл | `bee_presence_result` |
 | пчела | `Bee` |
 | цвет метки | `mark_color` |
 | положение метки | `mark_position` |

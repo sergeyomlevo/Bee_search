@@ -1,6 +1,7 @@
 package org.beesearch.app.data.local.room
 
 import android.content.Context
+import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
@@ -9,11 +10,14 @@ import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomTerritoryRepository
 import org.beesearch.app.domain.model.InvalidAzimuthException
 import org.beesearch.app.domain.model.BeeMarkCatalog
+import org.beesearch.app.domain.model.BeePresenceResult
+import org.beesearch.app.domain.model.BeePresenceResultRequiredException
 import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.DuplicateTerritoryCodeException
 import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
+import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.OpenFlightCycleExistsException
 import org.junit.After
@@ -50,6 +54,7 @@ class RoomPersistenceTest {
             beeDao = database.beeDao(),
             cycleDao = database.flightCycleDao(),
             clock = clock,
+            observationZoneIdProvider = clock::getZone,
         )
         territoryId = territoryRepository.createTerritory("KLYAZMA-01", "Клязьма").id
     }
@@ -68,9 +73,109 @@ class RoomPersistenceTest {
         }
 
         clock.advanceSeconds(10)
-        observationRepository.completeObservationPoint(first.id)
+        observationRepository.recordNoBeesFound(first.id)
         val second = createPoint()
         assertNull(second.completedAt)
+    }
+
+    @Test
+    fun pointNumberStartsAtOneAndIncrementsWithinTerritoryYearObserver() = runBlocking {
+        val first = createPoint()
+        assertEquals(2026, first.observationYear)
+        assertEquals(1, first.pointNumber)
+
+        observationRepository.recordNoBeesFound(first.id)
+        val second = createPoint()
+
+        assertEquals(2026, second.observationYear)
+        assertEquals(2, second.pointNumber)
+    }
+
+    @Test
+    fun observationYearUsesLocalCalendarWithoutChangingCreatedAtInstant() = runBlocking {
+        val creationInstant = Instant.parse("2026-12-31T22:30:00Z")
+        clock.set(creationInstant)
+        val localYearRepository = RoomObservationRepository(
+            database = database,
+            territoryDao = database.territoryDao(),
+            pointDao = database.observationPointDao(),
+            beeDao = database.beeDao(),
+            cycleDao = database.flightCycleDao(),
+            clock = clock,
+            observationZoneIdProvider = { ZoneOffset.ofHours(3) },
+        )
+
+        val point = localYearRepository.createObservationPoint(
+            point = NewObservationPoint(
+                territoryId = territoryId,
+                latitude = 56.1,
+                longitude = 42.7,
+            ),
+            observerCode = "SV",
+        )
+
+        assertEquals(2027, point.observationYear)
+        assertEquals(creationInstant, point.createdAt)
+    }
+
+    @Test
+    fun pointNumberRestartsForDifferentObserverYearAndTerritory() = runBlocking {
+        val first = createPoint(observerCode = "SV")
+        observationRepository.recordNoBeesFound(first.id)
+
+        val otherObserver = createPoint(observerCode = "IVN")
+        assertEquals(1, otherObserver.pointNumber)
+        observationRepository.recordNoBeesFound(otherObserver.id)
+
+        clock.set(Instant.parse("2027-01-02T06:34:12Z"))
+        val otherYear = createPoint(observerCode = "SV")
+        assertEquals(2027, otherYear.observationYear)
+        assertEquals(1, otherYear.pointNumber)
+        observationRepository.recordNoBeesFound(otherYear.id)
+
+        val otherTerritory = territoryRepository.createTerritory("OTHER", "Другая").id
+        val pointInOtherTerritory = createPoint(
+            observerCode = "SV",
+            pointTerritoryId = otherTerritory,
+        )
+        assertEquals(1, pointInOtherTerritory.pointNumber)
+    }
+
+    @Test
+    fun pointNumberUniqueConstraintIsAuthoritative() = runBlocking {
+        val point = createPoint()
+        val duplicate = ObservationPointEntity(
+            id = UUID.randomUUID(),
+            territoryId = point.territoryId,
+            observerCode = point.observerCode,
+            observationYear = point.observationYear,
+            pointNumber = point.pointNumber,
+            beePresenceResult = null,
+            code = null,
+            latitude = 56.2,
+            longitude = 42.8,
+            gpsLatitude = null,
+            gpsLongitude = null,
+            gpsAccuracyM = null,
+            createdAt = clock.instant(),
+            completedAt = clock.instant(),
+        )
+
+        assertThrows(SQLiteConstraintException::class.java) {
+            runBlocking { database.observationPointDao().insert(duplicate) }
+        }
+        Unit
+    }
+
+    @Test
+    fun failedCreateDoesNotConsumePointNumberOutsideTransaction() = runBlocking {
+        val first = createPoint()
+        assertThrows(ObservationPointAlreadyActiveException::class.java) {
+            runBlocking { createPoint() }
+        }
+
+        observationRepository.recordNoBeesFound(first.id)
+        assertEquals(2, createPoint().pointNumber)
     }
 
     @Test
@@ -85,6 +190,79 @@ class RoomPersistenceTest {
 
         val restored = observationRepository.observeActivePoint().first()
         assertEquals(point, restored)
+    }
+
+    @Test
+    fun newPointHasNoBeePresenceResultUntilFirstBee() = runBlocking {
+        val point = createPoint()
+
+        assertNull(point.beePresenceResult)
+        assertNull(observationRepository.observeActivePoint().first()?.beePresenceResult)
+    }
+
+    @Test
+    fun firstAndAdditionalBeeKeepBeesFoundResult() = runBlocking {
+        val point = createPoint()
+
+        observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        assertEquals(
+            BeePresenceResult.BEES_FOUND,
+            observationRepository.observeActivePoint().first()?.beePresenceResult,
+        )
+
+        observationRepository.addBee(point.id, "BLUE", MarkPosition.LEFT_WING)
+        assertEquals(
+            BeePresenceResult.BEES_FOUND,
+            observationRepository.observeActivePoint().first()?.beePresenceResult,
+        )
+    }
+
+    @Test
+    fun removingFinalPreparedBeeReturnsPresenceResultToNull() = runBlocking {
+        val point = createPoint()
+        val bee = observationRepository.addBee(point.id, "GREEN", MarkPosition.RIGHT_WING)
+
+        observationRepository.removePreparedBee(bee.id)
+
+        assertNull(observationRepository.observeActivePoint().first()?.beePresenceResult)
+    }
+
+    @Test
+    fun noBeesFoundResultBlocksBeeCreation() = runBlocking {
+        val point = createPoint()
+        database.observationPointDao().setBeePresenceResult(
+            point.id,
+            BeePresenceResult.NO_BEES_FOUND,
+        )
+
+        assertThrows(NoBeesFoundAlreadyRecordedException::class.java) {
+            runBlocking {
+                observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+            }
+        }
+        Unit
+    }
+
+    @Test
+    fun explicitNoBeesResultCompletesPointAtomically() = runBlocking {
+        val point = createPoint()
+
+        val completed = observationRepository.recordNoBeesFound(point.id)
+
+        assertEquals(BeePresenceResult.NO_BEES_FOUND, completed.beePresenceResult)
+        assertEquals(clock.instant(), completed.completedAt)
+        assertNull(observationRepository.observeActivePoint().first())
+    }
+
+    @Test
+    fun ordinaryCompletionRejectsUnknownBeePresence() = runBlocking {
+        val point = createPoint()
+
+        assertThrows(BeePresenceResultRequiredException::class.java) {
+            runBlocking { observationRepository.completeObservationPoint(point.id) }
+        }
+        assertEquals(point, observationRepository.observeActivePoint().first())
+        Unit
     }
 
     @Test
@@ -185,6 +363,10 @@ class RoomPersistenceTest {
         observationRepository.removePreparedBee(removed.id)
 
         assertEquals(listOf(retained), observationRepository.observeBees(point.id).first())
+        assertEquals(
+            BeePresenceResult.BEES_FOUND,
+            observationRepository.observeActivePoint().first()?.beePresenceResult,
+        )
     }
 
     @Test
@@ -242,17 +424,20 @@ class RoomPersistenceTest {
         Unit
     }
 
-    private suspend fun createPoint() = observationRepository.createObservationPoint(
+    private suspend fun createPoint(
+        observerCode: String = "SV",
+        pointTerritoryId: UUID = territoryId,
+    ) = observationRepository.createObservationPoint(
         point = NewObservationPoint(
-            territoryId = territoryId,
+            territoryId = pointTerritoryId,
             latitude = 56.1959786,
             longitude = 42.7477116,
             gpsLatitude = 56.1959000,
             gpsLongitude = 42.7477000,
             gpsAccuracyM = 4.5,
         ),
-        observerCode = " SV ",
-    ).also { point -> assertEquals("SV", point.observerCode) }
+        observerCode = " $observerCode ",
+    ).also { point -> assertEquals(observerCode, point.observerCode) }
 
     private class MutableClock(
         private var current: Instant,
@@ -265,6 +450,10 @@ class RoomPersistenceTest {
 
         fun advanceSeconds(seconds: Long) {
             current = current.plusSeconds(seconds)
+        }
+
+        fun set(instant: Instant) {
+            current = instant
         }
     }
 }

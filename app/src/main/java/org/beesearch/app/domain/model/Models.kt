@@ -20,6 +20,9 @@ data class ObservationPoint(
     val id: UUID,
     val territoryId: UUID,
     val observerCode: String,
+    val observationYear: Int,
+    val pointNumber: Int,
+    val beePresenceResult: BeePresenceResult?,
     val code: String?,
     val latitude: Double,
     val longitude: Double,
@@ -29,6 +32,11 @@ data class ObservationPoint(
     val createdAt: Instant,
     val completedAt: Instant?,
 )
+
+enum class BeePresenceResult {
+    BEES_FOUND,
+    NO_BEES_FOUND,
+}
 
 enum class MarkPosition {
     NONE,

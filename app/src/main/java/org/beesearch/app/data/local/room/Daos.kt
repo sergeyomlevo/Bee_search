@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import org.beesearch.app.domain.model.BeePresenceResult
 import java.time.Instant
 import java.util.UUID
 
@@ -36,6 +37,21 @@ internal interface ObservationPointDao {
     @Query("SELECT COUNT(*) FROM observation_points WHERE completed_at IS NULL")
     suspend fun countActive(): Int
 
+    @Query(
+        """
+        SELECT COALESCE(MAX(point_number), 0) + 1
+        FROM observation_points
+        WHERE territory_id = :territoryId
+          AND observation_year = :observationYear
+          AND observer_code = :observerCode
+        """,
+    )
+    suspend fun getNextPointNumber(
+        territoryId: UUID,
+        observationYear: Int,
+        observerCode: String,
+    ): Int
+
     @Query("SELECT * FROM observation_points WHERE completed_at IS NULL LIMIT 1")
     fun observeActive(): Flow<ObservationPointEntity?>
 
@@ -47,6 +63,28 @@ internal interface ObservationPointDao {
         """,
     )
     suspend fun complete(id: UUID, completedAt: Instant): Int
+
+    @Query(
+        """
+        UPDATE observation_points
+        SET bee_presence_result = :result
+        WHERE id = :id AND completed_at IS NULL
+        """,
+    )
+    suspend fun setBeePresenceResult(id: UUID, result: BeePresenceResult?): Int
+
+    @Query(
+        """
+        UPDATE observation_points
+        SET bee_presence_result = :result, completed_at = :completedAt
+        WHERE id = :id AND completed_at IS NULL
+        """,
+    )
+    suspend fun recordNoBeesAndComplete(
+        id: UUID,
+        result: BeePresenceResult,
+        completedAt: Instant,
+    ): Int
 }
 
 @Dao
@@ -62,6 +100,9 @@ internal interface BeeDao {
 
     @Query("SELECT * FROM bees WHERE observation_point_id = :pointId ORDER BY created_at, id")
     suspend fun getForPoint(pointId: UUID): List<BeeEntity>
+
+    @Query("SELECT COUNT(*) FROM bees WHERE observation_point_id = :pointId")
+    suspend fun countForPoint(pointId: UUID): Int
 
     @Query("SELECT * FROM bees WHERE observation_point_id = :pointId ORDER BY created_at, id")
     fun observeForPoint(pointId: UUID): Flow<List<BeeEntity>>

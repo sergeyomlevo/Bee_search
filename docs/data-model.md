@@ -386,6 +386,10 @@ territory_id        UUID        required
 
 observer_code       String      required
 
+observation_year    Int         required
+point_number        Int         required
+bee_presence_result BeePresenceResult? optional
+
 code                String?     optional
 
 latitude            Double      required
@@ -427,6 +431,49 @@ AppSettings.observer_code
 После этого оно является частью исторической записи точки.
 
 Изменение `observer_code` в настройках устройства не должно изменять существующие точки.
+
+---
+
+## 16.1. `observation_year`
+
+Обязательный локальный календарный год наблюдения. Он вычисляется один раз при создании ObservationPoint по локальной временной зоне устройства и хранится как `INTEGER`.
+
+`observation_year` не пересчитывается позднее из `created_at`. Отдельная история часовых поясов не хранится.
+
+---
+
+## 16.2. `point_number`
+
+Обязательный положительный последовательный номер, начинающийся с 1 внутри области:
+
+```text
+territory_id + observation_year + observer_code
+```
+
+Следующий номер определяется и записывается в одной Room transaction. Локальная база дополнительно обеспечивает уникальность полного сочетания:
+
+```text
+territory_id + observation_year + observer_code + point_number
+```
+
+Номер не является идентификатором. UUID остаётся первичным ключом и не меняется при возможном будущем перенумеровании после синхронизации.
+
+---
+
+## 16.3. `bee_presence_result`
+
+Nullable `TEXT` со значениями:
+
+```text
+BEES_FOUND
+NO_BEES_FOUND
+```
+
+`null` означает, что результат ещё не установлен. Значение не выводится из количества Bee.
+
+Первая вставка Bee и установка `BEES_FOUND` выполняются атомарно. При удалении последней подготовленной Bee до первого выпуска значение возвращается в `null`. Операция явного отсутствия пчёл одной транзакцией устанавливает `NO_BEES_FOUND` и `completed_at`; при этом добавление Bee запрещено.
+
+Отдельная таблица результата и generic-поле `status` не создаются.
 
 ---
 
@@ -542,6 +589,8 @@ completed_at = null
 После завершения наблюдения записывается время завершения.
 
 Отдельное поле `status` на данном этапе не требуется.
+
+Обычное завершение запрещено при `bee_presence_result = null`. Отрицательное наблюдение завершается отдельной атомарной операцией, устанавливающей `NO_BEES_FOUND` и `completed_at`.
 
 ---
 
@@ -1327,6 +1376,9 @@ ObservationPoint
 │ id PK                   │
 │ territory_id FK         │
 │ observer_code           │
+│ observation_year        │
+│ point_number            │
+│ bee_presence_result     │
 │ code                    │
 │ latitude                │
 │ longitude               │
@@ -1377,11 +1429,22 @@ code            UNIQUE
 ```text
 territory_id    MUST EXIST
 observer_code   required
+observation_year required
+point_number    required, >= 1
 latitude        required
 longitude       required
 ```
 
 Координаты не уникальны.
+
+Уникально:
+
+```text
+territory_id
++ observation_year
++ observer_code
++ point_number
+```
 
 ## Bee
 
@@ -1422,7 +1485,25 @@ return_time >= departure_time
 
 ---
 
-# 67. Что намеренно не хранится
+# 67. Room schema v2 и миграция из v1
+
+Schema v2 добавляет в `observation_points`:
+
+```text
+observation_year INTEGER NOT NULL
+point_number INTEGER NOT NULL
+bee_presence_result TEXT NULL
+```
+
+Миграция сохраняет все существующие строки и UUID. Для прототипных v1-точек `observation_year` вычисляется из `created_at` в текущей локальной временной зоне устройства во время миграции. Историческая зона v1 неизвестна и отдельно не восстанавливается.
+
+В каждой области `territory_id + observation_year + observer_code` номера назначаются с 1 в порядке `created_at`, затем `id` как детерминированный tie-breaker. После backfill создаётся UNIQUE index по четырём полям.
+
+`bee_presence_result` получает `BEES_FOUND`, если для точки существует хотя бы одна строка Bee. Для точек без Bee остаётся `null`; `NO_BEES_FOUND` никогда не выводится миграцией.
+
+---
+
+# 68. Что намеренно не хранится
 
 На текущем этапе не создаются отдельные поля или таблицы:
 
@@ -1437,6 +1518,7 @@ AzimuthMeasurement
 OfflineMap
 CurrentTerritory entity
 PhysicalPlace
+ObservationSeason
 Territory.map_status
 Territory.map_region_data
 time_zone_id
@@ -1444,7 +1526,7 @@ time_zone_id
 
 ---
 
-# 68. Почему нет PhysicalPlace
+# 69. Почему нет PhysicalPlace
 
 Разные ObservationPoint могут иметь одинаковые координаты.
 
@@ -1468,7 +1550,7 @@ ObservationPoint 2
 
 ---
 
-# 69. Минимальная модель MVP
+# 70. Минимальная модель MVP
 
 Ядро исследовательской базы:
 
@@ -1484,6 +1566,9 @@ ObservationPoint
 - id
 - territory_id
 - observer_code
+- observation_year
+- point_number
+- bee_presence_result?
 - code?
 - latitude
 - longitude
@@ -1523,7 +1608,7 @@ AppSettings
 
 ---
 
-# 70. Итоговая логика данных
+# 71. Итоговая логика данных
 
 ```text
 AppSettings
@@ -1535,6 +1620,8 @@ Territory
     │
     └── ObservationPoint
             ├── observer_code snapshot
+            ├── observation_year + point_number
+            ├── bee_presence_result?
             ├── coordinates
             ├── original GPS data
             │

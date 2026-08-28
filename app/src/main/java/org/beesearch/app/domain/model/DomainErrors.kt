@@ -38,6 +38,18 @@ class DuplicateBeeMarkException : IllegalStateException(
     "A bee with the same mark already exists in this observation point.",
 )
 
+class BeePresenceResultRequiredException : IllegalStateException(
+    "Bee presence must be established before the observation point is completed.",
+)
+
+class NoBeesFoundAlreadyRecordedException : IllegalStateException(
+    "A bee cannot be added after no bees were explicitly recorded.",
+)
+
+class BeesAlreadyFoundException : IllegalStateException(
+    "No bees cannot be recorded after bees were found.",
+)
+
 class OpenFlightCycleExistsException : IllegalStateException(
     "A bee cannot have more than one open flight cycle.",
 )

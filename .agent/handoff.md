@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Bee preparation for an active ObservationPoint and the focused reliability-hardening follow-up are committed, automatically verified, and physically accepted on Samsung. ObservationPoint creation remains complete. No implementation milestone is currently in progress.
+Accepted domain decisions D056/D057 are implemented and verified: ObservationPoint stores scoped year/number data and an explicit nullable Bee presence result. Room schema v2, migration 1→2, domain safeguards, documentation, and tests are complete. No next UI milestone has been started.
 
 ## Last completed commits
 
@@ -12,7 +12,7 @@ Bee preparation for an active ObservationPoint and the focused reliability-harde
 - `656519a` — ObservationPoint map placement workflow
 - `0db416b` — Bee preparation workflow
 
-The reliability-hardening follow-up is the current HEAD commit containing this handoff.
+The D056/D057 implementation is the current HEAD commit containing this handoff.
 
 ## Verified
 
@@ -49,10 +49,16 @@ The reliability-hardening follow-up is the current HEAD commit containing this h
 - `updateTerritory`, like `createTerritory`, maps the Room/SQLite unique-code constraint to `DuplicateTerritoryCodeException`. The database UNIQUE constraint remains authoritative, and the instrumented Room test covers both operations.
 - The focused follow-up passes `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lint`. Its targeted `RoomPersistenceTest` passes 11/11 on Samsung SM-S938B.
 - Physical Samsung verification confirms repeated map → other screen → map navigation does not blank or degrade the map; the map and current point restore after restart; granted location permission remains correct; the permission dialog does not reappear automatically; and the explicit `Разрешить доступ к местоположению` action still opens the system dialog when permission is needed. The reliability follow-up is physically accepted.
+- D056 records `observationYear` from the device-local calendar at creation and assigns `pointNumber` transactionally within `Territory + observationYear + observerCode`. UUID remains identity, the four-column Room UNIQUE index is authoritative, and O005 remains open for the final display-code format.
+- D057 adds nullable `BeePresenceResult`: first Bee atomically sets `BEES_FOUND`, removing the final prepared Bee before release restores `null`, `NO_BEES_FOUND` blocks Bee creation, ordinary completion rejects `null`, and `recordNoBeesFound` atomically saves the explicit result and completion timestamp. No no-bees UI control was added in this milestone.
+- Room schema is version 2 with an explicit v1→v2 migration. Prototype rows keep every UUID and row; year is derived from `created_at` in the device's local zone at migration time, and numbering is assigned by `created_at`, then UUID, per scope. Existing points with Bee rows backfill to `BEES_FOUND`; empty points backfill to `null`.
+- Final `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lint` pass. The exported v2 schema is present. Targeted Samsung execution passes 23/23 tests: 22 Room/domain tests plus the v1→v2 migration/backfill/schema-validation test.
+- The final debug APK was installed successfully on Samsung SM-S938B and Bee Search launched without an immediate Room/opening crash. The package had been absent before installation, so this launch used a fresh database rather than the phone's former prototype v1 database.
 
 ## Not yet verified
 
-- No remaining physical verification is required for the current Bee preparation and reliability-hardening milestone.
+- A real retained Bee Search v1 database was not available on the Samsung for a manual in-place upgrade. The equivalent v1→v2 migration, preservation, backfill, and Room schema validation pass as an instrumented test on that device.
+- The new year, number, and Bee presence values are not yet exposed by a new UI, so there is no additional visual field-UX claim in this milestone.
 
 ## Open items
 
@@ -63,7 +69,7 @@ The reliability-hardening follow-up is the current HEAD commit containing this h
 
 ## Next task
 
-The next planned milestone is the initial group release. Do not start it without an explicit user request.
+Wait for an explicit UI milestone. Possible next work includes exposing the accepted `Пчёлы отсутствуют` operation or proceeding to the initial group release; do not choose or start either automatically. Ideas I001–I004 remain non-authoritative unless explicitly promoted.
 
 ## Important constraints
 

@@ -76,9 +76,10 @@ found.
 **Motivation / expected value:** Make historical coverage and explicit negative
 observations visible in the field and during later review.
 
-**Dependencies / prerequisites:** Accepted year-filtering and explicit
-no-bees-result semantics; historical point queries; Points-screen navigation;
-map visualization.
+**Dependencies / prerequisites:** D056 provides stored observation year and
+scoped point numbering; D057 provides the explicit Bee presence result.
+Historical point queries, Points-screen navigation, and map visualization still
+require their own implementation milestone.
 
 **Notes:** The general ability to review saved points is already part of product
 requirements. The dedicated Points navigation, year filtering, result-based
