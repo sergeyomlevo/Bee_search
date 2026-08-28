@@ -38,7 +38,8 @@ multiple points into an evidence-based estimate of a probable nest area.
 **Dependencies / prerequisites:** Stable field-observation data; an accepted and
 validated method for deriving distance from FlightCycle observations; an
 analysis design that treats azimuth as optional supporting evidence rather than
-a direct direction to the nest.
+a direct direction to the nest; application of D058 so short first cycles that
+represent a delayed departure do not contribute flight-duration evidence.
 
 **Notes:** This is a research-analysis feature, not a current MVP requirement.
 It is consistent with D049 but must not be implemented as part of the field-data

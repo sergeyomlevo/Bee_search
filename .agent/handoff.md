@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Accepted domain decisions D056/D057 are implemented and verified: ObservationPoint stores scoped year/number data and an explicit nullable Bee presence result. Room schema v2, migration 1→2, domain safeguards, documentation, and tests are complete. No next UI milestone has been started.
+The project ideas workflow and accepted domain decisions D056–D058 are implemented, verified, and split into thematic commits. ObservationPoint stores scoped year/number data and an explicit nullable Bee presence result; the short-first-cycle analysis exclusion is derived without changing persisted FlightCycle data. Room schema v2, migration 1→2, domain safeguards, documentation, and tests are complete. No next UI milestone has been started.
 
 ## Last completed commits
 
@@ -11,8 +11,10 @@ Accepted domain decisions D056/D057 are implemented and verified: ObservationPoi
 - `50829b4` — MapLibre, foreground GPS and project handoff
 - `656519a` — ObservationPoint map placement workflow
 - `0db416b` — Bee preparation workflow
+- `ec957cd` — Project ideas workflow
+- `3304e94` — Observation metadata, Bee presence result, and Room v2
 
-The D056/D057 implementation is the current HEAD commit containing this handoff.
+The D058 delayed-departure analysis rule is the current HEAD commit containing this handoff.
 
 ## Verified
 
@@ -54,11 +56,14 @@ The D056/D057 implementation is the current HEAD commit containing this handoff.
 - Room schema is version 2 with an explicit v1→v2 migration. Prototype rows keep every UUID and row; year is derived from `created_at` in the device's local zone at migration time, and numbering is assigned by `created_at`, then UUID, per scope. Existing points with Bee rows backfill to `BEES_FOUND`; empty points backfill to `null`.
 - Final `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lint` pass. The exported v2 schema is present. Targeted Samsung execution passes 23/23 tests: 22 Room/domain tests plus the v1→v2 migration/backfill/schema-validation test.
 - The final debug APK was installed successfully on Samsung SM-S938B and Bee Search launched without an immediate Room/opening crash. The package had been absent before installation, so this launch used a fresh database rather than the phone's former prototype v1 database.
+- D058 preserves the common first group-release timestamp and derives `FlightCycle.isExcludedFromFlightDurationAnalysis` only when cycle 1 has returned in less than 60 seconds. The raw cycle remains unchanged; exactly 60 seconds and later short cycles are not excluded. No Room field, schema change, or nest-distance analysis was added.
+- The D058 JVM boundary tests pass as part of `test`; `assembleDebug`, `assembleDebugAndroidTest`, and `lint` also pass. Targeted `RoomPersistenceTest` execution passes 23/23 on Samsung, including closing a 20-second first cycle and later creating FlightCycle 2 with its actual individual departure timestamp. The final debug APK was reinstalled and launched after device testing.
 
 ## Not yet verified
 
 - A real retained Bee Search v1 database was not available on the Samsung for a manual in-place upgrade. The equivalent v1→v2 migration, preservation, backfill, and Room schema validation pass as an instrumented test on that device.
 - The new year, number, and Bee presence values are not yet exposed by a new UI, so there is no additional visual field-UX claim in this milestone.
+- D058 has no dedicated UI yet because the initial group-release/observation screen is still a future milestone; its eventual field interaction therefore remains to be verified when that UI exists.
 
 ## Open items
 

@@ -904,6 +904,17 @@ is_initial_group
 
 не хранится.
 
+Пригодность первого цикла для расчётов продолжительности также не хранится отдельным полем. Она вычисляется как:
+
+```text
+excluded_from_flight_duration_analysis =
+    sequence_number = 1
+    AND return_time IS NOT NULL
+    AND return_time - departure_time < 60 seconds
+```
+
+Такой FlightCycle остаётся полноценной строкой исходных данных. Его timestamps не изменяются. Ровно 60 секунд и циклы с `sequence_number > 1` этим правилом не исключаются.
+
 ---
 
 # 41. Первый групповой выпуск

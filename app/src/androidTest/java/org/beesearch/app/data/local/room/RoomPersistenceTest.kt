@@ -20,10 +20,13 @@ import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.OpenFlightCycleExistsException
+import org.beesearch.app.domain.model.isExcludedFromFlightDurationAnalysis
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Clock
@@ -302,6 +305,33 @@ class RoomPersistenceTest {
         val secondBeeCycles = observationRepository.observeFlightCycles(secondBee.id).first()
         assertEquals(2, firstBeeCycles.size)
         assertEquals(1, secondBeeCycles.size)
+    }
+
+    @Test
+    fun delayedBeeCanCloseShortFirstCycleAndStartActualSecondFlight() = runBlocking {
+        val point = createPoint()
+        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        val firstCycle = observationRepository.startInitialGroupRelease(point.id).single()
+
+        clock.advanceSeconds(20)
+        val closedFirstCycle = observationRepository.registerBeeReturn(bee.id)
+        assertEquals(firstCycle.departureTime, closedFirstCycle.departureTime)
+        assertTrue(closedFirstCycle.isExcludedFromFlightDurationAnalysis)
+
+        clock.advanceSeconds(147)
+        val actualDepartureTime = clock.instant()
+        val secondCycle = observationRepository.startNextFlight(bee.id)
+        assertEquals(2, secondCycle.sequenceNumber)
+        assertEquals(actualDepartureTime, secondCycle.departureTime)
+
+        clock.advanceSeconds(20)
+        val closedSecondCycle = observationRepository.registerBeeReturn(bee.id)
+        assertFalse(closedSecondCycle.isExcludedFromFlightDurationAnalysis)
+
+        val persistedCycles = observationRepository.observeFlightCycles(bee.id).first()
+        assertEquals(listOf(1, 2), persistedCycles.map { it.sequenceNumber })
+        assertEquals(firstCycle.departureTime, persistedCycles.first().departureTime)
+        assertEquals(actualDepartureTime, persistedCycles.last().departureTime)
     }
 
     @Test
