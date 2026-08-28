@@ -161,13 +161,14 @@ internal interface FlightCycleDao {
 
     @Query(
         """
-        SELECT COUNT(*) FROM flight_cycles
-        WHERE bee_id IN (
-            SELECT id FROM bees WHERE observation_point_id = :pointId
-        )
+        SELECT flight_cycles.*
+        FROM flight_cycles
+        INNER JOIN bees ON bees.id = flight_cycles.bee_id
+        WHERE bees.observation_point_id = :pointId
+        ORDER BY bees.created_at, bees.id, flight_cycles.sequence_number
         """,
     )
-    fun observeCountForObservationPoint(pointId: UUID): Flow<Int>
+    fun observeForObservationPoint(pointId: UUID): Flow<List<FlightCycleEntity>>
 
     @Query(
         """

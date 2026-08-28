@@ -21,6 +21,7 @@ import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.OpenFlightCycleExistsException
+import org.beesearch.app.domain.model.OpenFlightCycleNotFoundException
 import org.beesearch.app.domain.model.isExcludedFromFlightDurationAnalysis
 import org.beesearch.app.domain.usecase.StartupDestination
 import org.beesearch.app.domain.usecase.StartupRouter
@@ -339,6 +340,69 @@ class RoomPersistenceTest {
         val secondBeeCycles = observationRepository.observeFlightCycles(secondBee.id).first()
         assertEquals(2, firstBeeCycles.size)
         assertEquals(1, secondBeeCycles.size)
+        assertEquals(
+            3,
+            observationRepository.observeFlightCyclesForPoint(point.id).first().size,
+        )
+    }
+
+    @Test
+    fun repeatedReturnCannotCreateOrRewriteAnotherEvent() = runBlocking {
+        val point = createPoint()
+        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        observationRepository.startInitialGroupRelease(point.id)
+        clock.advanceSeconds(30)
+        val returned = observationRepository.registerBeeReturn(bee.id)
+
+        assertThrows(OpenFlightCycleNotFoundException::class.java) {
+            runBlocking { observationRepository.registerBeeReturn(bee.id) }
+        }
+
+        assertEquals(
+            listOf(returned),
+            observationRepository.observeFlightCycles(bee.id).first(),
+        )
+    }
+
+    @Test
+    fun activeReleasedPointRestoresAsObservationWorkflow() = runBlocking {
+        val point = createPoint()
+        observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        observationRepository.startInitialGroupRelease(point.id)
+
+        val restoredPoint = observationRepository.observeActivePoint().first()
+        val restoredCycles = observationRepository.observeFlightCyclesForPoint(point.id).first()
+        val territory = requireNotNull(territoryRepository.getTerritory(territoryId))
+
+        assertEquals(point.id, restoredPoint?.id)
+        assertTrue(restoredCycles.isNotEmpty())
+        assertEquals(
+            StartupDestination.ResumeObservation(restoredPoint!!),
+            StartupRouter.decide(restoredPoint, territoryId, listOf(territory)),
+        )
+    }
+
+    @Test
+    fun completionPreservesMixedOpenAndClosedFlightCycles() = runBlocking {
+        val point = createPoint()
+        val flyingBeeA = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        val atPointBee = observationRepository.addBee(point.id, "BLUE", MarkPosition.RIGHT_WING)
+        val flyingBeeC = observationRepository.addBee(point.id, "RED", MarkPosition.LEFT_WING)
+        observationRepository.startInitialGroupRelease(point.id)
+        clock.advanceSeconds(75)
+        val returned = observationRepository.registerBeeReturn(atPointBee.id)
+        val beforeCompletion = observationRepository.observeFlightCyclesForPoint(point.id).first()
+
+        clock.advanceSeconds(10)
+        val completed = observationRepository.completeObservationPoint(point.id)
+        val afterCompletion = observationRepository.observeFlightCyclesForPoint(point.id).first()
+
+        assertTrue(completed.completedAt != null)
+        assertNull(observationRepository.observeActivePoint().first())
+        assertEquals(beforeCompletion, afterCompletion)
+        assertNull(afterCompletion.single { it.beeId == flyingBeeA.id }.returnTime)
+        assertEquals(returned.returnTime, afterCompletion.single { it.beeId == atPointBee.id }.returnTime)
+        assertNull(afterCompletion.single { it.beeId == flyingBeeC.id }.returnTime)
     }
 
     @Test

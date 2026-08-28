@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -57,6 +59,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -66,11 +69,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.BeeMarkCombination
 import org.beesearch.app.domain.model.BeePresenceResult
+import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.Territory
@@ -86,6 +91,9 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.Point
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import java.time.Instant
 
 class MainActivity : ComponentActivity() {
     private val locationPermissionState = androidx.compose.runtime.mutableStateOf(false)
@@ -147,6 +155,7 @@ private fun BeeSearchApp(
     val completingObservationPointId by viewModel.completingObservationPointId.collectAsStateWithLifecycle()
     val beePreparation by viewModel.beePreparation.collectAsStateWithLifecycle()
     val beeMutationInProgress by viewModel.beeMutationInProgress.collectAsStateWithLifecycle()
+    val beeEventInProgressIds by viewModel.beeEventInProgressIds.collectAsStateWithLifecycle()
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, _ ->
@@ -199,26 +208,50 @@ private fun BeeSearchApp(
                         onOpenSettings = viewModel::openSettings,
                         onOpenTerritories = viewModel::openTerritoryManagement,
                     )
-                    is AppRoute.ResumeObservation -> BeePreparationScreen(
-                        point = currentRoute.point,
-                        preparation = beePreparation,
-                        isMutating = beeMutationInProgress,
-                        isCompleting = completingObservationPointId == currentRoute.point.id,
-                        onAddBee = { color, position ->
-                            viewModel.addPreparedBee(currentRoute.point.id, color, position)
-                        },
-                        onRemoveBee = viewModel::removePreparedBee,
-                        onRecordNoBeesFound = {
-                            viewModel.recordNoBeesFound(currentRoute.point.id)
-                        },
-                        onComplete = { viewModel.completeObservationPoint(currentRoute.point.id) },
-                        onOpenTerritories = viewModel::openTerritoryManagement,
-                    )
+                    is AppRoute.ResumeObservation -> {
+                        val stateMatchesPoint = beePreparation.pointId == currentRoute.point.id
+                        when {
+                            beePreparation.isLoading || !stateMatchesPoint -> LoadingScreen()
+                            activePointWorkflowPhase(beePreparation.isReleaseStarted) ==
+                                ActivePointWorkflowPhase.OBSERVATION -> BeeObservationScreen(
+                                point = currentRoute.point,
+                                bees = beePreparation.bees,
+                                flightCycles = beePreparation.flightCycles,
+                                beeEventInProgressIds = beeEventInProgressIds,
+                                isCompleting = completingObservationPointId == currentRoute.point.id,
+                                onRegisterReturn = viewModel::registerBeeReturn,
+                                onStartNextFlight = viewModel::startNextFlight,
+                                onComplete = {
+                                    viewModel.completeObservationPoint(currentRoute.point.id)
+                                },
+                            )
+                            else -> BeePreparationScreen(
+                                point = currentRoute.point,
+                                preparation = beePreparation,
+                                isMutating = beeMutationInProgress,
+                                isCompleting = completingObservationPointId == currentRoute.point.id,
+                                onAddBee = { color, position ->
+                                    viewModel.addPreparedBee(currentRoute.point.id, color, position)
+                                },
+                                onRemoveBee = viewModel::removePreparedBee,
+                                onRecordNoBeesFound = {
+                                    viewModel.recordNoBeesFound(currentRoute.point.id)
+                                },
+                                onComplete = {
+                                    viewModel.completeObservationPoint(currentRoute.point.id)
+                                },
+                                onOpenTerritories = viewModel::openTerritoryManagement,
+                                onStartInitialGroupRelease = {
+                                    viewModel.startInitialGroupRelease(currentRoute.point.id)
+                                },
+                            )
+                        }
+                    }
                 }
                 feedback?.let {
                     FeedbackBanner(
-                        message = it,
-                        onDismiss = viewModel::clearFeedback,
+                        feedback = it,
+                        onDismiss = { feedbackId -> viewModel.clearFeedback(feedbackId) },
                         modifier = Modifier.align(Alignment.TopCenter).zIndex(10f),
                     )
                 }
@@ -227,15 +260,36 @@ private fun BeeSearchApp(
     }
 }
 
+internal const val FEEDBACK_AUTO_DISMISS_MILLIS = 5_000L
+
 @Composable
-private fun FeedbackBanner(message: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    Card(modifier = modifier.fillMaxWidth().padding(8.dp)) {
+internal fun FeedbackBanner(
+    feedback: UiFeedback,
+    onDismiss: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    autoDismissMillis: Long = FEEDBACK_AUTO_DISMISS_MILLIS,
+) {
+    LaunchedEffect(feedback.id, feedback.displayMode, autoDismissMillis) {
+        if (feedback.displayMode == FeedbackDisplayMode.AUTO_DISMISS) {
+            delay(autoDismissMillis)
+            onDismiss(feedback.id)
+        }
+    }
+
+    Card(modifier = modifier.fillMaxWidth().padding(8.dp).testTag("feedback-banner")) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(message, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
-            TextButton(onClick = onDismiss) { Text("Закрыть") }
+            Text(
+                feedback.message,
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.primary,
+            )
+            TextButton(
+                onClick = { onDismiss(feedback.id) },
+                modifier = Modifier.testTag("feedback-dismiss"),
+            ) { Text("Закрыть") }
         }
     }
 }
@@ -759,6 +813,7 @@ internal fun BeePreparationScreen(
     onRecordNoBeesFound: () -> Unit,
     onComplete: () -> Unit,
     onOpenTerritories: () -> Unit,
+    onStartInitialGroupRelease: () -> Unit = {},
 ) {
     var showCompletionConfirmation by rememberSaveable { mutableStateOf(false) }
     var showNoBeesConfirmation by rememberSaveable { mutableStateOf(false) }
@@ -916,17 +971,20 @@ internal fun BeePreparationScreen(
 
                 item {
                     Button(
-                        onClick = {},
-                        enabled = false,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Выпустить всех") }
+                        onClick = onStartInitialGroupRelease,
+                        enabled = bees.isNotEmpty() &&
+                            beePresenceResult == BeePresenceResult.BEES_FOUND &&
+                            !isMutating &&
+                            !isCompleting,
+                        modifier = Modifier.fillMaxWidth().testTag("initial-group-release"),
+                    ) { Text(if (isMutating) "Сохранение…" else "Выпустить всех") }
                 }
                 item {
                     Text(
                         if (bees.isEmpty()) {
-                            "Добавьте хотя бы одну пчелу. Первый выпуск будет реализован следующим этапом."
+                            "Добавьте хотя бы одну пчелу для первого группового выпуска."
                         } else {
-                            "Набор готов. Первый групповой выпуск будет реализован следующим этапом."
+                            "Все подготовленные пчёлы получат одно общее время первого выпуска."
                         },
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -935,6 +993,195 @@ internal fun BeePreparationScreen(
                     TextButton(onClick = onOpenTerritories, modifier = Modifier.fillMaxWidth()) {
                         Text("Управление территориями")
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun BeeObservationScreen(
+    point: ObservationPoint,
+    bees: List<Bee>,
+    flightCycles: List<FlightCycle>,
+    beeEventInProgressIds: Set<UUID>,
+    isCompleting: Boolean,
+    onRegisterReturn: (UUID) -> Unit,
+    onStartNextFlight: (UUID) -> Unit,
+    onComplete: () -> Unit,
+    nowProvider: () -> Instant = { Instant.now() },
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var showCompletionConfirmation by rememberSaveable { mutableStateOf(false) }
+    var nowEpochMillis by remember { mutableLongStateOf(nowProvider().toEpochMilli()) }
+    val cards = remember(bees, flightCycles) {
+        buildBeeObservationCards(bees, flightCycles)
+    }
+
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (isActive) {
+                nowEpochMillis = nowProvider().toEpochMilli()
+                delay(1_000)
+            }
+        }
+    }
+
+    if (showCompletionConfirmation) {
+        AlertDialog(
+            onDismissRequest = { if (!isCompleting) showCompletionConfirmation = false },
+            title = { Text("Завершить наблюдение?") },
+            text = {
+                Text(
+                    "Точка наблюдения будет завершена. " +
+                        "Незаконченные полёты сохранятся как есть.",
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCompletionConfirmation = false
+                        onComplete()
+                    },
+                    enabled = !isCompleting,
+                    modifier = Modifier.testTag("confirm-field-observation-completion"),
+                ) { Text("Завершить") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showCompletionConfirmation = false },
+                    enabled = !isCompleting,
+                    modifier = Modifier.testTag("cancel-field-observation-completion"),
+                ) { Text("Отмена") }
+            },
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            Surface(tonalElevation = 2.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 52.dp)
+                        .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Наблюдение · точка ${point.pointNumber}",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    TextButton(
+                        onClick = { showCompletionConfirmation = true },
+                        enabled = !isCompleting && beeEventInProgressIds.isEmpty(),
+                        modifier = Modifier.testTag("complete-field-observation"),
+                    ) { Text(if (isCompleting) "Завершение…" else "Завершить") }
+                }
+            }
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).testTag("bee-observation-list"),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            items(cards, key = { it.bee.id }) { card ->
+                BeeObservationCard(
+                    card = card,
+                    now = Instant.ofEpochMilli(nowEpochMillis),
+                    isEventInProgress = card.bee.id in beeEventInProgressIds,
+                    onRegisterReturn = { onRegisterReturn(card.bee.id) },
+                    onStartNextFlight = { onStartNextFlight(card.bee.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BeeObservationCard(
+    card: BeeObservationCardModel,
+    now: Instant,
+    isEventInProgress: Boolean,
+    onRegisterReturn: () -> Unit,
+    onStartNextFlight: () -> Unit,
+) {
+    val state = card.fieldState
+    val stateStartedAt = card.stateStartedAt
+    val stateText = when (state) {
+        BeeFieldState.IN_FLIGHT -> "В полёте"
+        BeeFieldState.AT_POINT -> "На точке"
+        null -> "Ожидание данных"
+    }
+    val actionText = when (state) {
+        BeeFieldState.IN_FLIGHT -> "ПРИЛЕТЕЛА"
+        BeeFieldState.AT_POINT -> "УЛЕТЕЛА"
+        null -> "НЕДОСТУПНО"
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    MarkColorSwatch(card.bee.markColor, size = 22)
+                    Text(
+                        BeeMarkCatalog.displayName(card.bee.markColor, card.bee.markPosition),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    stateStartedAt?.let { formatElapsedTime(it, now) } ?: "--:--",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .testTag("bee-timer-${card.bee.id}"),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stateText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("bee-state-${card.bee.id}"),
+                )
+                Button(
+                    onClick = {
+                        when (state) {
+                            BeeFieldState.IN_FLIGHT -> onRegisterReturn()
+                            BeeFieldState.AT_POINT -> onStartNextFlight()
+                            null -> Unit
+                        }
+                    },
+                    enabled = state != null && !isEventInProgress,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = 132.dp, minHeight = 48.dp)
+                        .testTag("bee-action-${card.bee.id}"),
+                ) {
+                    Text(if (isEventInProgress) "СОХРАНЕНИЕ…" else actionText)
                 }
             }
         }

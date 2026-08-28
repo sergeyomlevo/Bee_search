@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-The Bee-preparation selector is optimized for sequential field entry and automatically verified, but still awaits the requested manual UX check. After a manual color choice it selects the first available position, advances only after the selected Bee appears in persisted state, retains manual position priority, and moves through the authoritative BeeMarkCatalog order. Room schema remains v2 and domain behavior is unchanged.
+The initial group release and main Bee observation screen are implemented in the dirty worktree and automatically verified. The release uses the existing atomic repository operation; the observation screen derives every Bee state from Room FlightCycle data, provides one-tap `ПРИЛЕТЕЛА` / `УЛЕТЕЛА`, uses one shared one-second UI timer tick, restores its phase from persisted cycles, and completes the whole ObservationPoint without rewriting open cycles. Room schema remains v2.
 
 ## Last completed commits
 
@@ -16,8 +16,9 @@ The Bee-preparation selector is optimized for sequential field entry and automat
 - `8db15b0` — Delayed departure analysis rule
 - `a689357` — Agent decision policy refinement
 - `a3ed1c2` — No-bees observation workflow
+- `37aade7` — Sequential Bee mark selection
 
-The no-bees observation workflow is the current HEAD commit; this selector optimization remains uncommitted for review.
+The sequential Bee mark selection is the current HEAD commit. The observation-screen milestone remains uncommitted for review.
 
 ## Verified
 
@@ -71,14 +72,26 @@ The no-bees observation workflow is the current HEAD commit; this selector optim
 - Selection progression is driven by the persisted Bee list: pressing `Добавить` records the currently displayed combination as pending, but the selector advances only when that exact combination appears in the used set. An unrelated availability change still clears an invalid selection instead of silently substituting another Bee.
 - Used position chips and exhausted color chips remain disabled. When the entire derived catalog is used, selection is empty, the existing full-catalog message remains visible, and `Добавить` is disabled. Repository duplicate protection is unchanged.
 - The new pure selection-logic suite passes 11/11 as part of `test`. Final `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lintDebug` pass. The final debug and test APKs are installed on Samsung SM-S938B. A stable LazyColumn item key now preserves BeeSelector state while persisted Bee rows are inserted; the focused full-screen regression test passes 1/1 and confirms `Белая: Обычная → КП → КЛ`, then `Жёлтая: Обычная`. The external-invalidation test also passes 1/1 in an isolated run. A combined 10-test class run passed 9 tests, including the new regression, and hit the known Compose runner `No compose hierarchies found` flake in the external-invalidation test; this was not a product assertion failure.
+- `Выпустить всех` now calls the existing transactional initial-release operation. All prepared Bee receive FlightCycle 1 with one common persisted departure timestamp, and the active-point UI switches to observation when the aggregate Room query reports FlightCycle data. A released active point therefore returns to observation rather than preparation after restart.
+- The observation screen renders a stable-keyed LazyColumn of Bee cards. An open latest cycle derives `В полёте` / `ПРИЛЕТЕЛА`; a closed latest cycle derives `На точке` / `УЛЕТЕЛА`. Each event is persisted through the existing repository operation before Room-driven UI state changes, and only the affected Bee button is disabled while its operation is running.
+- One screen-level lifecycle-aware coroutine refreshes a shared `now` value approximately once per second while the Activity is at least `STARTED`. Card timers are derived from persisted `departure_time` or `return_time`, format as `MM:SS` / `H:MM:SS`, and are never written to Room.
+- Observation completion requires confirmation and uses the existing point-completion transaction. Mixed open and closed FlightCycle rows remain byte-for-byte semantically unchanged; no synthetic return or next cycle is created. D058 remains derived from the unchanged first-cycle timestamps and the normal next-flight action creates FlightCycle 2.
+- Final JVM/build validation passes `test assembleDebug assembleDebugAndroidTest lintDebug`. On Samsung SM-S938B, direct runs pass 27/27 `RoomPersistenceTest`, 3/3 `BeeObservationScreenTest`, and 10/10 `ResumeObservationScreenTest`; the final debug/test APKs are installed and the app launches.
+- The observation UI density polish keeps the same stable-keyed list, persisted-state derivation, shared timer tick, and event commands while replacing the large card stack with two compact rows: mark/name plus timer, then state plus the current action. The header is one compact line, list/card spacing is reduced, and each action retains a tested minimum 48 dp height.
+- Final `test assembleDebug assembleDebugAndroidTest lintDebug` passes after the density change. The updated debug and test APKs are installed on Samsung SM-S938B, and `BeeObservationScreenTest` passes 4/4 there. Its new layout regression confirms that five complete Bee actions are visible without scrolling at the device's current large font scale and that the field-action touch target remains at least 48 dp.
+- The existing feedback banner now distinguishes short successful/informational feedback from persistent validation/domain/technical feedback without adding a second notification mechanism. Success messages auto-dismiss after five seconds through a token-keyed Compose effect; replacement messages restart the timer, stale ids cannot clear newer feedback, and manual `Закрыть` remains immediate.
+- Final `test assembleDebug assembleDebugAndroidTest lintDebug` passes for the feedback change. The updated debug/test APKs are installed on Samsung SM-S938B, where `FeedbackBannerTest` passes 4/4 with a controlled Compose clock: auto-dismiss, persistent error, replacement/stale-timeout protection, and manual dismissal.
 
 ## Not yet verified
 
 - A real retained Bee Search v1 database was not available on the Samsung for a manual in-place upgrade. The equivalent v1→v2 migration, preservation, backfill, and Room schema validation pass as an instrumented test on that device.
 - The new year, number, and Bee presence values are not yet exposed by a new UI, so there is no additional visual field-UX claim in this milestone.
-- D058 has no dedicated UI yet because the initial group-release/observation screen is still a future milestone; its eventual field interaction therefore remains to be verified when that UI exists.
+- D058 is now reachable through the normal observation UI, but its short-first-cycle interaction has not yet been manually timed and verified by a person on Samsung.
 - The new no-bees flow has not yet been manually exercised through both requested Samsung scenarios. Automated device tests cover persistence and Compose behavior, but a person still needs to verify the wording, cancellation, successful return to the map, cold-start routing, next-point creation, and action unavailability after adding a Bee.
 - Physical testing found that the initial selector optimization lost its highlighted color when a persisted Bee row was inserted above it in the preparation `LazyColumn`. The stable-item-key fix is installed and covered by a focused Samsung UI test, but a person still needs to confirm the corrected White ordinary/right/left sequence, automatic transition to Yellow, manual override, and availability after removing a prepared Bee at the device's field font scale.
+- The complete observation-screen field scenario still requires manual Samsung verification: common release transition, live timer readability, independent Bee actions, short first cycle followed by FlightCycle 2, process restart recovery, confirmation cancellation, completion with mixed states, and final return to the Territory map.
+- The compact observation layout still needs a person's visual/field check. The connected phone currently has no active ObservationPoint and opens the Territory map, so no actual-workflow screenshot was captured and no synthetic point was inserted into its retained app database merely for this UI check.
+- A person has not yet timed a real five-second success banner on Samsung. The connected retained database currently opens an unfinished Bee-preparation point; the available success actions would mutate its research data, so device verification was limited to the direct 4/4 Compose instrumentation run rather than silently altering that point.
 
 ## Open items
 
@@ -89,7 +102,7 @@ The no-bees observation workflow is the current HEAD commit; this selector optim
 
 ## Next task
 
-Manually verify the BeeSelector sequence on Samsung before accepting or committing this milestone. The earlier no-bees manual scenarios also remain pending. Do not start the initial group-release milestone automatically. Ideas I001–I004 remain non-authoritative unless explicitly promoted.
+Manually run the observation-screen smoke scenario on Samsung before accepting or committing this milestone. During that run, confirm that roughly five or more Bee cards are simultaneously readable at the current font scale and that `ПРИЛЕТЕЛА` / `УЛЕТЕЛА` remain easy to hit. Also time one normal success banner to confirm that it disappears after about five seconds while an actionable error remains until `Закрыть`; recheck the corrected BeeSelector sequence while preparing that point. The earlier no-bees manual scenarios remain pending. Do not start azimuth or another milestone automatically. Ideas I001–I004 remain non-authoritative unless explicitly promoted.
 
 ## Important constraints
 

@@ -54,8 +54,9 @@ internal class RoomObservationRepository(
     override fun observeBees(pointId: UUID): Flow<List<Bee>> = beeDao.observeForPoint(pointId)
         .map { bees -> bees.map(BeeEntity::toDomain) }
 
-    override fun observeHasFlightCycles(pointId: UUID): Flow<Boolean> =
-        cycleDao.observeCountForObservationPoint(pointId).map { count -> count > 0 }
+    override fun observeFlightCyclesForPoint(pointId: UUID): Flow<List<FlightCycle>> =
+        cycleDao.observeForObservationPoint(pointId)
+            .map { cycles -> cycles.map(FlightCycleEntity::toDomain) }
 
     override fun observeFlightCycles(beeId: UUID): Flow<List<FlightCycle>> =
         cycleDao.observeForBee(beeId).map { cycles -> cycles.map(FlightCycleEntity::toDomain) }

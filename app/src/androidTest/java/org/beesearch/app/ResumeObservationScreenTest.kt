@@ -62,7 +62,8 @@ class ResumeObservationScreenTest {
     }
 
     @Test
-    fun preparedBeesAndReadinessAreVisibleWithoutStartingRelease() {
+    fun preparedBeesEnableInitialGroupReleaseAction() {
+        var releaseRequests = 0
         composeRule.setContent {
             Bee_searchTheme {
                 BeePreparationScreen(
@@ -80,14 +81,17 @@ class ResumeObservationScreenTest {
                     onRecordNoBeesFound = {},
                     onComplete = {},
                     onOpenTerritories = {},
+                    onStartInitialGroupRelease = { releaseRequests += 1 },
                 )
             }
         }
 
         composeRule.onNodeWithText("Белая КП").assertIsDisplayed()
         composeRule.onNodeWithText("Готово к выпуску: 1").assertIsDisplayed()
-        composeRule.onNodeWithTag("bee-preparation-list").performScrollToNode(hasTestTag("add-bee"))
-        composeRule.onNodeWithText("Выпустить всех").assertIsNotEnabled()
+        composeRule.onNodeWithTag("bee-preparation-list")
+            .performScrollToNode(hasTestTag("initial-group-release"))
+        composeRule.onNodeWithTag("initial-group-release").assertIsEnabled().performClick()
+        composeRule.runOnIdle { assertEquals(1, releaseRequests) }
     }
 
     @Test
