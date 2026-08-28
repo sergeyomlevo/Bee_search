@@ -57,6 +57,31 @@ Weak evidence includes:
 
 Weak evidence should not normally create a high-confidence preference.
 
+### 2.4. Evidence metadata
+
+Every preference record must include structured provenance metadata:
+
+```text
+Evidence type: explicit_statement | repeated_direct_choice | inferred_pattern | cross_context_inference | legacy_unverified
+Confirmation: not_required | confirmed_by_user | not_confirmed | unknown_legacy
+Scope: general | project_specific | task_specific
+```
+
+Interpretation:
+
+* `explicit_statement` — the user directly stated a reusable preference;
+* `repeated_direct_choice` — the user repeatedly chose or rejected a class of solutions, but did not state a reusable general rule;
+* `inferred_pattern` — the preference is inferred from a broader pattern of work or accepted decisions;
+* `cross_context_inference` — evidence comes partly or wholly from another project or software context;
+* `legacy_unverified` — a legacy preference exists but no adequate evidence record was preserved.
+
+`not_required` is valid for a reusable explicit statement. A non-explicit
+inference may be `high` only after `confirmed_by_user`. `unknown_legacy` must
+not be treated as confirmation.
+
+`Scope` prevents a project-specific or task-specific choice from silently
+becoming a general preference.
+
 ---
 
 # 3. Prefer simple solutions
@@ -67,7 +92,10 @@ Weak evidence should not normally create a high-confidence preference.
 architecture.prefer_simple_solutions
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** repeated_direct_choice
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -97,7 +125,10 @@ Do not add layers, entities, or abstractions merely because they are common arch
 architecture.avoid_speculative_abstractions
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** repeated_direct_choice
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -126,6 +157,9 @@ architecture.avoid_unnecessary_entities
 ```
 
 **Confidence:** high
+**Evidence type:** explicit_statement
+**Confirmation:** not_required
+**Scope:** general
 
 ### Evidence
 
@@ -153,7 +187,10 @@ If not, prefer a property, relationship, derived value, or existing entity.
 architecture.prefer_explicit_domain_model
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -183,7 +220,10 @@ Important domain concepts and rules should be explicitly documented before they 
 architecture.prefer_incremental_architecture
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -213,7 +253,10 @@ Prefer architecture that can grow in controlled steps rather than committing ear
 architecture.avoid_enterprise_complexity_without_need
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** repeated_direct_choice
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -241,6 +284,9 @@ development.prefer_incremental_changes
 ```
 
 **Confidence:** high
+**Evidence type:** explicit_statement
+**Confirmation:** not_required
+**Scope:** general
 
 ### Evidence
 
@@ -264,7 +310,10 @@ Break work into small coherent milestones that can be reviewed and tested indepe
 development.prefer_small_coherent_steps
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** repeated_direct_choice
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -288,7 +337,10 @@ Prefer one well-defined change at a time over broad mixed tasks.
 development.prefer_working_prototype_before_advanced_features
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -315,7 +367,10 @@ Prioritize the smallest real field-useful version before advanced analysis or in
 development.prefer_real_world_validation
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -341,7 +396,10 @@ When theoretical design conflicts with observed field behavior, field behavior s
 development.prefer_physical_device_testing_when_relevant
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -368,7 +426,10 @@ Do not treat emulator results as sufficient for sensor-dependent functionality.
 development.avoid_large_unrelated_refactors
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -390,7 +451,10 @@ Keep changes tightly scoped to the current task unless a supporting refactor is 
 decision_making.prefer_agent_autonomy_for_trivial_choices
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -412,7 +476,10 @@ Agents should decide routine reversible implementation details independently.
 decision_making.prefer_discussion_for_important_project_decisions
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** repeated_direct_choice
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -439,7 +506,10 @@ Product, domain, architecture, and persistent-data semantics should be discussed
 decision_making.prefer_recommendation_over_neutral_option_dump
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -461,7 +531,10 @@ Do not merely enumerate alternatives without guidance.
 decision_making.prefer_reversible_choices_when_uncertain
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -487,7 +560,10 @@ When evidence is insufficient, prefer solutions that preserve future options.
 decision_making.avoid_questions_resolvable_from_repository
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -507,7 +583,10 @@ Ask the user only when repository inspection cannot resolve the uncertainty or w
 decision_making.avoid_premature_commitment_on_open_questions
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -534,7 +613,10 @@ Open questions remain open until implementation genuinely requires resolution.
 domain_modeling.prefer_minimal_domain_entities
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** repeated_direct_choice
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -559,7 +641,10 @@ Model only concepts that have independent meaning in the current domain.
 domain_modeling.prefer_derived_values_over_duplicate_state
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -583,7 +668,10 @@ Avoid storing redundant state that can drift out of sync with source data.
 domain_modeling.prefer_real_observed_data_over_inferred_data
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -605,7 +693,10 @@ Store observations directly and separate them from later analysis or inference.
 domain_modeling.avoid_false_precision
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -629,7 +720,10 @@ Do not create precise-looking data when the real observation does not justify th
 domain_modeling.prefer_nullable_value_over_fake_placeholder
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -659,7 +753,10 @@ Represent missing observations explicitly instead of inventing sentinel values t
 persistence.prefer_local_first_data_capture
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -681,7 +778,10 @@ Local persistence must complete independently of server availability.
 persistence.prefer_immediate_persistence_of_events
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -703,7 +803,10 @@ Persist critical field events at the moment they occur.
 persistence.prefer_data_safety_over_implementation_convenience
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -728,7 +831,10 @@ Convenient development shortcuts must not endanger real observations.
 persistence.avoid_destructive_migrations_after_real_data_exists
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -748,7 +854,10 @@ Once real observations exist, schema evolution must preserve them.
 persistence.prefer_stable_ids_for_future_sync
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -768,7 +877,10 @@ Prepare the data model for future merging without implementing synchronization p
 user_interface.prefer_fast_field_interaction
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -788,7 +900,10 @@ Field actions should be optimized around speed of event capture.
 user_interface.prefer_fewer_taps_for_frequent_actions
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -810,7 +925,10 @@ Common actions such as return and departure should be directly accessible.
 user_interface.prefer_single_working_screen_for_parallel_activity
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -832,7 +950,10 @@ The observation workflow should remain centered on a shared active-bee screen.
 user_interface.prefer_visible_current_state
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -856,7 +977,10 @@ Important states should be visible without opening detail screens.
 user_interface.avoid_deep_navigation_for_frequent_actions
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -876,7 +1000,10 @@ Details may exist separately, but common field actions belong on the main observ
 user_interface.prefer_manual_correction_when_sensor_data_can_be_wrong
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -898,7 +1025,10 @@ Sensor automation should assist the observer, not override observed reality.
 dependencies.prefer_active_maintained_dependencies
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** cross_context_inference
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -920,7 +1050,10 @@ Maintenance status is an important factor when selecting external libraries.
 dependencies.avoid_abandoned_dependencies_when_good_alternatives_exist
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** cross_context_inference
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -941,6 +1074,9 @@ documentation.prefer_project_knowledge_in_repository
 ```
 
 **Confidence:** high
+**Evidence type:** explicit_statement
+**Confirmation:** not_required
+**Scope:** project_specific
 
 ### Evidence
 
@@ -963,6 +1099,9 @@ documentation.prefer_docs_over_chat_memory_for_project_rules
 ```
 
 **Confidence:** high
+**Evidence type:** explicit_statement
+**Confirmation:** not_required
+**Scope:** project_specific
 
 ### Evidence
 
@@ -982,7 +1121,10 @@ Agents should consult repository documentation as the durable source of project 
 documentation.keep_documentation_and_code_consistent
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1003,6 +1145,9 @@ documentation.prefer_separation_of_project_truth_and_agent_preferences
 ```
 
 **Confidence:** high
+**Evidence type:** explicit_statement
+**Confirmation:** not_required
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1029,7 +1174,10 @@ Do not store Bee Search domain facts in preference files.
 documentation.prefer_decisions_with_rationale
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -1049,7 +1197,10 @@ Important choices should record not only what was chosen, but why.
 agent_behavior.prefer_inspect_before_edit
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -1069,7 +1220,10 @@ Agents should understand the current state before making changes.
 agent_behavior.prefer_read_relevant_docs_not_all_docs
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1089,7 +1243,10 @@ Read enough context to work safely without wasting context on unrelated document
 agent_behavior.prefer_explain_conflicts_before_overriding_rules
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1109,7 +1266,10 @@ When a requested change conflicts with accepted project truth, surface the confl
 agent_behavior.prefer_report_unverified_parts
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1129,7 +1289,10 @@ State clearly what was tested and what still requires verification.
 agent_behavior.avoid_claiming_success_without_verification
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1149,7 +1312,10 @@ Never report a passing build, test, sensor behavior, or migration without actual
 agent_behavior.avoid_inventing_requirements
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1169,7 +1335,10 @@ A plausible idea is not automatically a requirement.
 agent_behavior.avoid_silent_architectural_changes
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1189,7 +1358,10 @@ Significant architecture changes must be surfaced and documented.
 agent_behavior.avoid_overengineering
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -1209,7 +1381,10 @@ Complexity requires a concrete benefit.
 code_style.prefer_readable_code_over_clever_code
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** general
 
 ### Evidence
 
@@ -1231,7 +1406,10 @@ Prefer explicit readable Kotlin over unnecessarily sophisticated constructs.
 code_style.prefer_clear_names
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1251,7 +1429,10 @@ Names should match project terminology and reveal domain meaning.
 code_style.prefer_comments_for_non_obvious_domain_rules
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1271,7 +1452,10 @@ Comments should preserve reasoning where the code alone cannot explain why a con
 future_design.prefer_future_compatibility_without_premature_implementation
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1301,7 +1485,10 @@ Leave clean extension points where justified, but do not build unused systems.
 future_design.prefer_sync_ready_ids_without_building_sync_early
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1322,6 +1509,9 @@ future_design.prefer_modular_boundaries_around_replaceable_infrastructure
 ```
 
 **Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1349,7 +1539,10 @@ Do not generalize this into unnecessary abstraction everywhere.
 future_design.avoid_server_dependency_in_field_workflow
 ```
 
-**Confidence:** high
+**Confidence:** medium
+**Evidence type:** inferred_pattern
+**Confirmation:** not_confirmed
+**Scope:** project_specific
 
 ### Evidence
 
@@ -1361,14 +1554,146 @@ Future server features must not make basic field event capture dependent on conn
 
 ---
 
-# 59. Evidence update policy
+
+# 59. Prefer existing project structure when reasonable
+
+**Preference key:**
+
+```text
+development.prefer_existing_project_structure_when_reasonable
+```
+
+**Confidence:** medium
+**Evidence type:** legacy_unverified
+**Confirmation:** unknown_legacy
+**Scope:** general
+
+### Evidence
+
+No adequate evidence record was preserved for this legacy preference. The
+preference remains plausible, but this migration does not invent retrospective
+evidence for it.
+
+### Interpretation
+
+Treat the existing project structure as a useful default when it remains
+reasonable, but do not let this preference preserve a structure that conflicts
+with project truth or clearly impedes the current task.
+
+---
+
+# 60. Prefer standard platform capabilities first
+
+**Preference key:**
+
+```text
+dependencies.prefer_standard_platform_capabilities_first
+```
+
+**Confidence:** medium
+**Evidence type:** legacy_unverified
+**Confirmation:** unknown_legacy
+**Scope:** general
+
+### Evidence
+
+No adequate evidence record was preserved for this legacy preference. Existing
+project guidance is compatible with it, but project guidance is not treated as
+retrospective proof of a general user preference.
+
+### Interpretation
+
+Consider Android, Kotlin, or other standard platform capabilities before adding
+an external dependency when they solve the current problem adequately.
+
+---
+
+# 61. Avoid a large dependency for a small problem
+
+**Preference key:**
+
+```text
+dependencies.avoid_large_dependency_for_small_problem
+```
+
+**Confidence:** medium
+**Evidence type:** legacy_unverified
+**Confirmation:** unknown_legacy
+**Scope:** general
+
+### Evidence
+
+No adequate evidence record was preserved for the previous high-confidence
+value. The confidence is therefore reduced during migration rather than
+creating an explanation after the fact.
+
+### Interpretation
+
+Treat dependency size and architectural cost as a factor when the problem is
+small, while allowing a larger dependency when it provides a concrete current
+benefit that justifies the commitment.
+
+---
+
+# 62. Prefer small functions when natural
+
+**Preference key:**
+
+```text
+code_style.prefer_small_functions_when_natural
+```
+
+**Confidence:** medium
+**Evidence type:** legacy_unverified
+**Confirmation:** unknown_legacy
+**Scope:** general
+
+### Evidence
+
+No adequate evidence record was preserved for this legacy preference.
+
+### Interpretation
+
+Small functions are a useful readability tool when they follow natural
+boundaries, but function extraction should not be performed mechanically.
+
+---
+
+# 63. Avoid commenting obvious code
+
+**Preference key:**
+
+```text
+code_style.avoid_commenting_obvious_code
+```
+
+**Confidence:** low
+**Evidence type:** legacy_unverified
+**Confirmation:** unknown_legacy
+**Scope:** general
+
+### Evidence
+
+No user-specific evidence record was preserved. This resembles a common coding
+style guideline more than an established personal preference, so migration
+reduces it to low confidence.
+
+### Interpretation
+
+Avoid redundant comments only as a weak style hint. Preserve comments that add
+reasoning, domain context, constraints, or information not obvious from code.
+
+---
+
+# 64. Evidence update policy
 
 When new preference evidence appears:
 
 1. identify the relevant preference key;
 2. record the new evidence;
-3. distinguish project-specific constraints from general preferences;
-4. adjust confidence only when justified.
+3. record `Evidence type`, `Confirmation`, and `Scope`;
+4. distinguish project-specific constraints from general preferences;
+5. adjust confidence only when justified by the current promotion policy.
 
 Do not rewrite old evidence merely because a new preference appears.
 
@@ -1376,7 +1701,7 @@ If the user's preference genuinely changes, record the change and lower or revis
 
 ---
 
-# 60. Do not duplicate project truth here
+# 65. Do not duplicate project truth here
 
 The following kinds of statements do **not** belong in this file as preferences:
 
@@ -1393,21 +1718,20 @@ This file may reference those decisions only as evidence for a broader developme
 
 ---
 
-# 61. Current confidence summary
+# 66. Current confidence summary
 
-The strongest currently inferred preferences are:
+After the legacy migration, only preferences supported by a reusable explicit
+statement or confirmed promotion remain `high`. In particular, the strongest
+currently supported high-confidence preferences are:
 
-* prefer simple and incremental solutions;
-* avoid unnecessary entities and speculative abstractions;
-* keep project knowledge in repository documentation;
-* distinguish project truth from agent preferences;
-* let agents decide trivial implementation details;
-* discuss significant product and architecture choices;
-* prioritize real field behavior over theoretical elegance;
-* avoid false precision in observational data;
-* use nullable values instead of fake placeholders;
-* prioritize local persistence and data safety;
-* optimize the field UI for rapid parallel event entry;
-* delay server and advanced infrastructure until the local workflow is proven.
+* avoid unnecessary entities;
+* develop the project incrementally;
+* keep durable project knowledge in repository documentation;
+* prefer repository documentation over chat memory for project rules;
+* keep project truth separate from agent preferences.
+
+Other retained preferences remain useful as `medium` or `low` evidence-backed
+tie-breakers, but they must not silently acquire `high` confidence merely
+because they existed before the current promotion policy.
 
 These preferences should guide choices only when they do not conflict with explicit requirements or accepted project decisions.

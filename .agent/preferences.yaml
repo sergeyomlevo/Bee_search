@@ -1,14 +1,14 @@
-version: 1
+version: 2
 
 preferences:
   architecture:
     prefer_simple_solutions:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_speculative_abstractions:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_unnecessary_entities:
       value: true
@@ -16,15 +16,15 @@ preferences:
 
     prefer_explicit_domain_model:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_incremental_architecture:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_enterprise_complexity_without_need:
       value: true
-      confidence: high
+      confidence: medium
 
   development:
     prefer_incremental_changes:
@@ -33,23 +33,23 @@ preferences:
 
     prefer_small_coherent_steps:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_working_prototype_before_advanced_features:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_real_world_validation:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_physical_device_testing_when_relevant:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_large_unrelated_refactors:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_existing_project_structure_when_reasonable:
       value: true
@@ -58,94 +58,94 @@ preferences:
   decision_making:
     prefer_agent_autonomy_for_trivial_choices:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_discussion_for_important_project_decisions:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_recommendation_over_neutral_option_dump:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_reversible_choices_when_uncertain:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_questions_resolvable_from_repository:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_premature_commitment_on_open_questions:
       value: true
-      confidence: high
+      confidence: medium
 
   domain_modeling:
     prefer_minimal_domain_entities:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_derived_values_over_duplicate_state:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_real_observed_data_over_inferred_data:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_false_precision:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_nullable_value_over_fake_placeholder:
       value: true
-      confidence: high
+      confidence: medium
 
   persistence:
     prefer_local_first_data_capture:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_immediate_persistence_of_events:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_data_safety_over_implementation_convenience:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_destructive_migrations_after_real_data_exists:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_stable_ids_for_future_sync:
       value: true
-      confidence: high
+      confidence: medium
 
   user_interface:
     prefer_fast_field_interaction:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_fewer_taps_for_frequent_actions:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_single_working_screen_for_parallel_activity:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_visible_current_state:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_deep_navigation_for_frequent_actions:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_manual_correction_when_sensor_data_can_be_wrong:
       value: true
-      confidence: high
+      confidence: medium
 
   dependencies:
     prefer_standard_platform_capabilities_first:
@@ -154,15 +154,15 @@ preferences:
 
     prefer_active_maintained_dependencies:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_abandoned_dependencies_when_good_alternatives_exist:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_large_dependency_for_small_problem:
       value: true
-      confidence: high
+      confidence: medium
 
   documentation:
     prefer_project_knowledge_in_repository:
@@ -175,7 +175,7 @@ preferences:
 
     keep_documentation_and_code_consistent:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_separation_of_project_truth_and_agent_preferences:
       value: true
@@ -183,49 +183,49 @@ preferences:
 
     prefer_decisions_with_rationale:
       value: true
-      confidence: high
+      confidence: medium
 
   agent_behavior:
     prefer_inspect_before_edit:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_read_relevant_docs_not_all_docs:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_explain_conflicts_before_overriding_rules:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_report_unverified_parts:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_claiming_success_without_verification:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_inventing_requirements:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_silent_architectural_changes:
       value: true
-      confidence: high
+      confidence: medium
 
     avoid_overengineering:
       value: true
-      confidence: high
+      confidence: medium
 
   code_style:
     prefer_readable_code_over_clever_code:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_clear_names:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_small_functions_when_natural:
       value: true
@@ -233,20 +233,20 @@ preferences:
 
     avoid_commenting_obvious_code:
       value: true
-      confidence: medium
+      confidence: low
 
     prefer_comments_for_non_obvious_domain_rules:
       value: true
-      confidence: high
+      confidence: medium
 
   future_design:
     prefer_future_compatibility_without_premature_implementation:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_sync_ready_ids_without_building_sync_early:
       value: true
-      confidence: high
+      confidence: medium
 
     prefer_modular_boundaries_around_replaceable_infrastructure:
       value: true
@@ -254,4 +254,4 @@ preferences:
 
     avoid_server_dependency_in_field_workflow:
       value: true
-      confidence: high
+      confidence: medium

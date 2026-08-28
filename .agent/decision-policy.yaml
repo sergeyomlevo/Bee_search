@@ -21,7 +21,7 @@
 # For example, a database migration should be verified by migration tests
 # rather than trusted merely because an agent reports that it is safe.
 
-version: 2
+version: 3
 
 policy:
   principle: >
@@ -53,6 +53,15 @@ sources:
 
   preference_evidence:
     - .agent/preference-evidence.md
+
+  operational_context:
+    - .agent/handoff.md
+
+  operational_context_rule: >
+    Operational context helps resume work but is not a normative source and
+    does not participate in decision precedence. If it conflicts with current
+    user instructions, project truth, user preferences, or verified repository
+    state, follow the applicable authoritative source.
 
 
 rules:
@@ -371,6 +380,50 @@ preferences:
     accepted_decision:
       action: accepted_decision_wins
 
+  evidence_integrity:
+
+    every_preference_requires_evidence_record: true
+
+    required_metadata:
+      - evidence_type
+      - confirmation
+      - scope
+
+    allowed_evidence_types:
+      - explicit_statement
+      - repeated_direct_choice
+      - inferred_pattern
+      - cross_context_inference
+      - legacy_unverified
+
+    allowed_confirmation_values:
+      - not_required
+      - confirmed_by_user
+      - not_confirmed
+      - unknown_legacy
+
+    allowed_scopes:
+      - general
+      - project_specific
+      - task_specific
+
+    high_confidence_rule: >
+      A high-confidence preference may apply by default only when its evidence
+      record shows an explicit reusable user statement for which confirmation
+      is not required, or shows that a non-explicit inference was confirmed by
+      the user. Inferred, cross-context, or legacy-unverified evidence must not
+      remain high-confidence without such confirmation.
+
+    missing_evidence_rule: >
+      A preference without an evidence record must not be high-confidence.
+      During migration of legacy preferences, record the gap explicitly rather
+      than inventing retrospective evidence.
+
+    scope_rule: >
+      Evidence from a project-specific or task-specific choice must not be
+      generalized into a broader preference without independent supporting
+      evidence or explicit user confirmation.
+
 
 # ---------------------------------------------------------------------------
 # Preference learning
@@ -473,6 +526,15 @@ preference_learning:
     Do not silently rewrite preference history. Preserve contradictory evidence
     and revisions so that future agents can distinguish an old preference from
     a later change.
+
+  legacy_migration:
+    rule: >
+      Preferences created before the current evidence policy must not be
+      assumed to have passed the current promotion process merely because their
+      stored confidence is high. Classify their evidence provenance explicitly;
+      keep high confidence only when the current high-confidence rule is
+      satisfied, otherwise lower confidence until confirmation or stronger
+      evidence exists.
 
 
 # ---------------------------------------------------------------------------

@@ -4,8 +4,8 @@
 
 This file defines how coding agents work with the **Bee Search** repository.
 
-`AGENTS.md` is a routing and control document. It does not duplicate detailed
-product, domain, data, or architecture documentation.
+`AGENTS.md` is a routing and control document. It does not attempt to reproduce
+detailed product, domain, data, or architecture documentation.
 
 Before making changes:
 
@@ -169,6 +169,12 @@ and next task.
 
 Do not treat it as project truth when it conflicts with `docs/` or accepted
 decisions.
+
+`.agent/handoff.md` is operational continuation context, not a normative source,
+and does not participate in Decision Precedence. If it conflicts with current
+user instructions, project truth, agent preferences, or verified repository
+state, follow the applicable authoritative source and update the handoff when
+appropriate.
 
 Update it at the end of a significant milestone or before ending a development
 session.
@@ -561,6 +567,9 @@ Use canonical terminology from:
 ```text
 docs/glossary.md
 ```
+
+The examples below are convenience reminders only. `docs/glossary.md` is
+authoritative.
 
 Prefer established names such as:
 
