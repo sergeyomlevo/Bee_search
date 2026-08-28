@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-The project ideas workflow and accepted domain decisions D056–D058 are implemented, verified, and split into thematic commits. ObservationPoint stores scoped year/number data and an explicit nullable Bee presence result; the short-first-cycle analysis exclusion is derived without changing persisted FlightCycle data. Room schema v2, migration 1→2, domain safeguards, documentation, and tests are complete. No next UI milestone has been started.
+The D057 no-bees UI milestone is implemented and automatically verified, but still awaits the requested manual field-flow check. An empty active ObservationPoint now offers an explicit confirmed `Пчёлы отсутствуют` action backed by the existing atomic `recordNoBeesFound` repository operation. Expected domain failures are shown as Russian user messages rather than raw exception text. Room schema remains v2.
 
 ## Last completed commits
 
@@ -13,8 +13,10 @@ The project ideas workflow and accepted domain decisions D056–D058 are impleme
 - `0db416b` — Bee preparation workflow
 - `ec957cd` — Project ideas workflow
 - `3304e94` — Observation metadata, Bee presence result, and Room v2
+- `8db15b0` — Delayed departure analysis rule
+- `a689357` — Agent decision policy refinement
 
-The D058 delayed-departure analysis rule is the current HEAD commit containing this handoff.
+The decision-policy refinement is the current HEAD commit; this no-bees UI milestone remains uncommitted for review.
 
 ## Verified
 
@@ -52,18 +54,25 @@ The D058 delayed-departure analysis rule is the current HEAD commit containing t
 - The focused follow-up passes `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lint`. Its targeted `RoomPersistenceTest` passes 11/11 on Samsung SM-S938B.
 - Physical Samsung verification confirms repeated map → other screen → map navigation does not blank or degrade the map; the map and current point restore after restart; granted location permission remains correct; the permission dialog does not reappear automatically; and the explicit `Разрешить доступ к местоположению` action still opens the system dialog when permission is needed. The reliability follow-up is physically accepted.
 - D056 records `observationYear` from the device-local calendar at creation and assigns `pointNumber` transactionally within `Territory + observationYear + observerCode`. UUID remains identity, the four-column Room UNIQUE index is authoritative, and O005 remains open for the final display-code format.
-- D057 adds nullable `BeePresenceResult`: first Bee atomically sets `BEES_FOUND`, removing the final prepared Bee before release restores `null`, `NO_BEES_FOUND` blocks Bee creation, ordinary completion rejects `null`, and `recordNoBeesFound` atomically saves the explicit result and completion timestamp. No no-bees UI control was added in this milestone.
+- D057 adds nullable `BeePresenceResult`: first Bee atomically sets `BEES_FOUND`, removing the final prepared Bee before release restores `null`, `NO_BEES_FOUND` blocks Bee creation, ordinary completion rejects `null`, and `recordNoBeesFound` atomically saves the explicit result and completion timestamp.
 - Room schema is version 2 with an explicit v1→v2 migration. Prototype rows keep every UUID and row; year is derived from `created_at` in the device's local zone at migration time, and numbering is assigned by `created_at`, then UUID, per scope. Existing points with Bee rows backfill to `BEES_FOUND`; empty points backfill to `null`.
 - Final `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lint` pass. The exported v2 schema is present. Targeted Samsung execution passes 23/23 tests: 22 Room/domain tests plus the v1→v2 migration/backfill/schema-validation test.
 - The final debug APK was installed successfully on Samsung SM-S938B and Bee Search launched without an immediate Room/opening crash. The package had been absent before installation, so this launch used a fresh database rather than the phone's former prototype v1 database.
 - D058 preserves the common first group-release timestamp and derives `FlightCycle.isExcludedFromFlightDurationAnalysis` only when cycle 1 has returned in less than 60 seconds. The raw cycle remains unchanged; exactly 60 seconds and later short cycles are not excluded. No Room field, schema change, or nest-distance analysis was added.
 - The D058 JVM boundary tests pass as part of `test`; `assembleDebug`, `assembleDebugAndroidTest`, and `lint` also pass. Targeted `RoomPersistenceTest` execution passes 23/23 on Samsung, including closing a 20-second first cycle and later creating FlightCycle 2 with its actual individual departure timestamp. The final debug APK was reinstalled and launched after device testing.
+- The Bee-preparation screen now shows `Пчёлы отсутствуют` only while the active point has no Bee and `beePresenceResult` is still `null`. A confirmation dialog explains that the historical point will be saved and completed; cancellation does not invoke persistence, while confirmation calls the existing atomic repository operation and returns routing to the current Territory after Room no longer reports an active point.
+- Ordinary completion is disabled while `beePresenceResult` is `null`. Repository safeguards remain authoritative: an attempted no-bees result after a Bee was found is rejected without changing the Bee or `BEES_FOUND`.
+- Expected domain exceptions now pass through one compact Russian UI-message mapping. The mappings cover a missing Bee presence result, conflicting `BEES_FOUND` / `NO_BEES_FOUND`, inactive or completed ObservationPoint, and the existing expected Territory, Bee, FlightCycle, observer-code, time, and azimuth errors. Unexpected failures use an operation-specific neutral Russian fallback instead of exposing `exception.message`.
+- Final `test`, `assembleDebug`, `assembleDebugAndroidTest`, and `lintDebug` pass. On Samsung SM-S938B, direct final execution passes the v1→v2 migration test 1/1, `RoomPersistenceTest` 24/24, and `ResumeObservationScreenTest` 6/6. The final debug and test APKs are installed.
+- Removing the explicit `debugRuntimeOnly(kotlinx-serialization-json)` was tested rather than inferred. Without it, the Samsung migration test fails with `AbstractMethodError`: DataStore contributes serialization 1.7.3 to the debug app while Room 2.8 MigrationTestHelper uses 1.8.x-generated serializers. The dependency remains at 1.8.1 with a Gradle comment documenting this runtime alignment.
+- Backup/export was not implemented. The risk is already tracked as open decision O007 and in the architecture backup section, so no duplicate idea entry was added.
 
 ## Not yet verified
 
 - A real retained Bee Search v1 database was not available on the Samsung for a manual in-place upgrade. The equivalent v1→v2 migration, preservation, backfill, and Room schema validation pass as an instrumented test on that device.
 - The new year, number, and Bee presence values are not yet exposed by a new UI, so there is no additional visual field-UX claim in this milestone.
 - D058 has no dedicated UI yet because the initial group-release/observation screen is still a future milestone; its eventual field interaction therefore remains to be verified when that UI exists.
+- The new no-bees flow has not yet been manually exercised through both requested Samsung scenarios. Automated device tests cover persistence and Compose behavior, but a person still needs to verify the wording, cancellation, successful return to the map, cold-start routing, next-point creation, and action unavailability after adding a Bee.
 
 ## Open items
 
@@ -74,7 +83,7 @@ The D058 delayed-departure analysis rule is the current HEAD commit containing t
 
 ## Next task
 
-Wait for an explicit UI milestone. Possible next work includes exposing the accepted `Пчёлы отсутствуют` operation or proceeding to the initial group release; do not choose or start either automatically. Ideas I001–I004 remain non-authoritative unless explicitly promoted.
+Manually verify the two no-bees scenarios on Samsung before accepting or committing this milestone. Do not start the initial group-release milestone automatically. Ideas I001–I004 remain non-authoritative unless explicitly promoted.
 
 ## Important constraints
 

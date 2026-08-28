@@ -17,12 +17,27 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.beesearch.app.domain.model.AppSettings
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeeHasFlightHistoryException
+import org.beesearch.app.domain.model.BeePresenceResult
+import org.beesearch.app.domain.model.BeePresenceResultRequiredException
+import org.beesearch.app.domain.model.BeesAlreadyFoundException
 import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.DuplicateTerritoryCodeException
+import org.beesearch.app.domain.model.EntityNotFoundException
+import org.beesearch.app.domain.model.InitialFlightCycleRequiredException
 import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
+import org.beesearch.app.domain.model.InvalidAzimuthException
+import org.beesearch.app.domain.model.InvalidEventTimeException
+import org.beesearch.app.domain.model.InvalidObserverCodeException
 import org.beesearch.app.domain.model.MarkPosition
+import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
+import org.beesearch.app.domain.model.NoPreparedBeesException
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
+import org.beesearch.app.domain.model.ObservationPointNotActiveException
+import org.beesearch.app.domain.model.ObserverCodeRequiredException
+import org.beesearch.app.domain.model.OpenFlightCycleExistsException
+import org.beesearch.app.domain.model.OpenFlightCycleNotFoundException
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.location.LocationProvider
 import org.beesearch.app.domain.location.LocationUiState
@@ -45,6 +60,7 @@ sealed interface AppRoute {
 data class BeePreparationUiState(
     val pointId: UUID? = null,
     val bees: List<Bee> = emptyList(),
+    val beePresenceResult: BeePresenceResult? = null,
     val isReleaseStarted: Boolean = false,
     val isLoading: Boolean = true,
 )
@@ -97,6 +113,7 @@ internal class MainViewModel(
                 BeePreparationUiState(
                     pointId = point.id,
                     bees = bees,
+                    beePresenceResult = point.beePresenceResult,
                     isReleaseStarted = isReleaseStarted,
                     isLoading = false,
                 )
@@ -250,10 +267,10 @@ internal class MainViewModel(
             } catch (error: ObservationPointAlreadyActiveException) {
                 _observationPointDraft.value = null
                 manualRoute.value = activePoint.value?.let(AppRoute::ResumeObservation)
-                _feedback.value = error.message
+                _feedback.value = userMessageFor(error, "Не удалось сохранить точку наблюдения")
             } catch (error: Exception) {
                 _observationPointDraft.value = draft.copy(isSaving = false)
-                _feedback.value = error.message ?: "Не удалось сохранить точку наблюдения"
+                _feedback.value = userMessageFor(error, "Не удалось сохранить точку наблюдения")
             }
         }
     }
@@ -269,7 +286,25 @@ internal class MainViewModel(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                _feedback.value = error.message ?: "Не удалось завершить точку наблюдения"
+                _feedback.value = userMessageFor(error, "Не удалось завершить точку наблюдения")
+            } finally {
+                _completingObservationPointId.value = null
+            }
+        }
+    }
+
+    fun recordNoBeesFound(pointId: UUID) {
+        if (_completingObservationPointId.value != null) return
+        _completingObservationPointId.value = pointId
+        viewModelScope.launch {
+            try {
+                observationRepository.recordNoBeesFound(pointId)
+                manualRoute.value = null
+                _feedback.value = "Отсутствие пчёл сохранено. Точка наблюдения завершена"
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _feedback.value = userMessageFor(error, "Не удалось сохранить отсутствие пчёл")
             } finally {
                 _completingObservationPointId.value = null
             }
@@ -346,7 +381,7 @@ internal class MainViewModel(
             } catch (error: DuplicateTerritoryCodeException) {
                 _feedback.value = "Территория с таким кодом уже существует"
             } catch (error: Exception) {
-                _feedback.value = error.message ?: "Не удалось сохранить изменения"
+                _feedback.value = userMessageFor(error, "Не удалось сохранить изменения")
             }
         }
     }
@@ -364,7 +399,7 @@ internal class MainViewModel(
             } catch (error: InitialReleaseAlreadyStartedException) {
                 _feedback.value = "Первый выпуск уже начат: набор пчёл зафиксирован"
             } catch (error: Exception) {
-                _feedback.value = error.message ?: "Не удалось изменить набор пчёл"
+                _feedback.value = userMessageFor(error, "Не удалось изменить набор пчёл")
             } finally {
                 _beeMutationInProgress.value = false
             }
@@ -398,4 +433,33 @@ internal class MainViewModel(
                 }
             }
     }
+}
+
+internal fun userMessageFor(error: Throwable, fallback: String): String = when (error) {
+    is InvalidObserverCodeException -> "Введите непустой код наблюдателя"
+    is ObserverCodeRequiredException -> "Сначала сохраните код наблюдателя"
+    is EntityNotFoundException -> "Нужные данные не найдены. Обновите экран и повторите действие"
+    is DuplicateTerritoryCodeException -> "Территория с таким кодом уже существует"
+    is ObservationPointAlreadyActiveException ->
+        "Сначала завершите текущую точку наблюдения"
+    is ObservationPointNotActiveException ->
+        "Эта точка наблюдения уже завершена или больше не активна"
+    is InitialReleaseAlreadyStartedException ->
+        "Первый выпуск уже начат: набор пчёл зафиксирован"
+    is NoPreparedBeesException -> "Сначала добавьте хотя бы одну пчелу"
+    is BeeHasFlightHistoryException ->
+        "Нельзя удалить пчелу, для которой уже началось наблюдение"
+    is DuplicateBeeMarkException -> "Такая метка уже добавлена"
+    is BeePresenceResultRequiredException ->
+        "Сначала добавьте пчёл или отметьте, что пчёлы отсутствуют"
+    is NoBeesFoundAlreadyRecordedException ->
+        "На этой точке уже отмечено, что пчёлы отсутствуют"
+    is BeesAlreadyFoundException ->
+        "Пчёлы уже добавлены. Нельзя отметить, что они отсутствуют"
+    is OpenFlightCycleExistsException -> "У этой пчелы уже есть незавершённый вылет"
+    is OpenFlightCycleNotFoundException -> "У этой пчелы нет текущего вылета"
+    is InitialFlightCycleRequiredException -> "Сначала выполните первый групповой выпуск"
+    is InvalidEventTimeException -> "Время события противоречит предыдущему событию"
+    is InvalidAzimuthException -> "Азимут должен быть от 0° до 359,9°"
+    else -> fallback
 }

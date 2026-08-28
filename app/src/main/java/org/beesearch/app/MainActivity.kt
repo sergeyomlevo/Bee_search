@@ -34,6 +34,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -69,6 +70,7 @@ import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.BeeMarkCombination
+import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.Territory
@@ -206,6 +208,9 @@ private fun BeeSearchApp(
                             viewModel.addPreparedBee(currentRoute.point.id, color, position)
                         },
                         onRemoveBee = viewModel::removePreparedBee,
+                        onRecordNoBeesFound = {
+                            viewModel.recordNoBeesFound(currentRoute.point.id)
+                        },
                         onComplete = { viewModel.completeObservationPoint(currentRoute.point.id) },
                         onOpenTerritories = viewModel::openTerritoryManagement,
                     )
@@ -751,10 +756,12 @@ internal fun BeePreparationScreen(
     isCompleting: Boolean,
     onAddBee: (String, MarkPosition) -> Unit,
     onRemoveBee: (UUID) -> Unit,
+    onRecordNoBeesFound: () -> Unit,
     onComplete: () -> Unit,
     onOpenTerritories: () -> Unit,
 ) {
     var showCompletionConfirmation by rememberSaveable { mutableStateOf(false) }
+    var showNoBeesConfirmation by rememberSaveable { mutableStateOf(false) }
     if (showCompletionConfirmation) {
         AlertDialog(
             onDismissRequest = { if (!isCompleting) showCompletionConfirmation = false },
@@ -783,10 +790,43 @@ internal fun BeePreparationScreen(
             },
         )
     }
+    if (showNoBeesConfirmation) {
+        AlertDialog(
+            onDismissRequest = { if (!isCompleting) showNoBeesConfirmation = false },
+            title = { Text("Пчёлы отсутствуют?") },
+            text = {
+                Text(
+                    "Точка наблюдения будет сохранена с результатом " +
+                        "«пчёлы отсутствуют» и завершена.",
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showNoBeesConfirmation = false
+                        onRecordNoBeesFound()
+                    },
+                    enabled = !isCompleting,
+                    modifier = Modifier.testTag("confirm-no-bees"),
+                ) { Text("Подтвердить") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showNoBeesConfirmation = false },
+                    enabled = !isCompleting,
+                ) { Text("Отмена") }
+            },
+        )
+    }
     val stateMatchesPoint = preparation.pointId == point.id
     val bees = if (stateMatchesPoint) preparation.bees else emptyList()
     val isLoading = preparation.isLoading || !stateMatchesPoint
     val isReleaseStarted = stateMatchesPoint && preparation.isReleaseStarted
+    val beePresenceResult = if (stateMatchesPoint) preparation.beePresenceResult else null
+    val canRecordNoBees = !isLoading &&
+        !isReleaseStarted &&
+        bees.isEmpty() &&
+        beePresenceResult == null
 
     Scaffold(
         topBar = {
@@ -795,7 +835,9 @@ internal fun BeePreparationScreen(
                 actions = {
                     TextButton(
                         onClick = { showCompletionConfirmation = true },
-                        enabled = !isCompleting && !isMutating,
+                        enabled = !isCompleting &&
+                            !isMutating &&
+                            beePresenceResult != null,
                     ) { Text(if (isCompleting) "Завершение…" else "Завершить") }
                 },
             )
@@ -841,6 +883,16 @@ internal fun BeePreparationScreen(
                             canRemove = !isReleaseStarted && !isMutating,
                             onRemove = { onRemoveBee(bee.id) },
                         )
+                    }
+                }
+
+                if (canRecordNoBees) {
+                    item {
+                        OutlinedButton(
+                            onClick = { showNoBeesConfirmation = true },
+                            enabled = !isCompleting && !isMutating,
+                            modifier = Modifier.fillMaxWidth().testTag("record-no-bees"),
+                        ) { Text("Пчёлы отсутствуют") }
                     }
                 }
 

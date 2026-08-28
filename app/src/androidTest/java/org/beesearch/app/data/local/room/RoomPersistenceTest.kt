@@ -12,6 +12,7 @@ import org.beesearch.app.domain.model.InvalidAzimuthException
 import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.BeePresenceResultRequiredException
+import org.beesearch.app.domain.model.BeesAlreadyFoundException
 import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.DuplicateTerritoryCodeException
 import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
@@ -21,6 +22,8 @@ import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.OpenFlightCycleExistsException
 import org.beesearch.app.domain.model.isExcludedFromFlightDurationAnalysis
+import org.beesearch.app.domain.usecase.StartupDestination
+import org.beesearch.app.domain.usecase.StartupRouter
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -254,7 +257,38 @@ class RoomPersistenceTest {
 
         assertEquals(BeePresenceResult.NO_BEES_FOUND, completed.beePresenceResult)
         assertEquals(clock.instant(), completed.completedAt)
+        assertTrue(observationRepository.observeBees(point.id).first().isEmpty())
         assertNull(observationRepository.observeActivePoint().first())
+
+        val territory = requireNotNull(territoryRepository.getTerritory(territoryId))
+        assertEquals(
+            StartupDestination.CurrentTerritory(territory),
+            StartupRouter.decide(
+                activePoint = observationRepository.observeActivePoint().first(),
+                currentTerritoryId = territoryId,
+                territories = listOf(territory),
+            ),
+        )
+
+        clock.advanceSeconds(1)
+        val nextPoint = createPoint()
+        assertNull(nextPoint.completedAt)
+        assertEquals(nextPoint, observationRepository.observeActivePoint().first())
+    }
+
+    @Test
+    fun noBeesResultCannotReplaceFoundBees() = runBlocking {
+        val point = createPoint()
+        val bee = observationRepository.addBee(point.id, "RED", MarkPosition.NONE)
+
+        assertThrows(BeesAlreadyFoundException::class.java) {
+            runBlocking { observationRepository.recordNoBeesFound(point.id) }
+        }
+
+        assertEquals(listOf(bee), observationRepository.observeBees(point.id).first())
+        val unchangedPoint = requireNotNull(observationRepository.observeActivePoint().first())
+        assertEquals(BeePresenceResult.BEES_FOUND, unchangedPoint.beePresenceResult)
+        assertNull(unchangedPoint.completedAt)
     }
 
     @Test

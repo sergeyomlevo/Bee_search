@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.ui.theme.Bee_searchTheme
@@ -30,12 +31,17 @@ class ResumeObservationScreenTest {
         composeRule.setContent {
             Bee_searchTheme {
                 BeePreparationScreen(
-                    point = point(),
-                    preparation = BeePreparationUiState(pointId = pointId, isLoading = false),
+                    point = point(BeePresenceResult.BEES_FOUND),
+                    preparation = BeePreparationUiState(
+                        pointId = pointId,
+                        beePresenceResult = BeePresenceResult.BEES_FOUND,
+                        isLoading = false,
+                    ),
                     isMutating = false,
                     isCompleting = false,
                     onAddBee = { _, _ -> },
                     onRemoveBee = {},
+                    onRecordNoBeesFound = {},
                     onComplete = { completionRequests += 1 },
                     onOpenTerritories = {},
                 )
@@ -59,12 +65,14 @@ class ResumeObservationScreenTest {
                     preparation = BeePreparationUiState(
                         pointId = pointId,
                         bees = listOf(bee("WHITE", MarkPosition.RIGHT_WING)),
+                        beePresenceResult = BeePresenceResult.BEES_FOUND,
                         isLoading = false,
                     ),
                     isMutating = false,
                     isCompleting = false,
                     onAddBee = { _, _ -> },
                     onRemoveBee = {},
+                    onRecordNoBeesFound = {},
                     onComplete = {},
                     onOpenTerritories = {},
                 )
@@ -75,6 +83,69 @@ class ResumeObservationScreenTest {
         composeRule.onNodeWithText("Готово к выпуску: 1").assertIsDisplayed()
         composeRule.onNodeWithTag("bee-preparation-list").performScrollToNode(hasTestTag("add-bee"))
         composeRule.onNodeWithText("Выпустить всех").assertIsNotEnabled()
+    }
+
+    @Test
+    fun noBeesResultRequiresConfirmationAndCancelDoesNotInvokePersistenceAction() {
+        var noBeesRequests = 0
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeePreparationScreen(
+                    point = point(),
+                    preparation = BeePreparationUiState(pointId = pointId, isLoading = false),
+                    isMutating = false,
+                    isCompleting = false,
+                    onAddBee = { _, _ -> },
+                    onRemoveBee = {},
+                    onRecordNoBeesFound = { noBeesRequests += 1 },
+                    onComplete = {},
+                    onOpenTerritories = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("bee-preparation-list")
+            .performScrollToNode(hasTestTag("record-no-bees"))
+        composeRule.onNodeWithTag("record-no-bees").performClick()
+        composeRule.onNodeWithText("Пчёлы отсутствуют?").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Точка наблюдения будет сохранена с результатом «пчёлы отсутствуют» и завершена.",
+        ).assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(0, noBeesRequests) }
+
+        composeRule.onNodeWithText("Отмена").performClick()
+        composeRule.onNodeWithText("Пчёлы отсутствуют?").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(0, noBeesRequests) }
+
+        composeRule.onNodeWithTag("record-no-bees").performClick()
+        composeRule.onNodeWithTag("confirm-no-bees").performClick()
+        composeRule.runOnIdle { assertEquals(1, noBeesRequests) }
+    }
+
+    @Test
+    fun noBeesActionIsUnavailableAfterBeeWasFound() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeePreparationScreen(
+                    point = point(BeePresenceResult.BEES_FOUND),
+                    preparation = BeePreparationUiState(
+                        pointId = pointId,
+                        bees = listOf(bee("BLUE", MarkPosition.NONE)),
+                        beePresenceResult = BeePresenceResult.BEES_FOUND,
+                        isLoading = false,
+                    ),
+                    isMutating = false,
+                    isCompleting = false,
+                    onAddBee = { _, _ -> },
+                    onRemoveBee = {},
+                    onRecordNoBeesFound = {},
+                    onComplete = {},
+                    onOpenTerritories = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Пчёлы отсутствуют").assertDoesNotExist()
     }
 
     @Test
@@ -126,13 +197,13 @@ class ResumeObservationScreenTest {
         createdAt = Instant.parse("2026-08-27T08:32:00Z"),
     )
 
-    private fun point() = ObservationPoint(
+    private fun point(beePresenceResult: BeePresenceResult? = null) = ObservationPoint(
         id = pointId,
         territoryId = UUID.randomUUID(),
         observerCode = "GSE",
         observationYear = 2026,
         pointNumber = 1,
-        beePresenceResult = null,
+        beePresenceResult = beePresenceResult,
         code = null,
         latitude = 56.1959786,
         longitude = 42.7477116,

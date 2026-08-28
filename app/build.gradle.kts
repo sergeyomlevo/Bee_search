@@ -63,6 +63,8 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.room.testing)
+    // Aligns the debug app runtime with Room 2.8 MigrationTestHelper's serialization version.
+    // Without it, DataStore contributes incompatible serialization 1.7.3 and migration tests fail.
     debugRuntimeOnly(libs.kotlinx.serialization.json)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
