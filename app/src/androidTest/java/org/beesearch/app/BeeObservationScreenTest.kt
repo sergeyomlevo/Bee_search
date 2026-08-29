@@ -6,10 +6,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.BeePresenceResult
@@ -143,6 +146,124 @@ class BeeObservationScreenTest {
     }
 
     @Test
+    fun validAzimuthIsSavedForSelectedLatestCycleAndShownInCard() {
+        val previousCycle = cycle(flyingBee, 1, releaseTime, returnTime, azimuthDeg = 45.0)
+        val selectedCycle = cycle(
+            flyingBee,
+            2,
+            returnTime.plusSeconds(5),
+            null,
+            azimuthDeg = 90.0,
+        )
+        var savedCycleId: UUID? = null
+        var savedAzimuth: Double? = null
+
+        composeRule.setContent {
+            val cycles = remember { mutableStateOf(listOf(previousCycle, selectedCycle)) }
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = listOf(flyingBee),
+                    flightCycles = cycles.value,
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onSetFlightAzimuth = { cycleId, value, onSuccess ->
+                        savedCycleId = cycleId
+                        savedAzimuth = value
+                        cycles.value = cycles.value.map { cycle ->
+                            if (cycle.id == cycleId) cycle.copy(azimuthDeg = value) else cycle
+                        }
+                        onSuccess()
+                    },
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        composeRule.onNodeWithText("Азимут").assertIsDisplayed()
+        composeRule.onNodeWithTag("azimuth-input").assertTextContains("90")
+        composeRule.onNodeWithTag("azimuth-input").performTextClearance()
+        composeRule.onNodeWithTag("azimuth-input").performTextInput("247")
+        composeRule.onNodeWithTag("save-azimuth").performClick()
+
+        composeRule.onNodeWithText("Азимут 247°").assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertEquals(selectedCycle.id, savedCycleId)
+            assertEquals(247.0, savedAzimuth)
+        }
+    }
+
+    @Test
+    fun azimuth360ShowsValidationAndDoesNotInvokeSave() {
+        var saveRequests = 0
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = listOf(flyingBee),
+                    flightCycles = listOf(cycle(flyingBee, 1, releaseTime, null)),
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onSetFlightAzimuth = { _, _, _ -> saveRequests += 1 },
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}").performClick()
+        composeRule.onNodeWithTag("azimuth-input").performTextInput("360")
+        composeRule.onNodeWithTag("save-azimuth").performClick()
+
+        composeRule.onNodeWithText("Азимут должен быть от 0° до 359°").assertIsDisplayed()
+        composeRule.onNodeWithTag("azimuth-input").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(0, saveRequests) }
+    }
+
+    @Test
+    fun existingAzimuthCanBeRemovedFromItsCycle() {
+        val selectedCycle = cycle(flyingBee, 1, releaseTime, null, azimuthDeg = 90.0)
+        var removeRequests = 0
+        composeRule.setContent {
+            val cycles = remember { mutableStateOf(listOf(selectedCycle)) }
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = listOf(flyingBee),
+                    flightCycles = cycles.value,
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onSetFlightAzimuth = { cycleId, value, onSuccess ->
+                        if (value == null) removeRequests += 1
+                        cycles.value = cycles.value.map { cycle ->
+                            if (cycle.id == cycleId) cycle.copy(azimuthDeg = value) else cycle
+                        }
+                        onSuccess()
+                    },
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Азимут 90°").performClick()
+        composeRule.onNodeWithTag("remove-azimuth").performClick()
+
+        composeRule.onNodeWithText("Азимут —").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(1, removeRequests) }
+    }
+
+    @Test
     fun completionRequiresConfirmationAndCancelDoesNotComplete() {
         var completionRequests = 0
         composeRule.setContent {
@@ -202,13 +323,14 @@ class BeeObservationScreenTest {
         sequenceNumber: Int,
         departureTime: Instant,
         returnTime: Instant?,
+        azimuthDeg: Double? = null,
     ) = FlightCycle(
         id = UUID.randomUUID(),
         beeId = bee.id,
         sequenceNumber = sequenceNumber,
         departureTime = departureTime,
         returnTime = returnTime,
-        azimuthDeg = null,
+        azimuthDeg = azimuthDeg,
         createdAt = departureTime,
         updatedAt = returnTime ?: departureTime,
     )

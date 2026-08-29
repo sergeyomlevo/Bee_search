@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -56,12 +57,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -156,6 +160,7 @@ private fun BeeSearchApp(
     val beePreparation by viewModel.beePreparation.collectAsStateWithLifecycle()
     val beeMutationInProgress by viewModel.beeMutationInProgress.collectAsStateWithLifecycle()
     val beeEventInProgressIds by viewModel.beeEventInProgressIds.collectAsStateWithLifecycle()
+    val flightAzimuthInProgressIds by viewModel.flightAzimuthInProgressIds.collectAsStateWithLifecycle()
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, _ ->
@@ -218,9 +223,11 @@ private fun BeeSearchApp(
                                 bees = beePreparation.bees,
                                 flightCycles = beePreparation.flightCycles,
                                 beeEventInProgressIds = beeEventInProgressIds,
+                                flightAzimuthInProgressIds = flightAzimuthInProgressIds,
                                 isCompleting = completingObservationPointId == currentRoute.point.id,
                                 onRegisterReturn = viewModel::registerBeeReturn,
                                 onStartNextFlight = viewModel::startNextFlight,
+                                onSetFlightAzimuth = viewModel::setFlightAzimuth,
                                 onComplete = {
                                     viewModel.completeObservationPoint(currentRoute.point.id)
                                 },
@@ -1005,14 +1012,17 @@ internal fun BeeObservationScreen(
     bees: List<Bee>,
     flightCycles: List<FlightCycle>,
     beeEventInProgressIds: Set<UUID>,
+    flightAzimuthInProgressIds: Set<UUID> = emptySet(),
     isCompleting: Boolean,
     onRegisterReturn: (UUID) -> Unit,
     onStartNextFlight: (UUID) -> Unit,
+    onSetFlightAzimuth: (UUID, Double?, () -> Unit) -> Unit = { _, _, onSuccess -> onSuccess() },
     onComplete: () -> Unit,
     nowProvider: () -> Instant = { Instant.now() },
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var showCompletionConfirmation by rememberSaveable { mutableStateOf(false) }
+    var azimuthCycleId by rememberSaveable { mutableStateOf<String?>(null) }
     var nowEpochMillis by remember { mutableLongStateOf(nowProvider().toEpochMilli()) }
     val cards = remember(bees, flightCycles) {
         buildBeeObservationCards(bees, flightCycles)
@@ -1025,6 +1035,30 @@ internal fun BeeObservationScreen(
                 delay(1_000)
             }
         }
+    }
+
+    val azimuthCycle = azimuthCycleId?.let { selectedId ->
+        flightCycles.firstOrNull { it.id.toString() == selectedId }
+    }
+    val azimuthBee = azimuthCycle?.let { cycle -> bees.firstOrNull { it.id == cycle.beeId } }
+
+    if (azimuthCycle != null && azimuthBee != null) {
+        FlightAzimuthDialog(
+            beeLabel = BeeMarkCatalog.displayName(azimuthBee.markColor, azimuthBee.markPosition),
+            cycle = azimuthCycle,
+            isSaving = azimuthCycle.id in flightAzimuthInProgressIds,
+            onDismiss = { azimuthCycleId = null },
+            onSave = { value ->
+                onSetFlightAzimuth(azimuthCycle.id, value) {
+                    azimuthCycleId = null
+                }
+            },
+            onRemove = {
+                onSetFlightAzimuth(azimuthCycle.id, null) {
+                    azimuthCycleId = null
+                }
+            },
+        )
     }
 
     if (showCompletionConfirmation) {
@@ -1077,7 +1111,9 @@ internal fun BeeObservationScreen(
                     )
                     TextButton(
                         onClick = { showCompletionConfirmation = true },
-                        enabled = !isCompleting && beeEventInProgressIds.isEmpty(),
+                        enabled = !isCompleting &&
+                            beeEventInProgressIds.isEmpty() &&
+                            flightAzimuthInProgressIds.isEmpty(),
                         modifier = Modifier.testTag("complete-field-observation"),
                     ) { Text(if (isCompleting) "Завершение…" else "Завершить") }
                 }
@@ -1094,8 +1130,10 @@ internal fun BeeObservationScreen(
                     card = card,
                     now = Instant.ofEpochMilli(nowEpochMillis),
                     isEventInProgress = card.bee.id in beeEventInProgressIds,
+                    isAzimuthInProgress = card.latestCycle?.id in flightAzimuthInProgressIds,
                     onRegisterReturn = { onRegisterReturn(card.bee.id) },
                     onStartNextFlight = { onStartNextFlight(card.bee.id) },
+                    onEditAzimuth = { cycle -> azimuthCycleId = cycle.id.toString() },
                 )
             }
         }
@@ -1107,8 +1145,10 @@ private fun BeeObservationCard(
     card: BeeObservationCardModel,
     now: Instant,
     isEventInProgress: Boolean,
+    isAzimuthInProgress: Boolean,
     onRegisterReturn: () -> Unit,
     onStartNextFlight: () -> Unit,
+    onEditAzimuth: (FlightCycle) -> Unit,
 ) {
     val state = card.fieldState
     val stateStartedAt = card.stateStartedAt
@@ -1122,10 +1162,13 @@ private fun BeeObservationCard(
         BeeFieldState.AT_POINT -> "УЛЕТЕЛА"
         null -> "НЕДОСТУПНО"
     }
+    val azimuthActionEnabled = card.latestCycle != null &&
+        !isEventInProgress &&
+        !isAzimuthInProgress
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
@@ -1163,10 +1206,35 @@ private fun BeeObservationCard(
                 Text(
                     stateText,
                     style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("bee-state-${card.bee.id}"),
                 )
+                Box(
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = 48.dp)
+                        .clickable(
+                            enabled = azimuthActionEnabled,
+                            role = Role.Button,
+                            onClick = { card.latestCycle?.let(onEditAzimuth) },
+                        )
+                        .padding(horizontal = 8.dp)
+                        .testTag("bee-azimuth-${card.bee.id}"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        if (isAzimuthInProgress) "Сохранение…" else formatAzimuthAction(card.latestCycle?.azimuthDeg),
+                        color = if (azimuthActionEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                    )
+                }
                 Button(
                     onClick = {
                         when (state) {
@@ -1175,7 +1243,7 @@ private fun BeeObservationCard(
                             null -> Unit
                         }
                     },
-                    enabled = state != null && !isEventInProgress,
+                    enabled = state != null && !isEventInProgress && !isAzimuthInProgress,
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                     modifier = Modifier
                         .defaultMinSize(minWidth = 132.dp, minHeight = 48.dp)
@@ -1186,6 +1254,72 @@ private fun BeeObservationCard(
             }
         }
     }
+}
+
+@Composable
+private fun FlightAzimuthDialog(
+    beeLabel: String,
+    cycle: FlightCycle,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (Double) -> Unit,
+    onRemove: () -> Unit,
+) {
+    var input by rememberSaveable(cycle.id) { mutableStateOf(azimuthInputText(cycle.azimuthDeg)) }
+    var validationMessage by rememberSaveable(cycle.id) { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text("Азимут") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(beeLabel, fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = {
+                        input = it
+                        validationMessage = null
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("azimuth-input"),
+                    enabled = !isSaving,
+                    singleLine = true,
+                    label = { Text("Градусы (0–359)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = validationMessage != null,
+                    supportingText = validationMessage?.let { message ->
+                        { Text(message) }
+                    },
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val validation = validateManualAzimuth(input)
+                    validationMessage = validation.errorMessage
+                    validation.value?.let { onSave(it.toDouble()) }
+                },
+                enabled = !isSaving,
+                modifier = Modifier.testTag("save-azimuth"),
+            ) { Text(if (isSaving) "Сохранение…" else "Сохранить") }
+        },
+        dismissButton = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (cycle.azimuthDeg != null) {
+                    TextButton(
+                        onClick = onRemove,
+                        enabled = !isSaving,
+                        modifier = Modifier.testTag("remove-azimuth"),
+                    ) { Text("Удалить") }
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    enabled = !isSaving,
+                    modifier = Modifier.testTag("cancel-azimuth"),
+                ) { Text("Отмена") }
+            }
+        },
+    )
 }
 
 @Composable

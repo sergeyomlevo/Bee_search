@@ -92,6 +92,7 @@ internal class MainViewModel(
     private val _completingObservationPointId = MutableStateFlow<UUID?>(null)
     private val _beeMutationInProgress = MutableStateFlow(false)
     private val _beeEventInProgressIds = MutableStateFlow<Set<UUID>>(emptySet())
+    private val _flightAzimuthInProgressIds = MutableStateFlow<Set<UUID>>(emptySet())
     private var locationJob: kotlinx.coroutines.Job? = null
     private var nextFeedbackId = 0L
 
@@ -102,6 +103,8 @@ internal class MainViewModel(
     val completingObservationPointId: StateFlow<UUID?> = _completingObservationPointId.asStateFlow()
     val beeMutationInProgress: StateFlow<Boolean> = _beeMutationInProgress.asStateFlow()
     val beeEventInProgressIds: StateFlow<Set<UUID>> = _beeEventInProgressIds.asStateFlow()
+    val flightAzimuthInProgressIds: StateFlow<Set<UUID>> =
+        _flightAzimuthInProgressIds.asStateFlow()
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -376,6 +379,27 @@ internal class MainViewModel(
         launchBeeEvent(beeId, fallback = "Не удалось сохранить вылет пчелы") {
             observationRepository.startNextFlight(beeId)
             showSuccessFeedback("Вылет пчелы сохранён")
+        }
+    }
+
+    fun setFlightAzimuth(
+        flightCycleId: UUID,
+        azimuthDeg: Double?,
+        onSuccess: () -> Unit = {},
+    ) {
+        if (flightCycleId in _flightAzimuthInProgressIds.value) return
+        _flightAzimuthInProgressIds.value = _flightAzimuthInProgressIds.value + flightCycleId
+        viewModelScope.launch {
+            try {
+                observationRepository.setFlightAzimuth(flightCycleId, azimuthDeg)
+                onSuccess()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                showPersistentFeedback(userMessageFor(error, "Не удалось сохранить азимут"))
+            } finally {
+                _flightAzimuthInProgressIds.value = _flightAzimuthInProgressIds.value - flightCycleId
+            }
         }
     }
 

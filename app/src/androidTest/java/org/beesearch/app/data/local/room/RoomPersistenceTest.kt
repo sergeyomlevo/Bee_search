@@ -538,6 +538,51 @@ class RoomPersistenceTest {
     }
 
     @Test
+    fun azimuthIsEditableScopedToCycleAndRestoredWithoutChangingFlightWorkflow() = runBlocking {
+        val point = createPoint()
+        val measuredBee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        val otherBee = observationRepository.addBee(point.id, "BLUE", MarkPosition.RIGHT_WING)
+        val initialCycles = observationRepository.startInitialGroupRelease(point.id)
+        val measuredFirstCycle = initialCycles.single { it.beeId == measuredBee.id }
+        val otherFirstCycle = initialCycles.single { it.beeId == otherBee.id }
+
+        observationRepository.setFlightAzimuth(measuredFirstCycle.id, 247.0)
+        observationRepository.setFlightAzimuth(measuredFirstCycle.id, 259.0)
+
+        val restoredRepository = RoomObservationRepository(
+            database = database,
+            territoryDao = database.territoryDao(),
+            pointDao = database.observationPointDao(),
+            beeDao = database.beeDao(),
+            cycleDao = database.flightCycleDao(),
+            clock = clock,
+            observationZoneIdProvider = clock::getZone,
+        )
+        val restoredInitialCycles = restoredRepository.observeFlightCyclesForPoint(point.id).first()
+        assertEquals(259.0, restoredInitialCycles.single { it.id == measuredFirstCycle.id }.azimuthDeg)
+        assertNull(restoredInitialCycles.single { it.id == otherFirstCycle.id }.azimuthDeg)
+
+        clock.advanceSeconds(20)
+        val returned = restoredRepository.registerBeeReturn(measuredBee.id)
+        assertEquals(259.0, returned.azimuthDeg)
+        assertTrue(returned.isExcludedFromFlightDurationAnalysis)
+
+        clock.advanceSeconds(5)
+        val secondCycle = restoredRepository.startNextFlight(measuredBee.id)
+        assertEquals(2, secondCycle.sequenceNumber)
+        assertNull(secondCycle.azimuthDeg)
+
+        val beforeCompletion = restoredRepository.observeFlightCyclesForPoint(point.id).first()
+        restoredRepository.completeObservationPoint(point.id)
+        val afterCompletion = restoredRepository.observeFlightCyclesForPoint(point.id).first()
+
+        assertEquals(beforeCompletion, afterCompletion)
+        assertEquals(259.0, afterCompletion.single { it.id == measuredFirstCycle.id }.azimuthDeg)
+        assertNull(afterCompletion.single { it.id == secondCycle.id }.azimuthDeg)
+        assertNull(afterCompletion.single { it.id == otherFirstCycle.id }.azimuthDeg)
+    }
+
+    @Test
     fun territoryCodeConstraintMapsToDomainErrorForCreateAndUpdate() = runBlocking {
         assertThrows(DuplicateTerritoryCodeException::class.java) {
             runBlocking { territoryRepository.createTerritory("KLYAZMA-01", "Дубликат") }
