@@ -113,3 +113,47 @@ Territory management safely reachable.
 accepted. Removing Territory information without an adequate replacement would
 conflict with the current workflow requirement that the active Territory be
 clear on the working screen.
+
+## I005 — Pre-field compass check and HeadingProvider diagnostics
+
+**Status:** `idea`
+
+**Description:** Provide an optional screen outside the active observation
+workflow, such as `Настройки → Компас → Проверка компаса`, where the user can
+check the same live true/geographic heading that Bee Search would offer for
+`FlightCycle.azimuthDeg`. The screen must reuse the production `HeadingProvider`
+and its display-rotation and `GeomagneticField` correction path rather than
+implementing a separate demo compass. It may show a large live heading, the
+direction of the phone's upper short edge, Android sensor accuracy (`high`,
+`medium`, `low`, or unavailable), and brief guidance for comparing the reading
+with a known cardinal direction.
+
+**Motivation / expected value:** A systematic heading error could distort many
+FlightCycle observations and future direction or probable-nest analysis. A
+calm pre-field sanity check can expose gross coordinate-transform, display-
+rotation, calibration, or sensor problems before time-critical observation
+begins, without creating research data or making the check mandatory for every
+ObservationPoint.
+
+**Dependencies / prerequisites:** D033 and D059; the existing lifecycle-aware
+`HeadingProvider`; a future Settings/navigation location; physical-device and
+daylight testing. The true-heading calculation needs a defined reference
+location even when no ObservationPoint is active. That source must be selected
+explicitly before implementation so the diagnostic value remains comparable to
+the observation workflow. A detailed block may require the shared heading
+pipeline to expose, without duplicating its math, the sensor source, magnetic
+heading, declination, true heading, reference coordinates, calculation time,
+and altitude or the accepted `0 m` fallback.
+
+**Notes:** The simple view may show `269°`, an orientation cue, sensor accuracy,
+and instructions to point the phone's upper edge toward a roughly known north,
+east, south, or west direction. A collapsible diagnostic section may show data
+such as `Rotation Vector`, magnetic heading, declination, true heading,
+coordinates, current timestamp, and altitude fallback. Low or unreliable
+accuracy should prompt the user to move away from metal or magnets and try the
+phone's normal physical calibration procedure, without claiming that a
+particular movement guarantees correction. Bee Search may identify suspicious
+readings but should not write sensor calibration coefficients, store an
+arbitrary manual angular offset, block field work, or add diagnostic details to
+the compact observation cards. Any future persisted manual offset would change
+research semantics and requires a separate durable decision.
