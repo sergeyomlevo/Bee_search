@@ -128,18 +128,37 @@ DataStore используется только для небольших лок
 
 ---
 
-# D005 — Создание территории включает подготовку офлайн-карты
+# D005 — Подготовка карты для офлайн является необязательной гарантией
 
 **Статус:** ACCEPTED
 
-Создание новой территории включает:
+Bee Search использует одну обычную карту. При наличии сети она может получать
+картографические ресурсы online. Пользователь может выбрать прямоугольную
+область и выполнить действие `Подготовить для офлайн`; после успешной подготовки
+эта область гарантированно доступна без сети.
 
-1. код;
-2. название;
-3. выбор картографической области;
-4. загрузку офлайн-карты.
+Offline preparation не создаёт отдельный пользовательский режим карты и не
+является обязательным условием создания, выбора или использования `Territory`.
+Отсутствие подготовленного пакета не блокирует GPS, создание
+`ObservationPoint` и другие исследовательские операции. Если сеть недоступна,
+карта за пределами подготовленного покрытия может отображаться неполно, но
+локальный research workflow остаётся доступен.
 
-После успешной подготовки новая территория становится текущей.
+Следует различать:
+
+```text
+online availability
+offline readiness
+```
+
+Видимая за счёт сети или ambient cache карта не доказывает offline readiness.
+
+### История изменения
+
+Первоначальная редакция D005 включала выбор области и загрузку карты в создание
+Territory и требовала подготовить карту до обычной полевой работы. После
+исследования MapLibre offline delivery эта обязательность отменена. Сохранён
+номер D005, а текущее правило заменяет прежнюю редакцию.
 
 ### Следствие
 
@@ -178,43 +197,110 @@ MapLibre является движком отображения карты.
 
 ---
 
-# D007 — Формат офлайн-карт пока не фиксируется
+# D007 — Первый offline milestone использует MapLibre OfflineRegion
 
-**Статус:** PROVISIONAL
+**Статус:** ACCEPTED
 
-Окончательный формат офлайн-карт пока не выбран.
+Первый production milestone офлайн-подготовки использует:
 
-Рассматриваются, в частности:
+- `MapLibre Native Android OfflineRegion`;
+- общую MapLibre resource database для online cache и offline regions;
+- прямоугольные области, выбираемые пользователем;
+- foreground-only download с progress, pause/resume и retry;
+- те же canonical resource URLs, которые использует обычная online-карта.
 
-- PMTiles;
-- MBTiles;
-- механизм offline regions MapLibre;
-- другие совместимые варианты.
+Обычная карта и подготовленное покрытие являются одной картой: локально
+сохранённые ресурсы используются там, где они существуют, а при доступной сети
+отсутствующие ресурсы могут загружаться online. Отдельный переключатель
+`online map / offline map` не создаётся.
 
-### Решение должно учитывать
+Offline area задаётся rectangle. Начальная область может формироваться из
+текущего viewport и корректироваться пользователем до начала download. Bounds
+не являются данными `Territory` и не сохраняются в Room research schema.
 
-- размер данных;
-- скорость работы на Android;
-- удобство загрузки территории;
-- возможность обновления;
-- лицензирование;
-- возможность работы полностью без сети.
+Region считается готовым только когда существует совместимый
+`OfflineRegion`, его definition соответствует требуемым bounds и zoom, metadata
+связывает его с нужными Territory/package/profile, а
+`OfflineRegionStatus.isComplete == true`. Ambient cache и
+`downloadState == inactive` сами по себе не означают Ready.
 
-Выбор должен быть сделан до реализации полноценной загрузки территорий.
+Bounds существующего `OfflineRegion` не меняются in place. Допускаются несколько
+additive regions; при таком расширении существующее Ready coverage сохраняется.
+При replacement старый region удаляется только после того, как новый подтверждён
+как полностью Ready, совместим с нужным profile и покрывает необходимую старую
+область.
+
+Первый milestone не обещает продолжение загрузки после process death и не
+требует background service. После restart приложение перечитывает status и
+может продолжить incomplete region в foreground.
+
+PMTiles и MBTiles не используются как формат первого milestone. PMTiles может
+позднее рассматриваться для заранее подготовленных автономных packages, но не
+является активной архитектурой текущего workflow.
 
 ---
 
-# D008 — Источник карт пока не фиксируется
+# D008 — Bee Search использует собственный OSM-derived field source
 
-**Статус:** DEFERRED
+**Статус:** ACCEPTED
 
-Необходимо отдельно выбрать источник базовых карт и стиль.
+Основной vector source строится по цепочке:
 
-### Ограничение
+```text
+Raw OSM
+→ Planetiler / OpenMapTiles-compatible generation
+→ минимальный Bee_search field profile
+→ versioned static MVT
+→ HTTPS static/object delivery
+→ MapLibre
+```
 
-Нельзя исходить из предположения, что любой публичный tile server разрешает массовую загрузку карт для офлайн-использования.
+Конкретный cloud/CDN vendor не фиксируется. Stateful tile server не является
+обязательным архитектурным условием. Delivery должна предоставлять стабильные
+versioned URL для style JSON, TileJSON, MVT tiles, glyphs, sprites и информации
+об attribution/license.
 
-Источник должен допускать выбранный сценарий использования.
+Online runtime style и OfflineRegion preparation обязаны использовать
+одинаковые canonical resource URLs. Несовместимая версия не должна молча
+переиспользовать URL старого profile.
+
+Стандартные OpenMapTiles-compatible layers переиспользуются для roads,
+tracks/paths, waterways, landcover, buildings, settlements, railway и bridges.
+Минимальное Bee_search extension сохраняет:
+
+- `man_made=cutline`;
+- `power=line` и `power=minor_line`;
+- `tracktype`;
+- field-relevant surface detail beyond generic paved/unpaved.
+
+Окончательная нормализация surface categories остаётся задачей implementation
+PoC; другие OSM tags не добавляются без подтверждённой полевой пользы.
+
+Baseline zoom contract:
+
+- vector source maxzoom — `15`;
+- offline download maxzoom — `15`;
+- UI maxzoom — `20`;
+- `z16–20` отображаются через vector overscaling.
+
+Source z16 может быть принят позднее только после ограниченного Samsung A/B PoC,
+если дополнительная полевая детализация оправдывает рост размера и времени
+загрузки. Source z17–20 не входят в первый milestone.
+
+Используется один versioned field `MapProfile`, описывающий совместимость
+schema/profile, dataset snapshot, style/resources, zoom contract и attribution.
+Provider catalog не создаётся. Старый Ready region должен оставаться
+интерпретируемым после публикации новой версии profile.
+
+Satellite не входит в обязательный vector offline milestone. При наличии
+подходящих прав provider он может работать online независимо от vector
+readiness, а позднее — иметь отдельный optional OfflineRegion с собственными
+bounds, zoom, provider/profile и lifecycle. Конкретный satellite provider пока
+не выбран. Contours, hillshade и DEM отложены.
+
+Source data и delivery terms должны разрешать предусмотренную генерацию,
+attribution и массовую подготовку выбранных областей для длительного локального
+offline use.
 
 ---
 
@@ -949,11 +1035,11 @@ CSV, GeoJSON и другие форматы могут появиться как
 
 ---
 
-# D052 — Метаданные офлайн-карты локальны и отложены
+# D052 — Метаданные offline packages являются device-local infrastructure
 
 **Статус:** ACCEPTED
 
-В первую Room-схему не добавляются поля:
+В Room research schema не добавляются поля:
 
 ```text
 Territory.map_status
@@ -962,11 +1048,27 @@ Territory.map_region_data
 
 Состояние загрузки, выбранная область, локальные пути и другие технические метаданные офлайн-карты относятся к конкретному устройству, а не к синхронизируемой исследовательской `Territory`.
 
-Их структура и место хранения будут определены после выбора формата и механизма офлайн-карт. До этого отдельная таблица или поле «на будущее» не создаётся.
+Первый milestone использует opaque metadata самого MapLibre `OfflineRegion` для
+минимальной связи package с `territoryId`, package kind и versioned MapProfile.
+Metadata может иметь собственную schema version и необходимые lifecycle
+timestamps или replacement/supersession link.
+
+Не дублируются значения, для которых MapLibre остаётся authoritative source:
+
+- bounds и zoom из `OfflineRegionDefinition`;
+- download status;
+- bytes;
+- resource и tile counts из `OfflineRegionStatus`.
+
+Отдельная infrastructure database или DataStore-каталог не создаются в первом
+milestone без доказанной необходимости.
 
 ### Следствие
 
-D005 продолжает определять пользовательский процесс подготовки территории к офлайн-работе. D007 и открытые вопросы O001–O003 продолжают определять ещё не выбранный технический механизм.
+Удаление или failure offline package не изменяет `Territory`,
+`ObservationPoint`, `Bee` или `FlightCycle`. Map/network/offline failures не
+могут повреждать, отменять или блокировать локальную запись исследовательских
+событий.
 
 ---
 
@@ -1168,26 +1270,21 @@ Room schema v3 добавляет `azimuth_capture_consumed`. Migration 2 → 3 
 
 ---
 
+# Закрытые архитектурные вопросы
+
+- O001 — формат первого offline milestone закрыт решением D007:
+  MapLibre `OfflineRegion`;
+- O002 — основной vector source закрыт решением D008: контролируемые Bee Search
+  OSM-derived versioned MVT; satellite provider остаётся отдельным открытым
+  выбором;
+- O003 — первый механизм выбора области закрыт решением D007: корректируемый
+  пользователем rectangle.
+
+---
+
 # Открытые архитектурные решения
 
 Следующие вопросы намеренно пока не закрыты.
-
-## O001 — Формат офлайн-карт
-
-Необходимо выбрать между PMTiles, MBTiles, MapLibre offline mechanisms или другим вариантом.
-
-## O002 — Источник карт
-
-Необходимо определить источник данных, лицензию и стиль.
-
-## O003 — Механизм выбора области загрузки
-
-Необходимо решить, как пользователь задаёт территорию офлайн-покрытия:
-
-- прямоугольник;
-- полигон;
-- радиус;
-- иной механизм.
 
 ## O004 — Набор цветов меток
 
@@ -1247,7 +1344,13 @@ Room schema v3 добавляет `azimuth_capture_consumed`. Migration 2 → 3 
 
 `timestamps → Instant / Unix epoch milliseconds`
 
-`offline map metadata → device-local, structure deferred`
+`one MapLibre map → online resources + explicitly prepared OfflineRegion coverage`
+
+`field vector source → Bee_search OSM profile + versioned HTTPS MVT`
+
+`vector zoom → source/offline z15 + UI overscaling to z20`
+
+`offline package metadata → device-local OfflineRegion metadata`
 
 `локальное сохранение сейчас → серверная синхронизация позже`
 

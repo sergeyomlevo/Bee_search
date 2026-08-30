@@ -329,9 +329,12 @@ KLYAZMA-01
 
 Состояние загрузки офлайн-карты относится к конкретному устройству, а не к исследовательской сущности `Territory`.
 
-В первой Room-схеме поле `Territory.map_status` не создаётся.
+В Room поле `Territory.map_status` не создаётся.
 
-Точный набор состояний и место их локального хранения определяются после выбора механизма офлайн-карт.
+Первый offline milestone использует status MapLibre `OfflineRegion` как
+authoritative source. `OfflineRegionStatus.isComplete == true` при совместимых
+definition/metadata означает Ready. Status, bytes и resource counts не
+дублируются в research database или отдельном catalog без необходимости.
 
 ---
 
@@ -339,15 +342,21 @@ KLYAZMA-01
 
 Выбранная область и другие технические метаданные офлайн-карты являются локальными данными устройства.
 
-В первой Room-схеме поле `Territory.map_region_data` и отдельная таблица метаданных карты не создаются.
+В Room поле `Territory.map_region_data` и отдельная таблица метаданных карты не создаются.
 
-Формат и структура этих данных определяются одновременно с механизмом офлайн-карт, а не моделируются заранее.
+Rectangular bounds и zoom являются частью MapLibre `OfflineRegionDefinition`.
+Opaque region metadata минимально связывает package с `territoryId`, package
+kind и versioned MapProfile и при необходимости хранит собственную metadata
+schema version, lifecycle timestamp или replacement/supersession link.
+
+Bounds, zoom и status не копируются в metadata, когда их можно получить из
+authoritative MapLibre definition/status.
 
 ---
 
 # 13. Картографические файлы
 
-Сами тайлы, PMTiles, MBTiles или другие картографические данные не должны храниться внутри основной базы наблюдений.
+Сами MVT tiles, style resources и другие картографические данные не должны храниться внутри основной базы наблюдений.
 
 Логическое разделение:
 
@@ -359,10 +368,12 @@ Database
     └── FlightCycle
 
 Map storage
-    └── offline map files
+    └── MapLibre shared cache / OfflineRegion resources
 ```
 
-Место хранения локальной связи Territory с картографическим ресурсом определяется после выбора механизма офлайн-карт.
+Связь Territory с package существует только в opaque device-local
+OfflineRegion metadata. Удаление или failure package не изменяет Territory и
+связанные исследовательские записи.
 
 ---
 
@@ -1368,11 +1379,15 @@ current_territory_id
 observer_code как текущая настройка
 локальные пути офлайн-карт
 map download state
+OfflineRegion definition/metadata
 UI preferences
 последняя позиция карты
 ```
 
-Локальные данные офлайн-карт в первой Room-схеме ещё не моделируются. Их структура определяется после выбора картографического механизма.
+Локальные данные офлайн-карт не моделируются в Room research schema. Их
+authoritative structure и status предоставляет MapLibre OfflineRegion API;
+минимальная package-to-Territory/profile связь хранится в opaque region
+metadata.
 
 При этом значение `observer_code`, уже скопированное в `ObservationPoint`, становится частью исследовательских данных.
 

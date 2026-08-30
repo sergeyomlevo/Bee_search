@@ -130,13 +130,51 @@ Territory, выбранная для текущей работы приложе�
 
 **Русский:** офлайн-карта
 
-Локально сохранённые картографические данные, позволяющие работать с картой Territory без подключения к интернету.
+Разговорное обозначение явно подготовленного локального покрытия обычной карты.
+Это не отдельный пользовательский режим или вторая карта.
 
 Offline Map является техническим ресурсом, а не самостоятельной предметной сущностью базы наблюдений.
 
-Состояние загрузки и другие метаданные Offline Map локальны для конкретного устройства и не являются полями `Territory` в первой Room-схеме.
+Состояние загрузки и другие metadata локальны для конкретного устройства и не
+являются полями `Territory` в Room research schema. Territory может
+существовать и использоваться без offline package.
 
-Конкретный формат офлайн-карт определяется отдельно.
+Первый milestone использует MapLibre OfflineRegion.
+
+---
+
+# 7.1. Offline Readiness
+
+**Русский:** готовность карты для офлайн / готово офлайн
+
+Подтверждённая гарантия, что все ресурсы выбранной области и совместимого
+MapProfile сохранены на устройстве. Для первого milestone authoritative
+признаком является совместимый `OfflineRegion` с
+`OfflineRegionStatus.isComplete == true`.
+
+Online-видимость, ambient cache и inactive download state сами по себе не
+означают Offline Readiness.
+
+---
+
+# 7.2. OfflineRegion
+
+**Техническое имя:** `MapLibre OfflineRegion`
+
+Device-local MapLibre package, определённый style URL, географической областью,
+zoom range и opaque metadata. Не является предметной сущностью Bee Search и не
+хранится в Room research schema.
+
+---
+
+# 7.3. MapProfile
+
+**Русский:** профиль карты
+
+Versioned технический контракт одного поддерживаемого набора карты: совместимость
+tile schema/field profile, dataset snapshot, style/resources, source/offline/UI
+zoom и attribution. Первый offline milestone использует один field MapProfile;
+provider catalog не создаётся.
 
 ---
 
@@ -813,7 +851,8 @@ MapLibre не следует путать с источником картогр
 
 Картографический движок и Map Source являются разными компонентами.
 
-Конкретный источник для Bee Search пока не зафиксирован.
+Основной source Bee Search — контролируемые проектом OSM-derived versioned MVT,
+доставляемые по HTTPS. Конкретный cloud/CDN vendor не фиксируется.
 
 ---
 
@@ -839,7 +878,8 @@ MapLibre не следует путать с источником картогр
 
 Географическая область, для которой подготавливаются офлайн-картографические данные Territory.
 
-Это локальная техническая информация устройства. В первой Room-схеме она не моделируется; точный способ представления будет определён вместе с механизмом офлайн-карт.
+В первом milestone пользователь выбирает rectangle. Bounds являются частью
+MapLibre OfflineRegion definition и не моделируются в Room research schema.
 
 ---
 
@@ -938,7 +978,7 @@ UUID создаётся непосредственно на устройстве
 
 `выбрать Territory`
 
-→ `работать с офлайн-картой`
+→ `работать с одной картой online или в подготовленном offline coverage`
 
 → `создать ObservationPoint`
 
@@ -1075,6 +1115,9 @@ MVP не требует наличия сервера, web-интерфейса 
 |---|---|
 | территория | `Territory` |
 | текущая территория | `current_territory_id` |
+| подготовленная область карты | `OfflineRegion` |
+| готово офлайн | compatible `OfflineRegionStatus.isComplete` |
+| профиль карты | `MapProfile` |
 | точка наблюдения | `ObservationPoint` |
 | код наблюдателя | `observer_code` |
 | год наблюдения | `observation_year` |

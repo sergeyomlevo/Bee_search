@@ -273,7 +273,6 @@ app/src/main/java/org/beesearch/app/
 
     map/
         MapController
-        OfflineMapManager
 
     location/
         LocationProvider
@@ -659,65 +658,108 @@ showOfflineRegion()
 
 # 21. Офлайн-карты
 
-Территория должна иметь подготовленное офлайн-картографическое покрытие.
+Bee Search использует одну MapLibre-карту. При наличии сети обычные resource
+requests могут загружаться online. Явно подготовленный `OfflineRegion`
+гарантирует локальную доступность выбранной области, но не создаёт отдельный
+режим карты и не является обязательным условием существования Territory или
+полевой работы.
 
 Архитектура должна поддерживать:
 
 ```text
 Territory
         ↓
-device-local map state
+device-local OfflineRegion metadata
         ↓
-OfflineMapManager
+MapLibre shared cache/offline resource database
         ↓
-local map storage
+local resource hit ── or ── network request on miss
 ```
 
-Сами картографические данные не хранятся в Room.
+Ambient cache может быть вытеснен и не является доказательством readiness.
+Region считается Ready только по совместимым metadata/definition и
+`OfflineRegionStatus.isComplete == true`.
 
-В первой Room-схеме `Territory` не содержит `map_status` или `map_region_data`. Отдельная структура локального состояния карты также не создаётся до выбора формата и механизма офлайн-карт.
+Сами картографические данные и metadata не хранятся в Room research schema.
+`Territory` не содержит `map_status`, `map_region_data` или bounds.
 
 ---
 
-# 22. OfflineMapManager
+# 22. Граница offline-map infrastructure
 
-Отдельный технический компонент отвечает за:
+Небольшая техническая граница вокруг MapLibre offline API должна отвечать за:
 
 * выбор области карты;
 * начало загрузки;
 * отображение прогресса;
-* продолжение прерванной загрузки;
-* проверку наличия офлайн-данных;
+* pause/resume/retry в foreground;
+* восстановление списка regions и status после restart;
+* проверку Ready по MapLibre API;
 * удаление или обновление картографического пакета;
-* предоставление карты MapLibre.
+* предоставление definition/metadata для coverage overlay.
 
 Предметная модель не должна знать формат файлов карты.
+
+Имя и внутренняя форма компонента не фиксируются до implementation. Не нужно
+строить generic provider framework или отдельный catalog для одного field
+profile.
+
+Первый milestone может хранить минимальную связь package в opaque metadata
+самого OfflineRegion: metadata schema version, `territoryId`, package kind,
+profile/dataset/style versions и только необходимые lifecycle timestamps или
+supersession link. Bounds/zoom берутся из definition, а status, bytes и resource
+counts — из `OfflineRegionStatus`; эти значения не дублируются.
+
+Coverage отображается app-generated GeoJSON overlay поверх обычной карты. Для
+первого milestone достаточно границ Ready, Downloading/Incomplete, Failed и
+currently selected rectangles. Несколько regions можно показывать отдельно без
+сложного polygon union manager.
+
+Map/network/offline failures изолированы от Room research workflow. Они не
+удаляют Territory или связанные наблюдения, не отменяют ObservationPoint и не
+блокируют локальную запись GPS/time/azimuth events.
 
 ---
 
 # 23. Формат офлайн-карт
 
-Конкретный формат пока не фиксируется окончательно.
+Первый production milestone использует MapLibre Native Android
+`OfflineRegion` с `OfflineTilePyramidRegionDefinition`:
 
-Возможные варианты:
+- style URL;
+- прямоугольные bounds;
+- offline min/max zoom;
+- device pixel ratio;
+- opaque device-local metadata.
 
 ```text
-PMTiles
-MBTiles
-MapLibre offline regions
-другой совместимый формат
+online MapLibre requests
+        ↓
+shared resource database
+        ↓ cache miss
+HTTPS source
 ```
 
-Перед реализацией загрузки территории необходимо отдельно выбрать механизм с учётом:
+Online runtime и offline preparation обязаны использовать одинаковые canonical
+resource URLs. Иначе ранее сохранённый ресурс не соответствует runtime request.
 
-* размера файлов;
-* удобства загрузки;
-* лицензии источника карт;
-* работы без сети;
-* возможности обновления;
-* производительности на Android.
+Пользователь выбирает rectangle, который может первоначально соответствовать
+viewport и затем корректироваться. Bounds остаются в MapLibre region
+definition, не становятся Territory data и не копируются в Room.
 
-Это решение должно быть оформлено отдельным ADR в `decisions.md`.
+Bounds существующего OfflineRegion не изменяются in place. Первый milestone
+допускает несколько additive regions. При replacement старый Ready region
+сохраняется до тех пор, пока новый не имеет `isComplete == true`, совместимый
+profile и достаточное покрытие старой области. Failed extension никогда не
+удаляет существующее Ready coverage.
+
+Download работает foreground-only. Process death не обязан оставлять активную
+загрузку, но созданный region и уже полученные ресурсы сохраняются; после
+restart status перечитывается и incomplete download можно продолжить в
+foreground.
+
+PMTiles/MBTiles не входят в этот milestone. PMTiles остаётся возможным будущим
+форматом prebuilt autonomous packages, требующим отдельного lifecycle решения.
 
 ---
 
@@ -727,14 +769,45 @@ MapLibre offline regions
 
 MapLibre не предоставляет готовые карты автоматически.
 
-Необходимо отдельно выбрать:
+Основной источник контролируется Bee Search и строится как:
 
-* источник базовой карты;
-* стиль;
-* способ получения офлайн-данных;
-* правила лицензирования.
+```text
+Raw OSM
+→ Planetiler / OpenMapTiles-compatible generation
+→ minimal Bee_search field profile
+→ versioned static MVT
+→ HTTPS object/static delivery
+```
 
-Не следует проектировать приложение таким образом, чтобы оно зависело от публичного tile server без разрешения на массовую офлайн-загрузку.
+Stateful tile server и конкретный cloud/CDN vendor не являются обязательными.
+Delivery предоставляет versioned style JSON, TileJSON, MVT, glyphs, sprites и
+attribution/license information.
+
+Стандартные OpenMapTiles-compatible layers используются для roads,
+tracks/paths, waterways, landcover, buildings, settlements, railway и bridges.
+Field extension сохраняет `man_made=cutline`, `power=line/minor_line`,
+`tracktype` и surface detail beyond generic paved/unpaved. Окончательная
+нормализация surface categories уточняется implementation PoC.
+
+Vector source и offline maxzoom равны `15`. UI может увеличивать карту до
+`20`, используя vector overscaling на z16–20. Actual source z16 допускается
+только после Samsung A/B PoC; z17–20 не генерируются в первый milestone.
+
+Один versioned field MapProfile задаёт совместимость schema/profile, dataset
+snapshot, style/resources, zoom contract и attribution. Новая несовместимая
+версия получает новые resource URLs; старые Ready regions не удаляются и не
+становятся неинтерпретируемыми молча.
+
+Satellite остаётся optional: при разрешении provider он может работать online
+независимо от vector preparation и позднее использовать отдельный
+OfflineRegion с собственными bounds/zoom/profile. Satellite readiness не
+входит в readiness основной vector map. Contours, hillshade и DEM отложены.
+
+Runtime style может содержать Field, Satellite и Hybrid layer groups и менять
+их visibility без полной перезагрузки style. Download-specific vector и
+satellite styles должны сохранять те же canonical resource URLs. GPS,
+crosshair, ObservationPoints и будущие app-generated research overlays не
+зависят от выбранной base-map group.
 
 ---
 
@@ -1653,7 +1726,10 @@ Navigation
 сохранение между запусками
 ```
 
-На текущем прототипном milestone этот этап реализуется без MapLibre и без проверки готовности офлайн-карты. После локального создания Territory приложение может выбрать её текущей и открыть pre-map экран; это не означает, что территория подготовлена для полноценной офлайн-работы. Подготовка карты остаётся следующим этапом по D005/D052.
+Territory создаётся и выбирается независимо от offline package. Отсутствие
+подготовленного coverage не блокирует переход к рабочей карте или
+исследовательские операции; оно означает только отсутствие гарантированной
+карты при потере сети.
 
 ## Этап 3 — карта
 
@@ -1711,11 +1787,13 @@ remove azimuth
 ## Этап 9 — offline maps
 
 ```text
-region selection
-download
-progress
-restore
-offline operation
+Bee_search OSM field source
+rectangular OfflineRegion selection
+foreground download + progress/pause/resume/retry
+strict Ready status
+coverage overlay
+safe additive/replacement regions
+airplane-mode Samsung validation
 ```
 
 ## Этап 10 — полевой прототип
@@ -1751,7 +1829,7 @@ offline operation
 │          │                                  │
 │ Territory → Point → Bee → FlightCycle      │
 │                                            │
-│ MapLibre ← OfflineMapManager               │
+│ MapLibre ← device-local OfflineRegion API  │
 │                                            │
 │ LocationProvider ← GPS                     │
 │ HeadingProvider  ← Sensors                 │
