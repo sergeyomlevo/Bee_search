@@ -65,6 +65,7 @@ Every preference record must include structured provenance metadata:
 Evidence type: explicit_statement | repeated_direct_choice | inferred_pattern | cross_context_inference | legacy_unverified
 Confirmation: not_required | confirmed_by_user | not_confirmed | unknown_legacy
 Scope: general | project_specific | task_specific
+Optional: Rationale, Lifecycle state, Context notes, Confirmed, Last reviewed, Superseded, Related preferences
 ```
 
 Interpretation:
@@ -81,6 +82,121 @@ not be treated as confirmation.
 
 `Scope` prevents a project-specific or task-specific choice from silently
 becoming a general preference.
+
+Optional metadata may be added when it improves future interpretation:
+
+* `Rationale` — a user-provided reason that helps define why the preference matters;
+* `Lifecycle state` — `active`, `needs_revalidation`, or `superseded`;
+* `Context notes` — known conditions or exceptions that materially affect applicability;
+* `Confirmed` — when the user explicitly confirmed the durable preference;
+* `Last reviewed` — when its meaning or scope was materially revalidated;
+* `Superseded` — when the user explicitly replaced or withdrew it;
+* `Related preferences` — concrete relationships to other stored preferences when those relationships aid interpretation.
+
+Do not invent a rationale or psychological explanation when the user did not provide one.
+Optional metadata must not be backfilled mechanically. Add it only when supported
+by actual evidence or a real lifecycle event.
+
+### 2.5. Behavioral evidence is a hypothesis until confirmed
+
+Repeated behavior may justify asking whether a preference exists, but it must
+not be treated as proof of the user's underlying preference. A choice may be
+shaped by time pressure, task constraints, attention, fatigue, mood, health, or
+other circumstances that are not reliably observable to the agent.
+
+For behaviorally inferred preferences:
+
+1. accumulate enough evidence for the hypothesis to matter;
+2. ask whether the observed pattern is correctly understood;
+3. clarify whether it is general or context-dependent when relevant;
+4. ask for the reason only when it helps define scope, exceptions, or trade-offs;
+5. only then record it as a confirmed durable preference.
+
+Do not infer a hidden psychological cause. Record only what the user confirms
+or what is directly observable from the interaction.
+
+If several non-urgent preference hypotheses accumulate, avoid turning them into
+a rapid sequence of confirmation questions. Defer them to a natural pause and,
+when practical, group closely related hypotheses into one concise discussion.
+
+### 2.6. Situational choices and constraints
+
+An explicit instruction such as "do this quickly" is not automatically an
+explicit reusable preference. Distinguish between:
+
+* a durable preference;
+* a contextual preference;
+* a temporary constraint;
+* a one-off choice.
+
+When the user explicitly distinguishes an ideal preference from a temporary
+constraint, preserve both meanings. For example, "normally I want a detailed
+analysis, but today I have no time" supports the durable preference for detail
+and records the current speed requirement as situational rather than reversing
+the durable preference.
+
+### 2.7. Confirmed preferences remain revisable
+
+A confirmed preference is not permanent truth. Continue to compare it with
+later evidence. A single conflicting choice is normally an exception. If
+behavior repeatedly and materially conflicts with a stated or confirmed
+preference, record the conflict and ask the user to reconcile it.
+
+The revalidation question should neutrally describe both sides, for example:
+
+> You previously said you prefer X, but in several comparable recent cases you
+> chose Y. Has your preference changed, does it depend on context, or were those
+> choices situational?
+
+Do not silently replace an explicit preference with inferred behavior. Possible
+outcomes are: keep the preference, narrow its scope, revise it, supersede it, or
+mark it as needing revalidation when the conflict remains unresolved.
+
+### 2.8. Selective use and write-back
+
+This file is a provenance log, not a document that should be loaded in full for
+every task. When provenance is needed, locate the relevant record by preference
+key and inspect only the applicable section unless a broader audit is explicitly
+required.
+
+Behaviorally inferred preferences require a confirmation loop before durable
+write-back: formulate the interpretation and scope, present it to the user, and
+write it to both `.agent/preferences.yaml` and this file only after explicit
+confirmation. If the user directly states a reusable preference and explicitly
+asks to record, remember, update, or remove it, that request itself is sufficient
+confirmation and must not trigger a redundant approval question.
+
+After every write-back, verify that both files agree on the preference key,
+confidence, scope, confirmation status, and lifecycle meaning. Preserve previous
+evidence and lifecycle history instead of silently rewriting it.
+
+### 2.9. Lightweight temporal history
+
+When useful, record simple lifecycle dates rather than treating a confirmed
+preference as timeless. `Confirmed`, `Last reviewed`, and `Superseded` are
+optional metadata. They help future agents distinguish a recently confirmed
+preference from one that has not been revisited for a long time and preserve
+the chronology of actual lifecycle events.
+
+Do not invent historical dates and do not retrofit these fields across all
+existing records merely for completeness. Add them only when the corresponding
+event is known.
+
+### 2.10. Optional relations between preferences
+
+When one stored preference concretely changes the interpretation of another, an
+optional `Related preferences` field may record one of these relations:
+
+```text
+supersedes: <preference-key>
+narrows: <preference-key>
+conflicts_with: <preference-key>
+```
+
+Use relations to preserve meaningful history, not to build a graph for its own
+sake. Do not retrofit relations onto the existing preference set without
+actual evidence for a specific relationship. `Lifecycle state` remains useful
+and is not replaced by these relations.
 
 ---
 
@@ -1690,14 +1806,24 @@ reasoning, domain context, constraints, or information not obvious from code.
 When new preference evidence appears:
 
 1. identify the relevant preference key;
-2. record the new evidence;
-3. record `Evidence type`, `Confirmation`, and `Scope`;
-4. distinguish project-specific constraints from general preferences;
-5. adjust confidence only when justified by the current promotion policy.
+2. determine whether the observation is evidence of a durable preference, a contextual preference, or only a situational choice/constraint;
+3. record the new evidence;
+4. record `Evidence type`, `Confirmation`, and `Scope`;
+5. for behaviorally inferred preferences, obtain user confirmation before treating the hypothesis as a confirmed durable preference;
+6. record user-provided rationale when it materially clarifies scope, exceptions, or trade-offs;
+7. distinguish project-specific constraints from general preferences;
+8. adjust confidence only when justified by the current promotion policy;
+9. continue monitoring confirmed preferences for sustained contradictory evidence;
+10. batch non-urgent preference-confirmation questions when several accumulate;
+11. add temporal metadata or preference relations only when a real event or concrete evidence supports them;
+12. never mechanically backfill optional provenance fields merely for completeness.
 
-Do not rewrite old evidence merely because a new preference appears.
+Do not rewrite old evidence merely because a new preference appears. Preserve
+exceptions, conflicts, confirmations, and revisions as history.
 
-If the user's preference genuinely changes, record the change and lower or revise the previous confidence.
+If later behavior repeatedly conflicts with a stated or confirmed preference,
+do not silently overwrite either side. Ask the user whether the preference has
+changed, is context-dependent, or the conflicting choices were situational.
 
 ---
 

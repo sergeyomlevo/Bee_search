@@ -21,7 +21,7 @@
 # For example, a database migration should be verified by migration tests
 # rather than trusted merely because an agent reports that it is safe.
 
-version: 3
+version: 6
 
 policy:
   principle: >
@@ -374,6 +374,23 @@ preferences:
     explicit_current_user_instruction:
       action: current_instruction_wins
 
+    explicit_temporary_task_directive:
+      description: >
+        The user explicitly states a situational constraint or preference for
+        the current task, such as prioritizing speed, accepting a temporary
+        workaround, or requesting less discussion.
+      action: >
+        Temporarily override conflicting agent preferences for this task where
+        doing so does not violate higher-priority project constraints or
+        required safety and verification behavior.
+      rule: >
+        Do not persist the directive as a durable preference merely because it
+        affected the current task. Do not let a temporary directive override
+        project truth, ACCEPTED decisions, domain or data-safety invariants,
+        destructive-action approval requirements, or the requirement to report
+        verification truthfully. If verification is intentionally omitted,
+        report exactly what remains unverified rather than implying success.
+
     project_requirement:
       action: project_requirement_wins
 
@@ -388,6 +405,11 @@ preferences:
       - evidence_type
       - confirmation
       - scope
+
+    optional_metadata:
+      - rationale
+      - lifecycle_state
+      - context_notes
 
     allowed_evidence_types:
       - explicit_statement
@@ -406,6 +428,11 @@ preferences:
       - general
       - project_specific
       - task_specific
+
+    allowed_lifecycle_states:
+      - active
+      - needs_revalidation
+      - superseded
 
     high_confidence_rule: >
       A high-confidence preference may apply by default only when its evidence
@@ -434,10 +461,15 @@ preference_learning:
   enabled: true
 
   principle: >
-    Repeated user choices may provide evidence for a stable development
-    preference, but a single situational choice should not automatically
-    become a permanent rule. Explicit statements by the user are stronger
-    evidence than preferences inferred indirectly from behavior.
+    Observed behavior may create a hypothesis about a stable development
+    preference, but behavior alone must not be treated as direct access to the
+    user's underlying preference. Choices may be shaped by time pressure,
+    temporary constraints, task context, attention, fatigue, mood, health, or
+    other circumstances that the agent cannot reliably infer. A behavioral
+    hypothesis becomes a durable personal preference only after the user
+    confirms that interpretation. Explicit reusable statements remain the
+    strongest direct evidence, but even confirmed preferences remain
+    revisable when later evidence persistently conflicts with them.
 
   record_evidence_when:
     - the user explicitly states a general preference
@@ -451,6 +483,43 @@ preference_learning:
     - emergency workarounds
     - decisions forced by current platform limitations
     - choices already dictated by project requirements
+    - choices plausibly explained by temporary time pressure
+    - choices explicitly framed as "for now", "this time", or similar exceptions
+    - choices made while the user is explicitly trying to finish quickly
+    - behavior whose situational cause is unknown and may materially affect interpretation
+
+  behavioral_hypotheses:
+
+    rule: >
+      Repeated behavior may justify creating a hypothesis, not silently creating
+      or promoting a durable personal preference. Before a behavioral
+      hypothesis is stored as a confirmed reusable preference, ask the user
+      whether the observation is correct. Clarify scope when the behavior may
+      be context-dependent. Ask for the reason only when that reason would help
+      determine scope, applicability, exceptions, or trade-offs.
+
+    persistence_requires_user_confirmation: true
+
+    before_confirmation:
+      max_confidence: medium
+      apply_by_default: false
+
+    confirmation_content:
+      required:
+        - concise description of the observed pattern
+        - whether the user considers it a real preference
+      when_relevant:
+        - whether it is general or context-specific
+        - why it matters to the user
+        - known exceptions or competing preferences
+
+    avoid_confirmation_noise:
+      - do not ask after a single weak observation
+      - do not ask when the inferred preference would have no practical effect
+      - do not interrupt a time-sensitive task merely to confirm a preference
+      - accumulate evidence and ask when the hypothesis is stable enough to matter
+      - if several non-urgent preference hypotheses accumulate, do not ask them as a rapid sequence
+      - defer non-urgent hypotheses to a natural pause and batch closely related questions when practical
 
 
   promotion:
@@ -486,9 +555,36 @@ preference_learning:
 
   promotion_rule: >
     A preference inferred solely from behavior must not become high-confidence
-    and apply silently by default until the user has confirmed the promotion.
-    An explicit reusable user preference may become high-confidence without
-    redundant confirmation.
+    or be stored as a confirmed durable personal preference until the user has
+    confirmed the interpretation. An explicit reusable user preference may
+    become high-confidence without redundant confirmation. Confirmation should
+    validate the meaning and scope of the preference, not merely the existence
+    of repeated behavior.
+
+  write_back_protocol:
+
+    inferred_preference:
+      steps:
+        - formulate the proposed preference, scope, and relevant rationale
+        - present the interpretation to the user before durable write-back
+        - obtain explicit user confirmation
+        - update .agent/preferences.yaml and .agent/preference-evidence.md together
+        - verify that the preference key, confidence, scope, confirmation status, and evidence record are consistent
+      rule: >
+        Never convert behavioral inference into a durable stored preference
+        silently. The user's confirmation must validate the interpretation,
+        not merely acknowledge that repeated behavior occurred.
+
+    explicit_user_request:
+      rule: >
+        If the user explicitly states a reusable preference and asks to record,
+        remember, update, or remove it, that instruction itself constitutes
+        confirmation. Do not request redundant confirmation before write-back.
+
+    general_rule: >
+      Keep .agent/preferences.yaml and .agent/preference-evidence.md consistent
+      after every write-back. Preserve prior evidence and lifecycle history
+      instead of silently rewriting it.
 
 
   contradiction:
@@ -515,6 +611,20 @@ preference_learning:
       action: lower_confidence_and_flag
       record_in: .agent/preference-evidence.md
 
+    sustained_behavior_vs_declared_preference:
+      condition: >
+        behavior repeatedly and materially conflicts with a directly stated or
+        previously confirmed preference across enough comparable situations
+        that a one-off exception is no longer the best explanation
+      action: ask_user_to_reconcile
+      record_in: .agent/preference-evidence.md
+      behavior:
+        - remind the user of the previously stated or confirmed preference
+        - describe the conflicting behavioral pattern without claiming to know its cause
+        - ask whether the preference changed, is context-dependent, or the recent choices were situational
+        - ask about the reason only when it would clarify future applicability
+        - do not silently replace the declared preference with the behavioral pattern
+
     clearly_represents_changed_preference:
       condition: >
         the newer evidence clearly establishes a durable preference change
@@ -526,6 +636,73 @@ preference_learning:
     Do not silently rewrite preference history. Preserve contradictory evidence
     and revisions so that future agents can distinguish an old preference from
     a later change.
+
+  lifecycle:
+
+    principle: >
+      A confirmed preference is a currently supported model of the user's
+      decision style, not an immutable fact. Continue checking whether later
+      choices remain compatible with it while accounting for context and
+      situational constraints.
+
+    states:
+      active:
+        meaning: preference may be used according to its confidence
+      needs_revalidation:
+        meaning: sustained conflicting evidence exists; avoid aggressive default application in ambiguous cases
+      superseded:
+        meaning: the user explicitly replaced or withdrew the preference
+
+    revalidation_trigger: >
+      Do not trigger revalidation for isolated exceptions. Revalidate when
+      conflicting choices are repeated, materially relevant, and sufficiently
+      comparable, especially when they appear across more than one context or
+      when the same contextual explanation no longer accounts for them.
+
+    revalidation_result:
+      unchanged:
+        action: preserve_preference_and_record_context_or_exception
+      narrowed_scope:
+        action: revise_scope_and_record_user_explanation
+      changed:
+        action: supersede_or_revise_preference
+      unresolved:
+        action: mark_needs_revalidation_and_reduce_default_reliance
+
+  evidence_history_metadata:
+
+    principle: >
+      Preference evidence may carry lightweight temporal metadata when it helps
+      future agents understand whether a preference was recently confirmed,
+      reviewed, or superseded. These fields preserve history; they are not a
+      requirement to retrofit every existing preference.
+
+    optional_fields:
+      - confirmed_at
+      - last_reviewed_at
+      - superseded_at
+
+    update_when:
+      confirmed_at: user explicitly confirms a durable preference
+      last_reviewed_at: the preference is materially revalidated or its scope is reviewed
+      superseded_at: the user explicitly replaces or withdraws the preference
+
+    no_mechanical_backfill: true
+
+  preference_relations:
+
+    principle: >
+      When a concrete relationship between two stored preferences matters for
+      interpretation, record that relationship explicitly instead of erasing
+      history. Relations are optional and must be supported by actual evidence
+      or a real lifecycle event.
+
+    allowed_relations:
+      - supersedes
+      - narrows
+      - conflicts_with
+
+    no_mechanical_backfill: true
 
   legacy_migration:
     rule: >
@@ -705,11 +882,27 @@ verification:
     rule: >
       Where practical, external enforcement should verify the property that
       matters rather than merely verify that an agent claimed compliance.
+      Rules whose important outcomes can be checked deterministically should,
+      when the practical value justifies the added mechanism, move from
+      model-only guidance toward tests, hooks, CI checks, or agent-harness
+      enforcement. Introduce such enforcement incrementally.
+
+    rollout:
+      default_first_mode: audit_only
+      audit_only_meaning: >
+        Evaluate and log what the policy would have classified or blocked, but
+        do not prevent the agent action. Use observed false positives, false
+        negatives, and workflow cost to decide whether enforcement is justified.
+      enforce_only_after: >
+        the deterministic rule has demonstrated enough practical value and
+        acceptable accuracy in audit use, or the property is already an
+        established non-negotiable safety invariant with reliable verification
 
     examples:
       - migration test verifies preserved data instead of only requiring an approval marker
       - CI reruns tests instead of trusting a reported success
       - schema checks detect incompatible changes independently of agent narration
+      - a future policy checker may first report decision classifications in audit-only mode before blocking changes
 
 
 # ---------------------------------------------------------------------------
@@ -747,6 +940,18 @@ reporting:
       - the existing preference
       - the conflicting evidence
       - whether the conflict is being treated as an exception or possible change
+      - when revalidation is triggered, ask whether the preference changed, is contextual, or recent choices were situational
+
+  post_action_tradeoff:
+    trigger: >
+      A completed, user-approved action is valid but introduces a material
+      technical debt, maintenance cost, or future architectural constraint.
+    action: >
+      Briefly report the trade-off after implementation and state when it is
+      likely to matter.
+    rule: >
+      Do not reopen the accepted choice, exaggerate minor trade-offs, or create
+      speculative future work merely to produce a warning.
 
   avoid:
     - lengthy explanations of trivial implementation choices

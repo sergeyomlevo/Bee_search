@@ -261,10 +261,27 @@ Use:
 - `.agent/preference-evidence.md` when a preference is ambiguous, conflicting,
   or needs revision.
 
+### Preference Evidence Usage
+
+`.agent/preference-evidence.md` is a provenance log, not a primary instruction
+file. Do not load it entirely into context by default. Inspect it only when a
+specific preference is ambiguous, conflicting, requires revalidation, or its
+provenance is needed. Use the preference key to locate the relevant section
+rather than reading the whole file.
+
 Project truth in `docs/` always takes precedence over `.agent/`.
 
 Before asking the user a technical question, first determine whether the
 answer can be obtained by inspecting the repository and relevant docs.
+
+Behavioral patterns may suggest a user preference, but do not silently treat
+them as durable personal rules. Situational choices may reflect time pressure
+or other temporary constraints. Follow `.agent/decision-policy.yaml` for
+confirmation, scope clarification, batching of non-urgent preference questions,
+and revalidation when observed behavior persistently conflicts with a stated or
+previously confirmed preference. Preference-history metadata and relations are
+optional provenance aids; do not backfill them mechanically without actual
+evidence or a real lifecycle event.
 
 Do not ask the user to choose between trivial technically equivalent options.
 
