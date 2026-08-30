@@ -17,6 +17,8 @@ import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.BeePresenceResultRequiredException
 import org.beesearch.app.domain.model.BeesAlreadyFoundException
 import org.beesearch.app.domain.model.BeeHasFlightHistoryException
+import org.beesearch.app.domain.model.AzimuthCaptureAlreadyConsumedException
+import org.beesearch.app.domain.model.AzimuthCaptureRequiresOpenFlightCycleException
 import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.EntityNotFoundException
 import org.beesearch.app.domain.model.FlightCycle
@@ -178,6 +180,7 @@ internal class RoomObservationRepository(
                     departureTime = departureTime,
                     returnTime = null,
                     azimuthDeg = null,
+                    azimuthCaptureConsumed = false,
                     createdAt = departureTime,
                     updatedAt = departureTime,
                 )
@@ -216,11 +219,40 @@ internal class RoomObservationRepository(
             departureTime = departureTime,
             returnTime = null,
             azimuthDeg = null,
+            azimuthCaptureConsumed = false,
             createdAt = departureTime,
             updatedAt = departureTime,
         )
         cycleDao.insert(entity)
         entity.toDomain()
+    }
+
+    override suspend fun captureFlightAzimuth(
+        flightCycleId: UUID,
+        azimuthDeg: Double,
+    ): FlightCycle = database.withTransaction {
+        if (azimuthDeg < 0.0 || azimuthDeg >= 360.0) {
+            throw InvalidAzimuthException()
+        }
+        val cycle = cycleDao.getById(flightCycleId)
+            ?: throw EntityNotFoundException("FlightCycle")
+        val bee = requireBee(cycle.beeId)
+        requireActivePoint(bee.observationPointId)
+        if (cycle.returnTime != null) {
+            throw AzimuthCaptureRequiresOpenFlightCycleException()
+        }
+        if (cycle.azimuthCaptureConsumed || cycle.azimuthDeg != null) {
+            throw AzimuthCaptureAlreadyConsumedException()
+        }
+        val updatedAt = clock.instant()
+        if (cycleDao.captureAzimuth(flightCycleId, azimuthDeg, updatedAt) != 1) {
+            throw AzimuthCaptureAlreadyConsumedException()
+        }
+        cycle.copy(
+            azimuthDeg = azimuthDeg,
+            azimuthCaptureConsumed = true,
+            updatedAt = updatedAt,
+        ).toDomain()
     }
 
     override suspend fun setFlightAzimuth(

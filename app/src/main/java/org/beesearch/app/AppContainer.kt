@@ -2,6 +2,7 @@ package org.beesearch.app
 
 import android.app.Application
 import android.content.Context
+import org.beesearch.app.data.heading.AndroidHeadingProvider
 import org.beesearch.app.data.location.AndroidLocationProvider
 import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
@@ -40,4 +41,5 @@ internal class AppContainer(context: Context) {
         pointCreator = observationRepository,
     )
     val locationProvider = AndroidLocationProvider(context)
+    val headingProvider = AndroidHeadingProvider(context, clock)
 }

@@ -69,3 +69,11 @@ class InvalidEventTimeException : IllegalStateException(
 class InvalidAzimuthException : IllegalArgumentException(
     "Azimuth must be in the range 0 (inclusive) to 360 (exclusive).",
 )
+
+class AzimuthCaptureRequiresOpenFlightCycleException : IllegalStateException(
+    "Field azimuth capture requires an open flight cycle.",
+)
+
+class AzimuthCaptureAlreadyConsumedException : IllegalStateException(
+    "The field azimuth capture opportunity has already been consumed.",
+)

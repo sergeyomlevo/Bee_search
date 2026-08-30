@@ -41,6 +41,7 @@ class FlightCycleAnalysisRulesTest {
             departureTime = departureTime,
             returnTime = departureTime.plusMillis(durationMillis),
             azimuthDeg = null,
+            azimuthCaptureConsumed = false,
             createdAt = departureTime,
             updatedAt = departureTime.plusMillis(durationMillis),
         )

@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.beesearch.app.domain.model.AppSettings
+import org.beesearch.app.domain.model.AzimuthCaptureAlreadyConsumedException
+import org.beesearch.app.domain.model.AzimuthCaptureRequiresOpenFlightCycleException
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.BeeHasFlightHistoryException
 import org.beesearch.app.domain.model.BeePresenceResult
@@ -371,14 +373,14 @@ internal class MainViewModel(
     fun registerBeeReturn(beeId: UUID) {
         launchBeeEvent(beeId, fallback = "Не удалось сохранить возвращение пчелы") {
             observationRepository.registerBeeReturn(beeId)
-            showSuccessFeedback("Возвращение пчелы сохранено")
+            showSuccessFeedback("Прилёт сохранён")
         }
     }
 
     fun startNextFlight(beeId: UUID) {
         launchBeeEvent(beeId, fallback = "Не удалось сохранить вылет пчелы") {
             observationRepository.startNextFlight(beeId)
-            showSuccessFeedback("Вылет пчелы сохранён")
+            showSuccessFeedback("Вылет сохранён")
         }
     }
 
@@ -392,6 +394,27 @@ internal class MainViewModel(
         viewModelScope.launch {
             try {
                 observationRepository.setFlightAzimuth(flightCycleId, azimuthDeg)
+                onSuccess()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                showPersistentFeedback(userMessageFor(error, "Не удалось сохранить азимут"))
+            } finally {
+                _flightAzimuthInProgressIds.value = _flightAzimuthInProgressIds.value - flightCycleId
+            }
+        }
+    }
+
+    fun captureFlightAzimuth(
+        flightCycleId: UUID,
+        azimuthDeg: Double,
+        onSuccess: () -> Unit = {},
+    ) {
+        if (flightCycleId in _flightAzimuthInProgressIds.value) return
+        _flightAzimuthInProgressIds.value = _flightAzimuthInProgressIds.value + flightCycleId
+        viewModelScope.launch {
+            try {
+                observationRepository.captureFlightAzimuth(flightCycleId, azimuthDeg)
                 onSuccess()
             } catch (error: CancellationException) {
                 throw error
@@ -571,5 +594,9 @@ internal fun userMessageFor(error: Throwable, fallback: String): String = when (
     is InitialFlightCycleRequiredException -> "Сначала выполните первый групповой выпуск"
     is InvalidEventTimeException -> "Время события противоречит предыдущему событию"
     is InvalidAzimuthException -> "Азимут должен быть от 0° до 359,9°"
+    is AzimuthCaptureRequiresOpenFlightCycleException ->
+        "Азимут можно зафиксировать только во время текущего вылета"
+    is AzimuthCaptureAlreadyConsumedException ->
+        "Возможность зафиксировать азимут этого вылета уже использована"
     else -> fallback
 }

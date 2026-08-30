@@ -2,73 +2,123 @@
 
 ## Current milestone
 
-Manual azimuth entry for the active Bee observation screen is implemented in the dirty worktree on
-top of `31fc20b Implement active bee observation workflow`. No commit has been created.
+The previous manual-azimuth milestone is committed as
+`2c1f86d Add manual flight azimuth capture`.
 
-The existing domain semantics remain authoritative:
+The one-tap heading milestone is implemented and reviewed. It replaces manual field entry with
+one-tap capture of live true/geographic heading while preserving the existing nullable
+`FlightCycle.azimuthDeg` field and repository set/clear operations.
+The approved one-capture-per-departure rule is persisted in Room schema version 4. Version 3 added
+the field; version 4 is a non-structural compatibility migration for an intermediate v3 identity.
 
-- azimuth is stored as nullable `FlightCycle.azimuthDeg` / Room `azimuth_deg`;
-- the UI targets the Bee card's explicit latest FlightCycle ID;
-- an open latest cycle is the current flight, while a closed latest cycle is the most recently
-  completed flight;
-- repository validation and active-ObservationPoint protection are unchanged;
-- an existing value may be replaced or removed (`null`) according to D030;
-- Room remains schema version 2.
+D059 is documented as the durable research meaning of persisted azimuth:
 
-The compact card now contains a 48 dp text action `Азимут —` / `Азимут 247°` in the existing second
-row. It opens a Material dialog with the Bee label, numeric keyboard, integer validation `0..359`,
-and `Отмена` / `Сохранить`; an existing value also exposes `Удалить`. The dialog closes only after
-the existing repository operation succeeds. Repository/domain errors use the existing persistent
-Russian feedback path. No extra success banner is shown because the Room-driven card value is the
-direct confirmation.
+- `0°` is true/geographic north;
+- the phone's upper short edge is the observed direction;
+- Android rotation-vector sensor data provides magnetic heading;
+- `GeomagneticField` corrects it using the confirmed ObservationPoint coordinates, the system time
+  of each heading calculation, and altitude `0 m` because altitude is not stored;
+- only the corrected, normalized true heading can be persisted after an explicit tap.
 
-## Verified
+D060 records the field-capture semantics:
 
-- The worktree was clean at milestone start and HEAD was `31fc20b`.
-- JVM tests cover accepted bounds, empty/text/fraction/negative rejection, lack of modulo
-  normalization, and display formatting including valid `0°`.
-- Compose tests cover saving `247°` to the explicit latest cycle, rejecting `360` without invoking
-  persistence, editing/removing an existing value, and a 48 dp azimuth touch target.
-- The Room test covers cycle/Bee isolation, replacement, restoration through a recreated repository,
-  a short D058 first cycle retaining its azimuth, a normal FlightCycle 2 without a fabricated
-  azimuth, and completion without rewriting any cycles.
-- Final Gradle validation passes `test assembleDebug assembleDebugAndroidTest lintDebug`.
-- Debug and test APKs are installed on Samsung SM-S938B without clearing retained application data.
-- Direct Samsung instrumentation passes `RoomPersistenceTest` 28/28.
-- Direct isolated Samsung Compose runs pass 4/4 relevant checks: valid save/display, `360`
-  validation, removal, and five complete Bee actions visible without scrolling.
-- The density test initially exposed multi-line wrapping of the secondary state after adding the
-  azimuth action. The state is now constrained to one line with ellipsis, decorative card vertical
-  padding is 4 dp, and the final density test passes while both actions retain 48 dp touch targets.
+- each new FlightCycle starts with `azimuthDeg == null` and
+  `azimuthCaptureConsumed == false`;
+- field capture atomically stores the true heading and changes the consumed flag to `true`;
+- Undo clears only `azimuthDeg`, so it cannot reopen the measurement opportunity;
+- recovery after restart uses the persisted consumed flag rather than transient UI state.
 
-## Not yet physically verified
+## Implemented
 
-- The retained phone database currently has no active ObservationPoint and launches on the Territory
-  map. No synthetic research row was inserted merely to exercise the dialog.
-- A person still needs to verify on a real active observation: numeric keyboard, manual entry of
-  `247`, visible `247°`, rejection of `360`, editing/removal, normal `Прилетела` / `Улетела`, and
-  restoration after app restart.
-- The whole Compose test class can still hit the known device-runner failure `No compose hierarchies
-  found`; the same new tests pass when run directly one at a time. This is runner instability, not an
-  assertion failure in the isolated checks.
+- One lifecycle-aware, injectable `HeadingProvider` serves the whole observation screen.
+- `TYPE_ROTATION_VECTOR` is preferred, with `TYPE_GEOMAGNETIC_ROTATION_VECTOR` fallback.
+- Display rotation is remapped before calculating the heading of the phone's upper edge.
+- UI updates are conflated and deduplicated by rounded degree and reported sensor accuracy.
+- Bee cards remain two rows: a 40 dp colored mark with `КП`/`КЛ`, full state and timer, then a
+  48 dp heading control and the existing 48 dp `ПРИЛЕТЕЛА` / `УЛЕТЕЛА` action.
+- Text color names and the manual numeric azimuth dialog were removed from the field screen.
+- A null, not-yet-consumed current-cycle azimuth shows live true heading. One tap uses the dedicated
+  atomic repository operation for the explicit current FlightCycle; a persisted value then remains
+  fixed and the control becomes read-only.
+- The heading control is interactive only for an open current FlightCycle (`returnTime == null`).
+  After `Прилетела` the closed cycle shows its saved azimuth read-only, or `—°` when none was saved;
+  after `Улетела` the new open cycle restores live one-tap capture without changing card dimensions.
+- A successful capture shows a fixed top Undo banner for about three seconds. Its token and explicit
+  FlightCycle ID prevent an older timeout/action from affecting a newer capture.
+- Undo uses the existing nullable set operation, clears only the value and leaves
+  `azimuthCaptureConsumed == true`; that FlightCycle remains read-only as `—°`.
+- Unavailable or unreliable heading cannot create a fabricated `0°`; return, departure and
+  completion remain available. Low reported accuracy is shown with a visible warning.
+- A newly created FlightCycle starts with `azimuthDeg == null` and
+  `azimuthCaptureConsumed == false`, so the next departure gets one fresh capture opportunity.
+- Migration 2→3 backfills `azimuthCaptureConsumed = true` for existing cycles with an azimuth and
+  `false` for cycles without one. The full 1→2→3 migration path remains supported.
+- Compatibility migration 3→4 changes no user table. It validates the final v3 structure and lets
+  Room replace the intermediate identity hash; 3→4, repeated v4 open and 1→2→3→4 are covered.
+- The lower card row uses a weighted spacer: heading remains left while `ПРИЛЕТЕЛА` / `УЛЕТЕЛА`
+  stays against the right side without reducing either 48 dp touch target.
+- The observation screen now renders one top feedback slot. Persistent feedback keeps priority;
+  azimuth Undo replaces ordinary success immediately and suppresses later ordinary success during
+  its own three-second window. Ordinary feedback also uses three seconds.
+- Ordinary success and azimuth Undo now share the title-side slot inside the existing 52 dp
+  observation header. They are single-line (`Прилёт сохранён`, `Вылет сохранён`,
+  `N° сохранён — ОТМЕНИТЬ`), never add list height, and leave `Завершить` as a separate visible,
+  clickable header action.
 
-## Documentation
+## Automatically verified
 
-- `docs/product-requirements.md` now identifies manual integer entry as the reliable current path
-  before sensor implementation and explicitly preserves the accepted future `HeadingProvider`
-  direction from D033.
-- `docs/user-workflows.md` describes the concrete compact-card dialog, editing/removal, and the exact
-  latest-cycle targeting used by the current screen.
-- No new durable decision was added.
+- `test assembleDebug assembleDebugAndroidTest lintDebug` passes.
+- JVM tests cover normalization, positive/negative declination, both north-boundary crossings and
+  rounding without producing `360°`.
+- Compose tests cover mark/state density, 48 dp controls, live capture/freeze, one-shot consumption,
+  Undo remaining disabled, stale-context protection, timeout behavior, failure retry, unavailable
+  heading, persisted consumed-state recovery and a new cycle returning to live heading.
+- Samsung direct instrumentation passes `BeeSearchMigrationTest` 5/5,
+  `RoomPersistenceTest` 31/31, `BeeObservationScreenTest` 18/18 and
+  `FeedbackBannerTest` 4/4, and `ResumeObservationScreenTest` 10/10.
+- The observation presentation test verifies that transient feedback stays within the header,
+  does not overlap `Завершить` or the first Bee card, remains one line, and does not move the list
+  when it appears or disappears.
+- Repository tests cover atomic value/consumed updates, technical rollback, closed-cycle rejection,
+  repeat rejection after capture and Undo, generic history/edit set/clear compatibility, and reset on
+  the next FlightCycle.
+- `git diff --check` is clean apart from Git's informational LF/CRLF warnings.
+
+## Physical verification still required
+
+The updated debug and test APKs were installed with `adb install -r` on Samsung SM-S938B without
+clearing application data. After the isolated tests the retained application opened on the Territory
+map with no active ObservationPoint, so the real event sequence was not executed against research
+data merely to create a manual smoke scenario.
+
+The retained device database was safely upgraded from the intermediate v3 identity to v4. Before
+and after canonical hashes match for all user tables: 1 Territory, 31 ObservationPoints, 152 Bees
+and 169 FlightCycles. Fourteen persisted azimuth values and their consumed flags are unchanged.
+Normal process restart and force-stop → launch both open MainActivity on the Territory map without a
+Room crash. Diagnostic copies before and after are kept under the system temporary directory.
+
+On Samsung, verify with safe test data:
+
+1. `Прилёт сохранён`, `Вылет сохранён` and azimuth Undo remain in the header without covering the
+   first Bee card or `Завершить`, and the list does not jump;
+2. live heading changes when the phone turns and follows the upper short edge;
+3. a known physical direction is plausible relative to true north;
+4. one tap freezes the displayed value; Undo removes it but leaves that cycle disabled as `—°`;
+5. a newer capture replaces the previous Undo and the banner disappears after about three seconds;
+6. `Прилетела`, `Улетела`, restart recovery of consumed-without-value state and a new FlightCycle
+   with a fresh capture opportunity work;
+7. sensor unavailable/low-accuracy behavior is understandable;
+8. six cards, touch targets, outdoor contrast and white/`КП`/`КЛ` marks are usable on the device;
+9. maximum-brightness and daylight readability.
 
 ## Open items
 
-- D033 automatic compass/sensor capture remains a separate future milestone.
+- Sensor correctness, physical upper-edge direction, true-north plausibility, device density and
+  daylight contrast are not proven by builds or fake-provider Compose tests.
 - Offline map source/format and useful high-zoom basemap detail remain unresolved.
-- Backup/export is still required before substantial real field data accumulates.
+- Backup/export remains required before substantial real field data accumulates.
 
 ## Next task
 
-Review the dirty diff and perform the focused Samsung manual checklist above using a deliberately
-created test ObservationPoint or other user-approved non-research data. Do not commit until explicitly
-requested, and do not start sensor-based azimuth capture automatically.
+Manually verify the single-use capture, Undo-without-recapture, restart recovery and next-departure
+reset on safe test data. Then continue with the next explicitly selected field-work milestone.

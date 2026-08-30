@@ -848,6 +848,7 @@ departure_time      Instant     required
 return_time         Instant?    optional
 
 azimuth_deg         Double?     optional
+azimuth_capture_consumed Boolean required
 
 created_at          Instant     required
 updated_at          Instant     required
@@ -1074,6 +1075,12 @@ return_time = null
 
 `azimuth_deg` является необязательным.
 
+Сохранённое значение является истинным / географическим азимутом. Магнитное sensor heading перед
+сохранением корректируется через `GeomagneticField`; магнитное значение отдельно не хранится.
+
+`azimuth_capture_consumed` хранит другой факт: использована ли уже однократная возможность field
+capture для этого FlightCycle. Он не означает наличие `azimuth_deg`.
+
 Допустимый диапазон:
 
 ```text
@@ -1097,9 +1104,10 @@ return_time = null
 azimuth_deg = null
 ```
 
-означает:
+вместе с `azimuth_capture_consumed = false` означает, что полевая фиксация ещё не выполнялась.
 
-> направление не было надёжно определено.
+Вместе с `azimuth_capture_consumed = true` означает, что зафиксированное направление было удалено;
+повторная полевая фиксация этого FlightCycle запрещена.
 
 Это нормальное состояние.
 
@@ -1111,7 +1119,7 @@ azimuth_deg = null
 azimuth_deg = 0
 ```
 
-означает реальное направление на север.
+означает реальное направление на истинный / географический север.
 
 Поэтому значение `0` не используется как признак отсутствия данных.
 
@@ -1123,6 +1131,7 @@ azimuth_deg = 0
 
 ```text
 azimuth_deg = null
+azimuth_capture_consumed = true
 ```
 
 Остальные значения FlightCycle не изменяются.
@@ -1419,6 +1428,7 @@ FlightCycle
 │ departure_time          │
 │ return_time             │
 │ azimuth_deg             │
+│ azimuth_capture_consumed│
 │ created_at              │
 │ updated_at              │
 └─────────────────────────┘
@@ -1514,7 +1524,31 @@ bee_presence_result TEXT NULL
 
 ---
 
-# 68. Что намеренно не хранится
+# 68. Room schema v3/v4 и миграции
+
+Schema v3 добавляет в `flight_cycles`:
+
+```text
+azimuth_capture_consumed INTEGER NOT NULL DEFAULT 0
+```
+
+Migration 2 → 3 сохраняет все строки, UUID, timestamps и значения азимута. Для старых строк с
+`azimuth_deg IS NOT NULL` поле получает `true`; для строк с `azimuth_deg IS NULL` — `false`.
+Ранее удалённую фиксацию восстановить невозможно, поскольку до v3 этот факт отдельно не хранился.
+
+Новый FlightCycle создаётся с `azimuth_deg = null` и `azimuth_capture_consumed = false`. Field
+capture одной атомарной операцией записывает значение и устанавливает consumed-state. Undo очищает
+только значение.
+
+Schema v4 не изменяет пользовательские таблицы. Compatibility migration 3 → 4 принимает финальную
+v3-структуру, установленную промежуточной debug-сборкой с прежним Room identity hash. После
+стандартной schema validation Room записывает актуальный hash; строки, UUID, timestamps,
+`azimuth_deg` и `azimuth_capture_consumed` не преобразуются. Проверяются пути 3 → 4, повторное
+открытие v4 и 1 → 2 → 3 → 4.
+
+---
+
+# 69. Что намеренно не хранится
 
 На текущем этапе не создаются отдельные поля или таблицы:
 
@@ -1537,7 +1571,7 @@ time_zone_id
 
 ---
 
-# 69. Почему нет PhysicalPlace
+# 70. Почему нет PhysicalPlace
 
 Разные ObservationPoint могут иметь одинаковые координаты.
 
@@ -1561,7 +1595,7 @@ ObservationPoint 2
 
 ---
 
-# 70. Минимальная модель MVP
+# 71. Минимальная модель MVP
 
 Ядро исследовательской базы:
 
@@ -1603,6 +1637,7 @@ FlightCycle
 - departure_time
 - return_time?
 - azimuth_deg?
+- azimuth_capture_consumed
 - created_at
 - updated_at
 ```
@@ -1619,7 +1654,7 @@ AppSettings
 
 ---
 
-# 71. Итоговая логика данных
+# 72. Итоговая логика данных
 
 ```text
 AppSettings
@@ -1642,12 +1677,14 @@ Territory
                     └── FlightCycle 1
                     │       ├── common first departure time
                     │       ├── return time?
-                    │       └── azimuth?
+                    │       ├── azimuth?
+                    │       └── azimuth capture consumed
                     │
                     ├── FlightCycle 2
                     │       ├── departure time
                     │       ├── return time?
-                    │       └── azimuth?
+                    │       ├── azimuth?
+                    │       └── azimuth capture consumed
                     │
                     └── ...
 ```

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.beesearch.app.ui.theme.Bee_searchTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -16,6 +17,7 @@ class FeedbackBannerTest {
 
     @Test
     fun informationalFeedbackAppearsAndAutoDismissesAfterTimeout() {
+        assertEquals(3_000L, FEEDBACK_AUTO_DISMISS_MILLIS)
         val current = mutableStateOf<UiFeedback?>(autoFeedback(id = 1, message = "Пчела добавлена"))
         composeRule.mainClock.autoAdvance = false
         setFeedbackContent(current)
@@ -51,15 +53,18 @@ class FeedbackBannerTest {
         composeRule.mainClock.autoAdvance = false
         setFeedbackContent(current)
 
-        composeRule.mainClock.advanceTimeBy(3_000)
+        composeRule.mainClock.advanceTimeBy(1_000)
         composeRule.runOnIdle {
             current.value = autoFeedback(id = 2, message = "Новое сообщение")
         }
         composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(FEEDBACK_AUTO_DISMISS_MILLIS - 1_000)
+        composeRule.mainClock.advanceTimeBy(2_100)
 
         composeRule.onNodeWithText("Первое сообщение").assertDoesNotExist()
         composeRule.onNodeWithText("Новое сообщение").assertIsDisplayed()
+
+        composeRule.mainClock.advanceTimeBy(901)
+        composeRule.onNodeWithTag("feedback-banner").assertDoesNotExist()
     }
 
     @Test

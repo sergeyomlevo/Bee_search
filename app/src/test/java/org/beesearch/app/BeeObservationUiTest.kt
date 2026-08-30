@@ -100,6 +100,7 @@ class BeeObservationUiTest {
         departureTime = departureTime,
         returnTime = returnTime,
         azimuthDeg = null,
+        azimuthCaptureConsumed = false,
         createdAt = departureTime,
         updatedAt = returnTime ?: departureTime,
     )

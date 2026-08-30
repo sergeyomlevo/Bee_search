@@ -91,6 +91,31 @@ internal val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+internal val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE flight_cycles " +
+                "ADD COLUMN azimuth_capture_consumed INTEGER NOT NULL DEFAULT 0",
+        )
+        db.execSQL(
+            """
+            UPDATE flight_cycles
+            SET azimuth_capture_consumed = 1
+            WHERE azimuth_deg IS NOT NULL
+            """.trimIndent(),
+        )
+    }
+}
+
+/**
+ * Compatibility migration for devices that opened an intermediate v3 build.
+ * The user schema already matches the final schema, so Room only needs to
+ * validate it and persist the current identity hash for version 4.
+ */
+internal val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) = Unit
+}
+
 private data class LegacyObservationPoint(
     val id: String,
     val territoryId: String,

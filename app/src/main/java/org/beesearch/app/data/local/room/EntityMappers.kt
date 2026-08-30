@@ -45,6 +45,7 @@ internal fun FlightCycleEntity.toDomain(): FlightCycle = FlightCycle(
     departureTime = departureTime,
     returnTime = returnTime,
     azimuthDeg = azimuthDeg,
+    azimuthCaptureConsumed = azimuthCaptureConsumed,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )

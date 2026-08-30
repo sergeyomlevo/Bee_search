@@ -182,6 +182,20 @@ internal interface FlightCycleDao {
     @Query(
         """
         UPDATE flight_cycles
+        SET azimuth_deg = :azimuthDeg,
+            azimuth_capture_consumed = 1,
+            updated_at = :updatedAt
+        WHERE id = :id
+          AND return_time IS NULL
+          AND azimuth_capture_consumed = 0
+          AND azimuth_deg IS NULL
+        """,
+    )
+    suspend fun captureAzimuth(id: UUID, azimuthDeg: Double, updatedAt: Instant): Int
+
+    @Query(
+        """
+        UPDATE flight_cycles
         SET azimuth_deg = :azimuthDeg, updated_at = :updatedAt
         WHERE id = :id
         """,

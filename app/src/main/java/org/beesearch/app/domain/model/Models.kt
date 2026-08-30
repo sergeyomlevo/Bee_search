@@ -59,6 +59,7 @@ data class FlightCycle(
     val departureTime: Instant,
     val returnTime: Instant?,
     val azimuthDeg: Double?,
+    val azimuthCaptureConsumed: Boolean,
     val createdAt: Instant,
     val updatedAt: Instant,
 )

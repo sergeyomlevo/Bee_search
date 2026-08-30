@@ -2,6 +2,8 @@ package org.beesearch.app
 
 import org.beesearch.app.domain.model.BeePresenceResultRequiredException
 import org.beesearch.app.domain.model.BeesAlreadyFoundException
+import org.beesearch.app.domain.model.AzimuthCaptureAlreadyConsumedException
+import org.beesearch.app.domain.model.AzimuthCaptureRequiresOpenFlightCycleException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -45,6 +47,18 @@ class DomainErrorMessagesTest {
                 IllegalStateException("raw technical details"),
                 fallback = "Не удалось сохранить отсутствие пчёл",
             ),
+        )
+    }
+
+    @Test
+    fun `field azimuth capture errors use Russian messages`() {
+        assertEquals(
+            "Возможность зафиксировать азимут этого вылета уже использована",
+            userMessageFor(AzimuthCaptureAlreadyConsumedException(), fallback = "fallback"),
+        )
+        assertEquals(
+            "Азимут можно зафиксировать только во время текущего вылета",
+            userMessageFor(AzimuthCaptureRequiresOpenFlightCycleException(), fallback = "fallback"),
         )
     }
 }

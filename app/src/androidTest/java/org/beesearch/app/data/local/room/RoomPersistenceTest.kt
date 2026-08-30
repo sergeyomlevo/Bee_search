@@ -2,6 +2,7 @@ package org.beesearch.app.data.local.room
 
 import android.content.Context
 import android.database.sqlite.SQLiteConstraintException
+import android.database.sqlite.SQLiteException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
@@ -9,6 +10,8 @@ import kotlinx.coroutines.runBlocking
 import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomTerritoryRepository
 import org.beesearch.app.domain.model.InvalidAzimuthException
+import org.beesearch.app.domain.model.AzimuthCaptureAlreadyConsumedException
+import org.beesearch.app.domain.model.AzimuthCaptureRequiresOpenFlightCycleException
 import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.BeePresenceResultRequiredException
@@ -529,12 +532,87 @@ class RoomPersistenceTest {
         val bee = observationRepository.addBee(point.id, "YELLOW", MarkPosition.NONE)
         val cycle = observationRepository.startInitialGroupRelease(point.id).single()
 
-        assertEquals(0.0, observationRepository.setFlightAzimuth(cycle.id, 0.0).azimuthDeg)
+        val manuallySet = observationRepository.setFlightAzimuth(cycle.id, 0.0)
+        assertEquals(0.0, manuallySet.azimuthDeg)
+        assertFalse(manuallySet.azimuthCaptureConsumed)
         assertThrows(InvalidAzimuthException::class.java) {
             runBlocking { observationRepository.setFlightAzimuth(cycle.id, 360.0) }
         }
-        assertNull(observationRepository.setFlightAzimuth(cycle.id, null).azimuthDeg)
+        val manuallyCleared = observationRepository.setFlightAzimuth(cycle.id, null)
+        assertNull(manuallyCleared.azimuthDeg)
+        assertFalse(manuallyCleared.azimuthCaptureConsumed)
         assertEquals(bee.id, cycle.beeId)
+    }
+
+    @Test
+    fun fieldCaptureIsSingleUseUndoKeepsItConsumedAndNextCycleResetsIt() = runBlocking {
+        val point = createPoint()
+        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        val firstCycle = observationRepository.startInitialGroupRelease(point.id).single()
+
+        assertNull(firstCycle.azimuthDeg)
+        assertFalse(firstCycle.azimuthCaptureConsumed)
+
+        val captured = observationRepository.captureFlightAzimuth(firstCycle.id, 247.0)
+        assertEquals(247.0, captured.azimuthDeg)
+        assertTrue(captured.azimuthCaptureConsumed)
+        assertThrows(AzimuthCaptureAlreadyConsumedException::class.java) {
+            runBlocking { observationRepository.captureFlightAzimuth(firstCycle.id, 250.0) }
+        }
+
+        val undone = observationRepository.setFlightAzimuth(firstCycle.id, null)
+        assertNull(undone.azimuthDeg)
+        assertTrue(undone.azimuthCaptureConsumed)
+        assertThrows(AzimuthCaptureAlreadyConsumedException::class.java) {
+            runBlocking { observationRepository.captureFlightAzimuth(firstCycle.id, 250.0) }
+        }
+
+        clock.advanceSeconds(30)
+        observationRepository.registerBeeReturn(bee.id)
+        clock.advanceSeconds(5)
+        val secondCycle = observationRepository.startNextFlight(bee.id)
+        assertNull(secondCycle.azimuthDeg)
+        assertFalse(secondCycle.azimuthCaptureConsumed)
+        assertEquals(132.0, observationRepository.captureFlightAzimuth(secondCycle.id, 132.0).azimuthDeg)
+    }
+
+    @Test
+    fun fieldCaptureRejectsClosedCycle() = runBlocking {
+        val point = createPoint()
+        val bee = observationRepository.addBee(point.id, "BLUE", MarkPosition.NONE)
+        val cycle = observationRepository.startInitialGroupRelease(point.id).single()
+        clock.advanceSeconds(30)
+        val closed = observationRepository.registerBeeReturn(bee.id)
+
+        assertFalse(closed.azimuthCaptureConsumed)
+        assertThrows(AzimuthCaptureRequiresOpenFlightCycleException::class.java) {
+            runBlocking { observationRepository.captureFlightAzimuth(cycle.id, 90.0) }
+        }
+        Unit
+    }
+
+    @Test
+    fun technicalCaptureFailureLeavesAzimuthAndConsumptionUnchanged() = runBlocking {
+        val point = createPoint()
+        observationRepository.addBee(point.id, "GREEN", MarkPosition.NONE)
+        val cycle = observationRepository.startInitialGroupRelease(point.id).single()
+        database.openHelper.writableDatabase.execSQL(
+            """
+            CREATE TRIGGER fail_field_azimuth_capture
+            BEFORE UPDATE OF azimuth_capture_consumed ON flight_cycles
+            BEGIN
+                SELECT RAISE(ABORT, 'forced capture failure');
+            END
+            """.trimIndent(),
+        )
+
+        assertThrows(SQLiteException::class.java) {
+            runBlocking { observationRepository.captureFlightAzimuth(cycle.id, 247.0) }
+        }
+
+        val unchanged = observationRepository.observeFlightCyclesForPoint(point.id).first().single()
+        assertNull(unchanged.azimuthDeg)
+        assertFalse(unchanged.azimuthCaptureConsumed)
     }
 
     @Test

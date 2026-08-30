@@ -108,6 +108,8 @@ internal data class FlightCycleEntity(
     @ColumnInfo(name = "departure_time") val departureTime: Instant,
     @ColumnInfo(name = "return_time") val returnTime: Instant?,
     @ColumnInfo(name = "azimuth_deg") val azimuthDeg: Double?,
+    @ColumnInfo(name = "azimuth_capture_consumed", defaultValue = "0")
+    val azimuthCaptureConsumed: Boolean,
     @ColumnInfo(name = "created_at") val createdAt: Instant,
     @ColumnInfo(name = "updated_at") val updatedAt: Instant,
 )

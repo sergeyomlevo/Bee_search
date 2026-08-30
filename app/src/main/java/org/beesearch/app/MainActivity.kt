@@ -61,11 +61,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -75,6 +73,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.repeatOnLifecycle
 import org.beesearch.app.domain.location.LocationUiState
+import org.beesearch.app.domain.heading.HeadingAccuracy
+import org.beesearch.app.domain.heading.HeadingProvider
+import org.beesearch.app.domain.heading.HeadingReference
+import org.beesearch.app.domain.heading.HeadingState
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.BeeMarkCombination
@@ -96,6 +98,7 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.Point
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.isActive
 import java.time.Instant
 
@@ -161,6 +164,11 @@ private fun BeeSearchApp(
     val beeMutationInProgress by viewModel.beeMutationInProgress.collectAsStateWithLifecycle()
     val beeEventInProgressIds by viewModel.beeEventInProgressIds.collectAsStateWithLifecycle()
     val flightAzimuthInProgressIds by viewModel.flightAzimuthInProgressIds.collectAsStateWithLifecycle()
+    val resumeRoute = route as? AppRoute.ResumeObservation
+    val observationScreenVisible = resumeRoute != null &&
+        !beePreparation.isLoading &&
+        beePreparation.pointId == resumeRoute.point.id &&
+        activePointWorkflowPhase(beePreparation.isReleaseStarted) == ActivePointWorkflowPhase.OBSERVATION
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, _ ->
@@ -224,9 +232,13 @@ private fun BeeSearchApp(
                                 flightCycles = beePreparation.flightCycles,
                                 beeEventInProgressIds = beeEventInProgressIds,
                                 flightAzimuthInProgressIds = flightAzimuthInProgressIds,
+                                headingProvider = application.container.headingProvider,
+                                feedback = feedback,
+                                onDismissFeedback = viewModel::clearFeedback,
                                 isCompleting = completingObservationPointId == currentRoute.point.id,
                                 onRegisterReturn = viewModel::registerBeeReturn,
                                 onStartNextFlight = viewModel::startNextFlight,
+                                onCaptureFlightAzimuth = viewModel::captureFlightAzimuth,
                                 onSetFlightAzimuth = viewModel::setFlightAzimuth,
                                 onComplete = {
                                     viewModel.completeObservationPoint(currentRoute.point.id)
@@ -255,7 +267,7 @@ private fun BeeSearchApp(
                         }
                     }
                 }
-                feedback?.let {
+                if (!observationScreenVisible) feedback?.let {
                     FeedbackBanner(
                         feedback = it,
                         onDismiss = { feedbackId -> viewModel.clearFeedback(feedbackId) },
@@ -267,7 +279,7 @@ private fun BeeSearchApp(
     }
 }
 
-internal const val FEEDBACK_AUTO_DISMISS_MILLIS = 5_000L
+internal const val FEEDBACK_AUTO_DISMISS_MILLIS = 3_000L
 
 @Composable
 internal fun FeedbackBanner(
@@ -1013,20 +1025,41 @@ internal fun BeeObservationScreen(
     flightCycles: List<FlightCycle>,
     beeEventInProgressIds: Set<UUID>,
     flightAzimuthInProgressIds: Set<UUID> = emptySet(),
+    headingProvider: HeadingProvider = HeadingProvider {
+        flowOf(HeadingState.Unavailable("Датчик направления недоступен"))
+    },
+    feedback: UiFeedback? = null,
+    onDismissFeedback: (Long) -> Unit = {},
     isCompleting: Boolean,
     onRegisterReturn: (UUID) -> Unit,
     onStartNextFlight: (UUID) -> Unit,
     onSetFlightAzimuth: (UUID, Double?, () -> Unit) -> Unit = { _, _, onSuccess -> onSuccess() },
+    onCaptureFlightAzimuth: (UUID, Double, () -> Unit) -> Unit =
+        { cycleId, value, onSuccess -> onSetFlightAzimuth(cycleId, value, onSuccess) },
     onComplete: () -> Unit,
     nowProvider: () -> Instant = { Instant.now() },
+    undoTimeoutMillis: Long = FEEDBACK_AUTO_DISMISS_MILLIS,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var showCompletionConfirmation by rememberSaveable { mutableStateOf(false) }
-    var azimuthCycleId by rememberSaveable { mutableStateOf<String?>(null) }
+    var undoSequence by remember { mutableLongStateOf(0L) }
+    var azimuthUndo by remember { mutableStateOf<AzimuthUndo?>(null) }
     var nowEpochMillis by remember { mutableLongStateOf(nowProvider().toEpochMilli()) }
     val cards = remember(bees, flightCycles) {
         buildBeeObservationCards(bees, flightCycles)
     }
+    val headingFlow = remember(headingProvider, point.latitude, point.longitude) {
+        headingProvider.updates(
+            HeadingReference(
+                latitude = point.latitude,
+                longitude = point.longitude,
+                altitudeMeters = 0.0,
+            ),
+        )
+    }
+    val headingState by headingFlow.collectAsStateWithLifecycle(
+        initialValue = HeadingState.Initializing,
+    )
 
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -1037,28 +1070,19 @@ internal fun BeeObservationScreen(
         }
     }
 
-    val azimuthCycle = azimuthCycleId?.let { selectedId ->
-        flightCycles.firstOrNull { it.id.toString() == selectedId }
+    LaunchedEffect(azimuthUndo?.id, undoTimeoutMillis) {
+        val undoId = azimuthUndo?.id ?: return@LaunchedEffect
+        delay(undoTimeoutMillis)
+        if (azimuthUndo?.id == undoId) azimuthUndo = null
     }
-    val azimuthBee = azimuthCycle?.let { cycle -> bees.firstOrNull { it.id == cycle.beeId } }
 
-    if (azimuthCycle != null && azimuthBee != null) {
-        FlightAzimuthDialog(
-            beeLabel = BeeMarkCatalog.displayName(azimuthBee.markColor, azimuthBee.markPosition),
-            cycle = azimuthCycle,
-            isSaving = azimuthCycle.id in flightAzimuthInProgressIds,
-            onDismiss = { azimuthCycleId = null },
-            onSave = { value ->
-                onSetFlightAzimuth(azimuthCycle.id, value) {
-                    azimuthCycleId = null
-                }
-            },
-            onRemove = {
-                onSetFlightAzimuth(azimuthCycle.id, null) {
-                    azimuthCycleId = null
-                }
-            },
-        )
+    LaunchedEffect(feedback?.id, feedback?.displayMode, azimuthUndo?.id) {
+        val ordinaryFeedback = feedback?.takeIf {
+            it.displayMode == FeedbackDisplayMode.AUTO_DISMISS
+        }
+        if (azimuthUndo != null && ordinaryFeedback != null) {
+            onDismissFeedback(ordinaryFeedback.id)
+        }
     }
 
     if (showCompletionConfirmation) {
@@ -1091,64 +1115,169 @@ internal fun BeeObservationScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            Surface(tonalElevation = 2.dp) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .defaultMinSize(minHeight = 52.dp)
-                        .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Наблюдение · точка ${point.pointNumber}",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+    val persistentFeedback = feedback?.takeIf {
+        it.displayMode == FeedbackDisplayMode.PERSISTENT
+    }
+    val ordinaryTransientFeedback = feedback?.takeIf {
+        it.displayMode == FeedbackDisplayMode.AUTO_DISMISS
+    }
+    val currentUndo = azimuthUndo
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                Surface(tonalElevation = 2.dp) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 52.dp)
+                            .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp)
+                            .testTag("observation-header"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .defaultMinSize(minHeight = 48.dp)
+                                .testTag("observation-header-feedback-slot"),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            when {
+                                persistentFeedback != null -> ObservationHeaderTitle(point.pointNumber)
+                                currentUndo != null -> {
+                                    val undo = currentUndo
+                                    AzimuthUndoBanner(
+                                        undo = undo,
+                                        isUndoing = undo.flightCycleId in flightAzimuthInProgressIds,
+                                        onUndo = {
+                                            val undoId = undo.id
+                                            onSetFlightAzimuth(undo.flightCycleId, null) {
+                                                if (azimuthUndo?.id == undoId) azimuthUndo = null
+                                            }
+                                        },
+                                    )
+                                }
+                                ordinaryTransientFeedback != null -> ObservationTransientFeedbackBanner(
+                                    feedback = ordinaryTransientFeedback,
+                                    onDismiss = onDismissFeedback,
+                                )
+                                else -> ObservationHeaderTitle(point.pointNumber)
+                            }
+                        }
+                        TextButton(
+                            onClick = { showCompletionConfirmation = true },
+                            enabled = !isCompleting &&
+                                beeEventInProgressIds.isEmpty() &&
+                                flightAzimuthInProgressIds.isEmpty(),
+                            modifier = Modifier.testTag("complete-field-observation"),
+                        ) { Text(if (isCompleting) "Завершение…" else "Завершить") }
+                    }
+                }
+            },
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding).testTag("bee-observation-list"),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                items(cards, key = { it.bee.id }) { card ->
+                    BeeObservationCard(
+                        card = card,
+                        now = Instant.ofEpochMilli(nowEpochMillis),
+                        headingState = headingState,
+                        isEventInProgress = card.bee.id in beeEventInProgressIds,
+                        isAzimuthInProgress = card.latestCycle?.id in flightAzimuthInProgressIds,
+                        onRegisterReturn = { onRegisterReturn(card.bee.id) },
+                        onStartNextFlight = { onStartNextFlight(card.bee.id) },
+                        onCaptureAzimuth = { cycle, value ->
+                            onCaptureFlightAzimuth(cycle.id, value.toDouble()) {
+                                undoSequence += 1
+                                azimuthUndo = AzimuthUndo(
+                                    id = undoSequence,
+                                    flightCycleId = cycle.id,
+                                    azimuthDeg = value,
+                                )
+                            }
+                        },
                     )
-                    TextButton(
-                        onClick = { showCompletionConfirmation = true },
-                        enabled = !isCompleting &&
-                            beeEventInProgressIds.isEmpty() &&
-                            flightAzimuthInProgressIds.isEmpty(),
-                        modifier = Modifier.testTag("complete-field-observation"),
-                    ) { Text(if (isCompleting) "Завершение…" else "Завершить") }
                 }
             }
-        },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).testTag("bee-observation-list"),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            items(cards, key = { it.bee.id }) { card ->
-                BeeObservationCard(
-                    card = card,
-                    now = Instant.ofEpochMilli(nowEpochMillis),
-                    isEventInProgress = card.bee.id in beeEventInProgressIds,
-                    isAzimuthInProgress = card.latestCycle?.id in flightAzimuthInProgressIds,
-                    onRegisterReturn = { onRegisterReturn(card.bee.id) },
-                    onStartNextFlight = { onStartNextFlight(card.bee.id) },
-                    onEditAzimuth = { cycle -> azimuthCycleId = cycle.id.toString() },
-                )
-            }
+        }
+        persistentFeedback?.let {
+            FeedbackBanner(
+                feedback = persistentFeedback,
+                onDismiss = onDismissFeedback,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 54.dp)
+                    .zIndex(5f),
+            )
         }
     }
 }
 
 @Composable
+private fun ObservationHeaderTitle(pointNumber: Int) {
+    Text(
+        "Наблюдение · точка $pointNumber",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun ObservationTransientFeedbackBanner(
+    feedback: UiFeedback,
+    onDismiss: (Long) -> Unit,
+    autoDismissMillis: Long = FEEDBACK_AUTO_DISMISS_MILLIS,
+) {
+    LaunchedEffect(feedback.id, autoDismissMillis) {
+        delay(autoDismissMillis)
+        onDismiss(feedback.id)
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 48.dp)
+            .testTag("observation-transient-banner"),
+        color = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                text = feedback.message,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.testTag("observation-transient-text"),
+            )
+        }
+    }
+}
+
+private data class AzimuthUndo(
+    val id: Long,
+    val flightCycleId: UUID,
+    val azimuthDeg: Int,
+)
+
+@Composable
 private fun BeeObservationCard(
     card: BeeObservationCardModel,
     now: Instant,
+    headingState: HeadingState,
     isEventInProgress: Boolean,
     isAzimuthInProgress: Boolean,
     onRegisterReturn: () -> Unit,
     onStartNextFlight: () -> Unit,
-    onEditAzimuth: (FlightCycle) -> Unit,
+    onCaptureAzimuth: (FlightCycle, Int) -> Unit,
 ) {
     val state = card.fieldState
     val stateStartedAt = card.stateStartedAt
@@ -1162,11 +1291,18 @@ private fun BeeObservationCard(
         BeeFieldState.AT_POINT -> "УЛЕТЕЛА"
         null -> "НЕДОСТУПНО"
     }
-    val azimuthActionEnabled = card.latestCycle != null &&
+    val latestCycle = card.latestCycle
+    val openCycle = latestCycle?.takeIf { it.returnTime == null }
+    val liveHeading = headingState as? HeadingState.Available
+    val captureEnabled = openCycle != null &&
+        !openCycle.azimuthCaptureConsumed &&
+        openCycle.azimuthDeg == null &&
+        liveHeading != null &&
+        liveHeading.accuracy != HeadingAccuracy.UNRELIABLE &&
         !isEventInProgress &&
         !isAzimuthInProgress
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth().testTag("bee-card-${card.bee.id}")) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -1175,20 +1311,20 @@ private fun BeeObservationCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    MarkColorSwatch(card.bee.markColor, size = 22)
-                    Text(
-                        BeeMarkCatalog.displayName(card.bee.markColor, card.bee.markPosition),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                ObservationBeeMark(
+                    markColor = card.bee.markColor,
+                    markPosition = card.bee.markPosition,
+                )
+                Text(
+                    stateText,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 10.dp)
+                        .testTag("bee-state-${card.bee.id}"),
+                )
                 Text(
                     stateStartedAt?.let { formatElapsedTime(it, now) } ?: "--:--",
                     style = MaterialTheme.typography.titleLarge,
@@ -1203,38 +1339,57 @@ private fun BeeObservationCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    stateText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("bee-state-${card.bee.id}"),
-                )
                 Box(
                     modifier = Modifier
-                        .defaultMinSize(minHeight = 48.dp)
+                        .defaultMinSize(minWidth = 72.dp, minHeight = 48.dp)
                         .clickable(
-                            enabled = azimuthActionEnabled,
+                            enabled = captureEnabled,
                             role = Role.Button,
-                            onClick = { card.latestCycle?.let(onEditAzimuth) },
+                            onClick = {
+                                if (openCycle != null && liveHeading != null) {
+                                    onCaptureAzimuth(openCycle, liveHeading.trueHeadingDeg)
+                                }
+                            },
                         )
-                        .padding(horizontal = 8.dp)
+                        .padding(horizontal = 6.dp)
                         .testTag("bee-azimuth-${card.bee.id}"),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        if (isAzimuthInProgress) "Сохранение…" else formatAzimuthAction(card.latestCycle?.azimuthDeg),
-                        color = if (azimuthActionEnabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        text = when {
+                            isAzimuthInProgress -> "…°"
+                            latestCycle?.azimuthDeg != null -> formatAzimuthDegrees(latestCycle.azimuthDeg)
+                            openCycle == null -> "—°"
+                            latestCycle?.azimuthCaptureConsumed == true -> "—°"
+                            liveHeading != null && liveHeading.accuracy == HeadingAccuracy.UNRELIABLE -> "! —"
+                            liveHeading != null && liveHeading.accuracy == HeadingAccuracy.LOW ->
+                                "! ${liveHeading.trueHeadingDeg}°"
+                            liveHeading != null -> "${liveHeading.trueHeadingDeg}°"
+                            headingState is HeadingState.Initializing -> "…°"
+                            else -> "нет"
                         },
-                        style = MaterialTheme.typography.labelLarge,
+                        color = when {
+                            latestCycle?.azimuthDeg != null -> MaterialTheme.colorScheme.onSurface
+                            liveHeading?.accuracy == HeadingAccuracy.LOW ||
+                                liveHeading?.accuracy == HeadingAccuracy.UNRELIABLE ->
+                                MaterialTheme.colorScheme.error
+                            captureEnabled -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurface
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
+                        modifier = Modifier.semantics {
+                            contentDescription = headingContentDescription(
+                                persistedAzimuth = latestCycle?.azimuthDeg,
+                                headingState = headingState,
+                                isInFlight = openCycle != null,
+                                captureConsumed = latestCycle?.azimuthCaptureConsumed == true,
+                            )
+                        },
                     )
                 }
+                Spacer(modifier = Modifier.weight(1f))
                 Button(
                     onClick = {
                         when (state) {
@@ -1257,69 +1412,81 @@ private fun BeeObservationCard(
 }
 
 @Composable
-private fun FlightAzimuthDialog(
-    beeLabel: String,
-    cycle: FlightCycle,
-    isSaving: Boolean,
-    onDismiss: () -> Unit,
-    onSave: (Double) -> Unit,
-    onRemove: () -> Unit,
+private fun ObservationBeeMark(
+    markColor: String,
+    markPosition: MarkPosition,
 ) {
-    var input by rememberSaveable(cycle.id) { mutableStateOf(azimuthInputText(cycle.azimuthDeg)) }
-    var validationMessage by rememberSaveable(cycle.id) { mutableStateOf<String?>(null) }
+    val background = markColorValue(markColor)
+    val foreground = if (markColor == "WHITE" || markColor == "YELLOW") Color.Black else Color.White
+    val positionText = when (markPosition) {
+        MarkPosition.NONE -> null
+        MarkPosition.RIGHT_WING -> "КП"
+        MarkPosition.LEFT_WING -> "КЛ"
+    }
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .background(background, CircleShape)
+            .border(
+                BorderStroke(if (markColor == "WHITE") 2.dp else 1.dp, Color(0xFF2B211D)),
+                CircleShape,
+            )
+            .semantics {
+                contentDescription = BeeMarkCatalog.displayName(markColor, markPosition)
+            }
+            .testTag("bee-mark-$markColor-${markPosition.name}"),
+        contentAlignment = Alignment.Center,
+    ) {
+        positionText?.let {
+            Text(
+                text = it,
+                color = foreground,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
 
-    AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Азимут") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(beeLabel, fontWeight = FontWeight.Bold)
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = {
-                        input = it
-                        validationMessage = null
-                    },
-                    modifier = Modifier.fillMaxWidth().testTag("azimuth-input"),
-                    enabled = !isSaving,
-                    singleLine = true,
-                    label = { Text("Градусы (0–359)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = validationMessage != null,
-                    supportingText = validationMessage?.let { message ->
-                        { Text(message) }
-                    },
+@Composable
+private fun AzimuthUndoBanner(
+    undo: AzimuthUndo,
+    isUndoing: Boolean,
+    onUndo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth().testTag("azimuth-undo-banner"),
+        color = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        shadowElevation = 6.dp,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${undo.azimuthDeg}° сохранён",
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            TextButton(
+                onClick = onUndo,
+                enabled = !isUndoing,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("azimuth-undo"),
+            ) {
+                Text(
+                    if (isUndoing) "ОТМЕНА…" else "ОТМЕНИТЬ",
+                    color = MaterialTheme.colorScheme.inversePrimary,
+                    fontWeight = FontWeight.Bold,
                 )
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val validation = validateManualAzimuth(input)
-                    validationMessage = validation.errorMessage
-                    validation.value?.let { onSave(it.toDouble()) }
-                },
-                enabled = !isSaving,
-                modifier = Modifier.testTag("save-azimuth"),
-            ) { Text(if (isSaving) "Сохранение…" else "Сохранить") }
-        },
-        dismissButton = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (cycle.azimuthDeg != null) {
-                    TextButton(
-                        onClick = onRemove,
-                        enabled = !isSaving,
-                        modifier = Modifier.testTag("remove-azimuth"),
-                    ) { Text("Удалить") }
-                }
-                TextButton(
-                    onClick = onDismiss,
-                    enabled = !isSaving,
-                    modifier = Modifier.testTag("cancel-azimuth"),
-                ) { Text("Отмена") }
-            }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -1502,14 +1669,7 @@ internal fun BeeSelector(
 
 @Composable
 private fun MarkColorSwatch(markColor: String, size: Int = 28) {
-    val color = when (markColor) {
-        "WHITE" -> Color.White
-        "YELLOW" -> Color(0xFFFFD54F)
-        "BLUE" -> Color(0xFF1976D2)
-        "RED" -> Color(0xFFD32F2F)
-        "GREEN" -> Color(0xFF388E3C)
-        else -> Color.Gray
-    }
+    val color = markColorValue(markColor)
     Box(
         modifier = Modifier
             .size(size.dp)
@@ -1517,6 +1677,15 @@ private fun MarkColorSwatch(markColor: String, size: Int = 28) {
             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), CircleShape)
             .semantics { contentDescription = "Цвет метки: $markColor" },
     )
+}
+
+private fun markColorValue(markColor: String): Color = when (markColor) {
+    "WHITE" -> Color.White
+    "YELLOW" -> Color(0xFFFFD54F)
+    "BLUE" -> Color(0xFF1565C0)
+    "RED" -> Color(0xFFC62828)
+    "GREEN" -> Color(0xFF2E7D32)
+    else -> Color.Gray
 }
 
 @Preview(showBackground = true)
