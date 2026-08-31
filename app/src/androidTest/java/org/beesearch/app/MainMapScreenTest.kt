@@ -19,6 +19,15 @@ import androidx.compose.ui.test.performTextInput
 import java.time.Instant
 import java.util.UUID
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.ui.map.CREATE_OBSERVATION_POINT_DESCRIPTION
+import org.beesearch.app.ui.map.CompactMapStatus
+import org.beesearch.app.ui.map.MAIN_BOTTOM_PANEL_TAG
+import org.beesearch.app.ui.map.MAIN_MAP_VIEWPORT_TAG
+import org.beesearch.app.ui.map.MapFirstScaffold
+import org.beesearch.app.ui.map.MapIdleControls
+import org.beesearch.app.ui.map.ObservationPointObserverCodeDialog
+import org.beesearch.app.ui.map.RECENTER_MAP_DESCRIPTION
+import org.beesearch.app.ui.map.SETTINGS_DESCRIPTION
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule

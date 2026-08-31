@@ -156,7 +156,7 @@ class MapViewLifecycleControllerTest {
     }
 
     private class ReflectedMapViewLifecycleController {
-        private val type = Class.forName("org.beesearch.app.MapViewLifecycleController")
+        private val type = Class.forName("org.beesearch.app.ui.map.MapViewLifecycleController")
         private val instance = type.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
         private val attach = type.getDeclaredMethod("attach", MapView::class.java).apply { isAccessible = true }
         private val onEvent = type
