@@ -216,12 +216,14 @@ internal class MainViewModel(
         }
     }
 
-    fun startObservationPointCreation() {
+    fun startObservationPointCreation(latitude: Double, longitude: Double) {
         val existingPoint = activePoint.value
         if (existingPoint != null) {
             openResumeObservation(existingPoint)
             return
         }
+        if (!latitude.isFinite() || latitude !in -90.0..90.0) return
+        if (!longitude.isFinite() || longitude !in -180.0..180.0) return
         val territory = currentTerritory.value
         if (territory == null) {
             showPersistentFeedback("Сначала выберите текущую территорию")
@@ -233,29 +235,19 @@ internal class MainViewModel(
             return
         }
 
-        _observationPointDraft.value = ObservationPointCreationDraft(
+        val draft = ObservationPointCreationDraft.fromMapCenter(
             territoryId = territory.id,
             originalGps = reading,
+            mapCenter = MapTarget(latitude, longitude),
             observerCodeInput = settings.value.observerCode.orEmpty(),
         )
+        _observationPointDraft.value = draft
         clearFeedback()
-    }
-
-    fun updateObservationPointCoordinates(latitude: Double, longitude: Double) {
-        if (!latitude.isFinite() || latitude !in -90.0..90.0) return
-        if (!longitude.isFinite() || longitude !in -180.0..180.0) return
-        _observationPointDraft.value = _observationPointDraft.value?.withSelectedCoordinates(
-            latitude = latitude,
-            longitude = longitude,
-        )
+        if (settings.value.observerCode != null) persistObservationPoint(draft)
     }
 
     fun updateObservationPointObserverCode(value: String) {
         _observationPointDraft.value = _observationPointDraft.value?.copy(observerCodeInput = value)
-    }
-
-    fun requestObservationPointGpsRecenter() {
-        _observationPointDraft.value = _observationPointDraft.value?.requestGpsRecenter()
     }
 
     fun cancelObservationPointCreation() {
@@ -265,6 +257,10 @@ internal class MainViewModel(
 
     fun confirmObservationPointCreation() {
         val draft = _observationPointDraft.value ?: return
+        persistObservationPoint(draft)
+    }
+
+    private fun persistObservationPoint(draft: ObservationPointCreationDraft) {
         if (draft.isSaving) return
         val observerCodeMissing = settings.value.observerCode == null
         if (observerCodeMissing && draft.observerCodeInput.isBlank()) {
@@ -291,7 +287,7 @@ internal class MainViewModel(
                 manualRoute.value = activePoint.value?.let(AppRoute::ResumeObservation)
                 showPersistentFeedback(userMessageFor(error, "Не удалось сохранить точку наблюдения"))
             } catch (error: Exception) {
-                _observationPointDraft.value = draft.copy(isSaving = false)
+                _observationPointDraft.value = null
                 showPersistentFeedback(userMessageFor(error, "Не удалось сохранить точку наблюдения"))
             }
         }

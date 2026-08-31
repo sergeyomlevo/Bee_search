@@ -1,0 +1,4 @@
+interface:
+  display_name: "Android Emulator Automation"
+  short_description: "Use semantic ADB and UIAutomator workflows to inspect, launch, and interact with Android apps from agents."
+  default_prompt: "Use $android-emulator-automation when the request is about Use semantic ADB and UIAutomator workflows to inspect, launch, and interact with Android apps from agents.."

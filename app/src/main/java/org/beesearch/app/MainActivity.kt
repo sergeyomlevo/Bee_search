@@ -11,11 +11,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.defaultMinSize
@@ -29,12 +32,17 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -54,7 +62,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
@@ -91,11 +101,6 @@ import org.maplibre.android.MapLibre
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.style.layers.CircleLayer
-import org.maplibre.android.style.layers.PropertyFactory
-import org.maplibre.android.style.sources.GeoJsonSource
-import org.maplibre.geojson.Feature
-import org.maplibre.geojson.Point
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
@@ -194,8 +199,10 @@ private fun BeeSearchApp(
                     AppRoute.Loading -> LoadingScreen()
                     AppRoute.Settings -> SettingsScreen(
                         initialObserverCode = settings.observerCode,
+                        currentTerritory = currentTerritory,
                         onBack = viewModel::returnToStartup,
                         onSave = viewModel::saveObserverCode,
+                        onOpenTerritories = viewModel::openTerritoryManagement,
                     )
                     AppRoute.TerritoryManagement -> TerritoryManagementScreen(
                         territories = territories,
@@ -213,9 +220,7 @@ private fun BeeSearchApp(
                         locationPermissionGranted = locationPermissionGranted,
                         onRequestLocationPermission = requestLocationPermission,
                         onStartObservationPointCreation = viewModel::startObservationPointCreation,
-                        onObservationPointCoordinatesChanged = viewModel::updateObservationPointCoordinates,
                         onObserverCodeChanged = viewModel::updateObservationPointObserverCode,
-                        onGpsRecenterRequested = viewModel::requestObservationPointGpsRecenter,
                         onConfirmObservationPoint = viewModel::confirmObservationPointCreation,
                         onCancelObservationPointCreation = viewModel::cancelObservationPointCreation,
                         onOpenSettings = viewModel::openSettings,
@@ -327,21 +332,30 @@ private fun LoadingScreen() {
 }
 
 @Composable
-private fun SettingsScreen(
+internal fun SettingsScreen(
     initialObserverCode: String?,
+    currentTerritory: Territory?,
     onBack: () -> Unit,
     onSave: (String) -> Unit,
+    onOpenTerritories: () -> Unit,
 ) {
     var observerCode by rememberSaveable(initialObserverCode) {
         mutableStateOf(initialObserverCode.orEmpty())
     }
-    Scaffold(topBar = {
-        TopAppBar(title = { Text("Настройки") }, navigationIcon = {
-            TextButton(onClick = onBack) { Text("Назад") }
-        })
-    }) { padding ->
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopAppBar(title = { Text("Настройки") }, navigationIcon = {
+                TextButton(onClick = onBack) { Text("Назад") }
+            })
+        },
+    ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Код наблюдателя", style = MaterialTheme.typography.titleMedium)
@@ -358,6 +372,16 @@ private fun SettingsScreen(
                 enabled = observerCode.trim().isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Сохранить") }
+            HorizontalDivider()
+            Text("Территория", style = MaterialTheme.typography.titleMedium)
+            Text(
+                currentTerritory?.let { "${it.code} — ${it.name}" }
+                    ?: "Текущая территория не выбрана",
+            )
+            OutlinedButton(
+                onClick = onOpenTerritories,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Управление территориями") }
         }
     }
 }
@@ -443,109 +467,204 @@ private fun TerritoryRow(territory: Territory, isCurrent: Boolean, onSelect: () 
 }
 
 @Composable
-private fun CurrentTerritoryScreen(
+internal fun CurrentTerritoryScreen(
     territory: Territory?,
     locationState: LocationUiState,
     observerCode: String?,
     observationPointDraft: ObservationPointCreationDraft?,
     locationPermissionGranted: Boolean,
     onRequestLocationPermission: () -> Unit,
-    onStartObservationPointCreation: () -> Unit,
-    onObservationPointCoordinatesChanged: (Double, Double) -> Unit,
+    onStartObservationPointCreation: (Double, Double) -> Unit,
     onObserverCodeChanged: (String) -> Unit,
-    onGpsRecenterRequested: () -> Unit,
     onConfirmObservationPoint: () -> Unit,
     onCancelObservationPointCreation: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTerritories: () -> Unit,
 ) {
-    val isCreatingObservationPoint = observationPointDraft != null
-    Scaffold(topBar = {
-        if (!isCreatingObservationPoint) {
-            TopAppBar(
-                title = { Text("Bee Search") },
-                actions = {
-                    TextButton(onClick = onOpenSettings) { Text("Настройки") }
-                },
-            )
-        }
-    }) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(if (isCreatingObservationPoint) 0.dp else 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (!isCreatingObservationPoint) {
-                if (territory == null) {
-                    Text("Текущая территория не найдена")
-                } else {
-                    Text(
-                        text = "${territory.code} — ${territory.name}",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-            }
+    MapFirstScaffold(
+        onOpenSettings = onOpenSettings,
+    ) { mapModifier ->
+        Box(modifier = mapModifier) {
             if (territory != null) {
                 BeeMap(
                     locationState = locationState,
-                    observerCode = observerCode,
-                    observationPointDraft = observationPointDraft,
+                    isCreatingObservationPoint = observationPointDraft != null,
                     locationPermissionGranted = locationPermissionGranted,
                     onRequestLocationPermission = onRequestLocationPermission,
-                    onObservationPointCoordinatesChanged = onObservationPointCoordinatesChanged,
-                    onObserverCodeChanged = onObserverCodeChanged,
-                    onGpsRecenterRequested = onGpsRecenterRequested,
-                    onConfirmObservationPoint = onConfirmObservationPoint,
-                    onCancelObservationPointCreation = onCancelObservationPointCreation,
-                    modifier = if (isCreatingObservationPoint) {
-                        Modifier.fillMaxSize()
-                    } else {
-                        Modifier.fillMaxWidth().weight(1f)
-                    },
+                    onCreateObservationPointAt = onStartObservationPointCreation,
+                    modifier = Modifier.fillMaxSize().testTag(MAIN_MAP_VIEWPORT_TAG),
+                )
+            } else {
+                Surface(
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    tonalElevation = 4.dp,
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("Текущая территория не найдена")
+                        TextButton(onClick = onOpenTerritories) { Text("Выбрать территорию") }
+                    }
+                }
+            }
+        }
+    }
+    if (observationPointDraft != null && observerCode == null) {
+        ObservationPointObserverCodeDialog(
+            draft = observationPointDraft,
+            onObserverCodeChanged = onObserverCodeChanged,
+            onConfirm = onConfirmObservationPoint,
+            onCancel = onCancelObservationPointCreation,
+        )
+    }
+}
+
+@Composable
+internal fun ObservationPointObserverCodeDialog(
+    draft: ObservationPointCreationDraft,
+    onObserverCodeChanged: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!draft.isSaving) onCancel() },
+        modifier = Modifier.testTag("observation-point-observer-dialog"),
+        title = { Text("Код наблюдателя") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Код будет сохранён в настройках и в новой точке.")
+                OutlinedTextField(
+                    value = draft.observerCodeInput,
+                    onValueChange = onObserverCodeChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("observer_code") },
+                    singleLine = true,
+                    enabled = !draft.isSaving,
                 )
             }
-            if (!isCreatingObservationPoint) {
-                Button(
-                    onClick = onStartObservationPointCreation,
-                    enabled = locationState is LocationUiState.Available,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Новая точка")
-                }
-                Button(onClick = onOpenTerritories, modifier = Modifier.fillMaxWidth()) {
-                    Text("Управление территориями")
-                }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = draft.observerCodeInput.isNotBlank() && !draft.isSaving,
+            ) {
+                Text(if (draft.isSaving) "Сохранение…" else "Создать точку")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel, enabled = !draft.isSaving) { Text("Отмена") }
+        },
+    )
+}
+
+internal const val MAIN_MAP_VIEWPORT_TAG = "main-map-viewport"
+internal const val MAIN_BOTTOM_PANEL_TAG = "main-bottom-panel"
+internal const val RECENTER_MAP_DESCRIPTION = "Вернуться к текущему местоположению"
+internal const val CREATE_OBSERVATION_POINT_DESCRIPTION = "Создать точку наблюдения"
+internal const val SETTINGS_DESCRIPTION = "Настройки"
+
+@Composable
+internal fun MapFirstScaffold(
+    onOpenSettings: () -> Unit,
+    content: @Composable BoxScope.(Modifier) -> Unit,
+) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            MapBottomPanel(onOpenSettings = onOpenSettings)
+        },
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            content(Modifier.fillMaxSize().padding(padding))
+        }
+    }
+}
+
+@Composable
+internal fun MapBottomPanel(
+    onOpenSettings: () -> Unit,
+) {
+    Surface(tonalElevation = 3.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(horizontal = 8.dp)
+                .testTag(MAIN_BOTTOM_PANEL_TAG),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier
+                    .size(48.dp)
+                    .semantics { contentDescription = SETTINGS_DESCRIPTION },
+            ) {
+                SettingsGlyph(Modifier.size(30.dp))
             }
         }
     }
 }
 
 @Composable
+private fun SettingsGlyph(modifier: Modifier = Modifier) {
+    val color = LocalContentColor.current
+    Canvas(modifier) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val innerRadius = size.minDimension * 0.23f
+        val spokeStartRadius = innerRadius
+        val spokeEndRadius = size.minDimension * 0.46f
+        drawCircle(
+            color = color,
+            radius = innerRadius,
+            center = center,
+            style = Stroke(width = 2.2.dp.toPx()),
+        )
+        repeat(8) { index ->
+            val angle = Math.PI * index / 4.0
+            val start = Offset(
+                x = center.x + (kotlin.math.cos(angle) * spokeStartRadius).toFloat(),
+                y = center.y + (kotlin.math.sin(angle) * spokeStartRadius).toFloat(),
+            )
+            val end = Offset(
+                x = center.x + (kotlin.math.cos(angle) * spokeEndRadius).toFloat(),
+                y = center.y + (kotlin.math.sin(angle) * spokeEndRadius).toFloat(),
+            )
+            drawLine(color = color, start = start, end = end, strokeWidth = 2.8.dp.toPx())
+        }
+        drawCircle(color = color, radius = 1.8.dp.toPx(), center = center)
+    }
+}
+
+@Composable
 private fun BeeMap(
     locationState: LocationUiState,
-    observerCode: String?,
-    observationPointDraft: ObservationPointCreationDraft?,
+    isCreatingObservationPoint: Boolean,
     locationPermissionGranted: Boolean,
     onRequestLocationPermission: () -> Unit,
-    onObservationPointCoordinatesChanged: (Double, Double) -> Unit,
-    onObserverCodeChanged: (String) -> Unit,
-    onGpsRecenterRequested: () -> Unit,
-    onConfirmObservationPoint: () -> Unit,
-    onCancelObservationPointCreation: () -> Unit,
+    onCreateObservationPointAt: (Double, Double) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val mapViewLifecycle = remember { MapViewLifecycleController() }
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
-    var locationSource by remember { mutableStateOf<GeoJsonSource?>(null) }
+    var gpsScreenPosition by remember { mutableStateOf<Offset?>(null) }
     var firstFixCentered by remember { mutableStateOf(false) }
-    var handledGpsRecenterRequestId by rememberSaveable(observationPointDraft?.originalGps?.timestamp) {
-        mutableLongStateOf(0L)
-    }
+    var initialGpsCenterEstablished by remember { mutableStateOf(false) }
+    var mapCenter by remember { mutableStateOf<MapTarget?>(null) }
     val reading = (locationState as? LocationUiState.Available)?.reading
+    val gpsPosition = reading?.let { MapTarget(it.latitude, it.longitude) }
+    val measurement = if (initialGpsCenterEstablished) {
+        visibleMapMeasurement(gpsPosition = gpsPosition, mapCenter = mapCenter)
+    } else {
+        null
+    }
+    val mapProfile = remember { beeSearchFieldMapProfile() }
 
     Box(modifier) {
         AndroidView(
@@ -558,23 +677,8 @@ private fun BeeMap(
                     view.onCreate(null)
                     view.getMapAsync { mapInstance ->
                         map = mapInstance
-                        // Temporary MapLibre demo style for this milestone; D008 source/style remains open.
-                        mapInstance.setStyle("https://demotiles.maplibre.org/style.json") { style ->
-                            val source = GeoJsonSource(
-                                "bee-current-location",
-                                Feature.fromGeometry(Point.fromLngLat(0.0, 0.0)),
-                            )
-                            style.addSource(source)
-                            style.addLayer(
-                                CircleLayer("bee-current-location-layer", "bee-current-location").withProperties(
-                                    PropertyFactory.circleRadius(5f),
-                                    PropertyFactory.circleColor("#1976D2"),
-                                    PropertyFactory.circleStrokeColor("#FFFFFF"),
-                                    PropertyFactory.circleStrokeWidth(1.5f),
-                                ),
-                            )
-                            locationSource = source
-                        }
+                        mapInstance.setMaxZoomPreference(mapProfile.uiMaxZoom)
+                        mapInstance.setStyle(mapProfile.styleUrl)
                     }
                 }
             },
@@ -596,174 +700,252 @@ private fun BeeMap(
             }
         }
 
-        LaunchedEffect(reading, locationSource, map) {
-            val current = reading ?: return@LaunchedEffect
-            locationSource?.setGeoJson(Feature.fromGeometry(Point.fromLngLat(current.longitude, current.latitude)))
+        LaunchedEffect(reading, map, mapView) {
+            val current = reading
+            if (current == null) {
+                gpsScreenPosition = null
+                return@LaunchedEffect
+            }
             if (!firstFixCentered) {
-                map?.animateCamera(
+                val mapInstance = map ?: return@LaunchedEffect
+                firstFixCentered = true
+                mapInstance.moveCamera(
                     org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
                         LatLng(current.latitude, current.longitude),
                         15.0,
                     ),
                 )
-                firstFixCentered = true
+                mapInstance.cameraPosition.target?.let { target ->
+                    mapCenter = MapTarget(target.latitude, target.longitude)
+                    initialGpsCenterEstablished = true
+                }
             }
+            gpsScreenPosition = projectedMapPosition(map, mapView, gpsPosition)
         }
 
-        LaunchedEffect(observationPointDraft?.originalGps?.timestamp, map) {
-            val draft = observationPointDraft ?: return@LaunchedEffect
-            map?.animateCamera(
-                org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
-                    LatLng(draft.selectedLatitude, draft.selectedLongitude),
-                    17.0,
-                ),
-            )
-        }
-
-        LaunchedEffect(observationPointDraft?.gpsRecenterRequestId, map) {
-            val draft = observationPointDraft ?: return@LaunchedEffect
-            val requestId = draft.gpsRecenterRequestId
-            if (requestId <= handledGpsRecenterRequestId) return@LaunchedEffect
-            val mapInstance = map ?: return@LaunchedEffect
-            mapInstance.animateCamera(
-                org.maplibre.android.camera.CameraUpdateFactory.newLatLng(
-                    LatLng(draft.originalGps.latitude, draft.originalGps.longitude),
-                ),
-            )
-            handledGpsRecenterRequestId = requestId
-        }
-
-        DisposableEffect(map, observationPointDraft != null) {
+        DisposableEffect(map, mapView, gpsPosition) {
             val mapInstance = map
-            if (mapInstance == null || observationPointDraft == null) {
+            val currentMapView = mapView
+            if (mapInstance == null || currentMapView == null) {
                 onDispose { }
             } else {
+                val updateGpsPosition = {
+                    gpsScreenPosition = projectedMapPosition(mapInstance, currentMapView, gpsPosition)
+                }
+                val moveListener = MapLibreMap.OnCameraMoveListener(updateGpsPosition)
                 val listener = MapLibreMap.OnCameraIdleListener {
                     mapInstance.cameraPosition.target?.let { target ->
-                        onObservationPointCoordinatesChanged(target.latitude, target.longitude)
+                        mapCenter = MapTarget(target.latitude, target.longitude)
+                        if (firstFixCentered) initialGpsCenterEstablished = true
                     }
+                    updateGpsPosition()
                 }
+                val layoutListener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                    updateGpsPosition()
+                }
+                mapInstance.addOnCameraMoveListener(moveListener)
                 mapInstance.addOnCameraIdleListener(listener)
-                onDispose { mapInstance.removeOnCameraIdleListener(listener) }
-            }
-        }
-
-        if (observationPointDraft != null) {
-            ObservationPointCrosshair(Modifier.align(Alignment.Center).zIndex(2f))
-        }
-
-        Card(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(if (observationPointDraft == null) 12.dp else 8.dp)
-                .zIndex(3f),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(if (observationPointDraft == null) 12.dp else 8.dp),
-                horizontalAlignment = if (observationPointDraft == null) {
-                    Alignment.CenterHorizontally
-                } else {
-                    Alignment.Start
-                },
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                when {
-                    !locationPermissionGranted -> Button(onClick = onRequestLocationPermission) {
-                        Text("Разрешить доступ к местоположению")
-                    }
-                    observationPointDraft != null -> {
-                        val offsetMeters = geodesicDistanceMeters(
-                            fromLatitude = observationPointDraft.originalGps.latitude,
-                            fromLongitude = observationPointDraft.originalGps.longitude,
-                            toLatitude = observationPointDraft.selectedLatitude,
-                            toLongitude = observationPointDraft.selectedLongitude,
-                        )
-                        Text(
-                            text = "Точность GPS: " +
-                                "±${observationPointDraft.originalGps.accuracyMeters.formatMeters()} м",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(
-                            text = "Смещение от GPS: ${formatManualOffsetMeters(offsetMeters)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        if (observerCode == null) {
-                            OutlinedTextField(
-                                value = observationPointDraft.observerCodeInput,
-                                onValueChange = onObserverCodeChanged,
-                                modifier = Modifier.fillMaxWidth(),
-                                label = { Text("Код наблюдателя") },
-                                singleLine = true,
-                                enabled = !observationPointDraft.isSaving,
-                            )
-                        }
-                    }
-                    locationState is LocationUiState.Available -> {
-                        Text(
-                            "Точность GPS: ${locationState.reading.accuracyMeters.formatMeters()} м",
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    locationState is LocationUiState.Unavailable -> Text(locationState.message)
-                    else -> Text("Ожидание GPS…")
+                currentMapView.addOnLayoutChangeListener(layoutListener)
+                updateGpsPosition()
+                onDispose {
+                    mapInstance.removeOnCameraMoveListener(moveListener)
+                    mapInstance.removeOnCameraIdleListener(listener)
+                    currentMapView.removeOnLayoutChangeListener(layoutListener)
                 }
             }
         }
 
-        if (observationPointDraft == null) {
-            Button(
-                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                enabled = reading != null,
-                onClick = {
-                    reading?.let { current ->
-                        map?.animateCamera(
-                            org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
-                                LatLng(current.latitude, current.longitude),
-                                15.0,
-                            ),
-                        )
-                    }
-                },
-            ) { Text("Центр") }
+        gpsScreenPosition?.let { position ->
+            MapGpsMarker(screenPosition = position, modifier = Modifier.zIndex(1f))
+        }
+        MapCenterTarget(Modifier.align(Alignment.Center).zIndex(2f))
+
+        if (locationPermissionGranted && locationState is LocationUiState.Available) {
+            CompactMapStatus(
+                accuracyMeters = locationState.reading.accuracyMeters,
+                measurement = measurement,
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp).zIndex(3f),
+            )
         } else {
-            Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp).zIndex(3f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Card(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .zIndex(3f),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Button(
-                        onClick = onGpsRecenterRequested,
-                        enabled = !observationPointDraft.isSaving,
-                        modifier = Modifier.weight(1f),
-                    ) { Text("К GPS") }
-                    Button(
-                        onClick = onCancelObservationPointCreation,
-                        enabled = !observationPointDraft.isSaving,
-                        modifier = Modifier.weight(1f),
-                    ) { Text("Отмена") }
-                }
-                Button(
-                    onClick = {
-                        map?.cameraPosition?.target?.let { target ->
-                            onObservationPointCoordinatesChanged(target.latitude, target.longitude)
+                    when {
+                        !locationPermissionGranted -> Button(onClick = onRequestLocationPermission) {
+                            Text("Разрешить доступ к местоположению")
                         }
-                        onConfirmObservationPoint()
-                    },
-                    enabled = !observationPointDraft.isSaving &&
-                        (observerCode != null || observationPointDraft.observerCodeInput.isNotBlank()),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(if (observationPointDraft.isSaving) "Сохранение…" else "Подтвердить точку")
+                        locationState is LocationUiState.Unavailable -> Text(locationState.message)
+                        else -> Text("Ожидание GPS…")
+                    }
                 }
             }
         }
+
+        MapIdleControls(
+            canRecenter = reading != null,
+            canCreateObservationPoint = reading != null &&
+                mapCenter != null &&
+                initialGpsCenterEstablished &&
+                !isCreatingObservationPoint,
+            onRecenter = {
+                reading?.let { current ->
+                    map?.animateCamera(
+                        org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(
+                            LatLng(current.latitude, current.longitude),
+                            15.0,
+                        ),
+                    )
+                }
+            },
+            onCreateObservationPoint = {
+                map?.cameraPosition?.target?.let { target ->
+                    onCreateObservationPointAt(target.latitude, target.longitude)
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).zIndex(3f),
+        )
+    }
+}
+
+private fun projectedMapPosition(
+    map: MapLibreMap?,
+    mapView: MapView?,
+    target: MapTarget?,
+): Offset? {
+    if (map == null || mapView == null || target == null || mapView.width <= 0 || mapView.height <= 0) return null
+    val point = map.projection.toScreenLocation(LatLng(target.latitude, target.longitude))
+    return Offset(point.x, point.y).takeIf {
+        it.x in 0f..mapView.width.toFloat() && it.y in 0f..mapView.height.toFloat()
+    }
+}
+
+@Composable
+internal fun CompactMapStatus(
+    accuracyMeters: Double,
+    measurement: MapMeasurement?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        CompactGpsAccuracy(accuracyMeters = accuracyMeters)
+        if (measurement != null) {
+            MapMeasurementOverlay(measurement = measurement)
+        }
+    }
+}
+
+@Composable
+internal fun MapMeasurementOverlay(
+    measurement: MapMeasurement,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.testTag("map-measurement-overlay"),
+        shape = MaterialTheme.shapes.small,
+        tonalElevation = 2.dp,
+        shadowElevation = 1.dp,
+    ) {
+        Text(
+            text = formatMapMeasurement(measurement),
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+internal fun CompactGpsAccuracy(
+    accuracyMeters: Double,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.testTag("gps-accuracy-overlay"),
+        shape = MaterialTheme.shapes.small,
+        tonalElevation = 2.dp,
+        shadowElevation = 1.dp,
+    ) {
+        Text(
+            text = "Точность ${accuracyMeters.formatMeters()} м",
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+internal fun MapIdleControls(
+    canRecenter: Boolean,
+    canCreateObservationPoint: Boolean,
+    onRecenter: () -> Unit,
+    onCreateObservationPoint: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        FilledTonalIconButton(
+            onClick = onRecenter,
+            enabled = canRecenter,
+            modifier = Modifier
+                .size(48.dp)
+                .semantics { contentDescription = RECENTER_MAP_DESCRIPTION }
+                .testTag("map-recenter"),
+        ) { RecenterGlyph() }
+        Button(
+            onClick = onCreateObservationPoint,
+            enabled = canCreateObservationPoint,
+            shape = CircleShape,
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier
+                .size(56.dp)
+                .semantics { contentDescription = CREATE_OBSERVATION_POINT_DESCRIPTION }
+                .testTag("create-observation-point"),
+        ) { AddPointGlyph() }
+    }
+}
+
+@Composable
+private fun RecenterGlyph() {
+    val color = LocalContentColor.current
+    Canvas(Modifier.size(24.dp)) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val radius = size.minDimension * 0.28f
+        drawCircle(color = color, radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
+        val inset = 1.dp.toPx()
+        drawLine(color, Offset(center.x, inset), Offset(center.x, center.y - radius), 2.dp.toPx())
+        drawLine(color, Offset(center.x, center.y + radius), Offset(center.x, size.height - inset), 2.dp.toPx())
+        drawLine(color, Offset(inset, center.y), Offset(center.x - radius, center.y), 2.dp.toPx())
+        drawLine(color, Offset(center.x + radius, center.y), Offset(size.width - inset, center.y), 2.dp.toPx())
+        drawCircle(color = color, radius = 2.dp.toPx(), center = center)
+    }
+}
+
+@Composable
+private fun AddPointGlyph() {
+    val color = LocalContentColor.current
+    Canvas(Modifier.size(24.dp)) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val half = size.minDimension * 0.30f
+        drawLine(color, Offset(center.x - half, center.y), Offset(center.x + half, center.y), 2.5.dp.toPx())
+        drawLine(color, Offset(center.x, center.y - half), Offset(center.x, center.y + half), 2.5.dp.toPx())
     }
 }
 

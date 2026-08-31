@@ -1,0 +1,30 @@
+{
+  "datasetId": "central-russia-poc-20260830",
+  "areas": [
+    {
+      "id": "forest-cutlines",
+      "description": "Forest, cutlines, tracks, heath and wetland",
+      "bbox": [42.7460, 56.0615, 42.7940, 56.0885],
+      "osmApiMapUrl": "https://api.openstreetmap.org/api/0.6/map?bbox=42.7460,56.0615,42.7940,56.0885"
+    },
+    {
+      "id": "sapunovo-fields-water",
+      "description": "Village, fields, roads, water, railway and buildings",
+      "bbox": [42.6413, 56.0933, 42.6893, 56.1203],
+      "osmApiMapUrl": "https://api.openstreetmap.org/api/0.6/map?bbox=42.6413,56.0933,42.6893,56.1203"
+    },
+    {
+      "id": "drainage-rural",
+      "description": "Sparse rural network, drains, wetland and wood",
+      "bbox": [42.4960, 56.2095, 42.5440, 56.2365],
+      "osmApiMapUrl": "https://api.openstreetmap.org/api/0.6/map?bbox=42.4960,56.2095,42.5440,56.2365"
+    }
+  ],
+  "diagnosticObjects": [
+    {
+      "id": "power-line-739597144",
+      "description": "Nearby power=line used only to validate the field profile",
+      "osmApiFullUrl": "https://api.openstreetmap.org/api/0.6/way/739597144/full"
+    }
+  ]
+}

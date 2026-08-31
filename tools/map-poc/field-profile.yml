@@ -1,0 +1,287 @@
+schema_name: Bee Search Field PoC
+schema_description: Minimal OSM-derived field map used to validate Bee Search data semantics and Android rendering.
+attribution: '<a href="https://www.openstreetmap.org/copyright">&copy; OpenStreetMap contributors</a>'
+version: 1
+is_overlay: false
+
+args:
+  osm_path:
+    description: Merged OSM PBF input
+    default: work/central-russia-poc.osm.pbf
+  minzoom: 8
+  maxzoom: 15
+
+sources:
+  osm:
+    type: osm
+    local_path: '${ args.osm_path }'
+
+definitions:
+  name: &name
+    key: name
+  name_ru: &name_ru
+    key: name_ru
+    tag_value: name:ru
+  surface: &surface
+    key: surface
+  surface_class: &surface_class
+    key: surface_class
+    value:
+      match:
+        - if: { surface: [asphalt, concrete, 'concrete:plates', paving_stones, sett, cobblestone] }
+          value: paved
+        - if: { surface: [compacted, gravel, fine_gravel, pebblestone] }
+          value: compacted_gravel
+        - if: { surface: [ground, dirt, earth, unpaved] }
+          value: ground_dirt
+        - if: { surface: sand }
+          value: sand
+        - if: { surface: [grass, grass_paver, mud] }
+          value: grass_mud
+        - else: unknown
+
+layers:
+  - id: landcover
+    features:
+      - source: osm
+        geometry: polygon
+        min_zoom: 8
+        include_when:
+          natural: [wood, wetland, heath, grassland, scrub]
+          landuse: [forest, farmland, meadow, residential, allotments]
+        attributes:
+          - key: class
+            value: '${ match_value == "wood" || match_value == "forest" ? "forest" : match_value }'
+          - key: wetland
+          - *name
+          - *name_ru
+
+  - id: water
+    features:
+      - source: osm
+        geometry: polygon
+        min_zoom: 8
+        include_when:
+          natural: water
+          waterway: riverbank
+          landuse: [reservoir, basin]
+        attributes:
+          - key: class
+            value: water
+          - key: intermittent
+          - *name
+          - *name_ru
+
+  - id: waterway
+    features:
+      - source: osm
+        geometry: line
+        min_zoom:
+          default_value: 11
+          overrides:
+            8: { waterway: river }
+            10: { waterway: stream }
+            12: { waterway: [ditch, drain, canal] }
+        include_when:
+          waterway: [river, stream, ditch, drain, canal]
+        attributes:
+          - key: class
+            tag_value: waterway
+          - key: intermittent
+          - key: bridge
+          - *name
+          - *name_ru
+
+  - id: transportation
+    features:
+      - source: osm
+        geometry: line
+        min_zoom:
+          default_value: 12
+          overrides:
+            8: { highway: [motorway, trunk, primary] }
+            9: { highway: secondary }
+            10: { highway: tertiary }
+            11: { highway: [unclassified, residential] }
+        include_when:
+          highway: [motorway, trunk, primary, secondary, tertiary, unclassified, residential, service, track, path, footway, steps]
+        attributes:
+          - key: class
+            tag_value: highway
+          - key: tracktype
+          - key: service
+          - key: bridge
+          - *surface
+          - *surface_class
+          - *name
+          - *name_ru
+      - source: osm
+        geometry: line
+        min_zoom: 10
+        include_when:
+          railway: [rail, narrow_gauge]
+        attributes:
+          - key: class
+            value: rail
+          - key: subclass
+            tag_value: railway
+          - key: bridge
+          - *name
+          - *name_ru
+
+  - id: building
+    features:
+      - source: osm
+        geometry: polygon
+        min_zoom: 13
+        include_when:
+          building: __any__
+        exclude_when:
+          building: 'no'
+        attributes:
+          - key: class
+            tag_value: building
+          - *name
+          - *name_ru
+
+  - id: place
+    features:
+      - source: osm
+        geometry: point
+        min_zoom: 8
+        include_when:
+          place: [city, town, village, hamlet, isolated_dwelling]
+        attributes:
+          - key: class
+            tag_value: place
+          - key: population
+            type: integer
+          - *name
+          - *name_ru
+      - source: osm
+        geometry: polygon_centroid
+        min_zoom: 8
+        include_when:
+          place: [city, town, village, hamlet, isolated_dwelling]
+        attributes:
+          - key: class
+            tag_value: place
+          - key: population
+            type: integer
+          - *name
+          - *name_ru
+
+  - id: field_infrastructure
+    features:
+      - source: osm
+        geometry: line
+        min_zoom: 12
+        include_when:
+          man_made: cutline
+        attributes:
+          - key: class
+            value: cutline
+          - *name
+          - *name_ru
+      - source: osm
+        geometry: line
+        min_zoom: 10
+        include_when:
+          power: [line, minor_line]
+        attributes:
+          - key: class
+            value: power
+          - key: subclass
+            tag_value: power
+          - key: voltage
+          - *name
+          - *name_ru
+
+examples:
+  - name: Cutline survives the field profile
+    input:
+      source: osm
+      geometry: line
+      tags: { man_made: cutline }
+    output:
+      - layer: field_infrastructure
+        geometry: line
+        min_zoom: 12
+        tags: { class: cutline }
+
+  - name: Major power line survives the field profile
+    input:
+      source: osm
+      geometry: line
+      tags: { power: line, voltage: '110000' }
+    output:
+      - layer: field_infrastructure
+        geometry: line
+        min_zoom: 10
+        tags: { class: power, subclass: line, voltage: '110000' }
+
+  - name: Minor power line survives the field profile
+    input:
+      source: osm
+      geometry: line
+      tags: { power: minor_line }
+    output:
+      - layer: field_infrastructure
+        geometry: line
+        min_zoom: 10
+        tags: { class: power, subclass: minor_line }
+
+  - name: Track keeps raw and normalized field surface detail
+    input:
+      source: osm
+      geometry: line
+      tags: { highway: track, tracktype: grade3, surface: ground }
+    output:
+      - layer: transportation
+        geometry: line
+        min_zoom: 12
+        tags: { class: track, tracktype: grade3, surface: ground, surface_class: ground_dirt }
+
+  - name: Paved road surface is normalized without losing the raw value
+    input:
+      source: osm
+      geometry: line
+      tags: { highway: tertiary, surface: asphalt }
+    output:
+      - layer: transportation
+        geometry: line
+        min_zoom: 10
+        tags: { class: tertiary, surface: asphalt, surface_class: paved }
+
+  - name: Drain survives as a minor waterway
+    input:
+      source: osm
+      geometry: line
+      tags: { waterway: drain }
+    output:
+      - layer: waterway
+        geometry: line
+        min_zoom: 12
+        tags: { class: drain }
+
+  - name: Wetland survives as landcover
+    input:
+      source: osm
+      geometry: polygon
+      tags: { natural: wetland, wetland: marsh }
+    output:
+      - layer: landcover
+        geometry: polygon
+        min_zoom: 8
+        tags: { class: wetland, wetland: marsh }
+
+  - name: Russian settlement label survives
+    input:
+      source: osm
+      geometry: point
+      tags: { place: hamlet, name: Сапуново, 'name:ru': Сапуново }
+    output:
+      - layer: place
+        geometry: point
+        min_zoom: 8
+        tags: { class: hamlet, name: Сапуново, name_ru: Сапуново }

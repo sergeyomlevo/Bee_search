@@ -24,6 +24,10 @@ captures/
 .externalNativeBuild/
 .cxx/
 
+# Local Map Data PoC downloads, generated tiles, and server output
+tools/map-poc/work/
+tools/map-poc/out/
+
 # OS files
 .DS_Store
 Thumbs.db

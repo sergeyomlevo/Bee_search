@@ -19,9 +19,27 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "BEE_MAP_STYLE_URL",
+            "\"https://maps.invalid.bee-search/field/v1/" +
+                "central-russia-poc-20260830/style-v3/style.json\"",
+        )
     }
 
     buildTypes {
+        debug {
+            val developmentStyleUrl = providers.gradleProperty("beeMapStyleUrl")
+                .orElse(
+                    "http://10.0.2.2:8080/field/v1/" +
+                        "central-russia-poc-20260830/style-v3/style.json",
+                )
+                .get()
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+            buildConfigField("String", "BEE_MAP_STYLE_URL", "\"$developmentStyleUrl\"")
+        }
         release {
             optimization {
                 enable = false
@@ -33,6 +51,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 }
