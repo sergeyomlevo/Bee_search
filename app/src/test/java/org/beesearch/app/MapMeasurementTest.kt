@@ -6,9 +6,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ObservationPointPlacementMetricsTest {
+class MapMeasurementTest {
     @Test
-    fun `distance is zero when crosshair remains at original GPS fix`() {
+    fun `distance is zero when target remains at original GPS fix`() {
         val distance = geodesicDistanceMeters(
             fromLatitude = 56.195946,
             fromLongitude = 42.747704,
@@ -20,7 +20,7 @@ class ObservationPointPlacementMetricsTest {
     }
 
     @Test
-    fun `distance is geodesic between original fix and moved crosshair`() {
+    fun `distance is geodesic between original fix and moved target`() {
         val distance = geodesicDistanceMeters(
             fromLatitude = 56.195946,
             fromLongitude = 42.747704,
