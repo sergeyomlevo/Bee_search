@@ -1,5 +1,19 @@
 # Bee Search — Handoff
 
+> 2026-09-01 — временная online-basemap для пользовательской оценки: главный
+> экран использует inline raster-style с HTTPS `tile.openstreetmap.org` и
+> видимой attribution OpenStreetMap contributors. Это не production/provider
+> решение и не изменение D008: собственный vector/offline путь остаётся
+> отдельным будущим milestone. `gradlew test assembleDebug lintDebug` прошёл.
+> На Samsung SM-S938B карта, attribution, pan, GPS/target measurement,
+> recenter и Settings проверены без `adb reverse`, локального сервера или
+> записи исследовательских данных. Recenter сохраняет current camera framing;
+> постоянный `z …` indicator находится между GPS-статусом и compass и
+> показывает фактический zoom.
+> Ручная проверка подтверждает pinch zoom, сохранение масштаба при recenter и
+> восстановление measurement после следующего pan. Offline/provider решение
+> по-прежнему не принималось.
+
 ## Current milestone
 
 The minimal Bee Search vector-map PoC, map-first main screen and unified

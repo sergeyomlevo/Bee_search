@@ -1,30 +1,47 @@
 package org.beesearch.app
 
-import java.net.URI
-
 internal data class BeeMapProfile(
     val profileId: String,
     val profileVersion: String,
     val datasetVersion: String,
     val styleVersion: String,
-    val styleUrl: String,
+    val styleJson: String,
     val sourceMaxZoom: Double,
     val uiMaxZoom: Double,
 )
 
-internal fun beeSearchFieldMapProfile(styleUrl: String = BuildConfig.BEE_MAP_STYLE_URL): BeeMapProfile {
-    val uri = URI(styleUrl)
-    require(uri.scheme == "https" || uri.scheme == "http") { "Map style URL must use HTTP(S)" }
-    require(!uri.host.isNullOrBlank()) { "Map style URL must have a host" }
-    require(uri.path.endsWith("/style.json")) { "Map style URL must identify a versioned style.json" }
-
+internal fun beeSearchFieldMapProfile(): BeeMapProfile {
     return BeeMapProfile(
-        profileId = "bee-search-field",
-        profileVersion = "v1",
-        datasetVersion = "central-russia-poc-20260830",
-        styleVersion = "style-v3",
-        styleUrl = styleUrl,
-        sourceMaxZoom = 15.0,
+        profileId = "osm-standard-evaluation",
+        profileVersion = "temporary-v1",
+        datasetVersion = "OpenStreetMap Standard",
+        styleVersion = "raster-v1",
+        styleJson = OSM_STANDARD_EVALUATION_STYLE,
+        sourceMaxZoom = 19.0,
         uiMaxZoom = 20.0,
     )
 }
+
+private const val OSM_STANDARD_EVALUATION_STYLE = """
+{
+  "version": 8,
+  "name": "OpenStreetMap Standard evaluation",
+  "sources": {
+    "openstreetmap-standard": {
+      "type": "raster",
+      "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      "tileSize": 256,
+      "minzoom": 0,
+      "maxzoom": 19,
+      "attribution": "© <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap contributors</a>"
+    }
+  },
+  "layers": [
+    {
+      "id": "openstreetmap-standard",
+      "type": "raster",
+      "source": "openstreetmap-standard"
+    }
+  ]
+}
+"""
