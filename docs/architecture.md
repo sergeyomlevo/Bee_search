@@ -743,9 +743,18 @@ HTTPS source
 Online runtime и offline preparation обязаны использовать одинаковые canonical
 resource URLs. Иначе ранее сохранённый ресурс не соответствует runtime request.
 
-Пользователь выбирает rectangle, который может первоначально соответствовать
-viewport и затем корректироваться. Bounds остаются в MapLibre region
-definition, не становятся Territory data и не копируются в Room.
+Пользователь формирует device-local offline coverage из одного или нескольких
+rectangle fragments. Каждый фрагмент может первоначально соответствовать
+viewport и затем добавляться после pan/zoom карты. Составное coverage является
+объединением фрагментов; оно не превращается автоматически в общий bounding
+rectangle. Фрагменты могут перекрываться и должны быть видимы поверх карты до
+начала download. Bounds остаются в MapLibre region definition, не становятся
+Territory data и не копируются в Room.
+
+При tile-based delivery overlap фрагментов не должен требовать повторного
+хранения одинаковых ресурсов. Общая MapLibre resource database остаётся
+границей этого требования; конкретный алгоритм дедупликации сейчас не
+проектируется.
 
 Bounds существующего OfflineRegion не изменяются in place. Первый milestone
 допускает несколько additive regions. При replacement старый Ready region
