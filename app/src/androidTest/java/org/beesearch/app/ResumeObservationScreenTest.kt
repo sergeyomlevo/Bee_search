@@ -339,7 +339,7 @@ class ResumeObservationScreenTest {
     private fun point(beePresenceResult: BeePresenceResult? = null) = ObservationPoint(
         id = pointId,
         territoryId = UUID.randomUUID(),
-        observerCode = "GSE",
+        observerId = UUID.randomUUID(),
         observationYear = 2026,
         pointNumber = 1,
         beePresenceResult = beePresenceResult,

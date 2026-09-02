@@ -10,6 +10,7 @@ class ObservationPointCreationDraftTest {
     @Test
     fun `map center becomes confirmed coordinates while original GPS measurement is preserved`() {
         val territoryId = UUID.randomUUID()
+        val observerId = UUID.randomUUID()
         val originalGps = LocationReading(
             latitude = 56.1959000,
             longitude = 42.7477000,
@@ -18,14 +19,15 @@ class ObservationPointCreationDraftTest {
         )
         val draft = ObservationPointCreationDraft.fromMapCenter(
             territoryId = territoryId,
+            observerId = observerId,
             originalGps = originalGps,
             mapCenter = MapTarget(56.1959786, 42.7477116),
-            observerCodeInput = "GSE",
         )
 
         val point = draft.toNewObservationPoint()
 
         assertEquals(territoryId, point.territoryId)
+        assertEquals(observerId, point.observerId)
         assertEquals(56.1959786, point.latitude, 0.0)
         assertEquals(42.7477116, point.longitude, 0.0)
         assertEquals(originalGps.latitude, point.gpsLatitude!!, 0.0)

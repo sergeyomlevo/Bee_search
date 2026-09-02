@@ -331,25 +331,10 @@ offline use.
 
 # D010 — Отдельной сущности Observer в MVP нет
 
-**Статус:** ACCEPTED
+**Статус:** SUPERSEDED by D061
 
-Для первой версии отдельная таблица `Observer` не создаётся.
-
-В локальных настройках устройства хранится:
-
-`observer_code`
-
-При создании `ObservationPoint` текущее значение `observer_code` копируется в неё.
-
-### Причина
-
-Для MVP полноценная модель пользователей избыточна.
-
-### Важное следствие
-
-Изменение `observer_code` в настройках не изменяет уже созданные точки.
-
-Историческое значение остаётся частью ObservationPoint.
+Это решение описывало раннюю code-only модель. Она заменена отдельной сущностью
+Observer и UUID-связью ObservationPoint с Observer.id.
 
 ---
 
@@ -853,7 +838,7 @@ FlightCycle при этом сохраняется.
 - связи используют UUID;
 - данные не зависят от server ID;
 - время хранится однозначно;
-- observer_code копируется в ObservationPoint.
+- ObservationPoint сохраняет immutable UUID-связь с Observer.
 
 Поля конкретного sync-протокола пока не добавляются.
 
@@ -1078,28 +1063,11 @@ milestone без доказанной необходимости.
 
 # D053 — observer_code отсутствует до явной настройки
 
-**Статус:** ACCEPTED
+**Статус:** SUPERSEDED by D061
 
-На чистой установке ключ `observer_code` в DataStore отсутствует.
-
-Не создаются автоматические значения вроде:
-
-```text
-UNKNOWN
-DEFAULT
-USER
-""
-```
-
-Territory можно создать без кода наблюдателя. Перед созданием первой `ObservationPoint` пользователь должен один раз явно задать непустой `observer_code`.
-
-При вводе удаляются только начальные и конечные пробельные символы (`trim`). После этого значение должно оставаться непустым. Регистр и внутреннее содержимое сохраняются без изменений; ограничение набора символов и искусственный предел длины пока не вводятся.
-
-Сначала нормализованное значение успешно сохраняется в DataStore, затем копируется в обязательное поле `ObservationPoint.observer_code` как исторический снимок.
-
-Если запись в DataStore не удалась, точка не создаётся. Если DataStore обновлён, а запись `ObservationPoint` в Room завершилась ошибкой, сохранённый код не откатывается: он остаётся корректной настройкой устройства, а повторная попытка создания точки использует уже сохранённое значение. Общая транзакция или компенсирующий rollback между DataStore и Room не создаются.
-
-Последующее изменение настройки влияет только на новые точки.
+Это решение описывало переходную модель одного device-level `observer_code` и
+его snapshot в ObservationPoint. Оно сохранено как история. Целевая модель
+нескольких сущностей Observer и `current_observer_id` определена D061.
 
 ---
 
@@ -1155,19 +1123,19 @@ point_number
 `point_number` — человекочитаемый последовательный номер. Нумерация начинается с 1 и ведётся отдельно для каждой комбинации:
 
 ```text
-Territory + observation_year + observer_code
+Territory + observation_year + observer_id
 ```
 
 Например:
 
 ```text
-KLZ / 2026 / GSE / 1
-KLZ / 2026 / GSE / 2
-KLZ / 2026 / IVN / 1
-KLZ / 2027 / GSE / 1
+KLZ / 2026 / observer-UUID-A / 1
+KLZ / 2026 / observer-UUID-A / 2
+KLZ / 2026 / observer-UUID-B / 1
+KLZ / 2027 / observer-UUID-A / 1
 ```
 
-Локальная Room-база обеспечивает уникальность `(territory_id, observation_year, observer_code, point_number)`, а следующий номер вычисляется и записывается внутри одной транзакции. `device_id` в область нумерации не входит. Отдельная сущность `ObservationSeason` не создаётся.
+Локальная Room-база обеспечивает уникальность `(territory_id, observation_year, observer_id, point_number)`, а следующий номер вычисляется и записывается внутри одной транзакции. `device_id` в область нумерации не входит. Отдельная сущность `ObservationSeason` не создаётся.
 
 UUID остаётся истинной устойчивой идентичностью точки. `point_number` не является идентификатором и не заменяет UUID.
 
@@ -1274,6 +1242,65 @@ Room schema v3 добавляет `azimuth_capture_consumed`. Migration 2 → 3 
 
 ---
 
+# D061 — Territory и Observer являются отдельными сохранёнными сущностями
+
+**Статус:** ACCEPTED
+
+На одном устройстве может существовать несколько сохранённых Territory и
+Observer. Territory имеет UUID, обязательные `code`, `name`, `region` и
+`district`; Observer имеет UUID, обязательные `code`, `last_name` и
+`first_name`, а также nullable `middle_name` и `contact`. Обязательные строки
+trim-ятся и не могут быть пустыми. Оба code уникальны на устройстве, сохраняют
+регистр и служат пользователю, но не являются technical identity или foreign
+key.
+
+`current_territory_id` и `current_observer_id` хранятся в DataStore как UUID
+device-level selection. Новая запись может сразу становиться current. Invalid
+saved ID не вызывает crash. При отсутствии active ObservationPoint карта всё
+равно доступна; создание новой точки требует полного контекста согласно D062.
+Active ObservationPoint всегда имеет приоритет recovery.
+
+Новая ObservationPoint хранит обязательные `territory_id` и `observer_id`.
+Переключение current selection не меняет уже созданные точки. ФИО, contact и
+code Observer не snapshot-ятся в ObservationPoint без отдельной причины.
+
+Будущее offline coverage принадлежит Territory через `Territory.id`; разные
+Territory могут иметь разный device-local map context. Rectangle geometry,
+tiles, package/download state и deduplication остаются map infrastructure, а
+не Room research model. Эта связь не реализует persistence coverage и не
+определяет download/storage алгоритм.
+
+Migration 4 → 5 является единственным согласованным development-stage reset:
+она очищает текущие test Territory/ObservationPoint/Bee/FlightCycle вместо
+создания фиктивных ФИО, регионов или районов. Это не general destructive
+migration policy: после этой точки будущие schema changes для реальных данных
+должны быть non-destructive по умолчанию.
+
+---
+
+# D062 — Settings не блокирует карту при неполном контексте
+
+**Статус:** ACCEPTED
+
+Settings является обычным management screen, а не обязательным onboarding
+барьером. При отсутствии current Observer или Territory приложение может
+открыть карту, и пользователь может свободно войти в Settings, ознакомиться с
+ним и вернуться назад. Фиктивные сущности не создаются.
+
+Создание новой ObservationPoint требует валидных current Observer и Territory.
+При неполном контексте операция не выполняется и показывает понятное сообщение
+с предложением открыть Settings. Active ObservationPoint по-прежнему имеет
+приоритет recovery. Это уточняет startup routing D061, не меняя историческую
+принадлежность уже созданных точек.
+
+Observer и Territory можно редактировать с сохранением их UUID. Удаление
+разрешено только для сущности, не используемой ObservationPoint; удаление
+связанной сущности блокируется, confirmation обязателен, cascade delete
+исследовательских данных не используется. При удалении current несвязанной
+сущности соответствующий current ID очищается.
+
+---
+
 # Закрытые архитектурные вопросы
 
 - O001 — формат первого offline milestone закрыт решением D007:
@@ -1344,7 +1371,7 @@ Room schema v3 добавляет `azimuth_capture_consumed`. Migration 2 → 3 
 
 `Territory → ObservationPoint → Bee → FlightCycle`
 
-`DataStore → observer_code? + current_territory_id?`
+`DataStore → current_observer_id? + current_territory_id?`
 
 `timestamps → Instant / Unix epoch milliseconds`
 

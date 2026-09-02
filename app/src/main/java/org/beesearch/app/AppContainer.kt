@@ -8,8 +8,10 @@ import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.local.settings.settingsDataStore
 import org.beesearch.app.data.repository.RoomObservationRepository
+import org.beesearch.app.data.repository.RoomObserverRepository
 import org.beesearch.app.data.repository.RoomTerritoryRepository
 import org.beesearch.app.domain.repository.ObservationRepository
+import org.beesearch.app.domain.repository.ObserverRepository
 import org.beesearch.app.domain.repository.SettingsRepository
 import org.beesearch.app.domain.repository.TerritoryRepository
 import org.beesearch.app.domain.usecase.CreateObservationPoint
@@ -28,10 +30,15 @@ internal class AppContainer(context: Context) {
         territoryDao = database.territoryDao(),
         clock = clock,
     )
+    val observerRepository: ObserverRepository = RoomObserverRepository(
+        observerDao = database.observerDao(),
+        clock = clock,
+    )
     val observationRepository: ObservationRepository = RoomObservationRepository(
         database = database,
         territoryDao = database.territoryDao(),
         pointDao = database.observationPointDao(),
+        observerDao = database.observerDao(),
         beeDao = database.beeDao(),
         cycleDao = database.flightCycleDao(),
         clock = clock,

@@ -1,12 +1,10 @@
 package org.beesearch.app.domain.model
 
-class InvalidObserverCodeException : IllegalArgumentException(
-    "Observer code must not be empty after trimming.",
-)
+class RequiredFieldException(field: String) : IllegalArgumentException("$field must not be empty after trimming.")
 
-class ObserverCodeRequiredException : IllegalStateException(
-    "Observer code must be saved before an observation point is created.",
-)
+class ObserverRequiredException : IllegalStateException("A current Observer is required before an observation point is created.")
+
+class TerritoryRequiredException : IllegalStateException("A current Territory is required before an observation point is created.")
 
 class EntityNotFoundException(entity: String) : IllegalStateException("$entity does not exist.")
 
@@ -69,6 +67,12 @@ class InvalidEventTimeException : IllegalStateException(
 class InvalidAzimuthException : IllegalArgumentException(
     "Azimuth must be in the range 0 (inclusive) to 360 (exclusive).",
 )
+
+class DuplicateObserverCodeException : IllegalStateException(
+    "An Observer with this code already exists on this device.",
+)
+class ObserverInUseException : IllegalStateException("Observer is used by observation points")
+class TerritoryInUseException : IllegalStateException("Territory is used by observation points")
 
 class AzimuthCaptureRequiresOpenFlightCycleException : IllegalStateException(
     "Field azimuth capture requires an open flight cycle.",

@@ -18,6 +18,23 @@ internal data class TerritoryEntity(
     @PrimaryKey val id: UUID,
     val code: String,
     val name: String,
+    val region: String,
+    val district: String,
+    @ColumnInfo(name = "created_at") val createdAt: Instant,
+    @ColumnInfo(name = "updated_at") val updatedAt: Instant,
+)
+
+@Entity(
+    tableName = "observers",
+    indices = [Index(value = ["code"], unique = true)],
+)
+internal data class ObserverEntity(
+    @PrimaryKey val id: UUID,
+    val code: String,
+    @ColumnInfo(name = "last_name") val lastName: String,
+    @ColumnInfo(name = "first_name") val firstName: String,
+    @ColumnInfo(name = "middle_name") val middleName: String?,
+    val contact: String?,
     @ColumnInfo(name = "created_at") val createdAt: Instant,
     @ColumnInfo(name = "updated_at") val updatedAt: Instant,
 )
@@ -32,11 +49,19 @@ internal data class TerritoryEntity(
             onDelete = ForeignKey.RESTRICT,
             onUpdate = ForeignKey.NO_ACTION,
         ),
+        ForeignKey(
+            entity = ObserverEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["observer_id"],
+            onDelete = ForeignKey.RESTRICT,
+            onUpdate = ForeignKey.NO_ACTION,
+        ),
     ],
     indices = [
         Index(value = ["territory_id"]),
+        Index(value = ["observer_id"]),
         Index(
-            value = ["territory_id", "observation_year", "observer_code", "point_number"],
+            value = ["territory_id", "observation_year", "observer_id", "point_number"],
             unique = true,
         ),
     ],
@@ -44,7 +69,7 @@ internal data class TerritoryEntity(
 internal data class ObservationPointEntity(
     @PrimaryKey val id: UUID,
     @ColumnInfo(name = "territory_id") val territoryId: UUID,
-    @ColumnInfo(name = "observer_code") val observerCode: String,
+    @ColumnInfo(name = "observer_id") val observerId: UUID,
     @ColumnInfo(name = "observation_year", defaultValue = "0") val observationYear: Int,
     @ColumnInfo(name = "point_number", defaultValue = "0") val pointNumber: Int,
     @ColumnInfo(name = "bee_presence_result") val beePresenceResult: BeePresenceResult?,

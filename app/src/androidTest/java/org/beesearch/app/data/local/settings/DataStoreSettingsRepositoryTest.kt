@@ -40,15 +40,16 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
-    fun cleanInstallHasNoObserverCodeAndValuesRoundTrip() = runBlocking {
-        assertNull(repository.getSettings().observerCode)
+    fun cleanInstallHasNoCurrentSelectionAndValuesRoundTrip() = runBlocking {
+        assertNull(repository.getSettings().currentObserverId)
 
         val territoryId = UUID.randomUUID()
-        assertEquals("Сергей-01", repository.saveObserverCode("  Сергей-01 "))
+        val observerId = UUID.randomUUID()
         repository.setCurrentTerritoryId(territoryId)
+        repository.setCurrentObserverId(observerId)
 
         val settings = repository.getSettings()
-        assertEquals("Сергей-01", settings.observerCode)
+        assertEquals(observerId, settings.currentObserverId)
         assertEquals(territoryId, settings.currentTerritoryId)
     }
 }

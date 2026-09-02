@@ -5,21 +5,37 @@ import java.util.UUID
 
 data class AppSettings(
     val currentTerritoryId: UUID?,
-    val observerCode: String?,
+    val currentObserverId: UUID?,
 )
 
 data class Territory(
     val id: UUID,
     val code: String,
     val name: String,
+    val region: String,
+    val district: String,
     val createdAt: Instant,
     val updatedAt: Instant,
 )
 
+data class Observer(
+    val id: UUID,
+    val code: String,
+    val lastName: String,
+    val firstName: String,
+    val middleName: String?,
+    val contact: String?,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+) {
+    val displayName: String
+        get() = listOfNotNull(lastName, firstName, middleName).joinToString(" ")
+}
+
 data class ObservationPoint(
     val id: UUID,
     val territoryId: UUID,
-    val observerCode: String,
+    val observerId: UUID,
     val observationYear: Int,
     val pointNumber: Int,
     val beePresenceResult: BeePresenceResult?,
@@ -66,6 +82,7 @@ data class FlightCycle(
 
 data class NewObservationPoint(
     val territoryId: UUID,
+    val observerId: UUID,
     val code: String? = null,
     val latitude: Double,
     val longitude: Double,

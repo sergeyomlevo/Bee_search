@@ -14,13 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,13 +44,10 @@ import org.beesearch.app.formatMapMeasurement
 internal fun CurrentTerritoryScreen(
     territory: Territory?,
     locationState: LocationUiState,
-    observerCode: String?,
     observationPointDraft: ObservationPointCreationDraft?,
     locationPermissionGranted: Boolean,
     onRequestLocationPermission: () -> Unit,
     onStartObservationPointCreation: (Double, Double) -> Unit,
-    onObserverCodeChanged: (String) -> Unit,
-    onConfirmObservationPoint: () -> Unit,
     onCancelObservationPointCreation: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTerritories: () -> Unit,
@@ -88,52 +83,6 @@ internal fun CurrentTerritoryScreen(
             }
         }
     }
-    if (observationPointDraft != null && observerCode == null) {
-        ObservationPointObserverCodeDialog(
-            draft = observationPointDraft,
-            onObserverCodeChanged = onObserverCodeChanged,
-            onConfirm = onConfirmObservationPoint,
-            onCancel = onCancelObservationPointCreation,
-        )
-    }
-}
-
-@Composable
-internal fun ObservationPointObserverCodeDialog(
-    draft: ObservationPointCreationDraft,
-    onObserverCodeChanged: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = { if (!draft.isSaving) onCancel() },
-        modifier = Modifier.testTag("observation-point-observer-dialog"),
-        title = { Text("Код наблюдателя") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Код будет сохранён в настройках и в новой точке.")
-                OutlinedTextField(
-                    value = draft.observerCodeInput,
-                    onValueChange = onObserverCodeChanged,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("observer_code") },
-                    singleLine = true,
-                    enabled = !draft.isSaving,
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                enabled = draft.observerCodeInput.isNotBlank() && !draft.isSaving,
-            ) {
-                Text(if (draft.isSaving) "Сохранение…" else "Создать точку")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onCancel, enabled = !draft.isSaving) { Text("Отмена") }
-        },
-    )
 }
 
 internal const val MAIN_MAP_VIEWPORT_TAG = "main-map-viewport"

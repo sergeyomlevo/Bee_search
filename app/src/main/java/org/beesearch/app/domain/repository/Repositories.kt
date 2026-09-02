@@ -7,6 +7,7 @@ import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.ObservationPoint
+import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
 import java.util.UUID
 
@@ -14,21 +15,35 @@ interface SettingsRepository {
     val settings: Flow<AppSettings>
 
     suspend fun getSettings(): AppSettings
-    suspend fun saveObserverCode(value: String): String
     suspend fun setCurrentTerritoryId(territoryId: UUID?)
+    suspend fun setCurrentObserverId(observerId: UUID?)
 }
 
 interface TerritoryRepository {
     fun observeTerritories(): Flow<List<Territory>>
     suspend fun getTerritory(id: UUID): Territory?
-    suspend fun createTerritory(code: String, name: String): Territory
-    suspend fun updateTerritory(id: UUID, code: String, name: String): Territory
+    suspend fun createTerritory(code: String, name: String, region: String, district: String): Territory
+    suspend fun updateTerritory(territory: Territory): Territory
+    suspend fun deleteTerritory(id: UUID)
+}
+
+interface ObserverRepository {
+    fun observeObservers(): Flow<List<Observer>>
+    suspend fun getObserver(id: UUID): Observer?
+    suspend fun createObserver(
+        code: String,
+        lastName: String,
+        firstName: String,
+        middleName: String?,
+        contact: String?,
+    ): Observer
+    suspend fun updateObserver(observer: Observer): Observer
+    suspend fun deleteObserver(id: UUID)
 }
 
 interface ObservationPointCreator {
     suspend fun createObservationPoint(
         point: NewObservationPoint,
-        observerCode: String,
     ): ObservationPoint
 }
 

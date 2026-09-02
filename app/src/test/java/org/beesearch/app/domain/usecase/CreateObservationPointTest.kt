@@ -1,112 +1,59 @@
 package org.beesearch.app.domain.usecase
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import org.beesearch.app.domain.model.AppSettings
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.ObservationPoint
+import org.beesearch.app.domain.model.ObserverRequiredException
+import org.beesearch.app.domain.model.TerritoryRequiredException
 import org.beesearch.app.domain.repository.ObservationPointCreator
 import org.beesearch.app.domain.repository.SettingsRepository
-import org.beesearch.app.domain.validation.ObserverCode
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
-import java.time.Instant
 import java.util.UUID
 
 class CreateObservationPointTest {
-    @Test
-    fun `DataStore failure prevents Room creation`() {
-        val settings = FakeSettingsRepository().apply {
-            saveFailure = IllegalStateException("DataStore failed")
-        }
-        val creator = FakePointCreator()
-        val useCase = CreateObservationPoint(settings, creator)
+    private val territoryId = UUID.randomUUID()
+    private val observerId = UUID.randomUUID()
+    private val point = NewObservationPoint(territoryId, observerId, latitude = 56.1, longitude = 42.7)
 
-        assertThrows(IllegalStateException::class.java) {
-            runBlocking { useCase.saveObserverCodeAndCreate(" SV ", newPoint()) }
-        }
-
-        assertEquals(0, creator.callCount)
-        assertNull(settings.current.observerCode)
+    @Test fun `delegates selected ids without a code snapshot`() = runBlocking {
+        val creator = FakeCreator()
+        CreateObservationPoint(FakeSettings(AppSettings(territoryId, observerId)), creator).create(point)
+        assertEquals(point, creator.created)
     }
 
-    @Test
-    fun `Room failure keeps saved code and retry uses it`() {
-        val settings = FakeSettingsRepository()
-        val creator = FakePointCreator().apply {
-            createFailure = IllegalStateException("Room failed")
-        }
-        val useCase = CreateObservationPoint(settings, creator)
-
-        assertThrows(IllegalStateException::class.java) {
-            runBlocking { useCase.saveObserverCodeAndCreate("  Сергей-01 ", newPoint()) }
-        }
-        assertEquals("Сергей-01", settings.current.observerCode)
-
-        creator.createFailure = null
-        runBlocking { useCase.create(newPoint()) }
-
-        assertEquals(2, creator.callCount)
-        assertEquals("Сергей-01", creator.lastObserverCode)
-    }
-
-    private fun newPoint() = NewObservationPoint(
-        territoryId = UUID.randomUUID(),
-        latitude = 56.1,
-        longitude = 42.7,
-    )
-
-    private class FakeSettingsRepository : SettingsRepository {
-        private val state = MutableStateFlow(AppSettings(null, null))
-        var saveFailure: RuntimeException? = null
-        val current: AppSettings get() = state.value
-
-        override val settings: Flow<AppSettings> = state
-
-        override suspend fun getSettings(): AppSettings = state.value
-
-        override suspend fun saveObserverCode(value: String): String {
-            saveFailure?.let { throw it }
-            val normalized = ObserverCode.normalize(value)
-            state.value = state.value.copy(observerCode = normalized)
-            return normalized
-        }
-
-        override suspend fun setCurrentTerritoryId(territoryId: UUID?) {
-            state.value = state.value.copy(currentTerritoryId = territoryId)
+    @Test fun `rejects stale current observer`() {
+        assertThrows(ObserverRequiredException::class.java) {
+            runBlocking { CreateObservationPoint(FakeSettings(AppSettings(territoryId, UUID.randomUUID())), FakeCreator()).create(point) }
         }
     }
 
-    private class FakePointCreator : ObservationPointCreator {
-        var callCount = 0
-        var lastObserverCode: String? = null
-        var createFailure: RuntimeException? = null
+    @Test fun `rejects stale current territory`() {
+        assertThrows(TerritoryRequiredException::class.java) {
+            runBlocking { CreateObservationPoint(FakeSettings(AppSettings(UUID.randomUUID(), observerId)), FakeCreator()).create(point) }
+        }
+    }
 
-        override suspend fun createObservationPoint(
-            point: NewObservationPoint,
-            observerCode: String,
-        ): ObservationPoint {
-            callCount += 1
-            lastObserverCode = observerCode
-            createFailure?.let { throw it }
+    private class FakeSettings(private val value: AppSettings) : SettingsRepository {
+        override val settings: Flow<AppSettings> = emptyFlow()
+        override suspend fun getSettings() = value
+        override suspend fun setCurrentTerritoryId(territoryId: UUID?) = Unit
+        override suspend fun setCurrentObserverId(observerId: UUID?) = Unit
+    }
+
+    private class FakeCreator : ObservationPointCreator {
+        var created: NewObservationPoint? = null
+        override suspend fun createObservationPoint(point: NewObservationPoint): ObservationPoint {
+            created = point
             return ObservationPoint(
-                id = UUID.randomUUID(),
-                territoryId = point.territoryId,
-                observerCode = observerCode,
-                observationYear = 1970,
-                pointNumber = 1,
-                beePresenceResult = null,
-                code = point.code,
-                latitude = point.latitude,
-                longitude = point.longitude,
-                gpsLatitude = point.gpsLatitude,
-                gpsLongitude = point.gpsLongitude,
-                gpsAccuracyM = point.gpsAccuracyM,
-                createdAt = Instant.EPOCH,
-                completedAt = null,
+                id = UUID.randomUUID(), territoryId = point.territoryId, observerId = point.observerId,
+                observationYear = 2026, pointNumber = 1, beePresenceResult = null, code = null,
+                latitude = point.latitude, longitude = point.longitude, gpsLatitude = null,
+                gpsLongitude = null, gpsAccuracyM = null, createdAt = java.time.Instant.EPOCH, completedAt = null,
             )
         }
     }

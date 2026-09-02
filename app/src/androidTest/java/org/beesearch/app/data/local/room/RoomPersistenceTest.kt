@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.beesearch.app.data.repository.RoomObservationRepository
+import org.beesearch.app.data.repository.RoomObserverRepository
 import org.beesearch.app.data.repository.RoomTerritoryRepository
 import org.beesearch.app.domain.model.InvalidAzimuthException
 import org.beesearch.app.domain.model.AzimuthCaptureAlreadyConsumedException
@@ -18,6 +19,8 @@ import org.beesearch.app.domain.model.BeePresenceResultRequiredException
 import org.beesearch.app.domain.model.BeesAlreadyFoundException
 import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.DuplicateTerritoryCodeException
+import org.beesearch.app.domain.model.DuplicateObserverCodeException
+import org.beesearch.app.domain.model.RequiredFieldException
 import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
@@ -48,6 +51,7 @@ class RoomPersistenceTest {
     private lateinit var territoryRepository: RoomTerritoryRepository
     private lateinit var observationRepository: RoomObservationRepository
     private lateinit var territoryId: UUID
+    private lateinit var observerId: UUID
 
     @Before
     fun setUp() = runBlocking {
@@ -57,16 +61,19 @@ class RoomPersistenceTest {
             .build()
         clock = MutableClock(Instant.parse("2026-08-26T06:34:12Z"))
         territoryRepository = RoomTerritoryRepository(database.territoryDao(), clock)
+        val observerRepository = RoomObserverRepository(database.observerDao(), clock)
         observationRepository = RoomObservationRepository(
             database = database,
             territoryDao = database.territoryDao(),
             pointDao = database.observationPointDao(),
+            observerDao = database.observerDao(),
             beeDao = database.beeDao(),
             cycleDao = database.flightCycleDao(),
             clock = clock,
             observationZoneIdProvider = clock::getZone,
         )
-        territoryId = territoryRepository.createTerritory("KLYAZMA-01", "Клязьма").id
+        territoryId = territoryRepository.createTerritory("KLYAZMA-01", "Клязьма", "Область", "Район").id
+        observerId = observerRepository.createObserver("SV", "Сидоров", "Сергей", null, null).id
     }
 
     @After
@@ -109,6 +116,7 @@ class RoomPersistenceTest {
             database = database,
             territoryDao = database.territoryDao(),
             pointDao = database.observationPointDao(),
+            observerDao = database.observerDao(),
             beeDao = database.beeDao(),
             cycleDao = database.flightCycleDao(),
             clock = clock,
@@ -118,10 +126,10 @@ class RoomPersistenceTest {
         val point = localYearRepository.createObservationPoint(
             point = NewObservationPoint(
                 territoryId = territoryId,
+                observerId = observerId,
                 latitude = 56.1,
                 longitude = 42.7,
             ),
-            observerCode = "SV",
         )
 
         assertEquals(2027, point.observationYear)
@@ -130,22 +138,23 @@ class RoomPersistenceTest {
 
     @Test
     fun pointNumberRestartsForDifferentObserverYearAndTerritory() = runBlocking {
-        val first = createPoint(observerCode = "SV")
+        val first = createPoint()
         observationRepository.recordNoBeesFound(first.id)
 
-        val otherObserver = createPoint(observerCode = "IVN")
+        val otherObserverId = RoomObserverRepository(database.observerDao(), clock)
+            .createObserver("IVN", "Иванов", "Иван", null, null).id
+        val otherObserver = createPoint(observerId = otherObserverId)
         assertEquals(1, otherObserver.pointNumber)
         observationRepository.recordNoBeesFound(otherObserver.id)
 
         clock.set(Instant.parse("2027-01-02T06:34:12Z"))
-        val otherYear = createPoint(observerCode = "SV")
+        val otherYear = createPoint()
         assertEquals(2027, otherYear.observationYear)
         assertEquals(1, otherYear.pointNumber)
         observationRepository.recordNoBeesFound(otherYear.id)
 
-        val otherTerritory = territoryRepository.createTerritory("OTHER", "Другая").id
+        val otherTerritory = territoryRepository.createTerritory("OTHER", "Другая", "Область", "Район").id
         val pointInOtherTerritory = createPoint(
-            observerCode = "SV",
             pointTerritoryId = otherTerritory,
         )
         assertEquals(1, pointInOtherTerritory.pointNumber)
@@ -157,7 +166,7 @@ class RoomPersistenceTest {
         val duplicate = ObservationPointEntity(
             id = UUID.randomUUID(),
             territoryId = point.territoryId,
-            observerCode = point.observerCode,
+            observerId = point.observerId,
             observationYear = point.observationYear,
             pointNumber = point.pointNumber,
             beePresenceResult = null,
@@ -266,11 +275,13 @@ class RoomPersistenceTest {
 
         val territory = requireNotNull(territoryRepository.getTerritory(territoryId))
         assertEquals(
-            StartupDestination.CurrentTerritory(territory),
+            StartupDestination.ReadyForMap,
             StartupRouter.decide(
                 activePoint = observationRepository.observeActivePoint().first(),
                 currentTerritoryId = territoryId,
                 territories = listOf(territory),
+                currentObserverId = observerId,
+                observers = listOf(requireNotNull(RoomObserverRepository(database.observerDao(), clock).getObserver(observerId))),
             ),
         )
 
@@ -278,6 +289,73 @@ class RoomPersistenceTest {
         val nextPoint = createPoint()
         assertNull(nextPoint.completedAt)
         assertEquals(nextPoint, observationRepository.observeActivePoint().first())
+    }
+
+    @Test
+    fun territoryAndObserverCreationTrimFieldsAndRejectDuplicateCodes() = runBlocking {
+        val observerRepository = RoomObserverRepository(database.observerDao(), clock)
+        val trimmedTerritory = territoryRepository.createTerritory(
+            "  A02 ", " Северный лес ", " Нижегородская область ", " Володарский район ",
+        )
+        val trimmedObserver = observerRepository.createObserver(
+            " SP01 ", " Иванов ", " Сергей ", "  ", "  ",
+        )
+
+        assertEquals("A02", trimmedTerritory.code)
+        assertEquals("Северный лес", trimmedTerritory.name)
+        assertEquals("Нижегородская область", trimmedTerritory.region)
+        assertEquals("Володарский район", trimmedTerritory.district)
+        assertEquals("SP01", trimmedObserver.code)
+        assertEquals("Иванов", trimmedObserver.lastName)
+        assertEquals("Сергей", trimmedObserver.firstName)
+        assertNull(trimmedObserver.middleName)
+        assertNull(trimmedObserver.contact)
+        assertThrows(RequiredFieldException::class.java) {
+            runBlocking { territoryRepository.createTerritory(" ", "Имя", "Регион", "Район") }
+        }
+        assertThrows(RequiredFieldException::class.java) {
+            runBlocking { territoryRepository.createTerritory("C04", " ", "Регион", "Район") }
+        }
+        assertThrows(RequiredFieldException::class.java) {
+            runBlocking { territoryRepository.createTerritory("C04", "Имя", " ", "Район") }
+        }
+        assertThrows(RequiredFieldException::class.java) {
+            runBlocking { territoryRepository.createTerritory("C04", "Имя", "Регион", " ") }
+        }
+        assertThrows(RequiredFieldException::class.java) {
+            runBlocking { observerRepository.createObserver(" ", "Иванов", "Сергей", null, null) }
+        }
+        assertThrows(RequiredFieldException::class.java) {
+            runBlocking { observerRepository.createObserver("AA", " ", "Сергей", null, null) }
+        }
+        assertThrows(RequiredFieldException::class.java) {
+            runBlocking { observerRepository.createObserver("AA", "Иванов", " ", null, null) }
+        }
+        assertThrows(DuplicateTerritoryCodeException::class.java) {
+            runBlocking { territoryRepository.createTerritory("A02", "Другая", "Область", "Район") }
+        }
+        assertThrows(DuplicateObserverCodeException::class.java) {
+            runBlocking { observerRepository.createObserver("SP01", "Другой", "Наблюдатель", null, null) }
+        }
+    }
+
+    @Test
+    fun createdPointKeepsItsTerritoryAndObserverAfterLaterEntitiesAreCreated() = runBlocking {
+        val first = createPoint()
+        observationRepository.recordNoBeesFound(first.id)
+        val observerRepository = RoomObserverRepository(database.observerDao(), clock)
+        val otherTerritory = territoryRepository.createTerritory("B03", "У реки", "Владимирская область", "Гороховецкий район")
+        val otherObserver = observerRepository.createObserver("AN02", "Петров", "Алексей", null, null)
+
+        val savedFirst = requireNotNull(database.observationPointDao().getById(first.id)).toDomain()
+        assertEquals(territoryId, savedFirst.territoryId)
+        assertEquals(observerId, savedFirst.observerId)
+
+        val second = observationRepository.createObservationPoint(
+            NewObservationPoint(otherTerritory.id, otherObserver.id, latitude = 56.2, longitude = 42.8),
+        )
+        assertEquals(otherTerritory.id, second.territoryId)
+        assertEquals(otherObserver.id, second.observerId)
     }
 
     @Test
@@ -381,7 +459,13 @@ class RoomPersistenceTest {
         assertTrue(restoredCycles.isNotEmpty())
         assertEquals(
             StartupDestination.ResumeObservation(restoredPoint!!),
-            StartupRouter.decide(restoredPoint, territoryId, listOf(territory)),
+            StartupRouter.decide(
+                restoredPoint,
+                territoryId,
+                listOf(territory),
+                observerId,
+                listOf(requireNotNull(RoomObserverRepository(database.observerDao(), clock).getObserver(observerId))),
+            ),
         )
     }
 
@@ -631,6 +715,7 @@ class RoomPersistenceTest {
             database = database,
             territoryDao = database.territoryDao(),
             pointDao = database.observationPointDao(),
+            observerDao = database.observerDao(),
             beeDao = database.beeDao(),
             cycleDao = database.flightCycleDao(),
             clock = clock,
@@ -663,32 +748,30 @@ class RoomPersistenceTest {
     @Test
     fun territoryCodeConstraintMapsToDomainErrorForCreateAndUpdate() = runBlocking {
         assertThrows(DuplicateTerritoryCodeException::class.java) {
-            runBlocking { territoryRepository.createTerritory("KLYAZMA-01", "Дубликат") }
+            runBlocking { territoryRepository.createTerritory("KLYAZMA-01", "Дубликат", "Область", "Район") }
         }
 
-        val other = territoryRepository.createTerritory("OTHER", "Другая")
+        territoryRepository.createTerritory("OTHER", "Другая", "Область", "Район")
         assertThrows(DuplicateTerritoryCodeException::class.java) {
-            runBlocking {
-                territoryRepository.updateTerritory(other.id, "KLYAZMA-01", "Дубликат")
-            }
+            runBlocking { territoryRepository.createTerritory("KLYAZMA-01", "Дубликат", "Область", "Район") }
         }
         Unit
     }
 
     private suspend fun createPoint(
-        observerCode: String = "SV",
+        observerId: UUID = this.observerId,
         pointTerritoryId: UUID = territoryId,
     ) = observationRepository.createObservationPoint(
         point = NewObservationPoint(
             territoryId = pointTerritoryId,
+            observerId = observerId,
             latitude = 56.1959786,
             longitude = 42.7477116,
             gpsLatitude = 56.1959000,
             gpsLongitude = 42.7477000,
             gpsAccuracyM = 4.5,
         ),
-        observerCode = " $observerCode ",
-    ).also { point -> assertEquals(observerCode, point.observerCode) }
+    )
 
     private class MutableClock(
         private var current: Instant,

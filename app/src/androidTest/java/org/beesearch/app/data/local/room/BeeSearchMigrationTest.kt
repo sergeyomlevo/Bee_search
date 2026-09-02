@@ -338,6 +338,52 @@ class BeeSearchMigrationTest {
         migrated.close()
     }
 
+    @Test
+    fun migrationFromFourToFiveClearsApprovedTestHierarchyAndCreatesObserverSchema() {
+        val databaseName = "$DATABASE_NAME-4-5"
+        val territoryId = UUID.randomUUID().toString()
+        val pointId = UUID.randomUUID().toString()
+        val createdAt = Instant.parse("2026-09-01T08:00:00Z").toEpochMilli()
+        migrationHelper.createDatabase(databaseName, 4).apply {
+            execSQL(
+                "INSERT INTO territories (id, code, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                arrayOf<Any>(territoryId, "TEST", "Тест", createdAt, createdAt),
+            )
+            execSQL(
+                """
+                INSERT INTO observation_points (
+                    id, territory_id, observer_code, observation_year, point_number,
+                    bee_presence_result, code, latitude, longitude, gps_latitude,
+                    gps_longitude, gps_accuracy_m, created_at, completed_at
+                ) VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, NULL, NULL, NULL, ?, NULL)
+                """.trimIndent(),
+                arrayOf<Any>(pointId, territoryId, "OLD", 2026, 1, 56.1, 42.7, createdAt),
+            )
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(databaseName, 5, true, MIGRATION_4_5)
+        migrated.query("SELECT COUNT(*) FROM territories").use { cursor -> cursor.moveToFirst(); assertEquals(0, cursor.getInt(0)) }
+        migrated.query("SELECT COUNT(*) FROM observation_points").use { cursor -> cursor.moveToFirst(); assertEquals(0, cursor.getInt(0)) }
+        migrated.query("PRAGMA table_info(observers)").use { cursor ->
+            val columns = mutableSetOf<String>()
+            while (cursor.moveToNext()) columns += cursor.getString(1)
+            assertTrue(columns.containsAll(setOf("id", "code", "last_name", "first_name", "middle_name", "contact")))
+        }
+        migrated.query("PRAGMA foreign_key_list(observation_points)").use { cursor ->
+            val referencedTables = mutableSetOf<String>()
+            while (cursor.moveToNext()) referencedTables += cursor.getString(2)
+            assertEquals(setOf("territories", "observers"), referencedTables)
+        }
+        migrated.query("PRAGMA index_list(observation_points)").use { cursor ->
+            val indexNames = mutableSetOf<String>()
+            while (cursor.moveToNext()) indexNames += cursor.getString(1)
+            assertTrue(indexNames.contains("index_observation_points_observer_id"))
+            assertTrue(indexNames.contains("index_observation_points_territory_id"))
+        }
+        migrated.close()
+    }
+
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyPoint(
         id: String,
         territoryId: String,

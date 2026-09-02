@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.beesearch.app.domain.model.AppSettings
 import org.beesearch.app.domain.repository.SettingsRepository
-import org.beesearch.app.domain.validation.ObserverCode
 import java.io.IOException
 import java.util.UUID
 
@@ -36,14 +35,6 @@ internal class DataStoreSettingsRepository(
 
     override suspend fun getSettings(): AppSettings = settings.first()
 
-    override suspend fun saveObserverCode(value: String): String {
-        val normalized = ObserverCode.normalize(value)
-        dataStore.edit { preferences ->
-            preferences[OBSERVER_CODE] = normalized
-        }
-        return normalized
-    }
-
     override suspend fun setCurrentTerritoryId(territoryId: UUID?) {
         dataStore.edit { preferences ->
             if (territoryId == null) {
@@ -54,9 +45,21 @@ internal class DataStoreSettingsRepository(
         }
     }
 
+    override suspend fun setCurrentObserverId(observerId: UUID?) {
+        dataStore.edit { preferences ->
+            if (observerId == null) {
+                preferences.remove(CURRENT_OBSERVER_ID)
+            } else {
+                preferences[CURRENT_OBSERVER_ID] = observerId.toString()
+            }
+            // Legacy v4 state is deliberately ignored after the approved v5 reset.
+            preferences.remove(LEGACY_OBSERVER_CODE)
+        }
+    }
+
     private fun toSettings(preferences: Preferences): AppSettings = AppSettings(
         currentTerritoryId = preferences[CURRENT_TERRITORY_ID]?.let(::parseUuidOrNull),
-        observerCode = preferences[OBSERVER_CODE],
+        currentObserverId = preferences[CURRENT_OBSERVER_ID]?.let(::parseUuidOrNull),
     )
 
     private fun parseUuidOrNull(value: String): UUID? = runCatching {
@@ -65,6 +68,7 @@ internal class DataStoreSettingsRepository(
 
     private companion object {
         val CURRENT_TERRITORY_ID = stringPreferencesKey("current_territory_id")
-        val OBSERVER_CODE = stringPreferencesKey("observer_code")
+        val CURRENT_OBSERVER_ID = stringPreferencesKey("current_observer_id")
+        val LEGACY_OBSERVER_CODE = stringPreferencesKey("observer_code")
     }
 }

@@ -23,11 +23,13 @@ Territory
     └── ObservationPoint
             └── Bee
                     └── FlightCycle
+
+Observer
 ```
 
-Отдельная сущность `Observer` в MVP не используется.
-
-Наблюдатель представлен значением `observer_code`: текущее значение хранится в локальных настройках устройства, а при создании точки копируется в `ObservationPoint`.
+`Observer` — отдельная сущность. ObservationPoint хранит стабильные ссылки на
+выбранные `Territory.id` и `Observer.id`; current selection является только
+device-local настройкой.
 
 Отдельная сущность `ObservationSession` не используется.
 
@@ -66,6 +68,7 @@ VLAD-02 — Владимирский участок
 * внутренний уникальный идентификатор;
 * стабильный код;
 * человекочитаемое название.
+* обязательные region и district.
 
 Код и название — разные понятия.
 
@@ -104,39 +107,37 @@ VLAD-02 — Владимирский участок
 можно создать и использовать без offline package; отсутствие package не
 блокирует исследовательские операции.
 
+Будущее offline coverage принадлежит конкретной Territory по `Territory.id`:
+разные Territory на устройстве могут иметь разный map context. Сами rectangle
+geometry, download state и map resources остаются device-local infrastructure,
+не становятся Room research entities и в текущем milestone не сохраняются.
+
 ---
 
-# 4. Код наблюдателя
+# 4. Observer
 
 ## 4.1. Смысл
 
-`observer_code` — короткое обозначение человека, выполняющего полевые наблюдения.
-
-Так как приложение может использоваться несколькими людьми, необходимо иметь возможность определить, кто создал конкретные данные.
-
----
-
-## 4.2. Хранение кода наблюдателя
-
-Текущее значение `observer_code` хранится в локальных настройках устройства.
-
-На чистой установке оно отсутствует и не заменяется фиктивным значением.
-
-При создании новой `ObservationPoint` оно копируется в саму точку и становится частью исторических данных.
-
-Последующее изменение настройки устройства не изменяет `observer_code` уже созданных точек.
+`Observer` — сохранённый человек, выполняющий полевые наблюдения. Он имеет
+UUID, обязательные code, lastName и firstName, а также необязательные
+middleName и contact. Код уникален на устройстве, проходит trim и сохраняет
+регистр, но не является identity.
 
 ---
 
-## 4.3. Ограничения первой версии
+## 4.2. Current Observer
 
-В MVP отдельная сущность или таблица `Observer` не создаётся.
+`current_observer_id` хранится в device-local settings. На устройстве может
+быть несколько Observer; пользователь выбирает одного из списка без повторного
+ввода данных. Новая запись может автоматически стать current.
 
-Полноценная учётная запись и авторизация не требуются.
+---
 
-Territory можно создать без `observer_code`, но до создания первой `ObservationPoint` пользователь должен явно задать непустой код.
+## 4.3. Историческая принадлежность
 
-При вводе код нормализуется только удалением начальных и конечных пробельных символов. После этого он должен оставаться непустым. Регистр, внутренние пробелы и другие введённые символы сохраняются; отдельная политика допустимых символов и искусственный предел длины пока не определяются.
+Новая ObservationPoint создаётся только при валидных current Observer и
+current Territory и получает их UUID. Их последующее переключение не изменяет
+уже созданную точку. Полноценная авторизация, accounts и роли не требуются.
 
 ---
 
@@ -230,7 +231,7 @@ pointNumber
 `pointNumber` — последовательный человекочитаемый номер внутри области:
 
 ```text
-Territory + observationYear + observerCode
+Territory + observationYear + observerId
 ```
 
 Нумерация каждой области начинается с 1. UUID остаётся идентичностью ObservationPoint; номер не является идентификатором. Одна Territory продолжает существовать между годами, отдельная сущность `ObservationSeason` не создаётся.
@@ -699,18 +700,17 @@ return_time == null
 
 ---
 
-# 14. Код наблюдателя в ObservationPoint
+# 14. Наблюдатель в ObservationPoint
 
 Минимальная модель:
 
 ```text id="observer-point"
-AppSettings.observer_code
-    └── ObservationPoint.observer_code
+AppSettings.current_observer_id
+    └── ObservationPoint.observer_id → Observer.id
 ```
 
-Сохранённое в точке значение позволяет определить наблюдателя, который создал точку или проводил работу.
-
-Это исторический снимок кода, а не ссылка на отдельную сущность.
+Сохранённая ссылка позволяет определить наблюдателя, который создал точку.
+Это историческая UUID-связь, а не snapshot ФИО, contact или code.
 
 ---
 
@@ -721,6 +721,7 @@ AppSettings.observer_code
 Это относится как минимум к:
 
 * Territory;
+* Observer;
 * ObservationPoint;
 * Bee;
 * FlightCycle.
@@ -792,7 +793,6 @@ ObservationPoint завершается
 
 Чтобы не усложнять модель без необходимости, на текущем этапе не создаются отдельные сущности:
 
-* `Observer`;
 * `ObservationSession`;
 * `GroupRelease`;
 * `OfflineMap`;
@@ -871,7 +871,8 @@ FlightCycle всегда имеет время вылета.
 
 ## 19.15.
 
-ObservationPoint создаётся только при наличии явно заданного, обрезанного по краям и непустого `observer_code` и сохраняет его исторический снимок.
+ObservationPoint создаётся только при валидных current Territory и current
+Observer и сохраняет их immutable UUID-связи.
 
 ## 19.16.
 
@@ -879,7 +880,9 @@ ObservationPoint создаётся только при наличии явно 
 
 ## 19.17.
 
-Каждая ObservationPoint имеет сохранённые `observationYear` и `pointNumber`; комбинация `Territory + observationYear + observerCode + pointNumber` уникальна в локальной базе.
+Каждая ObservationPoint имеет сохранённые `observationYear` и `pointNumber`;
+комбинация `Territory + observationYear + observerId + pointNumber` уникальна
+в локальной базе.
 
 ## 19.18.
 
@@ -927,9 +930,11 @@ ObservationPoint с неустановленным `beePresenceResult` не мо
 ```text id="final-domain-model"
 Territory
     │
+Observer
+    │
     └── ObservationPoint
             │
-            ├── observer_code snapshot
+            ├── territory_id + observer_id
             ├── observation_year + point_number
             ├── bee_presence_result?
             ├── coordinates

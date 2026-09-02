@@ -402,7 +402,11 @@ Use case вводится там, где существует реальное �
 
 ## 11.1. Создание ObservationPoint и результат присутствия пчёл
 
-Создание точки является транзакционной операцией. Внутри одной Room transaction приложение определяет локальный `observation_year`, получает следующий `point_number` в области `Territory + observation_year + observer_code` и вставляет ObservationPoint. Составной UNIQUE index остаётся окончательной защитой от совпадения номера.
+Создание точки является транзакционной операцией. Внутри одной Room transaction
+приложение проверяет ссылки на Territory и Observer, определяет локальный
+`observation_year`, получает следующий `point_number` в области `Territory +
+observation_year + observer_id` и вставляет ObservationPoint. Составной UNIQUE
+index остаётся окончательной защитой от совпадения номера.
 
 `created_at` сохраняется как абсолютный Instant; локальная временная зона используется только для однократного назначения `observation_year`.
 
@@ -490,12 +494,14 @@ Room предоставляет:
 
 ```text
 TerritoryEntity
+ObserverEntity
 ObservationPointEntity
 BeeEntity
 FlightCycleEntity
 ```
 
-Отдельной таблицы Observer в MVP нет.
+`ObserverEntity` хранится отдельно; `ObservationPointEntity` ссылается на неё
+по `observer_id`.
 
 ---
 
@@ -549,7 +555,12 @@ Room transaction обязательна как минимум для:
 
 Простая регистрация одного return_time может быть одной атомарной SQL-операцией.
 
-В Room schema v4 внешние ключи и составные уникальности метки Bee, номера FlightCycle и номера ObservationPoint обеспечиваются ограничениями SQLite. Правила «одна активная ObservationPoint» и «один открытый FlightCycle на Bee» проверяются внутри транзакционных методов Repository; DAO остаются внутренней деталью слоя хранения. Создание точки, изменение результата присутствия пчёл и связанные записи Bee выполняются транзакционно. One-tap field capture азимута одним условным UPDATE сохраняет true heading и consumed-state; обычный set/clear остаётся отдельной history/edit capability.
+В Room schema v5 внешние ключи Territory/Observer, составные уникальности метки
+Bee, номера FlightCycle и номера ObservationPoint обеспечиваются ограничениями
+SQLite. Правила «одна активная ObservationPoint» и «один открытый FlightCycle на
+Bee» проверяются внутри транзакционных методов Repository; DAO остаются
+внутренней деталью слоя хранения. Создание точки, изменение результата
+присутствия пчёл и связанные записи Bee выполняются транзакционно.
 
 ---
 
@@ -584,17 +595,19 @@ Preferences DataStore
 Минимально:
 
 ```text
-observer_code?
 current_territory_id?
+current_observer_id?
 ```
 
-На чистой установке `observer_code` отсутствует. DataStore не создаёт для него автоматический default.
+На чистой установке оба current UUID отсутствуют. DataStore не создаёт
+фиктивных значений. Сохранённые IDs, которые больше не соответствуют entity,
+считаются invalid; карта остаётся доступной, а действия, требующие контекста,
+предлагают открыть Settings (D062).
 
-Territory можно создать без кода наблюдателя, но перед сохранением первой `ObservationPoint` код должен быть явно введён и успешно записан в DataStore.
-
-Запись кода выполняет `trim`, отклоняет пустой результат и сохраняет регистр и содержимое без дополнительной политики символов или длины.
-
-DataStore и Room не объединяются в искусственную общую транзакцию: ошибка DataStore запрещает создание точки, а успешная запись DataStore не откатывается при последующей ошибке Room. Повторное создание точки использует уже сохранённый код.
+UUID selection записывается в DataStore только после выбора существующей
+сущности. DataStore и Room не объединяются в искусственную общую транзакцию:
+ошибка DataStore запрещает создание точки, а успешная запись DataStore не
+откатывается при последующей ошибке Room.
 
 Позднее могут появиться:
 
@@ -667,9 +680,9 @@ requests могут загружаться online. Явно подготовле
 Архитектура должна поддерживать:
 
 ```text
-Territory
+Territory.id
         ↓
-device-local OfflineRegion metadata
+device-local offline coverage metadata
         ↓
 MapLibre shared cache/offline resource database
         ↓
@@ -682,6 +695,8 @@ Region считается Ready только по совместимым metadat
 
 Сами картографические данные и metadata не хранятся в Room research schema.
 `Territory` не содержит `map_status`, `map_region_data` или bounds.
+У разных Territory может быть разный coverage; rectangles остаются map
+infrastructure и не становятся Room entities.
 
 ---
 
@@ -868,9 +883,11 @@ timestamp
 ```text
 Пользователь выбирает создание точки
         ↓
-observer_code задан?
+current Territory и current Observer валидны?
         │
-       нет → запросить код → trim + проверка → сохранить в DataStore
+       нет → карта остаётся доступной; создание точки показывает сообщение и предлагает Settings
+        ↓
+сохранить immutable territory_id + observer_id
         ↓
 LocationProvider
         ↓
@@ -1104,7 +1121,7 @@ UX будет уточняться при прототипировании.
         │
        нет
         ↓
-Есть current_territory_id?
+Есть valid current_territory_id и current_observer_id?
         │
        да
         ↓
@@ -1482,7 +1499,7 @@ SyncEngine
 * использовать UUID;
 * хранить timestamps как абсолютный `Instant` / Unix epoch milliseconds;
 * не полагаться на autoincrement ID;
-* хранить observer_code snapshot в точке;
+* хранить immutable Territory/Observer UUID-связи в точке;
 * хранить UUID как identity независимо от изменяемого `point_number`;
 * не связывать данные с локальным порядком строк.
 
@@ -1539,7 +1556,8 @@ sync_version
 
 Не следует использовать destructive migration для рабочей базы с полевыми наблюдениями.
 
-На самом раннем этапе разработки до появления реальных данных допустимо пересоздание базы.
+На самом раннем этапе разработки до появления реальных данных допустим только
+явно документированный controlled reset конкретной migration.
 
 Момент перехода к обязательным миграциям должен быть явно зафиксирован перед первым реальным полевым использованием.
 
@@ -1557,6 +1575,13 @@ Room schema v4 использует неструктурную compatibility mig
 hash: пользовательские таблицы не пересоздаются и не изменяются, а после стандартной Room schema
 validation записывается актуальный identity hash. Проверяются отдельный путь 3 → 4, повторное
 открытие v4 и полный путь 1 → 2 → 3 → 4.
+
+Room schema v5 вводит Observer, required region/district Territory и
+`ObservationPoint.observer_id`. Migration 4 → 5 очищает только согласованные
+тестовые Territory, ObservationPoint, Bee и FlightCycle: старые записи нельзя
+честно преобразовать без фиктивных персональных и географических данных. Это
+не fallback policy; после v5 migrations для реальных данных non-destructive по
+умолчанию.
 
 ---
 
@@ -1746,7 +1771,7 @@ Territory создаётся и выбирается независимо от o
 MapLibre
 GPS
 current position
-observer_code перед первой ObservationPoint
+current Territory + current Observer перед первой ObservationPoint
 создание ObservationPoint
 ручная коррекция
 ```

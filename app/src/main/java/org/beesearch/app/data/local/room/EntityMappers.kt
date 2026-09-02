@@ -3,12 +3,26 @@ package org.beesearch.app.data.local.room
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.ObservationPoint
+import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
 
 internal fun TerritoryEntity.toDomain(): Territory = Territory(
     id = id,
     code = code,
     name = name,
+    region = region,
+    district = district,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
+
+internal fun ObserverEntity.toDomain(): Observer = Observer(
+    id = id,
+    code = code,
+    lastName = lastName,
+    firstName = firstName,
+    middleName = middleName,
+    contact = contact,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
@@ -16,7 +30,7 @@ internal fun TerritoryEntity.toDomain(): Territory = Territory(
 internal fun ObservationPointEntity.toDomain(): ObservationPoint = ObservationPoint(
     id = id,
     territoryId = territoryId,
-    observerCode = observerCode,
+    observerId = observerId,
     observationYear = observationYear,
     pointNumber = pointNumber,
     beePresenceResult = beePresenceResult,

@@ -36,6 +36,8 @@ Territory
     └── ObservationPoint
             └── Bee
                     └── FlightCycle
+
+Observer
 ```
 
 Дополнительно приложение хранит локальные настройки устройства:
@@ -44,7 +46,8 @@ Territory
 AppSettings
 ```
 
-Отдельные сущности `Observer`, `ObservationSession`, `GroupRelease`, `BeeState`, `OfflineMap` и `AzimuthMeasurement` на текущем этапе не создаются.
+Отдельные сущности `ObservationSession`, `GroupRelease`, `BeeState`,
+`OfflineMap` и `AzimuthMeasurement` на текущем этапе не создаются.
 
 ---
 
@@ -90,25 +93,16 @@ sequence_number = 1
 
 ---
 
-## 3.5. Observer пока не является сущностью
+## 3.5. Observer является отдельной сущностью
 
-Для MVP отдельная таблица `Observer` не создаётся.
+`Observer` хранится в Room как отдельная исследовательская сущность с UUID.
+На одном устройстве может быть несколько Observer. Его код остаётся
+человеко-читаемым и уникальным на устройстве, но технические связи строятся
+только через `Observer.id`.
 
-Код наблюдателя хранится в локальных настройках конкретного устройства:
-
-```text
-observer_code
-```
-
-На чистой установке это значение отсутствует. Оно не заменяется автоматическим или фиктивным кодом.
-
-Territory можно создать без `observer_code`, но перед созданием первой `ObservationPoint` пользователь должен явно задать непустое значение.
-
-Введённое значение проходит `trim` и должно оставаться непустым. Регистр и остальное содержимое не изменяются; политика допустимых символов и искусственный предел длины пока не вводятся.
-
-При создании новой `ObservationPoint` текущий нормализованный код наблюдателя копируется в саму точку.
-
-Это важно, потому что последующее изменение настройки устройства не должно изменять уже сохранённые исторические данные.
+Текущий выбор хранится device-local как `current_observer_id`. Новая
+ObservationPoint получает этот ID при создании; последующее переключение
+current Observer не изменяет историческую запись точки.
 
 ---
 
@@ -127,6 +121,7 @@ UUID создаётся непосредственно на мобильном �
 UUID необходим для:
 
 * `Territory`;
+* `Observer`;
 * `ObservationPoint`;
 * `Bee`;
 * `FlightCycle`.
@@ -185,7 +180,7 @@ Unix epoch milliseconds
 AppSettings
 
 current_territory_id    UUID?       optional
-observer_code           String?     optional
+current_observer_id     UUID?       optional
 ```
 
 ---
@@ -208,33 +203,15 @@ Territory.is_current
 
 ---
 
-## 6.4. `observer_code`
+## 6.4. `current_observer_id`
 
-Короткий код наблюдателя, связанный с данным устройством или текущим пользователем устройства.
+Хранит UUID выбранного Observer. На чистой установке ключ отсутствует; не
+создаются фиктивные Observer. Если сохранённый UUID не соответствует сущности
+Room, selection считается invalid и startup направляет пользователя в Settings.
 
-На чистой установке ключ отсутствует. Значения `UNKNOWN`, `DEFAULT`, `USER`, пустая строка и другие фиктивные defaults не создаются.
-
-Примеры:
-
-```text
-S01
-SERGEY
-OBS-03
-```
-
-При создании новой точки текущее значение копируется в:
-
-```text
-ObservationPoint.observer_code
-```
-
-Если код отсутствует, приложение должно предложить пользователю ввести его и успешно сохранить в DataStore до создания `ObservationPoint`.
-
-При сохранении удаляются только начальные и конечные пробельные символы. Пустое после `trim` значение отклоняется; регистр не меняется, а набор символов и длина пока дополнительно не ограничиваются.
-
-Ошибка записи DataStore запрещает создание точки. Ошибка записи точки в Room после успешного DataStore не откатывает код: повторная попытка использует уже сохранённую настройку.
-
-Поле `ObservationPoint.observer_code` остаётся обязательным. Изменение настройки позднее влияет только на новые точки.
+`current_observer_id`, как и `current_territory_id`, — настройка устройства,
+а не поле исследовательской сущности. Переключение значения влияет только на
+будущие ObservationPoint.
 
 ---
 
@@ -275,6 +252,8 @@ Territory
 id                  UUID        required
 code                String      required
 name                String      required
+region              String      required
+district            String      required
 
 created_at          Instant     required
 updated_at          Instant     required
@@ -322,6 +301,35 @@ KLYAZMA-01
 ```
 
 Название может изменяться без изменения `id`.
+
+---
+
+# 10.1. `Territory.region` и `Territory.district`
+
+Обязательные человеко-читаемые поля для региона и района. Все четыре текстовых
+поля Territory проходят trim и не могут стать пустыми после него.
+
+---
+
+# 10.2. Observer
+
+```text
+Observer
+
+id                  UUID        required
+code                String      required, UNIQUE on device
+last_name           String      required
+first_name          String      required
+middle_name         String?     optional
+contact             String?     optional
+created_at          Instant     required
+updated_at          Instant     required
+```
+
+`code`, `last_name` и `first_name` проходят trim и обязательны. `middle_name`
+и `contact` проходят trim; пустая строка нормализуется в `null`. Contact — одно
+свободное текстовое поле без жёсткой phone/email валидации. `Observer.code` не
+является primary key или foreign key.
 
 ---
 
@@ -394,8 +402,7 @@ ObservationPoint
 
 id                  UUID        required
 territory_id        UUID        required
-
-observer_code       String      required
+observer_id         UUID        required
 
 observation_year    Int         required
 point_number        Int         required
@@ -429,19 +436,12 @@ ObservationPoint.territory_id
 
 ---
 
-# 16. `observer_code`
+# 16. `observer_id`
 
-При создании точки значение копируется из:
-
-```text
-AppSettings.observer_code
-```
-
-Значение должно существовать, быть обрезано по краям и быть непустым. Если оно отсутствует, `ObservationPoint` не создаётся до явного ввода и успешного сохранения кода пользователем.
-
-После этого оно является частью исторической записи точки.
-
-Изменение `observer_code` в настройках устройства не должно изменять существующие точки.
+Ссылка на `Observer.id`. Перед созданием точки и current Territory, и current
+Observer должны быть валидными сохранёнными сущностями. `observer_id` и
+`territory_id` записываются в точку один раз и не меняются при последующем
+переключении current selection.
 
 ---
 
@@ -458,13 +458,13 @@ AppSettings.observer_code
 Обязательный положительный последовательный номер, начинающийся с 1 внутри области:
 
 ```text
-territory_id + observation_year + observer_code
+territory_id + observation_year + observer_id
 ```
 
 Следующий номер определяется и записывается в одной Room transaction. Локальная база дополнительно обеспечивает уникальность полного сочетания:
 
 ```text
-territory_id + observation_year + observer_code + point_number
+territory_id + observation_year + observer_id + point_number
 ```
 
 Номер не является идентификатором. UUID остаётся первичным ключом и не меняется при возможном будущем перенумеровании после синхронизации.
@@ -1308,7 +1308,7 @@ FlightCycle
 * связи строятся по UUID;
 * пользовательские коды не используются как внешние ключи;
 * время хранится как абсолютный `Instant` / Unix epoch milliseconds;
-* исторический `observer_code` копируется в ObservationPoint.
+* ObservationPoint сохраняет UUID выбранных Territory и Observer.
 
 ---
 
@@ -1368,6 +1368,7 @@ Territory
 ObservationPoint
 Bee
 FlightCycle
+Observer
 ```
 
 ## Локальные данные устройства
@@ -1376,7 +1377,7 @@ FlightCycle
 
 ```text
 current_territory_id
-observer_code как текущая настройка
+current_observer_id
 локальные пути офлайн-карт
 map download state
 OfflineRegion definition/metadata
@@ -1389,7 +1390,9 @@ authoritative structure и status предоставляет MapLibre OfflineReg
 минимальная package-to-Territory/profile связь хранится в opaque region
 metadata.
 
-При этом значение `observer_code`, уже скопированное в `ObservationPoint`, становится частью исследовательских данных.
+`current_territory_id` и `current_observer_id` сами не являются
+исследовательскими данными; историческую принадлежность определяют foreign keys
+в ObservationPoint.
 
 ---
 
@@ -1401,8 +1404,21 @@ Territory
 │ id PK                   │
 │ code UNIQUE             │
 │ name                    │
+│ region                  │
+│ district                │
 │ created_at              │
 │ updated_at              │
+└────────────┬────────────┘
+             │
+             ▼
+Observer
+┌─────────────────────────┐
+│ id PK                   │
+│ code UNIQUE             │
+│ last_name               │
+│ first_name              │
+│ middle_name?            │
+│ contact?                │
 └────────────┬────────────┘
              │
              ▼
@@ -1410,7 +1426,7 @@ ObservationPoint
 ┌─────────────────────────┐
 │ id PK                   │
 │ territory_id FK         │
-│ observer_code           │
+│ observer_id FK          │
 │ observation_year        │
 │ point_number            │
 │ bee_presence_result     │
@@ -1458,13 +1474,25 @@ FlightCycle
 ```text
 id              UNIQUE
 code            UNIQUE
+name, region, district required after trim
+
+## Observer
+
+```text
+id              UNIQUE
+code            UNIQUE
+last_name       required after trim
+first_name      required after trim
+middle_name     nullable
+contact         nullable
+```
 ```
 
 ## ObservationPoint
 
 ```text
 territory_id    MUST EXIST
-observer_code   required
+observer_id     MUST EXIST
 observation_year required
 point_number    required, >= 1
 latitude        required
@@ -1478,7 +1506,7 @@ longitude       required
 ```text
 territory_id
 + observation_year
-+ observer_code
++ observer_id
 + point_number
 ```
 
@@ -1563,12 +1591,27 @@ v3-структуру, установленную промежуточной deb
 
 ---
 
-# 69. Что намеренно не хранится
+# 69. Room schema v5 и controlled development reset
+
+Schema v5 добавляет required `Territory.region` и `Territory.district`,
+отдельную таблицу `Observer`, `ObservationPoint.observer_id`, внешние ключи и
+индекс нумерации по `territory_id + observation_year + observer_id`.
+
+Переход 4 → 5 является единственным явно согласованным controlled
+development-stage reset: он очищает прежние тестовые Territory,
+ObservationPoint, Bee и FlightCycle, потому что невозможно честно заполнить
+новые обязательные поля и Observer без выдумывания данных. Старый
+`observer_code` DataStore больше не является целевой настройкой и игнорируется.
+Это не является общей политикой: после v5 будущие миграции по умолчанию должны
+быть non-destructive и сохранять реальные исследовательские данные.
+
+---
+
+# 70. Что намеренно не хранится
 
 На текущем этапе не создаются отдельные поля или таблицы:
 
 ```text
-Observer
 ObservationSession
 GroupRelease
 is_initial_group
@@ -1586,7 +1629,7 @@ time_zone_id
 
 ---
 
-# 70. Почему нет PhysicalPlace
+# 71. Почему нет PhysicalPlace
 
 Разные ObservationPoint могут иметь одинаковые координаты.
 
@@ -1610,7 +1653,7 @@ ObservationPoint 2
 
 ---
 
-# 71. Минимальная модель MVP
+# 72. Минимальная модель MVP
 
 Ядро исследовательской базы:
 
@@ -1619,13 +1662,25 @@ Territory
 - id
 - code
 - name
+- region
+- district
+- created_at
+- updated_at
+
+Observer
+- id
+- code
+- last_name
+- first_name
+- middle_name?
+- contact?
 - created_at
 - updated_at
 
 ObservationPoint
 - id
 - territory_id
-- observer_code
+- observer_id
 - observation_year
 - point_number
 - bee_presence_result?
@@ -1662,25 +1717,26 @@ FlightCycle
 ```text
 AppSettings
 - current_territory_id?
-- observer_code?
+- current_observer_id?
 ```
 
 Картографические файлы хранятся отдельно от исследовательской базы.
 
 ---
 
-# 72. Итоговая логика данных
+# 73. Итоговая логика данных
 
 ```text
 AppSettings
-    ├── observer_code?
+    ├── current_observer_id?
     └── current_territory_id?
-                │
-                ▼
+
 Territory
     │
+Observer
+    │
     └── ObservationPoint
-            ├── observer_code snapshot
+            ├── territory_id + observer_id
             ├── observation_year + point_number
             ├── bee_presence_result?
             ├── coordinates

@@ -10,6 +10,7 @@ import org.beesearch.app.data.local.room.FlightCycleDao
 import org.beesearch.app.data.local.room.FlightCycleEntity
 import org.beesearch.app.data.local.room.ObservationPointDao
 import org.beesearch.app.data.local.room.ObservationPointEntity
+import org.beesearch.app.data.local.room.ObserverDao
 import org.beesearch.app.data.local.room.TerritoryDao
 import org.beesearch.app.data.local.room.toDomain
 import org.beesearch.app.domain.model.Bee
@@ -36,7 +37,6 @@ import org.beesearch.app.domain.model.ObservationPointNotActiveException
 import org.beesearch.app.domain.model.OpenFlightCycleExistsException
 import org.beesearch.app.domain.model.OpenFlightCycleNotFoundException
 import org.beesearch.app.domain.repository.ObservationRepository
-import org.beesearch.app.domain.validation.ObserverCode
 import java.time.Clock
 import java.time.ZoneId
 import java.util.UUID
@@ -45,6 +45,7 @@ internal class RoomObservationRepository(
     private val database: BeeSearchDatabase,
     private val territoryDao: TerritoryDao,
     private val pointDao: ObservationPointDao,
+    private val observerDao: ObserverDao,
     private val beeDao: BeeDao,
     private val cycleDao: FlightCycleDao,
     private val clock: Clock,
@@ -65,27 +66,28 @@ internal class RoomObservationRepository(
 
     override suspend fun createObservationPoint(
         point: NewObservationPoint,
-        observerCode: String,
     ): ObservationPoint = database.withTransaction {
         if (territoryDao.getById(point.territoryId) == null) {
             throw EntityNotFoundException("Territory")
+        }
+        if (observerDao.getById(point.observerId) == null) {
+            throw EntityNotFoundException("Observer")
         }
         if (pointDao.countActive() != 0) {
             throw ObservationPointAlreadyActiveException()
         }
 
-        val normalizedObserverCode = ObserverCode.normalize(observerCode)
         val createdAt = clock.instant()
         val observationYear = createdAt.atZone(observationZoneIdProvider()).year
         val pointNumber = pointDao.getNextPointNumber(
             territoryId = point.territoryId,
             observationYear = observationYear,
-            observerCode = normalizedObserverCode,
+            observerId = point.observerId,
         )
         val entity = ObservationPointEntity(
             id = UUID.randomUUID(),
             territoryId = point.territoryId,
-            observerCode = normalizedObserverCode,
+            observerId = point.observerId,
             observationYear = observationYear,
             pointNumber = pointNumber,
             beePresenceResult = null,

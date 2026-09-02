@@ -1,29 +1,38 @@
 package org.beesearch.app.domain.usecase
 
+import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.Territory
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import java.util.UUID
 
 class StartupRouterTest {
-    private val territory = Territory(
-        id = UUID.randomUUID(),
-        code = "KLYAZMA-01",
-        name = "Клязьма",
-        createdAt = Instant.EPOCH,
-        updatedAt = Instant.EPOCH,
-    )
+    private val territory = Territory(UUID.randomUUID(), "A01", "Лес", "Область", "Район", Instant.EPOCH, Instant.EPOCH)
+    private val observer = Observer(UUID.randomUUID(), "SP01", "Иванов", "Сергей", null, null, Instant.EPOCH, Instant.EPOCH)
 
-    @Test
-    fun `active observation takes precedence over current territory`() {
-        val point = ObservationPoint(
+    @Test fun `opens map when observer missing`() {
+        assertEquals(StartupDestination.ReadyForMap, StartupRouter.decide(null, territory.id, listOf(territory), null, listOf(observer)))
+    }
+
+    @Test fun `opens map when territory missing`() {
+        assertEquals(StartupDestination.ReadyForMap, StartupRouter.decide(null, null, listOf(territory), observer.id, listOf(observer)))
+    }
+
+    @Test fun `opens map when saved ids no longer exist`() {
+        assertEquals(
+            StartupDestination.ReadyForMap,
+            StartupRouter.decide(null, UUID.randomUUID(), listOf(territory), UUID.randomUUID(), listOf(observer)),
+        )
+    }
+
+    @Test fun `active observation recovery has priority over invalid selections`() {
+        val activePoint = ObservationPoint(
             id = UUID.randomUUID(),
             territoryId = territory.id,
-            observerCode = "SV",
-            observationYear = 1970,
+            observerId = observer.id,
+            observationYear = 2026,
             pointNumber = 1,
             beePresenceResult = null,
             code = null,
@@ -35,25 +44,13 @@ class StartupRouterTest {
             createdAt = Instant.EPOCH,
             completedAt = null,
         )
-
-        val destination = StartupRouter.decide(point, territory.id, listOf(territory))
-
-        assertEquals(StartupDestination.ResumeObservation(point), destination)
-    }
-
-    @Test
-    fun `valid current territory opens territory flow`() {
-        val destination = StartupRouter.decide(null, territory.id, listOf(territory))
-
-        assertEquals(StartupDestination.CurrentTerritory(territory), destination)
-    }
-
-    @Test
-    fun `missing or stale current territory opens management`() {
-        assertTrue(StartupRouter.decide(null, null, listOf(territory)) is StartupDestination.TerritoryManagement)
-        assertTrue(
-            StartupRouter.decide(null, UUID.randomUUID(), listOf(territory)) is
-                StartupDestination.TerritoryManagement,
+        assertEquals(
+            StartupDestination.ResumeObservation(activePoint),
+            StartupRouter.decide(activePoint, null, emptyList(), null, emptyList()),
         )
+    }
+
+    @Test fun `opens map with valid selections`() {
+        assertEquals(StartupDestination.ReadyForMap, StartupRouter.decide(null, territory.id, listOf(territory), observer.id, listOf(observer)))
     }
 }

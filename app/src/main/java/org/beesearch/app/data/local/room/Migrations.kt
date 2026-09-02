@@ -116,6 +116,117 @@ internal val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) = Unit
 }
 
+/**
+ * Development-stage reset approved while all existing observation records are test data.
+ * v4 cannot truthfully create required Territory fields or an Observer entity from legacy
+ * code-only settings, so it clears the old test hierarchy and creates the target schema.
+ * Later schema changes must add non-destructive migrations instead of extending this reset.
+ */
+internal val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP TABLE IF EXISTS flight_cycles")
+        db.execSQL("DROP TABLE IF EXISTS bees")
+        db.execSQL("DROP TABLE IF EXISTS observation_points")
+        db.execSQL("DROP TABLE IF EXISTS territories")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS territories (
+                id TEXT NOT NULL,
+                code TEXT NOT NULL,
+                name TEXT NOT NULL,
+                region TEXT NOT NULL,
+                district TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY(id)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_territories_code ON territories(code)")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS observers (
+                id TEXT NOT NULL,
+                code TEXT NOT NULL,
+                last_name TEXT NOT NULL,
+                first_name TEXT NOT NULL,
+                middle_name TEXT,
+                contact TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY(id)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_observers_code ON observers(code)")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS observation_points (
+                id TEXT NOT NULL,
+                territory_id TEXT NOT NULL,
+                observer_id TEXT NOT NULL,
+                observation_year INTEGER NOT NULL DEFAULT 0,
+                point_number INTEGER NOT NULL DEFAULT 0,
+                bee_presence_result TEXT,
+                code TEXT,
+                latitude REAL NOT NULL,
+                longitude REAL NOT NULL,
+                gps_latitude REAL,
+                gps_longitude REAL,
+                gps_accuracy_m REAL,
+                created_at INTEGER NOT NULL,
+                completed_at INTEGER,
+                PRIMARY KEY(id),
+                FOREIGN KEY(territory_id) REFERENCES territories(id) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                FOREIGN KEY(observer_id) REFERENCES observers(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_observation_points_territory_id ON observation_points(territory_id)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_observation_points_observer_id ON observation_points(observer_id)")
+        db.execSQL(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS index_observation_points_territory_id_observation_year_observer_id_point_number
+            ON observation_points(territory_id, observation_year, observer_id, point_number)
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS bees (
+                id TEXT NOT NULL,
+                observation_point_id TEXT NOT NULL,
+                mark_color TEXT NOT NULL,
+                mark_position TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                PRIMARY KEY(id),
+                FOREIGN KEY(observation_point_id) REFERENCES observation_points(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_bees_observation_point_id ON bees(observation_point_id)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_bees_observation_point_id_mark_color_mark_position ON bees(observation_point_id, mark_color, mark_position)")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS flight_cycles (
+                id TEXT NOT NULL,
+                bee_id TEXT NOT NULL,
+                sequence_number INTEGER NOT NULL,
+                departure_time INTEGER NOT NULL,
+                return_time INTEGER,
+                azimuth_deg REAL,
+                azimuth_capture_consumed INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY(id),
+                FOREIGN KEY(bee_id) REFERENCES bees(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_flight_cycles_bee_id ON flight_cycles(bee_id)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_flight_cycles_bee_id_sequence_number ON flight_cycles(bee_id, sequence_number)")
+    }
+}
+
 private data class LegacyObservationPoint(
     val id: String,
     val territoryId: String,

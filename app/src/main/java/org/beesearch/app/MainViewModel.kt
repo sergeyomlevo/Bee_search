@@ -25,26 +25,32 @@ import org.beesearch.app.domain.model.BeePresenceResultRequiredException
 import org.beesearch.app.domain.model.BeesAlreadyFoundException
 import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.DuplicateTerritoryCodeException
+import org.beesearch.app.domain.model.DuplicateObserverCodeException
 import org.beesearch.app.domain.model.EntityNotFoundException
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.InitialFlightCycleRequiredException
 import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
 import org.beesearch.app.domain.model.InvalidAzimuthException
 import org.beesearch.app.domain.model.InvalidEventTimeException
-import org.beesearch.app.domain.model.InvalidObserverCodeException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
 import org.beesearch.app.domain.model.NoPreparedBeesException
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
-import org.beesearch.app.domain.model.ObserverCodeRequiredException
+import org.beesearch.app.domain.model.Observer
+import org.beesearch.app.domain.model.ObserverRequiredException
+import org.beesearch.app.domain.model.RequiredFieldException
+import org.beesearch.app.domain.model.TerritoryRequiredException
+import org.beesearch.app.domain.model.ObserverInUseException
+import org.beesearch.app.domain.model.TerritoryInUseException
 import org.beesearch.app.domain.model.OpenFlightCycleExistsException
 import org.beesearch.app.domain.model.OpenFlightCycleNotFoundException
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.location.LocationProvider
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.repository.ObservationRepository
+import org.beesearch.app.domain.repository.ObserverRepository
 import org.beesearch.app.domain.repository.SettingsRepository
 import org.beesearch.app.domain.repository.TerritoryRepository
 import org.beesearch.app.domain.usecase.CreateObservationPoint
@@ -83,6 +89,7 @@ internal data class UiFeedback(
 internal class MainViewModel(
     private val settingsRepository: SettingsRepository,
     private val territoryRepository: TerritoryRepository,
+    private val observerRepository: ObserverRepository,
     private val observationRepository: ObservationRepository,
     private val createObservationPoint: CreateObservationPoint,
     private val locationProvider: LocationProvider,
@@ -110,9 +117,14 @@ internal class MainViewModel(
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
-        AppSettings(currentTerritoryId = null, observerCode = null),
+        AppSettings(currentTerritoryId = null, currentObserverId = null),
     )
     val territories: StateFlow<List<Territory>> = territoryRepository.observeTerritories().stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyList(),
+    )
+    val observers: StateFlow<List<Observer>> = observerRepository.observeObservers().stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         emptyList(),
@@ -145,12 +157,22 @@ internal class MainViewModel(
     val currentTerritory: StateFlow<Territory?> = combine(settings, territories) { appSettings, allTerritories ->
         appSettings.currentTerritoryId?.let { id -> allTerritories.firstOrNull { it.id == id } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val currentObserver: StateFlow<Observer?> = combine(settings, observers) { appSettings, allObservers ->
+        appSettings.currentObserverId?.let { id -> allObservers.firstOrNull { it.id == id } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val startupDestination: StateFlow<StartupDestination> = combine(
         activePoint,
         settings,
         territories,
-    ) { point, appSettings, allTerritories ->
-        StartupRouter.decide(point, appSettings.currentTerritoryId, allTerritories)
+        observers,
+    ) { point, appSettings, allTerritories, allObservers ->
+        StartupRouter.decide(
+            activePoint = point,
+            currentTerritoryId = appSettings.currentTerritoryId,
+            territories = allTerritories,
+            currentObserverId = appSettings.currentObserverId,
+            observers = allObservers,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StartupDestination.Loading)
     val route: StateFlow<AppRoute> = combine(startupDestination, manualRoute) { destination, manual ->
         manual ?: destination.toRoute()
@@ -181,13 +203,6 @@ internal class MainViewModel(
         clearFeedback()
     }
 
-    fun saveObserverCode(value: String) {
-        launchOperation {
-            settingsRepository.saveObserverCode(value)
-            showSuccessFeedback("Код наблюдателя сохранён")
-        }
-    }
-
     fun setCurrentTerritory(territoryId: UUID) {
         launchOperation {
             settingsRepository.setCurrentTerritoryId(territoryId)
@@ -196,11 +211,21 @@ internal class MainViewModel(
         }
     }
 
-    fun createTerritory(code: String, name: String) {
+    fun setCurrentObserver(observerId: UUID) {
+        launchOperation {
+            settingsRepository.setCurrentObserverId(observerId)
+            manualRoute.value = null
+            showSuccessFeedback("Текущий наблюдатель изменён")
+        }
+    }
+
+    fun createTerritory(code: String, name: String, region: String, district: String) {
         val validationError = when {
             code.isBlank() -> "Введите код территории"
             name.isBlank() -> "Введите название территории"
-            territories.value.any { it.code == code } -> "Территория с таким кодом уже существует"
+            region.isBlank() -> "Введите область или регион"
+            district.isBlank() -> "Введите район"
+            territories.value.any { it.code.trim() == code.trim() } -> "Территория с таким кодом уже существует"
             else -> null
         }
         if (validationError != null) {
@@ -209,10 +234,66 @@ internal class MainViewModel(
         }
 
         launchOperation {
-            val territory = territoryRepository.createTerritory(code, name)
+            val territory = territoryRepository.createTerritory(code, name, region, district)
             settingsRepository.setCurrentTerritoryId(territory.id)
             manualRoute.value = null
             showSuccessFeedback("Территория создана и выбрана текущей")
+        }
+    }
+
+    fun createObserver(
+        code: String,
+        lastName: String,
+        firstName: String,
+        middleName: String,
+        contact: String,
+    ) {
+        val validationError = when {
+            code.isBlank() -> "Введите код наблюдателя"
+            lastName.isBlank() -> "Введите фамилию"
+            firstName.isBlank() -> "Введите имя"
+            observers.value.any { it.code.trim() == code.trim() } -> "Наблюдатель с таким кодом уже существует"
+            else -> null
+        }
+        if (validationError != null) {
+            showPersistentFeedback(validationError)
+            return
+        }
+        launchOperation {
+            val observer = observerRepository.createObserver(
+                code, lastName, firstName, middleName, contact,
+            )
+            settingsRepository.setCurrentObserverId(observer.id)
+            manualRoute.value = null
+            showSuccessFeedback("Наблюдатель создан и выбран текущим")
+        }
+    }
+
+    fun updateObserver(observer: Observer) {
+        val validationError = validateObserver(observer.code, observer.lastName, observer.firstName, observer.id)
+        if (validationError != null) { showPersistentFeedback(validationError); return }
+        launchOperation { observerRepository.updateObserver(observer) ; showSuccessFeedback("Наблюдатель изменён") }
+    }
+
+    fun deleteObserver(observer: Observer) {
+        launchOperation {
+            observerRepository.deleteObserver(observer.id)
+            if (settings.value.currentObserverId == observer.id) settingsRepository.setCurrentObserverId(null)
+            showSuccessFeedback("Наблюдатель удалён")
+        }
+    }
+
+    fun updateTerritory(territory: Territory) {
+        val validationError = validateTerritory(territory.code, territory.name, territory.region, territory.district, territory.id)
+        if (validationError != null) { showPersistentFeedback(validationError); return }
+        launchOperation { territoryRepository.updateTerritory(territory); showSuccessFeedback("Территория изменена") }
+    }
+
+    fun deleteTerritory(territory: Territory) {
+        launchOperation {
+            territoryRepository.deleteTerritory(territory.id)
+            if (settings.value.currentTerritoryId == territory.id) settingsRepository.setCurrentTerritoryId(null)
+            showSuccessFeedback("Территория удалена")
         }
     }
 
@@ -229,6 +310,11 @@ internal class MainViewModel(
             showPersistentFeedback("Сначала выберите текущую территорию")
             return
         }
+        val observer = currentObserver.value
+        if (observer == null) {
+            showPersistentFeedback("Сначала выберите текущего наблюдателя")
+            return
+        }
         val reading = (locationState.value as? LocationUiState.Available)?.reading
         if (reading == null) {
             showPersistentFeedback("Дождитесь GPS-позиции")
@@ -237,17 +323,13 @@ internal class MainViewModel(
 
         val draft = ObservationPointCreationDraft.fromMapCenter(
             territoryId = territory.id,
+            observerId = observer.id,
             originalGps = reading,
             mapCenter = MapTarget(latitude, longitude),
-            observerCodeInput = settings.value.observerCode.orEmpty(),
         )
         _observationPointDraft.value = draft
         clearFeedback()
-        if (settings.value.observerCode != null) persistObservationPoint(draft)
-    }
-
-    fun updateObservationPointObserverCode(value: String) {
-        _observationPointDraft.value = _observationPointDraft.value?.copy(observerCodeInput = value)
+        persistObservationPoint(draft)
     }
 
     fun cancelObservationPointCreation() {
@@ -262,21 +344,11 @@ internal class MainViewModel(
 
     private fun persistObservationPoint(draft: ObservationPointCreationDraft) {
         if (draft.isSaving) return
-        val observerCodeMissing = settings.value.observerCode == null
-        if (observerCodeMissing && draft.observerCodeInput.isBlank()) {
-            showPersistentFeedback("Введите код наблюдателя")
-            return
-        }
-
         _observationPointDraft.value = draft.copy(isSaving = true)
         viewModelScope.launch {
             try {
                 val point = draft.toNewObservationPoint()
-                if (observerCodeMissing) {
-                    createObservationPoint.saveObserverCodeAndCreate(draft.observerCodeInput, point)
-                } else {
-                    createObservationPoint.create(point)
-                }
+                createObservationPoint.create(point)
                 _observationPointDraft.value = null
                 manualRoute.value = null
                 showSuccessFeedback("Точка наблюдения сохранена")
@@ -469,10 +541,33 @@ internal class MainViewModel(
                 throw error
             } catch (error: DuplicateTerritoryCodeException) {
                 showPersistentFeedback("Территория с таким кодом уже существует")
+            } catch (error: DuplicateObserverCodeException) {
+                showPersistentFeedback("Наблюдатель с таким кодом уже существует")
+            } catch (error: ObserverInUseException) {
+                showPersistentFeedback("Наблюдатель используется в данных наблюдений и не может быть удалён")
+            } catch (error: TerritoryInUseException) {
+                showPersistentFeedback("Территория используется в данных наблюдений и не может быть удалена")
             } catch (error: Exception) {
                 showPersistentFeedback(userMessageFor(error, "Не удалось сохранить изменения"))
             }
         }
+    }
+
+    private fun validateObserver(code: String, lastName: String, firstName: String, id: UUID?): String? = when {
+        code.isBlank() -> "Введите код наблюдателя"
+        lastName.isBlank() -> "Введите фамилию"
+        firstName.isBlank() -> "Введите имя"
+        observers.value.any { it.id != id && it.code.trim() == code.trim() } -> "Наблюдатель с таким кодом уже существует"
+        else -> null
+    }
+
+    private fun validateTerritory(code: String, name: String, region: String, district: String, id: UUID?): String? = when {
+        code.isBlank() -> "Введите код территории"
+        name.isBlank() -> "Введите название территории"
+        region.isBlank() -> "Введите область или регион"
+        district.isBlank() -> "Введите район"
+        territories.value.any { it.id != id && it.code.trim() == code.trim() } -> "Территория с таким кодом уже существует"
+        else -> null
     }
 
     private fun launchBeeMutation(
@@ -543,8 +638,8 @@ internal class MainViewModel(
     private fun StartupDestination.toRoute(): AppRoute = when (this) {
         StartupDestination.Loading -> AppRoute.Loading
         is StartupDestination.ResumeObservation -> AppRoute.ResumeObservation(point)
-        is StartupDestination.CurrentTerritory -> AppRoute.CurrentTerritory
-        StartupDestination.TerritoryManagement -> AppRoute.TerritoryManagement
+        StartupDestination.ReadyForMap -> AppRoute.CurrentTerritory
+        StartupDestination.SettingsRequired -> AppRoute.Settings
     }
 
     companion object {
@@ -555,6 +650,7 @@ internal class MainViewModel(
                     return MainViewModel(
                         settingsRepository = application.container.settingsRepository,
                         territoryRepository = application.container.territoryRepository,
+                        observerRepository = application.container.observerRepository,
                         observationRepository = application.container.observationRepository,
                         createObservationPoint = application.container.createObservationPoint,
                         locationProvider = application.container.locationProvider,
@@ -565,10 +661,12 @@ internal class MainViewModel(
 }
 
 internal fun userMessageFor(error: Throwable, fallback: String): String = when (error) {
-    is InvalidObserverCodeException -> "Введите непустой код наблюдателя"
-    is ObserverCodeRequiredException -> "Сначала сохраните код наблюдателя"
+    is RequiredFieldException -> "Заполните обязательное поле"
+    is ObserverRequiredException -> "Сначала выберите текущего наблюдателя"
+    is TerritoryRequiredException -> "Сначала выберите текущую территорию"
     is EntityNotFoundException -> "Нужные данные не найдены. Обновите экран и повторите действие"
     is DuplicateTerritoryCodeException -> "Территория с таким кодом уже существует"
+    is DuplicateObserverCodeException -> "Наблюдатель с таким кодом уже существует"
     is ObservationPointAlreadyActiveException ->
         "Сначала завершите текущую точку наблюдения"
     is ObservationPointNotActiveException ->

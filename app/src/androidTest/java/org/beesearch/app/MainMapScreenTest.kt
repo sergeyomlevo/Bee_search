@@ -6,8 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -15,9 +15,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextInput
 import java.time.Instant
 import java.util.UUID
+import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.ui.map.CREATE_OBSERVATION_POINT_DESCRIPTION
 import org.beesearch.app.ui.map.CompactMapStatus
@@ -25,7 +25,6 @@ import org.beesearch.app.ui.map.MAIN_BOTTOM_PANEL_TAG
 import org.beesearch.app.ui.map.MAIN_MAP_VIEWPORT_TAG
 import org.beesearch.app.ui.map.MapFirstScaffold
 import org.beesearch.app.ui.map.MapIdleControls
-import org.beesearch.app.ui.map.ObservationPointObserverCodeDialog
 import org.beesearch.app.ui.map.RECENTER_MAP_DESCRIPTION
 import org.beesearch.app.ui.map.SETTINGS_DESCRIPTION
 import org.beesearch.app.ui.theme.Bee_searchTheme
@@ -181,65 +180,38 @@ class MainMapScreenTest {
     }
 
     @Test
-    fun settingsKeepsTerritoryContextAndOpensTerritoryManagement() {
-        val territoriesOpened = mutableStateOf(false)
-        composeRule.setContent {
-            Bee_searchTheme {
-                SettingsScreen(
-                    initialObserverCode = "GSE",
-                    currentTerritory = territory,
-                    onBack = {},
-                    onSave = {},
-                    onOpenTerritories = { territoriesOpened.value = true },
-                )
-            }
-        }
-
-        composeRule
-            .onNodeWithText("KLYAZMA — Клязьминско-Лухский заказник")
-            .assertIsDisplayed()
-        composeRule
-            .onNodeWithText("Управление территориями")
-            .performScrollTo()
-            .assertIsDisplayed()
-            .assertHasClickAction()
-            .performClick()
-        composeRule.runOnIdle { assertTrue(territoriesOpened.value) }
-    }
-
-    @Test
-    fun missingObserverCodeUsesMetadataDialogInsteadOfPlacementScreen() {
-        val confirmed = mutableStateOf(false)
-        val draft = mutableStateOf(
-            ObservationPointCreationDraft.fromMapCenter(
-                territoryId = territory.id,
-                originalGps = org.beesearch.app.domain.location.LocationReading(
-                    latitude = 56.1959,
-                    longitude = 42.7477,
-                    accuracyMeters = 3.8,
-                    timestamp = Instant.EPOCH,
-                ),
-                mapCenter = MapTarget(56.1960, 42.7480),
-                observerCodeInput = "",
-            ),
+    fun settingsShowsSavedEntitiesAndSelectsAnotherTerritory() {
+        val selectedTerritory = mutableStateOf<UUID?>(null)
+        val otherTerritory = territory.copy(
+            id = UUID.fromString("00000000-0000-0000-0000-000000000112"),
+            code = "LUKH",
+            name = "Участок у Луха",
         )
         composeRule.setContent {
             Bee_searchTheme {
-                ObservationPointObserverCodeDialog(
-                    draft = draft.value,
-                    onObserverCodeChanged = { draft.value = draft.value.copy(observerCodeInput = it) },
-                    onConfirm = { confirmed.value = true },
-                    onCancel = {},
+                SettingsScreen(
+                    observers = listOf(observer),
+                    currentObserverId = observer.id,
+                    territories = listOf(territory, otherTerritory),
+                    currentTerritoryId = territory.id,
+                    onBack = {},
+                    onSelectObserver = {},
+                    onCreateObserver = { _, _, _, _, _ -> },
+                    onSelectTerritory = { selectedTerritory.value = it },
+                    onCreateTerritory = { _, _, _, _ -> },
                 )
             }
         }
 
-        composeRule.onNodeWithTag("observation-point-observer-dialog").assertIsDisplayed()
-        composeRule.onNodeWithText("К GPS").assertDoesNotExist()
-        composeRule.onNodeWithText("Подтвердить точку").assertDoesNotExist()
-        composeRule.onNodeWithText("observer_code").performTextInput("GSE")
-        composeRule.onNodeWithText("Создать точку").performClick()
-        composeRule.runOnIdle { assertTrue(confirmed.value) }
+        composeRule
+            .onNodeWithText("Наблюдатель")
+            .assertIsDisplayed()
+        composeRule
+            .onNodeWithText("Сделать текущей")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.runOnIdle { assertTrue(selectedTerritory.value == otherTerritory.id) }
     }
 
     private companion object {
@@ -247,6 +219,18 @@ class MainMapScreenTest {
             id = UUID.fromString("00000000-0000-0000-0000-000000000111"),
             code = "KLYAZMA",
             name = "Клязьминско-Лухский заказник",
+            region = "Владимирская область",
+            district = "Гороховецкий район",
+            createdAt = Instant.EPOCH,
+            updatedAt = Instant.EPOCH,
+        )
+        val observer = Observer(
+            id = UUID.fromString("00000000-0000-0000-0000-000000000113"),
+            code = "GSE",
+            lastName = "Сергеев",
+            firstName = "Георгий",
+            middleName = null,
+            contact = null,
             createdAt = Instant.EPOCH,
             updatedAt = Instant.EPOCH,
         )

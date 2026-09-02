@@ -5,7 +5,6 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import org.beesearch.app.domain.model.BeePresenceResult
 import java.time.Instant
@@ -16,14 +15,41 @@ internal interface TerritoryDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(territory: TerritoryEntity)
 
-    @Update(onConflict = OnConflictStrategy.ABORT)
-    suspend fun update(territory: TerritoryEntity): Int
-
     @Query("SELECT * FROM territories WHERE id = :id")
     suspend fun getById(id: UUID): TerritoryEntity?
 
     @Query("SELECT * FROM territories ORDER BY code COLLATE NOCASE, id")
     fun observeAll(): Flow<List<TerritoryEntity>>
+
+    @Query("UPDATE territories SET code = :code, name = :name, region = :region, district = :district, updated_at = :updatedAt WHERE id = :id")
+    suspend fun update(id: UUID, code: String, name: String, region: String, district: String, updatedAt: Instant): Int
+
+    @Query("DELETE FROM territories WHERE id = :id")
+    suspend fun deleteById(id: UUID): Int
+
+    @Query("SELECT COUNT(*) FROM observation_points WHERE territory_id = :id")
+    suspend fun countObservationPoints(id: UUID): Int
+}
+
+@Dao
+internal interface ObserverDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(observer: ObserverEntity)
+
+    @Query("SELECT * FROM observers WHERE id = :id")
+    suspend fun getById(id: UUID): ObserverEntity?
+
+    @Query("SELECT * FROM observers ORDER BY last_name COLLATE NOCASE, first_name COLLATE NOCASE, id")
+    fun observeAll(): Flow<List<ObserverEntity>>
+
+    @Query("UPDATE observers SET code = :code, last_name = :lastName, first_name = :firstName, middle_name = :middleName, contact = :contact, updated_at = :updatedAt WHERE id = :id")
+    suspend fun update(id: UUID, code: String, lastName: String, firstName: String, middleName: String?, contact: String?, updatedAt: Instant): Int
+
+    @Query("DELETE FROM observers WHERE id = :id")
+    suspend fun deleteById(id: UUID): Int
+
+    @Query("SELECT COUNT(*) FROM observation_points WHERE observer_id = :id")
+    suspend fun countObservationPoints(id: UUID): Int
 }
 
 @Dao
@@ -43,13 +69,13 @@ internal interface ObservationPointDao {
         FROM observation_points
         WHERE territory_id = :territoryId
           AND observation_year = :observationYear
-          AND observer_code = :observerCode
+          AND observer_id = :observerId
         """,
     )
     suspend fun getNextPointNumber(
         territoryId: UUID,
         observationYear: Int,
-        observerCode: String,
+        observerId: UUID,
     ): Int
 
     @Query("SELECT * FROM observation_points WHERE completed_at IS NULL LIMIT 1")

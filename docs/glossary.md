@@ -89,6 +89,8 @@ Territory объединяет множество ObservationPoint.
 - `id`;
 - `code`;
 - `name`.
+- `region`;
+- `district`.
 
 Территория не является отдельным полевым наблюдением.
 
@@ -218,7 +220,9 @@ ObservationPoint содержит:
 
 **Техническое имя:** `point_number` / `pointNumber`
 
-Последовательный человекочитаемый номер ObservationPoint внутри области `Territory + observationYear + observerCode`. Нумерация начинается с 1. Номер не является идентичностью; identity точки задаёт UUID.
+Последовательный человекочитаемый номер ObservationPoint внутри области
+`Territory + observationYear + observerId`. Нумерация начинается с 1. Номер не
+является идентичностью; identity точки задаёт UUID.
 
 ---
 
@@ -300,20 +304,18 @@ GPS Position не обязательно совпадает с итоговым�
 
 ---
 
-# 13. Observer Code
+# 13. Observer
 
-**Русский:** код наблюдателя  
-**Техническое имя:** `observer_code`
+**Русский:** наблюдатель
+**Техническое имя:** `Observer`
 
-Короткое обозначение человека, выполняющего наблюдение.
+Сохранённая сущность человека, выполняющего наблюдение. Имеет `id`, `code`,
+`lastName`, `firstName`, optional `middleName` и optional `contact`.
 
-В MVP отдельная сущность `Observer` отсутствует.
-
-Текущий `observer_code` хранится в настройках устройства.
-
-На чистой установке он отсутствует и не заменяется фиктивным значением. Перед созданием первой ObservationPoint пользователь должен явно задать непустой код.
-
-При создании ObservationPoint значение копируется в неё и становится частью исторических данных.
+`Observer.code` — уникальный на устройстве человеко-читаемый код; он не
+является foreign key. `current_observer_id` — настройка устройства. Каждая
+ObservationPoint хранит `observer_id`, поэтому смена current Observer не
+изменяет историческую принадлежность прежних точек.
 
 ---
 
@@ -825,7 +827,7 @@ Android-механизм хранения небольших локальных 
 
 `current_territory_id`
 
-`observer_code`
+`current_observer_id`
 
 DataStore не используется вместо Room для истории наблюдений.
 
@@ -1103,7 +1105,7 @@ MVP не требует наличия сервера, web-интерфейса 
 
 ## Observer
 
-Допустимо как понятие человека-наблюдателя, но в MVP сущности `Observer` в базе нет.
+Отдельная сохранённая сущность наблюдателя; см. раздел 13.
 
 ---
 
@@ -1119,7 +1121,7 @@ MVP не требует наличия сервера, web-интерфейса 
 | готово офлайн | compatible `OfflineRegionStatus.isComplete` |
 | профиль карты | `MapProfile` |
 | точка наблюдения | `ObservationPoint` |
-| код наблюдателя | `observer_code` |
+| наблюдатель | `Observer` / `current_observer_id` |
 | год наблюдения | `observation_year` |
 | номер точки | `point_number` |
 | результат присутствия пчёл | `bee_presence_result` |

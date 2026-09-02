@@ -878,7 +878,7 @@ class BeeObservationScreenTest {
     private fun point() = ObservationPoint(
         id = pointId,
         territoryId = UUID.randomUUID(),
-        observerCode = "SV",
+        observerId = UUID.randomUUID(),
         observationYear = 2026,
         pointNumber = 7,
         beePresenceResult = BeePresenceResult.BEES_FOUND,
