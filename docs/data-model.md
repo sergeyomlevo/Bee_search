@@ -1394,6 +1394,14 @@ metadata.
 исследовательскими данными; историческую принадлежность определяют foreign keys
 в ObservationPoint.
 
+Желаемое offline coverage хранится отдельно от Room в device-local Preferences
+DataStore. Запись имеет version marker `v1` и keyed storage по `Territory.id`;
+каждый fragment содержит `north`, `east`, `south`, `west` как `Double`. Это
+только сохранённая геометрия намерения пользователя, не downloaded resources.
+При успешном удалении неиспользуемой Territory соответствующая device-local
+coverage запись удаляется по `Territory.id`; удаление Territory, используемой
+ObservationPoint, блокируется и не изменяет coverage.
+
 ---
 
 # 65. Предлагаемая схема связей

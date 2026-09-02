@@ -1,6 +1,7 @@
 package org.beesearch.app.ui.map
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,9 +30,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import java.util.Locale
+import java.util.UUID
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.launch
 import org.beesearch.app.MapCenterTarget
 import org.beesearch.app.MapGpsMarker
 import org.beesearch.app.MapTarget
@@ -47,11 +51,14 @@ import org.maplibre.android.maps.Style
 
 @Composable
 internal fun BeeMap(
+    territoryId: UUID?,
+    coverageStore: MapCoverageStore,
     locationState: LocationUiState,
     isCreatingObservationPoint: Boolean,
     locationPermissionGranted: Boolean,
     onRequestLocationPermission: () -> Unit,
     onCreateObservationPointAt: (Double, Double) -> Unit,
+    onCoverageTerritoryMissing: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -65,7 +72,11 @@ internal fun BeeMap(
     var mapZoom by remember { mutableStateOf<Double?>(null) }
     var recenteredUntilNextGesture by remember { mutableStateOf(false) }
     var coverageSelectionMode by remember { mutableStateOf(false) }
-    var coverageFragments by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
+    var editingTerritoryId by remember { mutableStateOf<UUID?>(null) }
+    var persistedCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
+    var workingCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
+    var coverageLoadedFor by remember { mutableStateOf<UUID?>(null) }
+    var coverageLoading by remember { mutableStateOf(false) }
     var clearCoverageConfirmationVisible by remember { mutableStateOf(false) }
     var mapCameraRevision by remember { mutableStateOf(0) }
     var coverageControlsHeightPx by remember { mutableStateOf(0) }
@@ -83,6 +94,38 @@ internal fun BeeMap(
         null
     }
     val mapProfile = remember { beeSearchFieldMapProfile() }
+    val coroutineScope = rememberCoroutineScope()
+    LaunchedEffect(territoryId, coverageStore) {
+        if (editingTerritoryId != null && editingTerritoryId != territoryId) {
+            coverageSelectionMode = false
+            editingTerritoryId = null
+            workingCoverage = emptyList()
+        }
+        coverageLoadedFor = null
+        persistedCoverage = emptyList()
+        if (territoryId != null) {
+            coverageLoading = true
+            persistedCoverage = try {
+                coverageStore.load(territoryId)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            coverageLoadedFor = territoryId
+            coverageLoading = false
+        } else {
+            coverageLoading = false
+        }
+    }
+    val coverageFragments = when {
+        coverageSelectionMode -> workingCoverage
+        territoryId != null && coverageLoadedFor == territoryId && !coverageLoading -> persistedCoverage
+        else -> emptyList()
+    }
+    BackHandler(enabled = coverageSelectionMode) {
+        coverageSelectionMode = false
+        editingTerritoryId = null
+        workingCoverage = emptyList()
+    }
 
     Box(modifier) {
         AndroidView(
@@ -275,14 +318,14 @@ internal fun BeeMap(
                 canAddFragment = map != null,
                 onAddFragment = {
                     map?.projection?.visibleRegion?.latLngBounds?.let { visibleBounds ->
-                        coverageFragments = addCoverageFragment(
-                            fragments = coverageFragments,
+                        workingCoverage = addCoverageFragment(
+                            fragments = workingCoverage,
                             bounds = MapGeoBounds.fromMapLibre(visibleBounds),
                         )
                     }
                 },
                 onUndo = {
-                    coverageFragments = undoLastCoverageFragment(coverageFragments)
+                    workingCoverage = undoLastCoverageFragment(workingCoverage)
                 },
                 onShowAll = {
                     coverageBoundsForShowAll(coverageFragments)?.let { bounds ->
@@ -306,7 +349,18 @@ internal fun BeeMap(
                     // MapLibre retains the padding passed to newLatLngBounds. It is valid for
                     // coverage review, but would otherwise shift the normal map camera center.
                     map?.restoreNormalCameraPadding(normalCameraPadding)
+                    val id = editingTerritoryId
+                    if (id != null) {
+                        coroutineScope.launch { coverageStore.replace(id, workingCoverage) }
+                        if (id == territoryId) persistedCoverage = workingCoverage
+                    }
                     coverageSelectionMode = false
+                    editingTerritoryId = null
+                },
+                onCancel = {
+                    coverageSelectionMode = false
+                    editingTerritoryId = null
+                    workingCoverage = emptyList()
                 },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -316,7 +370,17 @@ internal fun BeeMap(
             )
         } else {
             CoverageSelectionEntry(
-                onEnter = { coverageSelectionMode = true },
+                onEnter = {
+                    if (territoryId == null) {
+                        onCoverageTerritoryMissing()
+                    } else if (coverageLoading || coverageLoadedFor != territoryId) {
+                        // Wait until the current Territory's persisted geometry is loaded.
+                    } else {
+                        editingTerritoryId = territoryId
+                        workingCoverage = persistedCoverage
+                        coverageSelectionMode = true
+                    }
+                },
                 modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).zIndex(3f),
             )
         }
@@ -324,7 +388,7 @@ internal fun BeeMap(
         if (clearCoverageConfirmationVisible) {
             ClearCoverageSelectionDialog(
                 onConfirm = {
-                    coverageFragments = clearCoverageFragments()
+                    workingCoverage = clearCoverageFragments()
                     clearCoverageConfirmationVisible = false
                 },
                 onDismiss = { clearCoverageConfirmationVisible = false },

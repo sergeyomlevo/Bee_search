@@ -65,6 +65,7 @@ internal fun MapCoverageSelectionControls(
     onShowAll: () -> Unit,
     onClear: () -> Unit,
     onDone: () -> Unit,
+    onCancel: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -93,6 +94,7 @@ internal fun MapCoverageSelectionControls(
                 ) {
                     Text("Готово")
                 }
+                TextButton(onClick = onCancel) { Text("Выйти") }
             }
             Button(
                 onClick = onAddFragment,

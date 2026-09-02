@@ -64,10 +64,17 @@ internal class RoomTerritoryRepository(
         return updated
     }
 
-    override suspend fun deleteTerritory(id: UUID) {
+    override suspend fun ensureTerritoryCanBeDeleted(id: UUID) {
         if (territoryDao.countObservationPoints(id) != 0) {
             throw TerritoryInUseException()
         }
+        if (territoryDao.getById(id) == null) {
+            throw org.beesearch.app.domain.model.EntityNotFoundException("Territory")
+        }
+    }
+
+    override suspend fun deleteTerritory(id: UUID) {
+        ensureTerritoryCanBeDeleted(id)
         if (territoryDao.deleteById(id) != 1) throw org.beesearch.app.domain.model.EntityNotFoundException("Territory")
     }
 

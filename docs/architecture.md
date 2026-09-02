@@ -697,6 +697,12 @@ Region считается Ready только по совместимым metadat
 `Territory` не содержит `map_status`, `map_region_data` или bounds.
 У разных Territory может быть разный coverage; rectangles остаются map
 infrastructure и не становятся Room entities.
+Желаемое coverage хранится device-local в Preferences DataStore по ключу
+`Territory.id` в versioned формате `v1`; это не downloaded resources и не Room
+research data. Редактирование использует working copy и заменяет список только
+после Done, а смена Territory загружает только её собственные fragments.
+При успешном удалении неиспользуемой Territory её coverage key очищается; если
+удаление заблокировано существующим ObservationPoint, coverage не изменяется.
 
 ---
 

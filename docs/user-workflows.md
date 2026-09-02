@@ -277,7 +277,14 @@ KLYAZMA-01
 Приложение не добавляет автоматический fixed buffer: необходимую ширину
 покрытия пользователь определяет сам по местности. Геометрия coverage не
 обязана совпадать с Territory boundary, ObservationPoint или текущим viewport.
-Она является device-local infrastructure, а не данными Territory.
+Она является device-local map infrastructure, а не данными research model. В
+текущем прототипе список fragments сохраняется отдельно для каждой Territory по
+стабильному UUID; редактирование работает через working copy и записывается
+только после `Готово`. `Back`/Cancel отбрасывает незавершённые изменения.
+При удалении неиспользуемой Territory её сохранённое coverage удаляется вместе с
+этим device-local map context. Используемую ObservationPoint Territory удалить
+нельзя, поэтому её coverage остаётся без изменений.
+Сохранённая геометрия не означает, что tiles или другие ресурсы уже скачаны.
 
 ---
 
@@ -295,7 +302,8 @@ KLYAZMA-01
 ██████████████░░░░ 76 %
 ```
 
-В первый milestone download выполняется только в foreground. Пользователь может
+Фактическая загрузка ресурсов в текущем prototype ещё не реализована. В первый
+будущий milestone download выполняется только в foreground. Пользователь может
 приостановить, продолжить или повторить incomplete download. После restart
 приложение перечитывает сохранённый MapLibre OfflineRegion status и предлагает
 продолжение в foreground; продолжение после process death в фоне не обещается.

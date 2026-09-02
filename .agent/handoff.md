@@ -38,5 +38,17 @@ is no longer read by the target model and is removed on next observer selection.
 
 ## Next task
 
-1. User review of edit/delete UX and IME behavior on Samsung.
-2. Do not commit or push the Territory/Observer milestone until user review.
+## Next milestone
+
+Device-local desired map coverage persistence is implemented on top of the
+committed Territory/Observer model. Preferences DataStore stores versioned `v1`
+rectangle lists keyed by Territory UUID; Room remains v5. BeeMap loads only the
+current Territory, edits a working copy, persists atomically on Done and cancels
+on Back. No tiles, OfflineRegion or download state exists yet.
+Deleting an unused Territory also clears only that Territory UUID's persisted
+coverage; a Territory referenced by an ObservationPoint remains undeletable and
+keeps its coverage.
+
+Verification still required: Gradle checks and data-safe Samsung review of
+Territory A/B switching, restart, Done/Cancel/Clear, and no stale overlays.
+Do not commit or push this milestone until user review.

@@ -24,6 +24,7 @@ interface TerritoryRepository {
     suspend fun getTerritory(id: UUID): Territory?
     suspend fun createTerritory(code: String, name: String, region: String, district: String): Territory
     suspend fun updateTerritory(territory: Territory): Territory
+    suspend fun ensureTerritoryCanBeDeleted(id: UUID)
     suspend fun deleteTerritory(id: UUID)
 }
 

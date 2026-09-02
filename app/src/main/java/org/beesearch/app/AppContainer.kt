@@ -7,6 +7,7 @@ import org.beesearch.app.data.location.AndroidLocationProvider
 import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.local.settings.settingsDataStore
+import org.beesearch.app.data.local.settings.DataStoreMapCoverageStore
 import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomObserverRepository
 import org.beesearch.app.data.repository.RoomTerritoryRepository
@@ -26,6 +27,7 @@ internal class AppContainer(context: Context) {
     private val database = BeeSearchDatabase.create(context)
 
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(context.settingsDataStore)
+    val mapCoverageStore = DataStoreMapCoverageStore(context.settingsDataStore)
     val territoryRepository: TerritoryRepository = RoomTerritoryRepository(
         territoryDao = database.territoryDao(),
         clock = clock,

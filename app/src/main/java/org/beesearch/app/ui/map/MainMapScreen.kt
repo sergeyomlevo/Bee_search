@@ -38,11 +38,13 @@ import org.beesearch.app.MapMeasurement
 import org.beesearch.app.ObservationPointCreationDraft
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.model.Territory
+import java.util.UUID
 import org.beesearch.app.formatMapMeasurement
 
 @Composable
 internal fun CurrentTerritoryScreen(
     territory: Territory?,
+    mapCoverageStore: MapCoverageStore,
     locationState: LocationUiState,
     observationPointDraft: ObservationPointCreationDraft?,
     locationPermissionGranted: Boolean,
@@ -56,16 +58,18 @@ internal fun CurrentTerritoryScreen(
         onOpenSettings = onOpenSettings,
     ) { mapModifier ->
         Box(modifier = mapModifier) {
-            if (territory != null) {
-                BeeMap(
+            BeeMap(
+                    territoryId = territory?.id,
+                    coverageStore = mapCoverageStore,
                     locationState = locationState,
                     isCreatingObservationPoint = observationPointDraft != null,
                     locationPermissionGranted = locationPermissionGranted,
                     onRequestLocationPermission = onRequestLocationPermission,
                     onCreateObservationPointAt = onStartObservationPointCreation,
+                    onCoverageTerritoryMissing = onOpenSettings,
                     modifier = Modifier.fillMaxSize().testTag(MAIN_MAP_VIEWPORT_TAG),
                 )
-            } else {
+            if (territory == null) {
                 Surface(
                     modifier = Modifier.align(Alignment.Center).padding(24.dp),
                     tonalElevation = 4.dp,

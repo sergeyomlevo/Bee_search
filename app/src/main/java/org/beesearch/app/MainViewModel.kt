@@ -93,6 +93,7 @@ internal class MainViewModel(
     private val observationRepository: ObservationRepository,
     private val createObservationPoint: CreateObservationPoint,
     private val locationProvider: LocationProvider,
+    private val territoryCoverageDeletion: TerritoryCoverageDeletion,
 ) : ViewModel() {
     private val manualRoute = MutableStateFlow<AppRoute?>(null)
     private val _feedback = MutableStateFlow<UiFeedback?>(null)
@@ -291,7 +292,7 @@ internal class MainViewModel(
 
     fun deleteTerritory(territory: Territory) {
         launchOperation {
-            territoryRepository.deleteTerritory(territory.id)
+            territoryCoverageDeletion.delete(territory.id)
             if (settings.value.currentTerritoryId == territory.id) settingsRepository.setCurrentTerritoryId(null)
             showSuccessFeedback("Территория удалена")
         }
@@ -654,6 +655,10 @@ internal class MainViewModel(
                         observationRepository = application.container.observationRepository,
                         createObservationPoint = application.container.createObservationPoint,
                         locationProvider = application.container.locationProvider,
+                        territoryCoverageDeletion = TerritoryCoverageDeletion(
+                            territoryRepository = application.container.territoryRepository,
+                            coverageStore = application.container.mapCoverageStore,
+                        ),
                     ) as T
                 }
             }

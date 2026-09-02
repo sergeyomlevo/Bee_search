@@ -91,6 +91,7 @@ import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.ui.map.CurrentTerritoryScreen
+import org.beesearch.app.ui.map.MapCoverageStore
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import java.util.UUID
 import kotlinx.coroutines.delay
@@ -215,6 +216,7 @@ private fun BeeSearchApp(
                     )
                     AppRoute.CurrentTerritory -> CurrentTerritoryScreen(
                         territory = currentTerritory,
+                        mapCoverageStore = application.container.mapCoverageStore,
                         locationState = locationState,
                         observationPointDraft = observationPointDraft,
                         locationPermissionGranted = locationPermissionGranted,
