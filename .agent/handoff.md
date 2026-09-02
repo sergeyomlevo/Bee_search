@@ -1,5 +1,27 @@
 # Bee Search — Handoff
 
+> 2026-09-01 — реализован незакоммиченный UX-прототип составного выбора
+> будущего offline coverage поверх online OSM-карты. `BeeMap` хранит только
+> transient `remember`-state: отдельные geographic viewport rectangles,
+> selection mode, Undo, Clear с подтверждением, Show all и Done. Это не
+> `OfflineRegion`, не download/prefetch/storage и не Room/domain state.
+> В selection mode видимый viewport выделен оранжевой рамкой, географически
+> закреплённые fragments показываются полупрозрачной синей заливкой и
+> контурами; target/measurement/recenter/`+` временно скрыты, после Done
+> обычный map UI восстанавливается, а fragments остаются видимыми до конца
+> жизни экрана. `gradlew test assembleDebug lintDebug assembleDebugAndroidTest`
+> прошёл. На Samsung SM-S938B APK обновлялся только через `adb install -r -t`:
+> проверены add, overlap, z15/z16 fragments, видимая щель, Show all, Undo,
+> Clear confirmation и Done без создания ObservationPoint. Screenshots в
+> ignored `captures/` не предназначены для commit.
+> После `Show all` MapLibre сохраняет applied camera padding; при выходе через
+> Done `BeeMap` явно возвращает zero padding через новый `CameraPosition`,
+> сохраняя target/zoom/bearing/pitch. На SM-S938B после normal и
+> coverage → Show all → Done сценариев GPS и target имеют общий экранный
+> центр `(540, 1062)`; measurement исчезает после recenter и появляется
+> после следующего pan. Этот regression fix остаётся незакоммиченным вместе
+> с prototype.
+
 > 2026-09-01 — временная online-basemap для пользовательской оценки: главный
 > экран использует inline raster-style с HTTPS `tile.openstreetmap.org` и
 > видимой attribution OpenStreetMap contributors. Это не production/provider

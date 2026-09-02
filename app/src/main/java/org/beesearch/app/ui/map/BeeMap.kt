@@ -19,6 +19,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -36,6 +38,7 @@ import org.beesearch.app.beeSearchFieldMapProfile
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.visibleMapMeasurement
 import org.maplibre.android.MapLibre
+import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -61,9 +64,20 @@ internal fun BeeMap(
     var mapCenter by remember { mutableStateOf<MapTarget?>(null) }
     var mapZoom by remember { mutableStateOf<Double?>(null) }
     var recenteredUntilNextGesture by remember { mutableStateOf(false) }
+    var coverageSelectionMode by remember { mutableStateOf(false) }
+    var coverageFragments by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
+    var clearCoverageConfirmationVisible by remember { mutableStateOf(false) }
+    var mapCameraRevision by remember { mutableStateOf(0) }
+    var coverageControlsHeightPx by remember { mutableStateOf(0) }
+    val coverageCameraEdgePaddingPx = with(LocalDensity.current) { 16.dp.roundToPx() }
+    val normalCameraPadding = remember { normalMapCameraPadding() }
     val reading = (locationState as? LocationUiState.Available)?.reading
     val gpsPosition = reading?.let { MapTarget(it.latitude, it.longitude) }
-    val measurement = if (initialGpsCenterEstablished && !recenteredUntilNextGesture) {
+    val measurement = if (
+        !coverageSelectionMode &&
+        initialGpsCenterEstablished &&
+        !recenteredUntilNextGesture
+    ) {
         visibleMapMeasurement(gpsPosition = gpsPosition, mapCenter = mapCenter)
     } else {
         null
@@ -134,10 +148,11 @@ internal fun BeeMap(
             if (mapInstance == null || currentMapView == null) {
                 onDispose { }
             } else {
-                val updateGpsPosition = {
+                val updateMapOverlays = {
                     gpsScreenPosition = projectedMapPosition(mapInstance, currentMapView, gpsPosition)
+                    mapCameraRevision += 1
                 }
-                val moveListener = MapLibreMap.OnCameraMoveListener(updateGpsPosition)
+                val moveListener = MapLibreMap.OnCameraMoveListener(updateMapOverlays)
                 val moveStartedListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
                     if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
                         recenteredUntilNextGesture = false
@@ -149,16 +164,16 @@ internal fun BeeMap(
                         if (firstFixCentered) initialGpsCenterEstablished = true
                     }
                     mapZoom = mapInstance.cameraPosition.zoom
-                    updateGpsPosition()
+                    updateMapOverlays()
                 }
                 val layoutListener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-                    updateGpsPosition()
+                    updateMapOverlays()
                 }
                 mapInstance.addOnCameraMoveStartedListener(moveStartedListener)
                 mapInstance.addOnCameraMoveListener(moveListener)
                 mapInstance.addOnCameraIdleListener(listener)
                 currentMapView.addOnLayoutChangeListener(layoutListener)
-                updateGpsPosition()
+                updateMapOverlays()
                 onDispose {
                     mapInstance.removeOnCameraMoveStartedListener(moveStartedListener)
                     mapInstance.removeOnCameraMoveListener(moveListener)
@@ -168,10 +183,22 @@ internal fun BeeMap(
             }
         }
 
+        MapCoverageFragmentsOverlay(
+            fragments = coverageFragments,
+            map = map,
+            cameraRevision = mapCameraRevision,
+            modifier = Modifier.fillMaxSize().zIndex(1f),
+        )
+        if (coverageSelectionMode) {
+            MapCoverageViewportFrame(Modifier.fillMaxSize().zIndex(2f))
+        }
+
         gpsScreenPosition?.let { position ->
             MapGpsMarker(screenPosition = position, modifier = Modifier.zIndex(1f))
         }
-        MapCenterTarget(Modifier.align(Alignment.Center).zIndex(2f))
+        if (!coverageSelectionMode) {
+            MapCenterTarget(Modifier.align(Alignment.Center).zIndex(2f))
+        }
 
         if (locationPermissionGranted && locationState is LocationUiState.Available) {
             Row(
@@ -214,32 +241,107 @@ internal fun BeeMap(
             }
         }
 
-        MapIdleControls(
-            canRecenter = reading != null,
-            canCreateObservationPoint = reading != null &&
-                mapCenter != null &&
-                initialGpsCenterEstablished &&
-                !isCreatingObservationPoint,
-            onRecenter = {
-                reading?.let { current ->
-                    map?.let { mapInstance ->
-                        recenteredUntilNextGesture = true
-                        mapInstance.animateCamera(
-                            CameraUpdateFactory.newLatLng(
-                                LatLng(current.latitude, current.longitude),
+        if (!coverageSelectionMode) {
+            MapIdleControls(
+                canRecenter = reading != null,
+                canCreateObservationPoint = reading != null &&
+                    mapCenter != null &&
+                    initialGpsCenterEstablished &&
+                    !isCreatingObservationPoint,
+                onRecenter = {
+                    reading?.let { current ->
+                        map?.let { mapInstance ->
+                            recenteredUntilNextGesture = true
+                            mapInstance.animateCamera(
+                                CameraUpdateFactory.newLatLng(
+                                    LatLng(current.latitude, current.longitude),
+                                ),
+                            )
+                        }
+                    }
+                },
+                onCreateObservationPoint = {
+                    map?.cameraPosition?.target?.let { target ->
+                        onCreateObservationPointAt(target.latitude, target.longitude)
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).zIndex(3f),
+            )
+        }
+
+        if (coverageSelectionMode) {
+            MapCoverageSelectionControls(
+                fragmentCount = coverageFragments.size,
+                canAddFragment = map != null,
+                onAddFragment = {
+                    map?.projection?.visibleRegion?.latLngBounds?.let { visibleBounds ->
+                        coverageFragments = addCoverageFragment(
+                            fragments = coverageFragments,
+                            bounds = MapGeoBounds.fromMapLibre(visibleBounds),
+                        )
+                    }
+                },
+                onUndo = {
+                    coverageFragments = undoLastCoverageFragment(coverageFragments)
+                },
+                onShowAll = {
+                    coverageBoundsForShowAll(coverageFragments)?.let { bounds ->
+                        val reviewPadding = coverageReviewCameraPadding(
+                            controlsHeightPx = coverageControlsHeightPx,
+                            edgePaddingPx = coverageCameraEdgePaddingPx,
+                        )
+                        map?.animateCamera(
+                            CameraUpdateFactory.newLatLngBounds(
+                                bounds.toLatLngBounds(),
+                                reviewPadding.left,
+                                reviewPadding.top,
+                                reviewPadding.right,
+                                reviewPadding.bottom,
                             ),
                         )
                     }
-                }
-            },
-            onCreateObservationPoint = {
-                map?.cameraPosition?.target?.let { target ->
-                    onCreateObservationPointAt(target.latitude, target.longitude)
-                }
-            },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).zIndex(3f),
-        )
+                },
+                onClear = { clearCoverageConfirmationVisible = true },
+                onDone = {
+                    // MapLibre retains the padding passed to newLatLngBounds. It is valid for
+                    // coverage review, but would otherwise shift the normal map camera center.
+                    map?.restoreNormalCameraPadding(normalCameraPadding)
+                    coverageSelectionMode = false
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
+                    .onSizeChanged { coverageControlsHeightPx = it.height }
+                    .zIndex(3f),
+            )
+        } else {
+            CoverageSelectionEntry(
+                onEnter = { coverageSelectionMode = true },
+                modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).zIndex(3f),
+            )
+        }
+
+        if (clearCoverageConfirmationVisible) {
+            ClearCoverageSelectionDialog(
+                onConfirm = {
+                    coverageFragments = clearCoverageFragments()
+                    clearCoverageConfirmationVisible = false
+                },
+                onDismiss = { clearCoverageConfirmationVisible = false },
+            )
+        }
     }
+}
+
+private fun MapLibreMap.restoreNormalCameraPadding(padding: MapCameraPadding) {
+    cameraPosition = CameraPosition.Builder(cameraPosition)
+        .padding(
+            padding.left.toDouble(),
+            padding.top.toDouble(),
+            padding.right.toDouble(),
+            padding.bottom.toDouble(),
+        )
+        .build()
 }
 
 internal const val MAP_ZOOM_INDICATOR_TAG = "map-zoom-indicator"

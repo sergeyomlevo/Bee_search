@@ -298,16 +298,17 @@ internal fun MapIdleControls(
                 .semantics { contentDescription = RECENTER_MAP_DESCRIPTION }
                 .testTag("map-recenter"),
         ) { RecenterGlyph() }
-        Button(
-            onClick = onCreateObservationPoint,
-            enabled = canCreateObservationPoint,
-            shape = CircleShape,
-            contentPadding = PaddingValues(0.dp),
-            modifier = Modifier
-                .size(56.dp)
-                .semantics { contentDescription = CREATE_OBSERVATION_POINT_DESCRIPTION }
-                .testTag("create-observation-point"),
-        ) { AddPointGlyph() }
+        if (canCreateObservationPoint) {
+            Button(
+                onClick = onCreateObservationPoint,
+                shape = CircleShape,
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier
+                    .size(56.dp)
+                    .semantics { contentDescription = CREATE_OBSERVATION_POINT_DESCRIPTION }
+                    .testTag("create-observation-point"),
+            ) { AddPointGlyph() }
+        }
     }
 }
 
