@@ -2,6 +2,7 @@ package org.beesearch.app
 
 import android.graphics.Bitmap
 import android.graphics.RectF
+import android.content.Intent
 import android.view.View
 import android.view.ViewGroup
 import androidx.test.core.app.ActivityScenario
@@ -19,10 +20,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.beesearch.app.beeSearchLocalPmtilesDiagnosticProfile
+import org.beesearch.app.beeSearchLocalPmtilesDiagnosticStageProfile
+import org.beesearch.app.beeSearchLocalSapunovoGlyphDiagnosticProfile
+import org.beesearch.app.beeSearchLocalSapunovoLabelDiagnosticProfile
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
 import org.maplibre.android.net.ConnectivityReceiver
 
 /**
@@ -99,14 +105,156 @@ class BeeMapPocDeviceTest {
         }
     }
 
-    private fun ActivityScenario<MainActivity>.findMapView(): MapView {
-        lateinit var result: MapView
-        onActivity { activity ->
-            result = checkNotNull(activity.window.decorView.findMapView()) {
-                "The current persisted startup route did not contain BeeMap"
+    @Test
+    fun localForestPmtilesRendersWithoutNetwork() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beePmtiles") == "true")
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val mapView = scenario.findMapView()
+            val map = mapView.awaitMap()
+            val profile = beeSearchLocalForestPmtilesMapProfile(instrumentation.targetContext)
+            map.setStyleAndAwait(profile.styleJson)
+            map.moveAndAwait(latitude = 56.0714506, longitude = 42.7528554, zoom = 15.0)
+            assertAnyRendered(mapView, map, "forest", "water", "waterways", "roads", "tracks", "cutlines")
+            captureScreenshot("forest-pmtiles-z15")
+
+            map.moveAndAwait(latitude = 56.0714506, longitude = 42.7528554, zoom = 20.0)
+            assertAnyRendered(mapView, map, "forest", "roads", "tracks")
+            captureScreenshot("forest-pmtiles-z20")
+        }
+    }
+
+    @Test
+    fun localSapunovoPmtilesRendersAcrossZooms() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beeSapunovoPmtiles") == "true")
+
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .putExtra("beeMapDiagnostic", "label")
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            val mapView = scenario.findMapView()
+            val map = mapView.awaitMap()
+            val profile = beeSearchLocalSapunovoPmtilesMapProfile(instrumentation.targetContext)
+            map.setStyleAndAwait(profile.styleJson)
+            // z10 is intentionally sparse for this bounded PoC and may contain no
+            // rendered feature at the exact camera center; validate the geometry
+            // at the useful in-coverage zooms instead of treating that as a source failure.
+            for (zoom in listOf(12.0, 15.0, 20.0)) {
+                map.moveAndAwait(latitude = 56.1068, longitude = 42.6653, zoom = zoom)
+                assertAnyRendered(mapView, map, "open-land", "forest", "water", "waterways", "roads", "tracks", "railway", "buildings")
+                captureScreenshot("sapunovo-pmtiles-z${zoom.toInt()}")
             }
         }
-        return result
+    }
+
+    @Test
+    fun localSapunovoPmtilesMinimalSourceRenders() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beePmtilesDiagnostic") == "true")
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val mapView = scenario.findMapView()
+            val map = mapView.awaitMap()
+            for (area in listOf("forest", "sapunovo")) {
+                val profile = beeSearchLocalPmtilesDiagnosticProfile(instrumentation.targetContext, area)
+                var styleCallback = false
+                onMain {
+                    map.setStyle(Style.Builder().fromJson(profile.styleJson)) {
+                        styleCallback = true
+                    }
+                }
+                assertTrue("Diagnostic style callback was not received for $area", eventually { styleCallback })
+                map.moveAndAwait(latitude = if (area == "forest") 56.075 else 56.1068, longitude = if (area == "forest") 42.77 else 42.6653, zoom = 12.0)
+                assertAnyRendered(mapView, map, "diagnostic-landcover", "diagnostic-transportation")
+                captureScreenshot("$area-diagnostic")
+            }
+        }
+    }
+
+    @Test
+    fun localSapunovoGlyphUriDiagnostic() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beeGlyphUri") != null)
+        val glyphUri = InstrumentationRegistry.getArguments().getString("beeGlyphUri")!!
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val mapView = scenario.findMapView()
+            val map = mapView.awaitMap()
+            val profile = beeSearchLocalSapunovoGlyphDiagnosticProfile(instrumentation.targetContext, glyphUri)
+            map.moveAndAwait(56.1068, 42.6653, 12.0)
+            assertAnyRendered(mapView, map, "diagnostic-landcover", "diagnostic-transportation")
+            captureScreenshot("sapunovo-glyph-${glyphUri.substringBefore(':').replace('/', '-')}")
+        }
+    }
+
+    @Test
+    fun localSapunovoLabelDiagnostic() {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beeLabelDiagnostic") == "true")
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val fontStack = InstrumentationRegistry.getArguments().getString("beeLabelFontStack") ?: "Noto Sans Regular"
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .putExtra("beeMapDiagnostic", "label")
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            val mapView = scenario.findMapView()
+            val map = mapView.awaitMap()
+            val profile = beeSearchLocalSapunovoLabelDiagnosticProfile(instrumentation.targetContext, fontStack)
+            val glyphAssetPath = "map-poc/glyphs/$fontStack/0-255.pbf"
+            val glyphAssetBytes = instrumentation.targetContext.assets.open(glyphAssetPath).use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                var total = 0L
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    total += read
+                }
+                total
+            }
+            map.setStyleAndAwait(profile.styleJson)
+            map.moveAndAwait(56.1068, 42.6653, 12.0)
+            val layer = onMain { map.style?.getLayer("diagnostic-place") }
+            assertNotNull("diagnostic place layer missing", layer)
+            val testLayer = onMain { map.style?.getLayer("diagnostic-test") }
+            assertNotNull("diagnostic test layer missing", testLayer)
+            val fixedPlaceLayer = onMain { map.style?.getLayer("diagnostic-place-fixed") }
+            assertNotNull("diagnostic fixed place layer missing", fixedPlaceLayer)
+            val rendered = onMain { map.queryRenderedFeatures(RectF(0f, 0f, mapView.width.toFloat(), mapView.height.toFloat()), "diagnostic-place").toList() }
+            val renderedTest = onMain { map.queryRenderedFeatures(RectF(0f, 0f, mapView.width.toFloat(), mapView.height.toFloat()), "diagnostic-test").toList() }
+            val renderedFixedPlace = onMain { map.queryRenderedFeatures(RectF(0f, 0f, mapView.width.toFloat(), mapView.height.toFloat()), "diagnostic-place-fixed").toList() }
+            android.util.Log.d("BeeMapLabelDiag", "glyph template=asset://map-poc/glyphs/{fontstack}/{range}.pbf fontstack=$fontStack expectedRequest=asset://map-poc/glyphs/$fontStack/0-255.pbf")
+            android.util.Log.d("BeeMapLabelDiag", "glyph asset open=$glyphAssetPath bytes=$glyphAssetBytes")
+            android.util.Log.d("BeeMapLabelDiag", "place layer source=bee-field source-layer=place minzoom=8 maxzoom=20 visibility=visible rendered count=${rendered.size}")
+            android.util.Log.d("BeeMapLabelDiag", "fixed PLACE layer source=bee-field source-layer=place minzoom=8 maxzoom=20 allow-overlap=true ignore-placement=true rendered count=${renderedFixedPlace.size}")
+            android.util.Log.d("BeeMapLabelDiag", "TEST layer=diagnostic-test source=diagnostic-point source-layer=<none> minzoom=0 maxzoom=20 visibility=visible text=TEST allow-overlap=true ignore-placement=true rendered count=${renderedTest.size}")
+            captureScreenshot("sapunovo-label-diagnostic-${fontStack.replace(" ", "-")}")
+        }
+    }
+
+    @Test
+    fun localSapunovoPmtilesLayersRestoreOneByOne() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beePmtilesLayerIsolation") == "true")
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val mapView = scenario.findMapView()
+            val map = mapView.awaitMap()
+            for (stage in 0..10) {
+                val profile = beeSearchLocalPmtilesDiagnosticStageProfile(instrumentation.targetContext, "sapunovo", stage)
+                map.setStyleAndAwait(profile.styleJson)
+                map.moveAndAwait(56.1068, 42.6653, 12.0)
+                assertAnyRendered(mapView, map, "landcover", "transportation")
+            }
+            captureScreenshot("sapunovo-layer-isolation-final")
+        }
+    }
+
+    private fun ActivityScenario<MainActivity>.findMapView(): MapView {
+        var result: MapView? = null
+        assertTrue("The current persisted startup route did not contain BeeMap", eventually {
+            onActivity { activity ->
+                result = activity.window.decorView.findMapView()
+            }
+            result != null
+        })
+        return checkNotNull(result)
     }
 
     private fun MapView.awaitMap(): MapLibreMap {
@@ -126,6 +274,21 @@ class BeeMapPocDeviceTest {
         val latch = CountDownLatch(1)
         onMain { getStyle { latch.countDown() } }
         assertTrue("Bee Search field style was not loaded", latch.await(20, TimeUnit.SECONDS))
+    }
+
+    private fun MapLibreMap.setStyleAndAwait(styleJson: String) {
+        val latch = CountDownLatch(1)
+        onMain { setStyle(Style.Builder().fromJson(styleJson)) { latch.countDown() } }
+        assertTrue("Local PMTiles style was not loaded", latch.await(20, TimeUnit.SECONDS))
+    }
+
+    private fun eventually(predicate: () -> Boolean): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
+        while (System.nanoTime() < deadline) {
+            if (onMain { predicate() }) return true
+            Thread.sleep(100)
+        }
+        return false
     }
 
     private fun MapLibreMap.moveAndAwait(

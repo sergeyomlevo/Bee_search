@@ -1,5 +1,7 @@
 package org.beesearch.app.ui.map
 
+import android.util.Log
+import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
@@ -7,9 +9,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -23,10 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import java.util.Locale
@@ -39,6 +50,12 @@ import org.beesearch.app.MapCenterTarget
 import org.beesearch.app.MapGpsMarker
 import org.beesearch.app.MapTarget
 import org.beesearch.app.beeSearchFieldMapProfile
+import org.beesearch.app.beeSearchLocalForestPmtilesMapProfile
+import org.beesearch.app.beeSearchLocalSapunovoPmtilesMapProfile
+import org.beesearch.app.beeSearchLocalSapunovoDiagnosticProfile
+import org.beesearch.app.beeSearchLocalSapunovoLabelDiagnosticProfile
+import org.beesearch.app.BuildConfig
+import org.beesearch.app.beeSearchLocalCyclOSMMapProfile
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.visibleMapMeasurement
 import org.maplibre.android.MapLibre
@@ -78,6 +95,15 @@ internal fun BeeMap(
     var coverageLoadedFor by remember { mutableStateOf<UUID?>(null) }
     var coverageLoading by remember { mutableStateOf(false) }
     var clearCoverageConfirmationVisible by remember { mutableStateOf(false) }
+    val activity = LocalContext.current as? Activity
+    val initialDeveloperBasemap = if (
+        BuildConfig.DEBUG && activity?.intent?.getStringExtra("beeMapDiagnostic") == "label"
+    ) {
+        DeveloperBasemap.LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC
+    } else {
+        DeveloperBasemap.ONLINE
+    }
+    var developerBasemap by remember { mutableStateOf(initialDeveloperBasemap) }
     var mapCameraRevision by remember { mutableStateOf(0) }
     var coverageControlsHeightPx by remember { mutableStateOf(0) }
     val coverageCameraEdgePaddingPx = with(LocalDensity.current) { 16.dp.roundToPx() }
@@ -93,7 +119,13 @@ internal fun BeeMap(
     } else {
         null
     }
-    val mapProfile = remember { beeSearchFieldMapProfile() }
+    val appContext = LocalContext.current.applicationContext
+    val onlineMapProfile = remember { beeSearchFieldMapProfile() }
+    val localMapProfile = remember(appContext) { beeSearchLocalCyclOSMMapProfile(appContext) }
+    val localVectorProfile = remember(appContext) { beeSearchLocalForestPmtilesMapProfile(appContext) }
+    val localSapunovoProfile = remember(appContext) { beeSearchLocalSapunovoPmtilesMapProfile(appContext) }
+    val localSapunovoDiagnosticProfile = remember(appContext) { beeSearchLocalSapunovoDiagnosticProfile(appContext) }
+    val localSapunovoLabelDiagnosticProfile = remember(appContext) { beeSearchLocalSapunovoLabelDiagnosticProfile(appContext) }
     val coroutineScope = rememberCoroutineScope()
     LaunchedEffect(territoryId, coverageStore) {
         if (editingTerritoryId != null && editingTerritoryId != territoryId) {
@@ -138,8 +170,8 @@ internal fun BeeMap(
                     view.onCreate(null)
                     view.getMapAsync { mapInstance ->
                         map = mapInstance
-                        mapInstance.setMaxZoomPreference(mapProfile.uiMaxZoom)
-                        mapInstance.setStyle(Style.Builder().fromJson(mapProfile.styleJson))
+                        mapInstance.setMaxZoomPreference(onlineMapProfile.uiMaxZoom)
+                        mapInstance.setStyle(Style.Builder().fromJson(onlineMapProfile.styleJson))
                         mapZoom = mapInstance.cameraPosition.zoom
                     }
                 }
@@ -234,6 +266,25 @@ internal fun BeeMap(
         )
         if (coverageSelectionMode) {
             MapCoverageViewportFrame(Modifier.fillMaxSize().zIndex(2f))
+        }
+
+        if (org.beesearch.app.BuildConfig.DEBUG) {
+            MapBasemapDeveloperSwitch(
+                mode = developerBasemap,
+                onSelectOnline = { developerBasemap = DeveloperBasemap.ONLINE },
+                onSelectForest = {
+                    Log.d("BeeMap", "selector VECTOR FOREST")
+                    developerBasemap = DeveloperBasemap.LOCAL_VECTOR
+                },
+                onSelectSapunovo = {
+                    Log.d("BeeMap", "selector VECTOR SAPUNOVO")
+                    developerBasemap = DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 60.dp, end = 16.dp)
+                    .zIndex(3f),
+            )
         }
 
         gpsScreenPosition?.let { position ->
@@ -395,7 +446,119 @@ internal fun BeeMap(
             )
         }
     }
+
+    LaunchedEffect(map, developerBasemap) {
+        val mapInstance = map ?: return@LaunchedEffect
+        val profile = when (developerBasemap) {
+            DeveloperBasemap.ONLINE -> onlineMapProfile
+            DeveloperBasemap.LOCAL_RASTER -> localMapProfile
+            DeveloperBasemap.LOCAL_VECTOR -> localVectorProfile
+            DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR -> localSapunovoProfile
+            DeveloperBasemap.LOCAL_SAPUNOVO_DIAGNOSTIC -> localSapunovoDiagnosticProfile
+            DeveloperBasemap.LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC -> localSapunovoLabelDiagnosticProfile
+        }
+        Log.d("BeeMap", "style request mode=$developerBasemap profile=${profile.profileId} path=${profile.datasetVersion} hash=${profile.styleJson.hashCode()}")
+        mapInstance.setMaxZoomPreference(profile.uiMaxZoom)
+        val fitBounds = when (developerBasemap) {
+            DeveloperBasemap.LOCAL_VECTOR -> FOREST_CUTLINES_BOUNDS
+            DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR -> SAPUNOVO_FIELDS_WATER_BOUNDS
+            else -> null
+        }
+        mapInstance.setStyle(Style.Builder().fromJson(profile.styleJson)) {
+            Log.d("BeeMap", "style loaded profile=${profile.profileId} center=${mapInstance.cameraPosition.target} zoom=${mapInstance.cameraPosition.zoom}")
+            fitBounds?.let { bounds ->
+                Log.d("BeeMap", "fit bounds profile=${profile.profileId} bounds=$bounds")
+                mapInstance.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 48))
+            }
+        }
+    }
 }
+
+private enum class DeveloperBasemap {
+    ONLINE,
+    LOCAL_RASTER,
+    LOCAL_VECTOR,
+    LOCAL_SAPUNOVO_VECTOR,
+    LOCAL_SAPUNOVO_DIAGNOSTIC,
+    LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC;
+
+    fun next(): DeveloperBasemap = when (this) {
+        ONLINE -> LOCAL_RASTER
+        LOCAL_RASTER -> LOCAL_VECTOR
+        LOCAL_VECTOR -> LOCAL_SAPUNOVO_VECTOR
+        LOCAL_SAPUNOVO_VECTOR -> ONLINE
+        LOCAL_SAPUNOVO_DIAGNOSTIC -> ONLINE
+        LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC -> ONLINE
+    }
+}
+
+@Composable
+private fun MapBasemapDeveloperSwitch(
+    mode: DeveloperBasemap,
+    onSelectOnline: () -> Unit,
+    onSelectForest: () -> Unit,
+    onSelectSapunovo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val developerControlFontSize = (14f / LocalDensity.current.fontScale).sp
+    var menuExpanded by remember { mutableStateOf(false) }
+    val modeLabel = when (mode) {
+        DeveloperBasemap.ONLINE -> "ONLINE"
+        DeveloperBasemap.LOCAL_RASTER -> "RASTER"
+        DeveloperBasemap.LOCAL_VECTOR -> "VECTOR FOREST"
+        DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR -> "VECTOR SAPUNOVO"
+        DeveloperBasemap.LOCAL_SAPUNOVO_DIAGNOSTIC -> "SAPUNOVO DIAG"
+        DeveloperBasemap.LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC -> "SAPUNOVO LABEL DIAG"
+    }
+    Surface(
+        modifier = modifier
+            .testTag("map-basemap-developer-switch")
+            .semantics {
+                contentDescription = when (mode) {
+                    DeveloperBasemap.ONLINE -> "Онлайн OSM карта, переключить на локальную CyclOSM"
+                    DeveloperBasemap.LOCAL_RASTER -> "Локальная CyclOSM raster карта, переключить на локальный vector PMTiles"
+                    DeveloperBasemap.LOCAL_VECTOR -> "Локальная vector PMTiles карта, переключить на онлайн OSM"
+                    DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR -> "Локальная vector PMTiles карта Sapunovo, переключить на онлайн OSM"
+                    DeveloperBasemap.LOCAL_SAPUNOVO_DIAGNOSTIC -> "Диагностическая локальная vector PMTiles карта Sapunovo"
+                    DeveloperBasemap.LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC -> "Скрытая glyph-диагностика Sapunovo"
+                }
+            },
+        shape = MaterialTheme.shapes.small,
+        tonalElevation = 2.dp,
+        shadowElevation = 1.dp,
+    ) {
+        Column {
+            Box {
+                TextButton(onClick = { menuExpanded = true }) {
+                    Text(
+                        "$modeLabel ▾",
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        fontSize = developerControlFontSize,
+                    )
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    val itemModifier = Modifier.height(40.dp)
+                    val itemPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                    DropdownMenuItem(text = { Text("ONLINE", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectOnline() }, contentPadding = itemPadding, modifier = itemModifier)
+                    DropdownMenuItem(text = { Text("VECTOR FOREST", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectForest() }, contentPadding = itemPadding, modifier = itemModifier)
+                    DropdownMenuItem(text = { Text("VECTOR SAPUNOVO", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectSapunovo() }, contentPadding = itemPadding, modifier = itemModifier)
+                }
+            }
+        }
+    }
+}
+
+// Descriptor source: tools/map-poc/areas.json (sapunovo-fields-water).
+private val SAPUNOVO_FIELDS_WATER_BOUNDS = org.maplibre.android.geometry.LatLngBounds.Builder()
+    .include(LatLng(56.0933, 42.6413))
+    .include(LatLng(56.1203, 42.6893))
+    .build()
+
+private val FOREST_CUTLINES_BOUNDS = org.maplibre.android.geometry.LatLngBounds.Builder()
+    .include(LatLng(56.0615, 42.7460))
+    .include(LatLng(56.0885, 42.7940))
+    .build()
 
 private fun MapLibreMap.restoreNormalCameraPadding(padding: MapCameraPadding) {
     cameraPosition = CameraPosition.Builder(cameraPosition)

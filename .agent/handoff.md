@@ -52,3 +52,30 @@ keeps its coverage.
 Verification still required: Gradle checks and data-safe Samsung review of
 Territory A/B switching, restart, Done/Cancel/Clear, and no stale overlays.
 Do not commit or push this milestone until user review.
+
+## Completed offline vector map PoC (2026-09-04)
+
+The developer selector exposes only `ONLINE`, `VECTOR FOREST`, and `VECTOR
+SAPUNOVO`. The two vector profiles read local PMTiles through
+`pmtiles://file://`; Sapunovo automatically fits its descriptor bounds once on
+selection. Its source stops at z15 and MapLibre vector overscaling remains
+available through UI z20.
+
+The ordinary Sapunovo profile contains the field geometry plus simple
+`name`-based place, water/waterway, and road labels. Local glyphs use
+`asset://map-poc/glyphs/{fontstack}/{range}.pbf` and `Noto Sans Regular`.
+Diagnostic profiles and tests remain hidden; they are not selector choices.
+
+Manual user verification on Samsung SM-S938B (not merely automation) passed:
+airplane mode, phone reboot, cold app start, Sapunovo geometry, Cyrillic place
+labels, water/waterway labels, road labels, and no network dependency observed.
+No Room/domain/Territory persistence or production map-download architecture
+was changed.
+
+## Next experiment
+
+Measure a production-like approximately 25 × 25 km local PMTiles package from
+the existing regional OSM PBF and field profile. Record package size, tile
+entries, Planetiler duration/RAM, Samsung open/first-render timing, pan/zoom,
+labels, z16–20 overscaling, and airplane/cold-start behaviour before designing
+Territory download or packaging workflows.
