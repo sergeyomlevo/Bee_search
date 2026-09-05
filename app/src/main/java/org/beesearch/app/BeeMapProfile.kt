@@ -81,6 +81,22 @@ internal fun beeSearchLocalSapunovoPmtilesMapProfile(context: Context): BeeMapPr
     )
 }
 
+/** Developer-only production-size local vector PMTiles benchmark. */
+internal fun beeSearchLocalTerritoryBenchmarkPmtilesMapProfile(context: Context): BeeMapProfile {
+    val archivePath = File(context.filesDir, "map-poc/territory-benchmark-v1.pmtiles")
+        .absolutePath
+        .replace('\\', '/')
+    return BeeMapProfile(
+        profileId = "territory-benchmark-pmtiles-poc",
+        profileVersion = "temporary-v1",
+        datasetVersion = "territory-benchmark-v1",
+        styleVersion = "vector-pmtiles-v1",
+        styleJson = localVectorPmtilesStyle("pmtiles://file://$archivePath", "Territory benchmark local vector PMTiles PoC"),
+        sourceMaxZoom = 15.0,
+        uiMaxZoom = 20.0,
+    )
+}
+
 /** Developer-only minimal source diagnostic, intentionally omitting labels and glyphs. */
 internal fun beeSearchLocalPmtilesDiagnosticProfile(context: Context, area: String): BeeMapProfile {
     val fileName = when (area) {

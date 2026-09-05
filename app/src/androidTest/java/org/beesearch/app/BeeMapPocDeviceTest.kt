@@ -149,6 +149,30 @@ class BeeMapPocDeviceTest {
     }
 
     @Test
+    fun localTerritoryBenchmarkPmtilesRendersAcrossZooms() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beeTerritoryPmtiles") == "true")
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val mapView = scenario.findMapView()
+            val map = mapView.awaitMap()
+            val profile = beeSearchLocalTerritoryBenchmarkPmtilesMapProfile(instrumentation.targetContext)
+            map.setStyleAndAwait(profile.styleJson)
+            assertNotNull(onMain { map.style?.getLayer("place-labels") })
+            assertNotNull(onMain { map.style?.getLayer("water-labels") })
+            assertNotNull(onMain { map.style?.getLayer("waterway-labels") })
+            assertNotNull(onMain { map.style?.getLayer("road-labels") })
+            // z10 can legitimately be sparse at a particular center; the useful field and
+            // overscaled zooms must render geometry from the local archive.
+            for (zoom in listOf(12.0, 15.0, 20.0)) {
+                map.moveAndAwait(latitude = 56.298866, longitude = 42.509102, zoom = zoom)
+                assertAnyRendered(mapView, map, "open-land", "forest", "water", "waterways", "roads", "tracks", "railway", "buildings")
+                captureScreenshot("territory-benchmark-pmtiles-z${zoom.toInt()}")
+            }
+        }
+    }
+
+    @Test
     fun localSapunovoPmtilesMinimalSourceRenders() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         assumeTrue(InstrumentationRegistry.getArguments().getString("beePmtilesDiagnostic") == "true")

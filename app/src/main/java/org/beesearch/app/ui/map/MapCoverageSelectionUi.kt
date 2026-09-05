@@ -35,6 +35,7 @@ internal const val SHOW_ALL_COVERAGE_DESCRIPTION = "Показать всё вы
 internal const val CLEAR_COVERAGE_DESCRIPTION = "Очистить выбранное покрытие"
 internal const val DONE_COVERAGE_SELECTION_DESCRIPTION = "Завершить выбор offline coverage"
 internal const val MAP_COVERAGE_SELECTION_CONTROLS_TAG = "map-coverage-selection-controls"
+internal const val ENTER_BENCHMARK_BOUNDS_SELECTION_DESCRIPTION = "Выбрать BBOX для PMTiles benchmark"
 
 private val coverageFill = Color(0xFF1565C0).copy(alpha = 0.16f)
 private val coverageBorder = Color(0xFF0D47A1).copy(alpha = 0.9f)
@@ -57,8 +58,24 @@ internal fun CoverageSelectionEntry(
 }
 
 @Composable
+internal fun BenchmarkBoundsSelectionEntry(
+    onEnter: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    TextButton(
+        onClick = onEnter,
+        modifier = modifier
+            .semantics { contentDescription = ENTER_BENCHMARK_BOUNDS_SELECTION_DESCRIPTION }
+            .testTag("enter-benchmark-bounds-selection"),
+    ) {
+        Text("BBOX")
+    }
+}
+
+@Composable
 internal fun MapCoverageSelectionControls(
     fragmentCount: Int,
+    title: String = "Выбор области",
     canAddFragment: Boolean,
     onAddFragment: () -> Unit,
     onUndo: () -> Unit,
@@ -82,7 +99,7 @@ internal fun MapCoverageSelectionControls(
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Выбор области · $fragmentCount",
+                    text = "$title · $fragmentCount",
                     modifier = Modifier.weight(1f).padding(start = 4.dp),
                     style = MaterialTheme.typography.labelLarge,
                 )
@@ -136,6 +153,36 @@ internal fun MapCoverageSelectionControls(
             }
         }
     }
+}
+
+@Composable
+internal fun BenchmarkBoundsResultDialog(
+    summary: MapBenchmarkBoundsSummary,
+    onDismiss: () -> Unit,
+) {
+    fun coordinate(value: Double): String = "%.6f".format(java.util.Locale.ROOT, value)
+    fun kilometers(value: Double): String = "%.1f".format(java.util.Locale.ROOT, value)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("PMTiles benchmark BBOX") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("west = ${coordinate(summary.bounds.west)}")
+                Text("south = ${coordinate(summary.bounds.south)}")
+                Text("east = ${coordinate(summary.bounds.east)}")
+                Text("north = ${coordinate(summary.bounds.north)}")
+                Text("Ширина: ${kilometers(summary.widthKm)} км")
+                Text("Высота: ${kilometers(summary.heightKm)} км")
+                Text("Площадь: ${kilometers(summary.areaKm2)} км²")
+                Text(
+                    "Это временный benchmark BBOX: он не сохранён в Territory и не запускает генерацию карты.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } },
+    )
 }
 
 @Composable

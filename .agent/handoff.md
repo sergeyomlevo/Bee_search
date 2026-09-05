@@ -74,8 +74,59 @@ was changed.
 
 ## Next experiment
 
-Measure a production-like approximately 25 × 25 km local PMTiles package from
-the existing regional OSM PBF and field profile. Record package size, tile
-entries, Planetiler duration/RAM, Samsung open/first-render timing, pan/zoom,
-labels, z16–20 overscaling, and airplane/cold-start behaviour before designing
-Territory download or packaging workflows.
+The user chose the real benchmark BBOX on Samsung; do not normalize it to a
+25 × 25 km square and do not persist it as a production Territory:
+
+```text
+west  = 42.288289
+south = 56.153038
+east  = 42.729915
+north = 56.444694
+27.2 × 32.4 km; approximately 883.6 km²
+```
+
+`C:\App\Bee_search_test_maps\pmtiles\territory-benchmark-v1.pmtiles` was
+generated from `central-fed-district-260830.osm.pbf` with the unchanged field
+profile, bounds above, z8–15 and `--download=false`. The regional PBF header
+covers the entire BBOX. The PMTiles is v3/MVT with gzip internal and tile
+compression, 5,255,967 bytes, 2,743 entries (2,738 unique contents), and no
+missing stored coordinate in its expected z8–15 bbox grid. It is copied to
+Samsung app-specific `files/map-poc/` and exposed temporarily as `VECTOR
+TERRITORY`; the device regression check passed. The temporary BBOX selector
+also remains uncommitted. Airplane/cold-start and field-ergonomics review for
+this larger package remain manual checks; do not design Territory download or
+packaging workflows yet.
+
+## Territory benchmark review (2026-09-05)
+
+Manual user review on the physical Samsung SM-S938B passed for `VECTOR
+TERRITORY`: correct rendering, satisfactory field detail and label readability,
+smooth pan/zoom, and no noticeable slowdown. This user-reviewed benchmark is
+the exact BBOX above: 27.2 × 32.4 km / approximately 883.6 km², 5.01 MiB
+PMTiles, and approximately 37 s local generation from the existing PBF.
+
+Evidence supports the current local pipeline as a practically suitable
+foundation for Bee Search offline vector maps:
+
+```text
+OSM PBF → Planetiler → custom field profile → PMTiles → MapLibre Android
+→ local asset glyphs and labels
+```
+
+For this real Territory, storage, generation time, Android rendering,
+readability and responsiveness are acceptable. The 5.01 MiB result is not a
+universal package estimate: it varies with OSM feature density and profile.
+This is PoC evidence, not a silent replacement of the accepted D007 production
+OfflineRegion workflow; choosing a production PMTiles delivery mechanism needs
+an explicit architectural decision.
+
+`Territory boundary != map coverage`:
+
+- a future Territory boundary is one primary working-area extent;
+- MapCoverageSelection remains a separate, multi-fragment device-local map
+  coverage mechanism for partial/additive coverage and potential later
+  selective satellite data;
+- the debug-only `BBOX` flow is ephemeral and neither writes Territory/Room/
+  DataStore nor replaces MapCoverageSelection. Its viewport-based interaction
+  is a candidate prototype for a later `Set Territory boundary` step, only
+  after a dedicated model/UX decision.

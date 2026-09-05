@@ -1,5 +1,9 @@
 package org.beesearch.app.ui.map
 
+import kotlin.math.asin
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 import org.maplibre.android.geometry.LatLngBounds
 
 /**
@@ -88,4 +92,57 @@ internal fun coverageBoundsForShowAll(
         south = fragments.minOf { it.bounds.south },
         west = fragments.minOf { it.bounds.west },
     )
+}
+
+/**
+ * A temporary benchmark result derived from the viewport rectangles. It deliberately has no
+ * Territory or persistence identity: the user must review the numbers before a map benchmark is
+ * generated.
+ */
+internal data class MapBenchmarkBoundsSummary(
+    val bounds: MapGeoBounds,
+    val widthKm: Double,
+    val heightKm: Double,
+    val areaKm2: Double,
+)
+
+internal fun benchmarkBoundsSummary(
+    fragments: List<MapCoverageFragment>,
+): MapBenchmarkBoundsSummary? {
+    val bounds = coverageBoundsForShowAll(fragments) ?: return null
+    val centerLatitude = (bounds.north + bounds.south) / 2.0
+    val centerLongitude = (bounds.east + bounds.west) / 2.0
+    val widthKm = haversineKm(
+        latitudeA = centerLatitude,
+        longitudeA = bounds.west,
+        latitudeB = centerLatitude,
+        longitudeB = bounds.east,
+    )
+    val heightKm = haversineKm(
+        latitudeA = bounds.south,
+        longitudeA = centerLongitude,
+        latitudeB = bounds.north,
+        longitudeB = centerLongitude,
+    )
+    return MapBenchmarkBoundsSummary(
+        bounds = bounds,
+        widthKm = widthKm,
+        heightKm = heightKm,
+        areaKm2 = widthKm * heightKm,
+    )
+}
+
+private fun haversineKm(
+    latitudeA: Double,
+    longitudeA: Double,
+    latitudeB: Double,
+    longitudeB: Double,
+): Double {
+    val latitudeDelta = Math.toRadians(latitudeB - latitudeA)
+    val longitudeDelta = Math.toRadians(longitudeB - longitudeA)
+    val latitudeARadians = Math.toRadians(latitudeA)
+    val latitudeBRadians = Math.toRadians(latitudeB)
+    val haversine = sin(latitudeDelta / 2.0).let { it * it } +
+        cos(latitudeARadians) * cos(latitudeBRadians) * sin(longitudeDelta / 2.0).let { it * it }
+    return 6_371.0088 * 2.0 * asin(sqrt(haversine))
 }
