@@ -1,0 +1,88 @@
+version: 1
+
+purpose: >
+  Maintain a small signal log for significant governance events. The log is not
+  an activity history, a project-truth source, or proof that governance is
+  effective.
+
+significant_governance_event:
+  definition: >
+    An evidenced event in which governance behavior materially affected, or
+    should have affected, an action, decision, implementation basis, report, or
+    user-control boundary.
+
+recording:
+  log: .agent/evaluation-log.md
+
+  record_when:
+    - unnecessary_escalation
+    - missed_escalation
+    - ignored_accepted_decision
+    - stale_instruction_materially_affected_action
+    - incorrect_preference_application
+    - unsupported_claim_materially_affected_implementation
+    - verification_overclaim
+    - destructive_risk_handling_failure
+    - governance_ambiguity_required_resolution
+    - governance_rule_demonstrably_prevented_meaningful_error
+
+  do_not_record:
+    - ordinary_successful_build
+    - ordinary_test_or_check_PASS
+    - every_question_to_the_user
+    - every_commit
+    - routine_instruction_application
+    - routine_preference_application
+    - every_hypothesis
+    - ordinary_successful_workflow
+
+  evidence_rule: >
+    Record an event only when observable evidence supports the material
+    governance signal. Do not reconstruct past incidents from memory or treat
+    absence of log entries as evidence of effectiveness.
+
+  unnecessary_escalation_rule: >
+    Do not classify every approval as unnecessary escalation. This event needs
+    an explicit user correction, independent review, or deterministic evidence
+    that the existing autonomy policy already authorized the action.
+
+event_record:
+  required_fields:
+    - date_time_or_task_context
+    - event_type
+    - expected_governance_behavior
+    - actual_behavior
+    - severity_or_impact
+    - source_of_classification
+    - evidence_reference
+    - preliminary_disposition
+  optional_fields:
+    - affected_rule
+    - consequence
+    - independent_review
+
+classification_ownership:
+  working_agent: >
+    The working agent may make a preliminary classification. Its self-report is
+    not independent evidence of governance effectiveness or ineffectiveness.
+  independent_review:
+    storage: separate_within_the_event_record
+    status_values:
+      - pending
+      - completed
+    allowed_results:
+      - confirmed
+      - modified
+      - rejected
+    required_when_present:
+      - reviewer_or_review_context
+      - status
+      - evidence_reference
+    result_required_when: status_is_completed
+
+evaluation_limits:
+  - the log alone does not prove governance improvement or regression
+  - the absence of recorded events does not prove effectiveness
+  - event counts without a comparable baseline do not establish outcomes
+  - future independent audit may consume selected evaluation evidence
+  - this policy does not define an audit bundle or audit tooling

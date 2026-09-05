@@ -249,7 +249,9 @@ Agent-specific decision behavior is defined in:
 .agent/
 ├── decision-policy.yaml
 ├── preferences.yaml
-└── preference-evidence.md
+├── preference-evidence.md
+├── evaluation-policy.yaml
+└── evaluation-log.md
 ```
 
 Use:
@@ -259,7 +261,12 @@ Use:
 - `.agent/preferences.yaml` as a tie-breaker between solutions already
   compatible with project truth;
 - `.agent/preference-evidence.md` when a preference is ambiguous, conflicting,
-  or needs revision.
+  needs revision, or a significant choice depends on its scope, confirmation,
+  or provenance;
+- `.agent/evaluation-policy.yaml` when a significant governance event occurs or
+  governance behavior is being reviewed;
+- `.agent/evaluation-log.md` only when its recorded events are relevant to the
+  current task or review.
 
 ### Preference Evidence Usage
 
@@ -268,6 +275,10 @@ file. Do not load it entirely into context by default. Inspect it only when a
 specific preference is ambiguous, conflicting, requires revalidation, or its
 provenance is needed. Use the preference key to locate the relevant section
 rather than reading the whole file.
+
+Do not read the full evaluation log during routine implementation work. Record
+only significant governance signals under `.agent/evaluation-policy.yaml`;
+routine success and ordinary policy application are not log events.
 
 Project truth in `docs/` always takes precedence over `.agent/`.
 
@@ -627,8 +638,10 @@ For non-trivial tasks:
    remains;
 7. implement the smallest coherent solution;
 8. run relevant verification;
-9. update affected documentation;
-10. report what changed and what remains unverified.
+9. record a significant governance event when required by
+   `.agent/evaluation-policy.yaml`;
+10. update affected documentation;
+11. report what changed and what remains unverified.
 
 Do not perform unrelated cleanup during a focused task unless necessary for
 correctness.

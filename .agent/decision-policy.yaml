@@ -21,7 +21,7 @@
 # For example, a database migration should be verified by migration tests
 # rather than trusted merely because an agent reports that it is safe.
 
-version: 6
+version: 7
 
 policy:
   principle: >
@@ -352,6 +352,13 @@ preferences:
   source: .agent/preferences.yaml
 
   evidence_source: .agent/preference-evidence.md
+
+  selective_evidence_reading:
+    rule: >
+      If a significant choice genuinely depends on the scope, confirmation, or
+      provenance of a specific preference, inspect the matching evidence entry
+      by preference key before relying on that preference. Do not load the full
+      evidence log for every task.
 
   rule: >
     Preferences are tie-breakers among solutions that already satisfy project
@@ -828,6 +835,86 @@ scope:
     - small supporting changes required for correctness
     - tests needed to protect changed behavior
     - documentation updates required to keep project truth consistent
+
+
+# ---------------------------------------------------------------------------
+# Epistemic discipline
+# ---------------------------------------------------------------------------
+
+epistemic_discipline:
+
+  scope:
+    applies_when_claim_materially_affects:
+      - implementation
+      - architecture
+      - verification
+      - migration_or_data_safety
+      - decision_making
+      - success_reporting
+    routine_statement_labels_required: false
+    rule: >
+      Assign one claim status when a significant implementation-relevant claim
+      materially affects an area listed above. This is decision and reporting
+      discipline, not a requirement to label every sentence.
+
+  claim_statuses:
+    OBSERVED: >
+      Directly confirmed by current inspection, test, device observation, or an
+      authoritative source for the exact property being claimed.
+    DERIVED: >
+      Logically follows from observed information, but the claimed property was
+      not checked directly.
+    HYPOTHESIS: >
+      A working assumption that still requires verification.
+    UNKNOWN: >
+      Available information is insufficient for a reliable claim.
+
+  provenance:
+    rule: >
+      When a significant claim is used as the basis for a decision, its source
+      must be recoverable from the reasoning, report, or referenced evidence in
+      addition to its epistemic status. Do not create a separate claims
+      registry.
+    examples:
+      - current_code_inspection
+      - current_automated_test
+      - current_device_observation
+      - accepted_decision
+      - project_documentation
+      - explicit_user_statement
+      - prior_reported_evidence
+      - inference
+
+  verification_scope:
+    principle: Verification proves only the property it directly checked.
+    examples:
+      - build PASS does not prove runtime behavior
+      - unit test PASS does not prove physical-device GPS or compass behavior
+      - screenshot evidence does not prove cold-start offline behavior
+      - code inspection does not prove runtime behavior
+      - successful new-database creation does not prove migration correctness
+      - historical reported PASS is not new independent verification
+      - one tested zoom or viewport does not prove the entire map package
+      - absence of an observed error does not prove the complete property
+
+  revalidation:
+    rule: >
+      If the underlying implementation, dependency, accepted decision,
+      authoritative file, or test setup changes, a dependent older claim must
+      not automatically be treated as still verified.
+    especially_relevant_to:
+      - library_or_framework_behavior
+      - migration_behavior
+      - Android_or_device_specific_behavior
+      - offline_map_behavior
+      - architecture_assumptions
+      - external_tool_behavior
+
+  relationship_to_decision_statuses:
+    rule: >
+      Epistemic statuses describe the evidence state of claims. They do not
+      replace ACCEPTED, PROVISIONAL, DEFERRED, or SUPERSEDED project decision
+      statuses.
 
 
 # ---------------------------------------------------------------------------

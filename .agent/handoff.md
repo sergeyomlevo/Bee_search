@@ -37,12 +37,12 @@ committed debug integration expects its device copy at
 `files/map-poc/territory-benchmark-v1.pmtiles`. These paths describe the
 existing benchmark setup, not a production acquisition design.
 
-The current uncommitted work is documentation-only maintenance of `AGENTS.md`,
-this handoff, historical clarifications in `.agent/preference-evidence.md`, and
-local skill instructions. It aligns those files with D061, D062, D063, and the
-current repository layout. It does not change Android code, Room, UI, domain
-behavior, the decision policy, preference values, taxonomy, confidence, scope,
-or lifecycle.
+The current uncommitted work adds minimal epistemic discipline to the existing
+decision policy and a signal-based evaluation policy and empty log under
+`.agent/`. `AGENTS.md` routes agents to those files without making the log part
+of routine implementation context. It does not change Android code, Room, UI,
+domain behavior, accepted decisions, decision statuses, autonomy classes,
+preference values, taxonomy, confidence, scope, or lifecycle.
 
 ## Historical reported verification
 
@@ -78,5 +78,5 @@ draft describes possible directions.
 
 ## Next task
 
-Review the documentation-only governance maintenance diff. Do not commit or
-push it without a separate user instruction.
+Review the epistemic-discipline and signal-evaluation governance diff. Do not
+commit or push it without a separate user instruction.
