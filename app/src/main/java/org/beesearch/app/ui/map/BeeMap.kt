@@ -280,20 +280,14 @@ internal fun BeeMap(
             MapCoverageViewportFrame(Modifier.fillMaxSize().zIndex(2f))
         }
 
-        if (org.beesearch.app.BuildConfig.DEBUG) {
-            MapBasemapDeveloperSwitch(
-                mode = developerBasemap,
+        if (
+            developerBasemap == DeveloperBasemap.ONLINE ||
+            developerBasemap == DeveloperBasemap.LOCAL_TERRITORY_BENCHMARK
+        ) {
+            MapBasemapSourceSelector(
+                vectorMapSelected = developerBasemap == DeveloperBasemap.LOCAL_TERRITORY_BENCHMARK,
                 onSelectOnline = { developerBasemap = DeveloperBasemap.ONLINE },
-                onSelectForest = {
-                    Log.d("BeeMap", "selector VECTOR FOREST")
-                    developerBasemap = DeveloperBasemap.LOCAL_VECTOR
-                },
-                onSelectSapunovo = {
-                    Log.d("BeeMap", "selector VECTOR SAPUNOVO")
-                    developerBasemap = DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR
-                },
-                onSelectTerritoryBenchmark = {
-                    Log.d("BeeMap", "selector VECTOR TERRITORY")
+                onSelectVectorMap = {
                     developerBasemap = DeveloperBasemap.LOCAL_TERRITORY_BENCHMARK
                 },
                 modifier = Modifier
@@ -471,18 +465,6 @@ internal fun BeeMap(
                 },
                 modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).zIndex(3f),
             )
-            if (BuildConfig.DEBUG) {
-                BenchmarkBoundsSelectionEntry(
-                    onEnter = {
-                        benchmarkWorkingCoverage = emptyList()
-                        benchmarkBoundsSelectionMode = true
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 72.dp, bottom = 16.dp)
-                        .zIndex(3f),
-                )
-            }
         }
 
         if (clearSelectionConfirmationVisible) {
@@ -557,38 +539,20 @@ private enum class DeveloperBasemap {
 }
 
 @Composable
-private fun MapBasemapDeveloperSwitch(
-    mode: DeveloperBasemap,
+private fun MapBasemapSourceSelector(
+    vectorMapSelected: Boolean,
     onSelectOnline: () -> Unit,
-    onSelectForest: () -> Unit,
-    onSelectSapunovo: () -> Unit,
-    onSelectTerritoryBenchmark: () -> Unit,
+    onSelectVectorMap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val developerControlFontSize = (14f / LocalDensity.current.fontScale).sp
     var menuExpanded by remember { mutableStateOf(false) }
-    val modeLabel = when (mode) {
-        DeveloperBasemap.ONLINE -> "ONLINE"
-        DeveloperBasemap.LOCAL_RASTER -> "RASTER"
-        DeveloperBasemap.LOCAL_VECTOR -> "VECTOR FOREST"
-        DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR -> "VECTOR SAPUNOVO"
-        DeveloperBasemap.LOCAL_TERRITORY_BENCHMARK -> "VECTOR TERRITORY"
-        DeveloperBasemap.LOCAL_SAPUNOVO_DIAGNOSTIC -> "SAPUNOVO DIAG"
-        DeveloperBasemap.LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC -> "SAPUNOVO LABEL DIAG"
-    }
+    val modeLabel = if (vectorMapSelected) "Векторная карта" else "Онлайн карта"
     Surface(
         modifier = modifier
-            .testTag("map-basemap-developer-switch")
+            .testTag("map-basemap-source-selector")
             .semantics {
-                contentDescription = when (mode) {
-                    DeveloperBasemap.ONLINE -> "Онлайн OSM карта, переключить на локальную CyclOSM"
-                    DeveloperBasemap.LOCAL_RASTER -> "Локальная CyclOSM raster карта, переключить на локальный vector PMTiles"
-                    DeveloperBasemap.LOCAL_VECTOR -> "Локальная vector PMTiles карта, переключить на онлайн OSM"
-                    DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR -> "Локальная vector PMTiles карта Sapunovo, переключить на онлайн OSM"
-                    DeveloperBasemap.LOCAL_TERRITORY_BENCHMARK -> "Локальная vector PMTiles benchmark Territory, переключить на онлайн OSM"
-                    DeveloperBasemap.LOCAL_SAPUNOVO_DIAGNOSTIC -> "Диагностическая локальная vector PMTiles карта Sapunovo"
-                    DeveloperBasemap.LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC -> "Скрытая glyph-диагностика Sapunovo"
-                }
+                contentDescription = "Источник карты: $modeLabel"
             },
         shape = MaterialTheme.shapes.small,
         tonalElevation = 2.dp,
@@ -607,10 +571,8 @@ private fun MapBasemapDeveloperSwitch(
                 DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                     val itemModifier = Modifier.height(40.dp)
                     val itemPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    DropdownMenuItem(text = { Text("ONLINE", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectOnline() }, contentPadding = itemPadding, modifier = itemModifier)
-                    DropdownMenuItem(text = { Text("VECTOR FOREST", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectForest() }, contentPadding = itemPadding, modifier = itemModifier)
-                    DropdownMenuItem(text = { Text("VECTOR SAPUNOVO", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectSapunovo() }, contentPadding = itemPadding, modifier = itemModifier)
-                    DropdownMenuItem(text = { Text("VECTOR TERRITORY", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectTerritoryBenchmark() }, contentPadding = itemPadding, modifier = itemModifier)
+                    DropdownMenuItem(text = { Text("Онлайн карта", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectOnline() }, contentPadding = itemPadding, modifier = itemModifier)
+                    DropdownMenuItem(text = { Text("Векторная карта", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectVectorMap() }, contentPadding = itemPadding, modifier = itemModifier)
                 }
             }
         }
