@@ -9,7 +9,6 @@ metadata:
     include: ["compose accessibility review", "android semantics issue compose", "focus order in compose", "screen reader compose ui", "large font compose problem"]
     exclude: ["dependency conflict only", "room schema only", "gradle plugin migration only"]
   owners: ["@android-agent-skills/maintainers"]
-  test_targets: ["examples/orbittasks-compose", "examples/orbittasks-xml", "benchmarks/triggers.jsonl"]
 ---
 # Android Compose Accessibility
 
@@ -19,12 +18,15 @@ metadata:
 - Handoff skills when the scope expands:
 - `android-ui-states-validation`
 - `android-testing-ui`
+- These are upstream capability labels and may not be installed as local Bee
+  Search skills. Use them only when the current environment provides them.
 
 ## Workflow
 1. Identify whether the target surface is Compose, View system, or a mixed interoperability screen.
 2. Select the lowest-friction UI pattern that satisfies responsiveness, accessibility, and performance needs.
 3. Build the UI around stable state, explicit side effects, and reusable design tokens.
-4. Exercise edge cases such as long text, font scaling, RTL, and narrow devices in the fixture apps.
+4. Exercise edge cases such as long text, font scaling, RTL, and narrow devices
+   in the affected Bee Search UI and its relevant tests.
 5. Validate with unit, UI, and screenshot-friendly checks before handing off.
 
 ## Guardrails
@@ -40,21 +42,17 @@ metadata:
 - Porting XML patterns directly into Compose without adapting the mental model.
 
 ## Examples
-### Happy path
-- Scenario: Add semantics and readable labels to the Compose OrbitTasks cards.
-- Command: `cd examples/orbittasks-compose && ./gradlew :app:connectedDebugAndroidTest`
 
-### Edge case
-- Scenario: Validate font scaling, contrast, and touch targets in narrow layouts.
-- Command: `cd examples/orbittasks-compose && ./gradlew :app:assembleDebug`
-
-### Failure recovery
-- Scenario: Differentiate accessibility requests from general UI validation or theme work.
-- Command: `python3 scripts/eval_triggers.py --skill android-compose-accessibility`
+The upstream skill examples referenced fixture and benchmark paths that are not
+part of Bee Search. For this repository, select the relevant Gradle, UI, and
+physical-device checks through the root `AGENTS.md` and the
+`android-development` skill. Do not cite an upstream fixture run as Bee Search
+verification.
 
 ## Done Checklist
 - The implementation path is explicit, minimal, and tied to the right Android surface.
-- Relevant example commands and benchmark prompts have been exercised or updated.
+- Relevant Bee Search checks have been exercised or any unverified behavior is
+  reported explicitly.
 - Handoffs to adjacent skills are documented when the request crosses boundaries.
 - Official references cover the chosen pattern and the main migration or troubleshooting path.
 

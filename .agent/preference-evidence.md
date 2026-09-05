@@ -656,8 +656,9 @@ decision_making.prefer_reversible_choices_when_uncertain
 
 Several decisions were intentionally deferred when they were not yet required:
 
-* offline-map format;
-* map source;
+* offline-map format (historically open; PMTiles was later accepted by D063);
+* map source (historically open; the primary vector source was later accepted
+  by D008);
 * sync architecture;
 * PC interface;
 * physical-place modeling.
@@ -706,12 +707,14 @@ decision_making.avoid_premature_commitment_on_open_questions
 
 ### Evidence
 
-The project deliberately leaves unresolved decisions marked as open or deferred rather than choosing arbitrarily.
+The project deliberately leaves unresolved decisions marked as open or deferred
+rather than choosing arbitrarily. The examples below describe the state when
+this evidence was recorded; later decisions may close them.
 
 Examples:
 
-* map format;
-* map source;
+* map format (later closed by D063);
+* map source (the primary vector source was later closed by D008);
 * point display code;
 * synchronization conflict model.
 
@@ -740,7 +743,7 @@ Strong repeated evidence:
 
 * no ObservationSession;
 * no GroupRelease entity;
-* no Observer entity for MVP;
+* no Observer entity at that stage (later superseded as project truth by D061);
 * no PhysicalPlace entity yet.
 
 ### Interpretation

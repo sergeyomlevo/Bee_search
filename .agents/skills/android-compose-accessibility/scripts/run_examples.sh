@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
     set -euo pipefail
 
-    cat <<'EOF'
-    Skill: Android Compose Accessibility
-    Canonical path: skills/android-compose-accessibility
-    Example commands:
-    Happy path: cd examples/orbittasks-compose && ./gradlew :app:connectedDebugAndroidTest
-Edge case: cd examples/orbittasks-compose && ./gradlew :app:assembleDebug
-Failure recovery: python3 scripts/eval_triggers.py --skill android-compose-accessibility
-    EOF
+printf '%s\n' \
+    'No runnable accessibility example is included in this Bee Search checkout.' \
+    'Select relevant Gradle, UI, and physical-device checks through AGENTS.md' \
+    'and the android-development skill. No verification was performed.' >&2
+exit 2

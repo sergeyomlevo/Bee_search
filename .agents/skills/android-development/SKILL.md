@@ -11,11 +11,13 @@ Provide a repeatable Android engineering workflow for the Bee Search repository.
 
 This skill defines **how to execute Android development work**. It does not define Bee Search product truth.
 
-Project truth lives in:
+Repository guidance is divided as follows:
 
-- `AGENTS.md`
-- `docs/`
-- `.agent/`
+- project truth and accepted decisions live in `docs/`;
+- root `AGENTS.md` routes agent work and summarizes high-signal constraints;
+- `.agent/decision-policy.yaml` governs agent decisions;
+- `.agent/preferences.yaml`, `.agent/preference-evidence.md`, and
+  `.agent/handoff.md` are preference or operational context, not project truth.
 
 Always follow those files when they apply.
 
@@ -176,7 +178,7 @@ Current examples include:
 
 ```text
 current_territory_id
-observer_code
+current_observer_id
 ```
 
 Do not move structured observation history from Room into DataStore.
@@ -256,7 +258,10 @@ Keep separate concerns for:
 - source
 - offline storage
 
-Do not lock the project into a specific offline format or provider while that project decision remains open.
+PMTiles is the accepted offline vector Map Package format under D063. Keep the
+still-open server API, package manifest, downloader, update cadence, and
+satellite imagery lifecycle undecided until the applicable project decision is
+approved.
 
 When adding MapLibre, isolate SDK-specific code enough that domain logic does not depend on MapLibre classes.
 

@@ -9,7 +9,6 @@ metadata:
     include: ["android emulator automation", "adb semantic ui automation", "uiautomator dump and tap", "launch android app and inspect screen", "android agent tap text on emulator"]
     exclude: ["play store release only", "room dao only", "gradle scan only"]
   owners: ["@android-agent-skills/maintainers"]
-  test_targets: ["examples/orbittasks-compose", "benchmarks/triggers.jsonl"]
 ---
 # Android Emulator Automation
 
@@ -20,6 +19,8 @@ metadata:
 - Handoff skills when the scope expands:
 - `android-testing-ui`
 - `android-permissions-activity-results`
+- These are upstream capability labels and may not be installed as local Bee
+  Search skills. Use them only when the current environment provides them.
 
 ## Workflow
 1. Verify the Android SDK, `adb`, the target device or emulator, and boot completion before attempting interaction.
@@ -42,8 +43,10 @@ metadata:
 
 ## Examples
 ### Happy path
-- Scenario: Build the Compose fixture, install it on an emulator, and dump the current OrbitTasks screen.
-- Command: `bash skills/android-emulator-automation/scripts/run_examples.sh`
+- Scenario: Build the Bee Search debug APK, target the intended device, launch
+  `org.beesearch.app`, and inspect the current screen semantically.
+- Use the repository Gradle wrapper and the scripts under this skill. Choose
+  the exact commands according to the current task and device state.
 
 ### Edge case
 - Scenario: Launch a preinstalled app and target a single semantic control without relying on screen coordinates.

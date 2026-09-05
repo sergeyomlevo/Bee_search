@@ -9,7 +9,6 @@ metadata:
     include: ["compose side effect problem", "remember vs derivedstateof", "collect flow in compose screen", "launchedeffect issue android", "compose state hoisting", "android-compose-state-effects skill", "rememberupdatedstate compose", "snapshotflow compose issue", "launchedeffect issue android before release"]
     exclude: ["xml recycler issue", "apk alignment", "play console release", "release automation", "android signing and release"]
   owners: ["@android-agent-skills/maintainers"]
-  test_targets: ["examples/orbittasks-compose", "examples/orbittasks-xml", "benchmarks/triggers.jsonl"]
 ---
 # Android Compose State Effects
 
@@ -21,6 +20,8 @@ metadata:
 - Handoff skills when the scope expands:
 - `android-state-management`
 - `android-compose-performance`
+- These are upstream capability labels and may not be installed as local Bee
+  Search skills. Use them only when the current environment provides them.
 
 ## Workflow
 1. Classify the issue first: local remembered state, saved state, derived state, lifecycle-aware collection, or one-off side effects.
@@ -48,17 +49,11 @@ metadata:
 - Is collection lifecycle-aware and cancellation-safe?
 
 ## Examples
-### Happy path
-- Scenario: Collect task state and snackbar events in Compose without duplicate launches.
-- Command: `cd examples/orbittasks-compose && ./gradlew :app:testDebugUnitTest`
 
-### Edge case
-- Scenario: Handle recomposition when permission state and sync state change together.
-- Command: `cd examples/orbittasks-compose && ./gradlew :app:assembleDebug`
-
-### Failure recovery
-- Scenario: Disambiguate state/effects work from generic Compose layout or state-management requests.
-- Command: `python3 scripts/eval_triggers.py --skill android-compose-state-effects`
+The upstream skill examples referenced fixture and benchmark paths that are not
+part of Bee Search. For this repository, select the relevant Gradle and UI
+checks through the root `AGENTS.md` and the `android-development` skill. Do not
+cite an upstream fixture run as Bee Search verification.
 
 ## Done Checklist
 - The chosen Compose primitive matches the actual runtime problem.

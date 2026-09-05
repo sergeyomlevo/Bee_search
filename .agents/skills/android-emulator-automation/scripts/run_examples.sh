@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-APP_DIR="$ROOT/examples/orbittasks-compose"
-APK_PATH="$APP_DIR/app/build/outputs/apk/debug/app-debug.apk"
-
-cd "$APP_DIR"
-./gradlew :app:assembleDebug
-
-python3 "$ROOT/skills/android-emulator-automation/scripts/device_health.py"
-python3 "$ROOT/skills/android-emulator-automation/scripts/app_launcher.py" --install "$APK_PATH"
-python3 "$ROOT/skills/android-emulator-automation/scripts/app_launcher.py" --launch dev.androidagentskills.orbittasks.compose
-python3 "$ROOT/skills/android-emulator-automation/scripts/screen_mapper.py" --limit 12
+printf '%s\n' \
+    'No runnable emulator example is included in this Bee Search checkout.' \
+    'Build Bee Search with its Gradle wrapper, verify the intended device, and' \
+    'use the helper scripts in this skill with package org.beesearch.app.' \
+    'No build or device verification was performed.' >&2
+exit 2

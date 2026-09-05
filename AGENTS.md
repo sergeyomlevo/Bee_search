@@ -298,6 +298,8 @@ Territory
     └── ObservationPoint
             └── Bee
                     └── FlightCycle
+
+Observer
 ```
 
 Do not introduce new domain entities merely to represent UI state,
@@ -310,7 +312,8 @@ Particularly important established rules include:
 - repeated observation at the same physical location may create a new
   `ObservationPoint`;
 - there is no separate `ObservationSession` entity in the MVP;
-- there is no separate `Observer` entity in the MVP;
+- `Observer` is a separate saved entity, and `ObservationPoint` keeps an
+  immutable `observer_id` link to it;
 - the first release is represented through the first `FlightCycle` records,
   not a separate `GroupRelease` entity;
 - a Bee may have at most one open `FlightCycle`;
@@ -411,8 +414,9 @@ Do not confuse:
 - map style;
 - offline map storage.
 
-Do not commit the project to a specific offline-map format or provider while
-that decision remains open.
+PMTiles is the accepted offline vector Map Package format under D063. Do not
+silently decide the still-open server API, package manifest, downloader, update
+cadence, or satellite imagery lifecycle.
 
 Keep Android platform access behind appropriate boundaries such as:
 
@@ -593,9 +597,10 @@ Prefer established names such as:
 ```text
 Territory
 ObservationPoint
+Observer
 Bee
 FlightCycle
-observerCode
+observerId
 markColor
 markPosition
 sequenceNumber
