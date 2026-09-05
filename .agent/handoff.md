@@ -3,8 +3,8 @@
 > 2026-09-02 — coverage-selection prototype review accepted and committed as
 > `c77044a Prototype composite offline coverage selection`. It remains an
 > ephemeral map-screen UI prototype: geographic viewport rectangles, visible
-> overlap/gaps, Undo, confirmed Clear, Show all and Done. No OfflineRegion,
-> download, tile persistence or Room/domain coverage model was introduced.
+> overlap/gaps, Undo, confirmed Clear, Show all and Done. No Map Package
+> acquisition, tile persistence or Room/domain coverage model was introduced.
 > The Show-all camera-padding regression is fixed: after Done ordinary recenter
 > again aligns GPS marker and center target without changing zoom.
 
@@ -44,7 +44,7 @@ Device-local desired map coverage persistence is implemented on top of the
 committed Territory/Observer model. Preferences DataStore stores versioned `v1`
 rectangle lists keyed by Territory UUID; Room remains v5. BeeMap loads only the
 current Territory, edits a working copy, persists atomically on Done and cancels
-on Back. No tiles, OfflineRegion or download state exists yet.
+on Back. No production Map Package acquisition or download state exists yet.
 Deleting an unused Territory also clears only that Territory UUID's persisted
 coverage; a Territory referenced by an ObservationPoint remains undeletable and
 keeps its coverage.
@@ -116,9 +116,9 @@ OSM PBF → Planetiler → custom field profile → PMTiles → MapLibre Android
 For this real Territory, storage, generation time, Android rendering,
 readability and responsiveness are acceptable. The 5.01 MiB result is not a
 universal package estimate: it varies with OSM feature density and profile.
-This is PoC evidence, not a silent replacement of the accepted D007 production
-OfflineRegion workflow; choosing a production PMTiles delivery mechanism needs
-an explicit architectural decision.
+The PMTiles direction is now the accepted production architecture in D063.
+D007 remains unchanged as historical text and is marked `SUPERSEDED BY D063`.
+Acquisition, manifest, downloader and update-cadence implementation remain open.
 
 `Territory boundary != map coverage`:
 
@@ -130,3 +130,24 @@ an explicit architectural decision.
   DataStore nor replaces MapCoverageSelection. Its viewport-based interaction
   is a candidate prototype for a later `Set Territory boundary` step, only
   after a dedicated model/UX decision.
+
+## Server/sync boundary draft (2026-09-05)
+
+`docs/server-sync-architecture.md` remains the detailed, non-normative
+server/sync proposal and now treats accepted D063 as its map-package baseline.
+Current Room v5 needs no immediate schema change. The
+recommended direction for explicit review is client-generated canonical UUIDs,
+an idempotent local mutation outbox, a monotonic server change-log cursor,
+optimistic revisions instead of universal last-write-wins, PostgreSQL/PostGIS,
+and immutable server-generated PMTiles artifacts. Raw field observations retain
+provenance; server enrichment must not silently rewrite them.
+
+No server, SyncEngine, auth, Room migration or map-package download mechanism
+was implemented. The previous D007/PMTiles decision gate is closed; the
+remaining candidate server/sync decisions in section 20 still require explicit
+review before implementation.
+The draft also keeps manual SAF PMTiles import and future server download behind
+one acquisition-independent package installer, keeps base PMTiles separate from
+canonical user/domain geodata, and separates recomputable analysis from raw
+observations. These are boundaries only: import, custom geo layers and analysis
+features were not implemented.

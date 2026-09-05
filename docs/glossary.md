@@ -141,7 +141,7 @@ Offline Map является техническим ресурсом, а не с
 являются полями `Territory` в Room research schema. Territory может
 существовать и использоваться без offline package.
 
-Первый milestone использует MapLibre OfflineRegion.
+Offline vector implementation использует PMTiles Map Package согласно D063.
 
 ---
 
@@ -149,23 +149,28 @@ Offline Map является техническим ресурсом, а не с
 
 **Русский:** готовность карты для офлайн / готово офлайн
 
-Подтверждённая гарантия, что все ресурсы выбранной области и совместимого
-MapProfile сохранены на устройстве. Для первого milestone authoritative
-признаком является совместимый `OfflineRegion` с
-`OfflineRegionStatus.isComplete == true`.
+Подтверждённая гарантия, что совместимый Map Package полностью staged в
+app-controlled storage, прошёл validation целостности/совместимости и атомарно
+активирован.
 
 Online-видимость, ambient cache и inactive download state сами по себе не
 означают Offline Readiness.
 
 ---
 
-# 7.2. OfflineRegion
+# 7.2. Map Package
 
-**Техническое имя:** `MapLibre OfflineRegion`
+**Русский:** пакет карты
 
-Device-local MapLibre package, определённый style URL, географической областью,
-zoom range и opaque metadata. Не является предметной сущностью Bee Search и не
-хранится в Room research schema.
+Versioned PMTiles artifact локальной offline vector base map. После acquisition
+он staged в app-controlled storage, проверяется и атомарно активируется для
+MapLibre. Не является предметной сущностью Bee Search и не хранится в Room
+research schema. Каждый активированный package имеет достаточно
+identity/version metadata, чтобы отличить его от совместимой замены; конкретный
+manifest format пока не определён.
+
+`MapLibre OfflineRegion` — исторический механизм superseded D007 и не является
+текущим production Map Package format.
 
 ---
 
@@ -880,8 +885,9 @@ MapLibre не следует путать с источником картогр
 
 Географическая область, для которой подготавливаются офлайн-картографические данные Territory.
 
-В первом milestone пользователь выбирает rectangle. Bounds являются частью
-MapLibre OfflineRegion definition и не моделируются в Room research schema.
+Пользователь может формировать coverage из rectangle fragments. Bounds являются
+device-local map infrastructure и не моделируются в Room research schema.
+`Territory boundary` и `map coverage` — разные понятия.
 
 ---
 
@@ -1117,8 +1123,8 @@ MVP не требует наличия сервера, web-интерфейса 
 |---|---|
 | территория | `Territory` |
 | текущая территория | `current_territory_id` |
-| подготовленная область карты | `OfflineRegion` |
-| готово офлайн | compatible `OfflineRegionStatus.isComplete` |
+| локальный пакет offline vector map | `Map Package` / PMTiles |
+| готово офлайн | validated and atomically activated compatible `Map Package` |
 | профиль карты | `MapProfile` |
 | точка наблюдения | `ObservationPoint` |
 | наблюдатель | `Observer` / `current_observer_id` |

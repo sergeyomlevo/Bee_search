@@ -339,10 +339,10 @@ updated_at          Instant     required
 
 В Room поле `Territory.map_status` не создаётся.
 
-Первый offline milestone использует status MapLibre `OfflineRegion` как
-authoritative source. `OfflineRegionStatus.isComplete == true` при совместимых
-definition/metadata означает Ready. Status, bytes и resource counts не
-дублируются в research database или отдельном catalog без необходимости.
+Offline Ready определяется наличием полностью staged, проверенного и атомарно
+активированного совместимого PMTiles Map Package. Installation/activation state
+не дублируется в research database; конкретный infrastructure store и manifest
+format определяются отдельно.
 
 ---
 
@@ -352,13 +352,10 @@ definition/metadata означает Ready. Status, bytes и resource counts н�
 
 В Room поле `Territory.map_region_data` и отдельная таблица метаданных карты не создаются.
 
-Rectangular bounds и zoom являются частью MapLibre `OfflineRegionDefinition`.
-Opaque region metadata минимально связывает package с `territoryId`, package
-kind и versioned MapProfile и при необходимости хранит собственную metadata
-schema version, lifecycle timestamp или replacement/supersession link.
-
-Bounds, zoom и status не копируются в metadata, когда их можно получить из
-authoritative MapLibre definition/status.
+Coverage bounds и zoom остаются device-local map infrastructure. Активированный
+package должен иметь достаточно identity/version metadata, чтобы отличить
+установленный artifact от совместимой замены и проверить versioned MapProfile.
+Конкретный manifest format и package-to-Territory association не фиксируются.
 
 ---
 
@@ -376,12 +373,12 @@ Database
     └── FlightCycle
 
 Map storage
-    └── MapLibre shared cache / OfflineRegion resources
+    └── activated PMTiles Map Package
 ```
 
-Связь Territory с package существует только в opaque device-local
-OfflineRegion metadata. Удаление или failure package не изменяет Territory и
-связанные исследовательские записи.
+Локальная связь Territory с package, если она требуется, существует только в
+device-local map infrastructure metadata. Удаление или failure package не
+изменяет Territory и связанные исследовательские записи.
 
 ---
 
@@ -1380,15 +1377,15 @@ current_territory_id
 current_observer_id
 локальные пути офлайн-карт
 map download state
-OfflineRegion definition/metadata
+Map Package installation/activation metadata
 UI preferences
 последняя позиция карты
 ```
 
-Локальные данные офлайн-карт не моделируются в Room research schema. Их
-authoritative structure и status предоставляет MapLibre OfflineRegion API;
-минимальная package-to-Territory/profile связь хранится в opaque region
-metadata.
+Локальные данные офлайн-карт не моделируются в Room research schema.
+Authoritative readiness задаётся полностью проверенным и атомарно активированным
+PMTiles Map Package; минимальная package identity/version и возможная
+package-to-Territory/profile связь относятся к device-local infrastructure.
 
 `current_territory_id` и `current_observer_id` сами не являются
 исследовательскими данными; историческую принадлежность определяют foreign keys

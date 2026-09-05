@@ -199,7 +199,9 @@ MapLibre является движком отображения карты.
 
 # D007 — Первый offline milestone использует MapLibre OfflineRegion
 
-**Статус:** ACCEPTED
+**Статус:** SUPERSEDED BY D063
+
+**Заменено решением:** D063
 
 Первый production milestone офлайн-подготовки использует:
 
@@ -254,19 +256,18 @@ PMTiles и MBTiles не используются как формат перво�
 Raw OSM
 → Planetiler / OpenMapTiles-compatible generation
 → минимальный Bee_search field profile
-→ versioned static MVT
-→ HTTPS static/object delivery
+→ versioned MVT внутри PMTiles Map Package
+→ acquisition-independent delivery
+→ app-controlled local storage
 → MapLibre
 ```
 
-Конкретный cloud/CDN vendor не фиксируется. Stateful tile server не является
-обязательным архитектурным условием. Delivery должна предоставлять стабильные
-versioned URL для style JSON, TileJSON, MVT tiles, glyphs, sprites и информации
-об attribution/license.
-
-Online runtime style и OfflineRegion preparation обязаны использовать
-одинаковые canonical resource URLs. Несовместимая версия не должна молча
-переиспользовать URL старого profile.
+Конкретный cloud/CDN vendor и способ получения package не фиксируются.
+Stateful tile server не является обязательным архитектурным условием. Offline
+delivery использует PMTiles Map Package по D063; manual import и future server
+download должны приводить к одному совместимому локальному artifact. Online
+delivery может использовать отдельный совместимый transport. Несовместимая
+версия не должна молча переиспользовать identity или resources старого profile.
 
 Стандартные OpenMapTiles-compatible layers переиспользуются для roads,
 tracks/paths, waterways, landcover, buildings, settlements, railway и bridges.
@@ -283,22 +284,22 @@ PoC; другие OSM tags не добавляются без подтвержд
 Baseline zoom contract:
 
 - vector source maxzoom — `15`;
-- offline download maxzoom — `15`;
+- offline Map Package maxzoom — `15`;
 - UI maxzoom — `20`;
 - `z16–20` отображаются через vector overscaling.
 
 Source z16 может быть принят позднее только после ограниченного Samsung A/B PoC,
-если дополнительная полевая детализация оправдывает рост размера и времени
-загрузки. Source z17–20 не входят в первый milestone.
+если дополнительная полевая детализация оправдывает рост размера package и
+времени его получения. Source z17–20 не входят в первый milestone.
 
 Используется один versioned field `MapProfile`, описывающий совместимость
 schema/profile, dataset snapshot, style/resources, zoom contract и attribution.
-Provider catalog не создаётся. Старый Ready region должен оставаться
+Provider catalog не создаётся. Старый активный Map Package должен оставаться
 интерпретируемым после публикации новой версии profile.
 
 Satellite не входит в обязательный vector offline milestone. При наличии
 подходящих прав provider он может работать online независимо от vector
-readiness, а позднее — иметь отдельный optional OfflineRegion с собственными
+readiness, а позднее — иметь отдельный optional offline package с собственными
 bounds, zoom, provider/profile и lifecycle. Конкретный satellite provider пока
 не выбран. Contours, hillshade и DEM отложены.
 
@@ -1037,20 +1038,15 @@ Territory.map_region_data
 
 Состояние загрузки, выбранная область, локальные пути и другие технические метаданные офлайн-карты относятся к конкретному устройству, а не к синхронизируемой исследовательской `Territory`.
 
-Первый milestone использует opaque metadata самого MapLibre `OfflineRegion` для
-минимальной связи package с `territoryId`, package kind и versioned MapProfile.
-Metadata может иметь собственную schema version и необходимые lifecycle
-timestamps или replacement/supersession link.
+Активированный PMTiles Map Package и его installation/activation state хранятся
+в app-controlled storage согласно D063. Локальная infrastructure metadata
+должна быть достаточна, чтобы отличить установленный artifact от совместимой
+замены и проверить его связь с versioned MapProfile. Конкретный manifest format
+и infrastructure store этим решением не фиксируются.
 
-Не дублируются значения, для которых MapLibre остаётся authoritative source:
-
-- bounds и zoom из `OfflineRegionDefinition`;
-- download status;
-- bytes;
-- resource и tile counts из `OfflineRegionStatus`.
-
-Отдельная infrastructure database или DataStore-каталог не создаются в первом
-milestone без доказанной необходимости.
+Authoritative readiness определяется наличием полностью staged, проверенного и
+атомарно активированного совместимого package, а не Room research data,
+внешним URI или частично полученным файлом.
 
 ### Следствие
 
@@ -1301,15 +1297,71 @@ Observer и Territory можно редактировать с сохранен�
 
 ---
 
+# D063 — PMTiles выбран форматом offline vector Map Package для Territory
+
+**Статус:** ACCEPTED
+
+**Заменяет:** D007
+
+Основной offline vector Map Package Bee Search для Territory представляет собой
+versioned PMTiles artifact, построенный из контролируемых OSM-derived данных
+через Planetiler и совместимый Bee Search field profile. MapLibre Android читает
+активированный package напрямую из app-controlled private storage; локальный
+HTTP-сервер не является частью этой архитектуры.
+
+Способ получения package не определяет его дальнейший lifecycle. Manual import,
+future server download и другие разрешённые acquisition adapters должны
+сходиться в одной последовательности:
+
+```text
+acquire
+→ stage in app-controlled storage
+→ validate compatibility and integrity
+→ atomically activate
+→ render through MapLibre
+```
+
+Отдельный copy step не является архитектурным инвариантом. Package считается
+готовым для офлайн-работы только после полной проверки совместимости и
+целостности и успешной атомарной активации. Внешний URI, cache hit, partially
+staged artifact или сам факт начала acquisition не означают Offline Ready.
+
+Каждый активированный Map Package должен иметь достаточно identity/version
+metadata, чтобы Bee Search могла отличить установленный artifact от совместимой
+замены. Конкретный manifest format этим решением не определяется.
+
+Replacement выполняется безопасно: текущий активный package остаётся доступным,
+пока новый artifact не прошёл validation и не был атомарно активирован. Ошибка
+acquisition, staging или validation не удаляет и не повреждает рабочую карту.
+
+Состояние установки, локальные пути и activation metadata являются
+device-local map infrastructure и не хранятся в Room research schema.
+
+Сохраняются следующие границы:
+
+- base map не содержит редактируемые user/domain geodata;
+- `Territory boundary` определяет рабочую область, а `map coverage` — один или
+  несколько фрагментов желаемого или фактического offline coverage;
+- map infrastructure не является `Territory`, `ObservationPoint`, `Bee` или
+  `FlightCycle` и не входит в их Room-модель.
+
+D063 заменяет OfflineRegion-specific механизм, readiness authority и delivery
+assumptions D007, но сохраняет его общие требования explicit offline readiness,
+device-local infrastructure и safe replacement.
+
+Это решение не определяет конкретный server API, package manifest format,
+downloader, update cadence или satellite imagery lifecycle.
+
+---
+
 # Закрытые архитектурные вопросы
 
-- O001 — формат первого offline milestone закрыт решением D007:
-  MapLibre `OfflineRegion`;
+- O001 — формат offline vector Map Package закрыт решением D063: PMTiles;
 - O002 — основной vector source закрыт решением D008: контролируемые Bee Search
   OSM-derived versioned MVT; satellite provider остаётся отдельным открытым
   выбором;
-- O003 — первый механизм выбора области закрыт решением D007: корректируемый
-  пользователем rectangle.
+- O003 — `Territory boundary` и multi-fragment `map coverage` разделены D063;
+  production UX и persistence границы Territory остаются отдельным решением.
 
 ---
 
@@ -1375,13 +1427,13 @@ Observer и Territory можно редактировать с сохранен�
 
 `timestamps → Instant / Unix epoch milliseconds`
 
-`one MapLibre map → online resources + explicitly prepared OfflineRegion coverage`
+`MapLibre → online source or activated local PMTiles Map Package`
 
-`field vector source → Bee_search OSM profile + versioned HTTPS MVT`
+`field vector source → Bee_search OSM profile + versioned PMTiles/MVT`
 
 `vector zoom → source/offline z15 + UI overscaling to z20`
 
-`offline package metadata → device-local OfflineRegion metadata`
+`offline package metadata → device-local installation/activation metadata`
 
 `локальное сохранение сейчас → серверная синхронизация позже`
 

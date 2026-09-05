@@ -660,7 +660,7 @@ showCurrentPosition()
 showObservationPoints()
 showTemporaryPoint()
 moveTemporaryPoint()
-showOfflineRegion()
+showOfflineMapPackage()
 ```
 
 Не требуется строить сложный универсальный GIS-framework.
@@ -671,11 +671,9 @@ showOfflineRegion()
 
 # 21. Офлайн-карты
 
-Bee Search использует одну MapLibre-карту. При наличии сети обычные resource
-requests могут загружаться online. Явно подготовленный `OfflineRegion`
-гарантирует локальную доступность выбранной области, но не создаёт отдельный
-режим карты и не является обязательным условием существования Territory или
-полевой работы.
+Bee Search использует MapLibre для online-карты и для активированного локального
+PMTiles Map Package. Offline package не является обязательным условием
+существования Territory или полевой работы.
 
 Архитектура должна поддерживать:
 
@@ -684,14 +682,14 @@ Territory.id
         ↓
 device-local offline coverage metadata
         ↓
-MapLibre shared cache/offline resource database
+validated active PMTiles Map Package in app-controlled storage
         ↓
-local resource hit ── or ── network request on miss
+MapLibre local rendering without network fallback
 ```
 
-Ambient cache может быть вытеснен и не является доказательством readiness.
-Region считается Ready только по совместимым metadata/definition и
-`OfflineRegionStatus.isComplete == true`.
+Ambient cache, внешний URI и partially staged file не являются доказательством
+readiness. Package считается Ready только после validation совместимости и
+целостности и атомарной активации.
 
 Сами картографические данные и metadata не хранятся в Room research schema.
 `Territory` не содержит `map_status`, `map_region_data` или bounds.
@@ -708,16 +706,15 @@ research data. Редактирование использует working copy и
 
 # 22. Граница offline-map infrastructure
 
-Небольшая техническая граница вокруг MapLibre offline API должна отвечать за:
+Небольшая техническая граница Map Package должна отвечать за:
 
 * выбор области карты;
-* начало загрузки;
-* отображение прогресса;
-* pause/resume/retry в foreground;
-* восстановление списка regions и status после restart;
-* проверку Ready по MapLibre API;
-* удаление или обновление картографического пакета;
-* предоставление definition/metadata для coverage overlay.
+* acquisition через отдельный adapter;
+* staging в app-controlled storage;
+* validation совместимости и целостности;
+* атомарную активацию;
+* безопасную замену или удаление картографического пакета;
+* предоставление device-local package/coverage state для UI.
 
 Предметная модель не должна знать формат файлов карты.
 
@@ -725,11 +722,9 @@ research data. Редактирование использует working copy и
 строить generic provider framework или отдельный catalog для одного field
 profile.
 
-Первый milestone может хранить минимальную связь package в opaque metadata
-самого OfflineRegion: metadata schema version, `territoryId`, package kind,
-profile/dataset/style versions и только необходимые lifecycle timestamps или
-supersession link. Bounds/zoom берутся из definition, а status, bytes и resource
-counts — из `OfflineRegionStatus`; эти значения не дублируются.
+Каждый активированный package имеет достаточно identity/version metadata, чтобы
+отличить установленный artifact от совместимой замены и проверить MapProfile.
+Конкретный manifest format и infrastructure store пока не фиксируются.
 
 Coverage отображается app-generated GeoJSON overlay поверх обычной карты. Для
 первого milestone достаточно границ Ready, Downloading/Incomplete, Failed и
@@ -744,52 +739,36 @@ Map/network/offline failures изолированы от Room research workflow.
 
 # 23. Формат офлайн-карт
 
-Первый production milestone использует MapLibre Native Android
-`OfflineRegion` с `OfflineTilePyramidRegionDefinition`:
-
-- style URL;
-- прямоугольные bounds;
-- offline min/max zoom;
-- device pixel ratio;
-- opaque device-local metadata.
+Offline vector Map Package использует PMTiles согласно D063. MapLibre Android
+читает активированный package напрямую из app-controlled private storage без
+локального HTTP-сервера.
 
 ```text
-online MapLibre requests
-        ↓
-shared resource database
-        ↓ cache miss
-HTTPS source
+acquire
+→ stage in app-controlled storage
+→ validate compatibility and integrity
+→ atomically activate
+→ render through MapLibre
 ```
 
-Online runtime и offline preparation обязаны использовать одинаковые canonical
-resource URLs. Иначе ранее сохранённый ресурс не соответствует runtime request.
+Отдельный copy step не является архитектурным инвариантом. Manual import и
+future server download различаются acquisition adapter, но используют один
+installation/validation/activation boundary. Renderer получает только локальный
+активный package, а не внешний document URI или partially staged artifact.
 
 Пользователь формирует device-local offline coverage из одного или нескольких
 rectangle fragments. Каждый фрагмент может первоначально соответствовать
 viewport и затем добавляться после pan/zoom карты. Составное coverage является
 объединением фрагментов; оно не превращается автоматически в общий bounding
 rectangle. Фрагменты могут перекрываться и должны быть видимы поверх карты до
-начала download. Bounds остаются в MapLibre region definition, не становятся
-Territory data и не копируются в Room.
+начала acquisition. Bounds остаются device-local map coverage data, не
+становятся Territory data и не копируются в Room.
 
-При tile-based delivery overlap фрагментов не должен требовать повторного
-хранения одинаковых ресурсов. Общая MapLibre resource database остаётся
-границей этого требования; конкретный алгоритм дедупликации сейчас не
-проектируется.
-
-Bounds существующего OfflineRegion не изменяются in place. Первый milestone
-допускает несколько additive regions. При replacement старый Ready region
-сохраняется до тех пор, пока новый не имеет `isComplete == true`, совместимый
-profile и достаточное покрытие старой области. Failed extension никогда не
-удаляет существующее Ready coverage.
-
-Download работает foreground-only. Process death не обязан оставлять активную
-загрузку, но созданный region и уже полученные ресурсы сохраняются; после
-restart status перечитывается и incomplete download можно продолжить в
-foreground.
-
-PMTiles/MBTiles не входят в этот milestone. PMTiles остаётся возможным будущим
-форматом prebuilt autonomous packages, требующим отдельного lifecycle решения.
+Replacement не изменяет активный package in place. Старая версия сохраняется,
+пока новый artifact не прошёл validation и не был атомарно активирован. Ошибка
+acquisition/staging/validation не удаляет существующую Ready-карту. Конкретные
+download, resume, quota, cleanup и manifest mechanics остаются отдельными
+решениями.
 
 ---
 
@@ -805,13 +784,16 @@ MapLibre не предоставляет готовые карты автома�
 Raw OSM
 → Planetiler / OpenMapTiles-compatible generation
 → minimal Bee_search field profile
-→ versioned static MVT
-→ HTTPS object/static delivery
+→ versioned MVT inside PMTiles Map Package
+→ acquisition-independent delivery
+→ app-controlled local storage
+→ MapLibre
 ```
 
 Stateful tile server и конкретный cloud/CDN vendor не являются обязательными.
-Delivery предоставляет versioned style JSON, TileJSON, MVT, glyphs, sprites и
-attribution/license information.
+Package и MapProfile обеспечивают совместимость MVT schema, style/resources,
+glyphs, attribution/license и zoom contract. Online source может использовать
+отдельный совместимый transport.
 
 Стандартные OpenMapTiles-compatible layers используются для roads,
 tracks/paths, waterways, landcover, buildings, settlements, railway и bridges.
@@ -825,17 +807,17 @@ Vector source и offline maxzoom равны `15`. UI может увеличив
 
 Один versioned field MapProfile задаёт совместимость schema/profile, dataset
 snapshot, style/resources, zoom contract и attribution. Новая несовместимая
-версия получает новые resource URLs; старые Ready regions не удаляются и не
-становятся неинтерпретируемыми молча.
+версия получает новую package identity/version; старый активный package не
+удаляется и не становится неинтерпретируемым молча.
 
 Satellite остаётся optional: при разрешении provider он может работать online
-независимо от vector preparation и позднее использовать отдельный
-OfflineRegion с собственными bounds/zoom/profile. Satellite readiness не
-входит в readiness основной vector map. Contours, hillshade и DEM отложены.
+независимо от vector preparation и позднее использовать отдельный offline
+package с собственными bounds/zoom/profile/lifecycle. Satellite readiness не
+входит в readiness основной vector map. Формат и provider satellite package не
+выбраны. Contours, hillshade и DEM отложены.
 
 Runtime style может содержать Field, Satellite и Hybrid layer groups и менять
-их visibility без полной перезагрузки style. Download-specific vector и
-satellite styles должны сохранять те же canonical resource URLs. GPS,
+их visibility без полной перезагрузки style. GPS,
 crosshair, ObservationPoints и будущие app-generated research overlays не
 зависят от выбранной base-map group.
 
@@ -1432,6 +1414,11 @@ GPX
 
 Сервер не входит в MVP.
 
+Подробное, пока не принятое архитектурное предложение по ownership данных,
+SyncEngine, conflict policy, map-package service и минимальному server stack
+находится в `server-sync-architecture.md`. Оно не изменяет статусы решений в
+`decisions.md` до отдельного review и утверждения.
+
 Предполагаемая будущая схема:
 
 ```text
@@ -1828,11 +1815,11 @@ remove azimuth
 
 ```text
 Bee_search OSM field source
-rectangular OfflineRegion selection
-foreground download + progress/pause/resume/retry
-strict Ready status
+PMTiles Map Package acquisition
+staging + compatibility/integrity validation
+atomic activation + strict Ready status
 coverage overlay
-safe additive/replacement regions
+safe package replacement
 airplane-mode Samsung validation
 ```
 
@@ -1869,7 +1856,7 @@ airplane-mode Samsung validation
 │          │                                  │
 │ Territory → Point → Bee → FlightCycle      │
 │                                            │
-│ MapLibre ← device-local OfflineRegion API  │
+│ MapLibre ← active local PMTiles package    │
 │                                            │
 │ LocationProvider ← GPS                     │
 │ HeadingProvider  ← Sensors                 │
