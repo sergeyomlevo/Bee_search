@@ -4,7 +4,6 @@ import org.beesearch.app.ui.map.MapCoverageFragment
 import org.beesearch.app.ui.map.MapCameraPadding
 import org.beesearch.app.ui.map.MapGeoBounds
 import org.beesearch.app.ui.map.addCoverageFragment
-import org.beesearch.app.ui.map.benchmarkBoundsSummary
 import org.beesearch.app.ui.map.clearCoverageFragments
 import org.beesearch.app.ui.map.coverageBoundsSummary
 import org.beesearch.app.ui.map.coverageReviewCameraPadding
@@ -137,23 +136,5 @@ class MapCoverageSelectionTest {
             "-West 42.2882890 -South 56.1530380 -East 42.7299151 -North 56.4446941",
             formatMapPackageBuilderBounds(normalized),
         )
-    }
-
-    @Test
-    fun `benchmark summary uses the selected rectangle envelope without persistence identity`() {
-        val summary = benchmarkBoundsSummary(
-            listOf(
-                MapCoverageFragment(firstViewportAtZoom15),
-                MapCoverageFragment(separateViewportAtZoom16),
-            ),
-        )
-
-        assertEquals(
-            MapGeoBounds(north = 56.21, east = 42.90, south = 56.13, west = 42.75),
-            summary?.bounds,
-        )
-        assertTrue(summary!!.widthKm > 0.0)
-        assertTrue(summary.heightKm > 0.0)
-        assertTrue(summary.areaKm2 > 0.0)
     }
 }

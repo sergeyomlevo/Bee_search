@@ -148,13 +148,6 @@ internal fun coverageBoundsSummary(bounds: MapGeoBounds): MapAreaBoundsSummary {
     )
 }
 
-internal fun benchmarkBoundsSummary(
-    fragments: List<MapCoverageFragment>,
-): MapAreaBoundsSummary? {
-    val bounds = coverageBoundsForShowAll(fragments) ?: return null
-    return coverageBoundsSummary(bounds)
-}
-
 private fun haversineKm(
     latitudeA: Double,
     longitudeA: Double,

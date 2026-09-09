@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
-import android.app.Activity
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.activity.compose.BackHandler
@@ -57,13 +56,7 @@ import org.beesearch.app.MapTarget
 import org.beesearch.app.ObservationPointCreationDraft
 import org.beesearch.app.beeSearchFieldMapProfile
 import org.beesearch.app.beeSearchActivePmtilesMapProfile
-import org.beesearch.app.beeSearchLocalForestPmtilesMapProfile
-import org.beesearch.app.beeSearchLocalSapunovoPmtilesMapProfile
-import org.beesearch.app.beeSearchLocalSapunovoDiagnosticProfile
-import org.beesearch.app.beeSearchLocalSapunovoLabelDiagnosticProfile
-import org.beesearch.app.beeSearchLocalTerritoryBenchmarkPmtilesMapProfile
 import org.beesearch.app.BuildConfig
-import org.beesearch.app.beeSearchLocalCyclOSMMapProfile
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.visibleMapMeasurement
 import org.maplibre.android.MapLibre
@@ -102,7 +95,6 @@ internal fun BeeMap(
     var mapZoom by remember { mutableStateOf<Double?>(null) }
     var recenteredUntilNextGesture by remember { mutableStateOf(false) }
     var coverageSelectionMode by remember { mutableStateOf(false) }
-    var benchmarkBoundsSelectionMode by remember { mutableStateOf(false) }
     var editingTerritoryId by remember { mutableStateOf<UUID?>(null) }
     var persistedCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
     var workingCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
@@ -111,17 +103,7 @@ internal fun BeeMap(
     var coverageViewportBounds by remember { mutableStateOf<MapGeoBounds?>(null) }
     var packageAvailability by remember { mutableStateOf<MapPackageAvailability>(MapPackageAvailability.Missing) }
     var clearSelectionConfirmationVisible by remember { mutableStateOf(false) }
-    var benchmarkWorkingCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
-    var benchmarkResult by remember { mutableStateOf<MapAreaBoundsSummary?>(null) }
-    val activity = LocalContext.current as? Activity
-    val initialDeveloperBasemap = if (
-        BuildConfig.DEBUG && activity?.intent?.getStringExtra("beeMapDiagnostic") == "label"
-    ) {
-        DeveloperBasemap.LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC
-    } else {
-        DeveloperBasemap.ONLINE
-    }
-    var developerBasemap by remember { mutableStateOf(initialDeveloperBasemap) }
+    var developerBasemap by remember { mutableStateOf(DeveloperBasemap.ONLINE) }
     var mapCameraRevision by remember { mutableStateOf(0) }
     var coverageControlsHeightPx by remember { mutableStateOf(0) }
     val coverageCameraEdgePaddingPx = with(LocalDensity.current) { 16.dp.roundToPx() }
@@ -129,7 +111,7 @@ internal fun BeeMap(
     val reading = (locationState as? LocationUiState.Available)?.reading
     val gpsPosition = reading?.let { MapTarget(it.latitude, it.longitude) }
     val isCreatingObservationPoint = observationPointDraft != null
-    val coverageSelectionActive = coverageSelectionMode || benchmarkBoundsSelectionMode
+    val coverageSelectionActive = coverageSelectionMode
     val measurement = if (
         !coverageSelectionActive &&
         initialGpsCenterEstablished &&
@@ -142,12 +124,6 @@ internal fun BeeMap(
     val appContext = LocalContext.current.applicationContext
     val latestTerritoryId by rememberUpdatedState(territoryId)
     val onlineMapProfile = remember { beeSearchFieldMapProfile() }
-    val localMapProfile = remember(appContext) { beeSearchLocalCyclOSMMapProfile(appContext) }
-    val localVectorProfile = remember(appContext) { beeSearchLocalForestPmtilesMapProfile(appContext) }
-    val localSapunovoProfile = remember(appContext) { beeSearchLocalSapunovoPmtilesMapProfile(appContext) }
-    val localTerritoryBenchmarkProfile = remember(appContext) { beeSearchLocalTerritoryBenchmarkPmtilesMapProfile(appContext) }
-    val localSapunovoDiagnosticProfile = remember(appContext) { beeSearchLocalSapunovoDiagnosticProfile(appContext) }
-    val localSapunovoLabelDiagnosticProfile = remember(appContext) { beeSearchLocalSapunovoLabelDiagnosticProfile(appContext) }
     val coroutineScope = rememberCoroutineScope()
     LaunchedEffect(territoryId, coverageStore) {
         if (editingTerritoryId != null && editingTerritoryId != territoryId) {
@@ -196,7 +172,6 @@ internal fun BeeMap(
     }
     val coverageFragments = when {
         coverageSelectionMode -> workingCoverage
-        benchmarkBoundsSelectionMode -> benchmarkWorkingCoverage
         territoryId != null && coverageLoadedFor == territoryId && !coverageLoading -> persistedCoverage
         else -> emptyList()
     }
@@ -213,14 +188,9 @@ internal fun BeeMap(
     val activeMapPackage = (packageAvailability as? MapPackageAvailability.Ready)?.activePackage
     val activeVectorProfile = activeMapPackage?.let(::beeSearchActivePmtilesMapProfile)
     BackHandler(enabled = coverageSelectionActive) {
-        if (benchmarkBoundsSelectionMode) {
-            benchmarkBoundsSelectionMode = false
-            benchmarkWorkingCoverage = emptyList()
-        } else {
-            coverageSelectionMode = false
-            editingTerritoryId = null
-            workingCoverage = emptyList()
-        }
+        coverageSelectionMode = false
+        editingTerritoryId = null
+        workingCoverage = emptyList()
     }
     BackHandler(enabled = isCreatingObservationPoint && !coverageSelectionActive) {
         onCancelObservationPointCreation()
@@ -482,28 +452,19 @@ internal fun BeeMap(
                 fragmentCount = coverageFragments.size,
                 viewportSummary = coverageViewportSummary,
                 selectedSummary = selectedCoverageSummary,
-                showDevBoundsExport = BuildConfig.DEBUG && !benchmarkBoundsSelectionMode,
-                title = if (benchmarkBoundsSelectionMode) "PMTiles benchmark BBOX" else "Участок",
+                showDevBoundsExport = BuildConfig.DEBUG,
+                title = "Участок",
                 canAddFragment = map != null,
                 onAddFragment = {
                     map?.projection?.visibleRegion?.latLngBounds?.let { visibleBounds ->
-                        val updated = addCoverageFragment(
-                            fragments = if (benchmarkBoundsSelectionMode) benchmarkWorkingCoverage else workingCoverage,
+                        workingCoverage = addCoverageFragment(
+                            fragments = workingCoverage,
                             bounds = MapGeoBounds.fromMapLibre(visibleBounds),
                         )
-                        if (benchmarkBoundsSelectionMode) {
-                            benchmarkWorkingCoverage = updated
-                        } else {
-                            workingCoverage = updated
-                        }
                     }
                 },
                 onUndo = {
-                    if (benchmarkBoundsSelectionMode) {
-                        benchmarkWorkingCoverage = undoLastCoverageFragment(benchmarkWorkingCoverage)
-                    } else {
-                        workingCoverage = undoLastCoverageFragment(workingCoverage)
-                    }
+                    workingCoverage = undoLastCoverageFragment(workingCoverage)
                 },
                 onShowAll = {
                     coverageBoundsForShowAll(coverageFragments)?.let { bounds ->
@@ -524,31 +485,22 @@ internal fun BeeMap(
                 },
                 onClear = { clearSelectionConfirmationVisible = true },
                 onDone = {
-                    if (benchmarkBoundsSelectionMode) {
-                        // MapLibre retains the padding passed to newLatLngBounds. It is valid for
-                        // coverage review, but would otherwise shift the normal map camera center.
-                        map?.restoreNormalCameraPadding(normalCameraPadding)
-                        benchmarkResult = benchmarkBoundsSummary(benchmarkWorkingCoverage)
-                        benchmarkBoundsSelectionMode = false
-                        benchmarkWorkingCoverage = emptyList()
-                    } else {
-                        val id = editingTerritoryId
-                        if (id != null) {
-                            val selectedCoverage = workingCoverage
-                            coroutineScope.launch {
-                                try {
-                                    coverageStore.replace(id, selectedCoverage)
-                                    if (id == latestTerritoryId) persistedCoverage = selectedCoverage
-                                    map?.restoreNormalCameraPadding(normalCameraPadding)
-                                    coverageSelectionMode = false
-                                    editingTerritoryId = null
-                                } catch (_: Exception) {
-                                    Toast.makeText(
-                                        appContext,
-                                        "Не удалось сохранить участок",
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                                }
+                    val id = editingTerritoryId
+                    if (id != null) {
+                        val selectedCoverage = workingCoverage
+                        coroutineScope.launch {
+                            try {
+                                coverageStore.replace(id, selectedCoverage)
+                                if (id == latestTerritoryId) persistedCoverage = selectedCoverage
+                                map?.restoreNormalCameraPadding(normalCameraPadding)
+                                coverageSelectionMode = false
+                                editingTerritoryId = null
+                            } catch (_: Exception) {
+                                Toast.makeText(
+                                    appContext,
+                                    "Не удалось сохранить участок",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
                             }
                         }
                     }
@@ -562,14 +514,9 @@ internal fun BeeMap(
                     }
                 },
                 onCancel = {
-                    if (benchmarkBoundsSelectionMode) {
-                        benchmarkBoundsSelectionMode = false
-                        benchmarkWorkingCoverage = emptyList()
-                    } else {
-                        coverageSelectionMode = false
-                        editingTerritoryId = null
-                        workingCoverage = emptyList()
-                    }
+                    coverageSelectionMode = false
+                    editingTerritoryId = null
+                    workingCoverage = emptyList()
                 },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -598,21 +545,10 @@ internal fun BeeMap(
         if (clearSelectionConfirmationVisible) {
             ClearCoverageSelectionDialog(
                 onConfirm = {
-                    if (benchmarkBoundsSelectionMode) {
-                        benchmarkWorkingCoverage = clearCoverageFragments()
-                    } else {
-                        workingCoverage = clearCoverageFragments()
-                    }
+                    workingCoverage = clearCoverageFragments()
                     clearSelectionConfirmationVisible = false
                 },
                 onDismiss = { clearSelectionConfirmationVisible = false },
-            )
-        }
-
-        benchmarkResult?.let { summary ->
-            BenchmarkBoundsResultDialog(
-                summary = summary,
-                onDismiss = { benchmarkResult = null },
             )
         }
     }
@@ -622,26 +558,11 @@ internal fun BeeMap(
         val profile = when (developerBasemap) {
             DeveloperBasemap.ONLINE -> onlineMapProfile
             DeveloperBasemap.ACTIVE_VECTOR -> activeVectorProfile ?: onlineMapProfile
-            DeveloperBasemap.LOCAL_RASTER -> localMapProfile
-            DeveloperBasemap.LOCAL_VECTOR -> localVectorProfile
-            DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR -> localSapunovoProfile
-            DeveloperBasemap.LOCAL_TERRITORY_BENCHMARK -> localTerritoryBenchmarkProfile
-            DeveloperBasemap.LOCAL_SAPUNOVO_DIAGNOSTIC -> localSapunovoDiagnosticProfile
-            DeveloperBasemap.LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC -> localSapunovoLabelDiagnosticProfile
         }
         Log.d("BeeMap", "style request mode=$developerBasemap profile=${profile.profileId} path=${profile.datasetVersion} hash=${profile.styleJson.hashCode()}")
         mapInstance.setMaxZoomPreference(profile.uiMaxZoom)
-        val fitBounds = when (developerBasemap) {
-            DeveloperBasemap.LOCAL_VECTOR -> FOREST_CUTLINES_BOUNDS
-            DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR -> SAPUNOVO_FIELDS_WATER_BOUNDS
-            else -> null
-        }
         mapInstance.setStyle(Style.Builder().fromJson(profile.styleJson)) {
             Log.d("BeeMap", "style loaded profile=${profile.profileId} center=${mapInstance.cameraPosition.target} zoom=${mapInstance.cameraPosition.zoom}")
-            fitBounds?.let { bounds ->
-                Log.d("BeeMap", "fit bounds profile=${profile.profileId} bounds=$bounds")
-                mapInstance.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 48))
-            }
         }
     }
 }
@@ -649,23 +570,6 @@ internal fun BeeMap(
 private enum class DeveloperBasemap {
     ONLINE,
     ACTIVE_VECTOR,
-    LOCAL_RASTER,
-    LOCAL_VECTOR,
-    LOCAL_SAPUNOVO_VECTOR,
-    LOCAL_TERRITORY_BENCHMARK,
-    LOCAL_SAPUNOVO_DIAGNOSTIC,
-    LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC;
-
-    fun next(): DeveloperBasemap = when (this) {
-        ONLINE -> LOCAL_RASTER
-        ACTIVE_VECTOR -> ONLINE
-        LOCAL_RASTER -> LOCAL_VECTOR
-        LOCAL_VECTOR -> LOCAL_SAPUNOVO_VECTOR
-        LOCAL_SAPUNOVO_VECTOR -> LOCAL_TERRITORY_BENCHMARK
-        LOCAL_TERRITORY_BENCHMARK -> ONLINE
-        LOCAL_SAPUNOVO_DIAGNOSTIC -> ONLINE
-        LOCAL_SAPUNOVO_LABEL_DIAGNOSTIC -> ONLINE
-    }
 }
 
 @Composable
@@ -708,23 +612,6 @@ private fun MapBasemapSourceSelector(
         }
     }
 }
-
-// Descriptor source: tools/map-poc/areas.json (sapunovo-fields-water).
-private val SAPUNOVO_FIELDS_WATER_BOUNDS = org.maplibre.android.geometry.LatLngBounds.Builder()
-    .include(LatLng(56.0933, 42.6413))
-    .include(LatLng(56.1203, 42.6893))
-    .build()
-
-private val FOREST_CUTLINES_BOUNDS = org.maplibre.android.geometry.LatLngBounds.Builder()
-    .include(LatLng(56.0615, 42.7460))
-    .include(LatLng(56.0885, 42.7940))
-    .build()
-
-// User-selected PMTiles benchmark BBOX. It is developer-only and is deliberately not a Territory model.
-private val TERRITORY_BENCHMARK_BOUNDS = org.maplibre.android.geometry.LatLngBounds.Builder()
-    .include(LatLng(56.153038, 42.288289))
-    .include(LatLng(56.444694, 42.729915))
-    .build()
 
 private fun MapLibreMap.restoreNormalCameraPadding(padding: MapCameraPadding) {
     cameraPosition = CameraPosition.Builder(cameraPosition)

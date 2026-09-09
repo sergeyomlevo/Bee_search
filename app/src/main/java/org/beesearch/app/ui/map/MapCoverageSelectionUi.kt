@@ -37,7 +37,6 @@ internal const val DONE_COVERAGE_SELECTION_DESCRIPTION = "Завершить в�
 internal const val MAP_COVERAGE_SELECTION_CONTROLS_TAG = "map-coverage-selection-controls"
 internal const val CURRENT_COVERAGE_SUMMARY_TAG = "current-coverage-summary"
 internal const val COPY_SELECTED_COVERAGE_DESCRIPTION = "Копировать выбранный bbox для сборки карты"
-internal const val ENTER_BENCHMARK_BOUNDS_SELECTION_DESCRIPTION = "Выбрать BBOX для PMTiles benchmark"
 internal const val IMPORT_OFFLINE_MAP_DESCRIPTION = "Импортировать офлайн-карту"
 internal const val SELECT_OFFLINE_COVERAGE_DESCRIPTION = "Выбрать участок для офлайн-карты"
 internal const val OFFLINE_MAP_PACKAGE_PANEL_TAG = "offline-map-package-panel"
@@ -126,21 +125,6 @@ internal fun CoverageSelectionEntry(
             .testTag("enter-coverage-selection"),
     ) {
         CoverageGlyph()
-    }
-}
-
-@Composable
-internal fun BenchmarkBoundsSelectionEntry(
-    onEnter: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    TextButton(
-        onClick = onEnter,
-        modifier = modifier
-            .semantics { contentDescription = ENTER_BENCHMARK_BOUNDS_SELECTION_DESCRIPTION }
-            .testTag("enter-benchmark-bounds-selection"),
-    ) {
-        Text("BBOX")
     }
 }
 
@@ -270,36 +254,6 @@ private fun CoverageViewportSummary(summary: MapAreaBoundsSummary) {
             style = MaterialTheme.typography.labelSmall,
         )
     }
-}
-
-@Composable
-internal fun BenchmarkBoundsResultDialog(
-    summary: MapAreaBoundsSummary,
-    onDismiss: () -> Unit,
-) {
-    fun coordinate(value: Double): String = "%.6f".format(java.util.Locale.ROOT, value)
-    fun kilometers(value: Double): String = "%.1f".format(java.util.Locale.ROOT, value)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("PMTiles benchmark BBOX") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("west = ${coordinate(summary.bounds.west)}")
-                Text("south = ${coordinate(summary.bounds.south)}")
-                Text("east = ${coordinate(summary.bounds.east)}")
-                Text("north = ${coordinate(summary.bounds.north)}")
-                Text("Ширина: ${kilometers(summary.widthKm)} км")
-                Text("Высота: ${kilometers(summary.heightKm)} км")
-                Text("Площадь: ${kilometers(summary.areaKm2)} км²")
-                Text(
-                    "Это временный benchmark BBOX: он не сохранён в Territory и не запускает генерацию карты.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } },
-    )
 }
 
 @Composable
