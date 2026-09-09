@@ -1,0 +1,58 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^apply_patch$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tools/personal-core-audit-pilot/hook-handler.js\"",
+            "commandWindows": "node (Join-Path (& git rev-parse --show-toplevel) 'tools/personal-core-audit-pilot/hook-handler.js')",
+            "async": true,
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^apply_patch$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tools/personal-core-audit-pilot/hook-handler.js\"",
+            "commandWindows": "node (Join-Path (& git rev-parse --show-toplevel) 'tools/personal-core-audit-pilot/hook-handler.js')",
+            "async": true,
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tools/luna-delegation-audit/hook-handler.js\"",
+            "commandWindows": "node (Join-Path (& git rev-parse --show-toplevel) 'tools/luna-delegation-audit/hook-handler.js')",
+            "async": true,
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tools/luna-delegation-audit/hook-handler.js\"",
+            "commandWindows": "node (Join-Path (& git rev-parse --show-toplevel) 'tools/luna-delegation-audit/hook-handler.js')",
+            "async": true,
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

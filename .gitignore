@@ -31,3 +31,7 @@ tools/map-poc/out/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Python tooling caches
+__pycache__/
+*.pyc

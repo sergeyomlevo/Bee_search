@@ -3,6 +3,7 @@ package org.beesearch.app
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.content.Intent
+import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
 import androidx.test.core.app.ActivityScenario
@@ -13,6 +14,7 @@ import java.io.FileOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.runBlocking
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -30,6 +32,8 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.net.ConnectivityReceiver
+import org.beesearch.app.ui.map.MapPackageAvailability
+import org.beesearch.app.ui.map.MapPackageImportResult
 
 /**
  * Opt-in real-endpoint checks for the development Map Data PoC.
@@ -40,6 +44,113 @@ import org.maplibre.android.net.ConnectivityReceiver
  */
 @RunWith(AndroidJUnit4::class)
 class BeeMapPocDeviceTest {
+    @Test
+    fun reimportingActiveLargePackageIsIdempotent() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beeLargeActiveMapPackage") == "true")
+        assertEquals("org.beesearch.app.dev", instrumentation.targetContext.packageName)
+        assertTrue("Large-package device check must run only in a debug build", BuildConfig.DEBUG)
+
+        val container = (instrumentation.targetContext.applicationContext as BeeSearchApplication).container
+        val (territoryId, coverage, before) = runBlocking {
+            val territoryId = requireNotNull(container.settingsRepository.getSettings().currentTerritoryId)
+            val coverage = container.mapCoverageStore.load(territoryId)
+            val ready = container.mapPackageStore.loadActive(territoryId, coverage) as? MapPackageAvailability.Ready
+            Triple(territoryId, coverage, requireNotNull(ready).activePackage)
+        }
+        assertEquals("user-large-coverage-20260909-v2", before.manifest.packageId)
+        val packagesDirectory = requireNotNull(before.pmtilesFile.parentFile?.parentFile)
+        val beforeDirectories = packagesDirectory.listFiles().orEmpty().filter(File::isDirectory).map(File::getName).toSet()
+
+        val result = runBlocking {
+            container.mapPackageStore.import(
+                territoryId = territoryId,
+                desiredCoverage = coverage,
+                manifestUri = Uri.fromFile(File(requireNotNull(before.pmtilesFile.parentFile), "package.manifest.json")),
+                pmtilesUri = Uri.fromFile(before.pmtilesFile),
+            )
+        }
+        assertTrue("Byte-identical active package was not an idempotent success: $result", result is MapPackageImportResult.Activated)
+        val after = (result as MapPackageImportResult.Activated).activePackage
+        assertEquals(before.pmtilesFile.absolutePath, after.pmtilesFile.absolutePath)
+        assertEquals(
+            beforeDirectories,
+            packagesDirectory.listFiles().orEmpty().filter(File::isDirectory).map(File::getName).toSet(),
+        )
+    }
+
+    @Test
+    fun activeLargePackageRendersRemoteCoverageAndOverscalesOnDevice() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beeLargeActiveMapPackage") == "true")
+        assertEquals("org.beesearch.app.dev", instrumentation.targetContext.packageName)
+        assertTrue("Large-package device check must run only in a debug build", BuildConfig.DEBUG)
+
+        val activePackage = runBlocking {
+            val container = (instrumentation.targetContext.applicationContext as BeeSearchApplication).container
+            val territoryId = requireNotNull(container.settingsRepository.getSettings().currentTerritoryId)
+            val coverage = container.mapCoverageStore.load(territoryId)
+            val ready = container.mapPackageStore.loadActive(territoryId, coverage) as? MapPackageAvailability.Ready
+            requireNotNull(ready) { "The selected large package is not active and compatible" }
+            ready.activePackage
+        }
+        assertEquals("user-large-coverage-20260909-v2", activePackage.manifest.packageId)
+        val profile = beeSearchActivePmtilesMapProfile(activePackage)
+        val timings = mutableListOf<String>()
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val mapView = scenario.findMapView()
+            val map = mapView.awaitMap()
+            map.setStyleAndAwait(profile.styleJson)
+            assertEquals(20.0, onMain { map.maxZoomLevel }, 0.0)
+            assertNotNull(onMain { map.style?.getSource("bee-field") })
+
+            val points = listOf(
+                Triple("north-west", 56.43, 42.30),
+                Triple("north-east", 56.43, 42.95),
+                Triple("south-west", 55.78, 42.30),
+                Triple("south-east", 55.78, 42.95),
+            )
+            points.forEach { (name, latitude, longitude) ->
+                val started = System.nanoTime()
+                map.moveAndAwait(latitude = latitude, longitude = longitude, zoom = 14.0)
+                assertAnyRendered(
+                    mapView,
+                    map,
+                    "forest",
+                    "water",
+                    "waterways",
+                    "roads",
+                    "tracks",
+                    "railway",
+                    "power-lines",
+                    "cutlines",
+                    "buildings",
+                    "place-labels",
+                )
+                timings += "$name-z14=${"%.3f".format((System.nanoTime() - started) / 1_000_000_000.0)}s"
+                captureScreenshot("large-active-$name-z14")
+            }
+
+            val overviewStarted = System.nanoTime()
+            map.moveAndAwait(latitude = 56.1001581, longitude = 42.6222602, zoom = 9.0)
+            assertAnyRendered(mapView, map, "forest", "water", "roads", "place-labels")
+            timings += "overview-z9=${"%.3f".format((System.nanoTime() - overviewStarted) / 1_000_000_000.0)}s"
+            captureScreenshot("large-active-overview-z9")
+
+            val overscaleStarted = System.nanoTime()
+            map.moveAndAwait(latitude = 56.0715664, longitude = 42.7508162, zoom = 20.0)
+            assertEquals(20.0, onMain { map.cameraPosition.zoom }, 0.01)
+            assertRendered(mapView, map, "cutlines") { it.getStringProperty("class") == "cutline" }
+            timings += "center-z20=${"%.3f".format((System.nanoTime() - overscaleStarted) / 1_000_000_000.0)}s"
+            captureScreenshot("large-active-center-z20")
+        }
+
+        val evidenceDirectory = File(instrumentation.targetContext.getExternalFilesDir(null), "map-poc")
+        check(evidenceDirectory.mkdirs() || evidenceDirectory.isDirectory)
+        File(evidenceDirectory, "large-active-performance.txt").writeText(timings.joinToString("\n") + "\n")
+    }
+
     @Test
     fun fieldSourceRendersRequiredObjectsAndOverscalesOnDevice() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()

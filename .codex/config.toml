@@ -1,0 +1,10 @@
+# Bee Search only. Select the root model (GPT-6 Astra) when launching Codex.
+[features]
+multi_agent = true
+multi_agent_v2 = false
+step_model_switching = false
+
+[agents]
+enabled = true
+default_subagent_model = "gpt-5.6-luna"
+default_subagent_reasoning_effort = "medium"

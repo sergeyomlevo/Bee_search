@@ -1,0 +1,3 @@
+# Audit records are local and intentionally untracked.
+*
+!.gitignore

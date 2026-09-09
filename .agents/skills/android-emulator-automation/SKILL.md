@@ -44,7 +44,7 @@ metadata:
 ## Examples
 ### Happy path
 - Scenario: Build the Bee Search debug APK, target the intended device, launch
-  `org.beesearch.app`, and inspect the current screen semantically.
+  `org.beesearch.app.dev`, and inspect the current screen semantically.
 - Use the repository Gradle wrapper and the scripts under this skill. Choose
   the exact commands according to the current task and device state.
 

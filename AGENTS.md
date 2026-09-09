@@ -251,7 +251,8 @@ Agent-specific decision behavior is defined in:
 ├── preferences.yaml
 ├── preference-evidence.md
 ├── evaluation-policy.yaml
-└── evaluation-log.md
+├── evaluation-log.md
+└── ui-policy.md
 ```
 
 Use:
@@ -267,6 +268,56 @@ Use:
   governance behavior is being reviewed;
 - `.agent/evaluation-log.md` only when its recorded events are relevant to the
   current task or review.
+
+For any task that creates, modifies, reviews, or verifies user-facing UI, read
+`.agent/ui-policy.md` before implementation. Treat it as the project-wide UI
+policy. For significant UI work, verify the applicable items from its final
+checklist.
+
+### Project-specific multi-agent routing
+
+GPT-6 Astra is the root agent selected at launch. Root owns interpretation of
+ambiguous requirements, architecture, product and domain semantics, persistence
+and migrations/invariants, governance and policy, ACCEPTED D0xx and destructive
+decisions, planning, integration of delegated results, and final review and
+acceptance. Delegation does not transfer decision ownership or user approval.
+
+Prefer `luna-worker` for bounded, well-defined, reversible implementation work
+that needs no architectural, product, domain, persistence, or governance
+judgment, including local refactoring, repo exploration, mechanical edits, and
+straightforward docs once root has defined the scope, invariants, and acceptance
+criteria. Prefer `luna-verifier` for independent diff/tests/build/device
+verification when a separate check is genuinely useful.
+Both roles and default subagents use `gpt-5.6-luna` with `medium` reasoning,
+configured in `.codex/config.toml` and `.codex/agents/`.
+When the spawn tool exposes model/effort overrides, pass those Luna values
+explicitly with a scoped handoff instead of inheriting the root model. If the
+tool cannot select a custom agent, read the corresponding role file and pass
+its instructions in the handoff; report that fallback accurately.
+
+Typical workflow:
+
+```text
+Astra root: scope, invariants, acceptance criteria
+    -> luna-worker: bounded implementation
+    -> luna-verifier: independent evidence when justified
+    -> Astra root: final review and acceptance
+```
+
+Root chooses proportionate delegation. This is a preference, not hard
+enforcement: do not delegate merely to demonstrate multi-agent use, and work
+directly when defining and reviewing the subtask would cost about as much as
+completing it. Neither role is mandatory for every small task.
+For Room migrations, transactional invariants, ObservationPoint/Bee/FlightCycle
+lifecycle, D064/D067 or other ACCEPTED D0xx decisions, map package lifecycle or
+integrity, analysis/predictions/nests architecture, or product semantics changes,
+root must implement the critical part itself or explicitly review it after Luna.
+Luna must return unresolved ambiguity, decision conflicts, and invariant risks
+to root before continuing the affected work.
+
+This routing policy supplements all existing project governance and does not
+replace Decision Precedence, `.agent/decision-policy.yaml`, or the authoritative
+`.agent/ui-policy.md` for UI tasks. Preserve existing dirty-worktree changes.
 
 ### Preference Evidence Usage
 
@@ -566,6 +617,15 @@ Never claim a build, test, migration, or device behavior succeeded unless it
 was actually verified.
 
 If something could not be verified, state exactly what remains unverified.
+
+### Development and field package safety
+
+`org.beesearch.app` is the protected field package. Normal development and
+instrumentation workflows must use `org.beesearch.app.dev` and
+`org.beesearch.app.dev.test`. Before direct ADB installation, verify the
+artifact application ID. Do not target the field package with `pm clear`,
+uninstall, or a release install unless the current task explicitly authorizes
+a field-release or recovery operation.
 
 ---
 

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "packageId": "territory-benchmark-v1",
+  "territoryCompatibility": {
+    "policy": "coverage_fragments_only"
+  },
+  "datasetVersion": "central-russia-poc-20260830",
+  "profileId": "bee-search-field",
+  "profileVersion": "v1",
+  "styleVersion": "vector-pmtiles-v1",
+  "coverageFragments": [
+    {
+      "west": 42.288289,
+      "south": 56.153038,
+      "east": 42.729915,
+      "north": 56.444694
+    }
+  ],
+  "minZoom": 8,
+  "maxZoom": 15,
+  "pmtilesFile": "territory-benchmark-v1.pmtiles",
+  "pmtilesByteLength": 5255967,
+  "pmtilesSha256": "d5d895bd51b96a8adc0e9338c35467d82e8f5064c07e831ec0d067cfd1849768"
+}

@@ -288,12 +288,22 @@ Useful commands include:
 
 ```powershell
 adb devices
-adb install -r <apk>
+adb install -r -t <debug-apk>
 adb shell pm list packages
 adb logcat
 ```
 
 Prefer Android Studio/Gradle deployment when it is already working; use direct ADB when it improves diagnosis or repeatability.
+
+### Bee Search package safety
+
+The field package is `org.beesearch.app`. Normal development and
+instrumentation workflows use `org.beesearch.app.dev` and
+`org.beesearch.app.dev.test`; `installDebug` produces the development package.
+Before a direct ADB install, verify the artifact's application ID and target
+only the intended development package. Never run `pm clear`, `uninstall`, or
+install a release artifact against `org.beesearch.app` unless the current task
+explicitly authorizes a field-release or recovery operation.
 
 Do not change device settings unrelated to the task.
 
