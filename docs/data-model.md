@@ -77,9 +77,9 @@ AppSettings
 
 ---
 
-## 3.4. Первый групповой выпуск определяется первым циклом
+## 3.4. Первый групповой выпуск и его correction provenance
 
-Первый групповой выпуск не хранится отдельной сущностью и не требует отдельного флага.
+Первый групповой выпуск не хранится отдельной сущностью `GroupRelease`.
 
 Для каждой участвующей Bee:
 
@@ -87,7 +87,19 @@ AppSettings
 sequence_number = 1
 ```
 
-означает первый групповой выпуск.
+означает первый цикл участвующей Bee. Чтобы приложение могло безопасно
+отличить атомарно созданный групповой вылет от позднего индивидуального
+первого вылета после correction, Room хранит минимальное provenance:
+
+- `ObservationPoint.initial_group_release_at` — общий timestamp уже
+  произошедшего группового выпуска;
+- `FlightCycle.initial_group_launch` — цикл создан этой групповой транзакцией;
+- `FlightCycle.initial_group_launch_correction_eligible` — только для ещё
+  открытого такого цикла, пока для него ни разу не был записан `return_time`.
+
+Это не отдельная research-сущность, не сохранённый state Bee и не общий undo
+history. Эти технические признаки нужны только для одной локальной correction
+ошибочно приписанного первоначального вылета.
 
 Все первые циклы подготовленных пчёл получают одинаковое `departure_time`.
 
@@ -415,6 +427,7 @@ gps_longitude       Double?     optional
 gps_accuracy_m      Double?     optional
 
 created_at          Instant     required
+initial_group_release_at Instant? optional
 completed_at        Instant?    optional
 ```
 
@@ -857,6 +870,8 @@ return_time         Instant?    optional
 
 azimuth_deg         Double?     optional
 azimuth_capture_consumed Boolean required
+initial_group_launch Boolean required
+initial_group_launch_correction_eligible Boolean required
 
 created_at          Instant     required
 updated_at          Instant     required
@@ -899,19 +914,11 @@ bee_id + sequence_number
 
 # 40. Первый цикл
 
-```text
-sequence_number = 1
-```
-
-всегда означает первый групповой выпуск.
-
-Отдельное поле:
-
-```text
-is_initial_group
-```
-
-не хранится.
+`sequence_number = 1` означает первый FlightCycle конкретной Bee. Обычно он
+создаётся в групповом выпуске, но после локальной correction Bee, которая
+фактически не улетела, её первый настоящий индивидуальный вылет также остаётся
+`sequence_number = 1`. Поэтому происхождение группового цикла хранится в
+`initial_group_launch`, а не угадывается по номеру или timestamp.
 
 Пригодность первого цикла для расчётов продолжительности также не хранится отдельным полем. Она вычисляется как:
 
@@ -940,7 +947,12 @@ excluded_from_flight_duration_analysis =
 FlightCycle
 sequence_number = 1
 departure_time = одно общее значение
+initial_group_launch = true
+initial_group_launch_correction_eligible = true
 ```
+
+В этой же транзакции у ObservationPoint сохраняется
+`initial_group_release_at = departure_time`.
 
 Например:
 
@@ -964,7 +976,8 @@ cycle 1
 
 Первый групповой выпуск должен сохраняться одной транзакцией.
 
-Недопустима ситуация, когда из-за ошибки только часть Bee получила первый FlightCycle.
+Недопустима ситуация, когда из-за ошибки только часть Bee получила первый
+FlightCycle или timestamp/provenance группового выпуска.
 
 Операция должна завершаться:
 
@@ -1166,8 +1179,14 @@ azimuth_capture_consumed = true
 создание территории
 → сохранить
 
-создание точки
-→ сохранить
+подтверждение координат
+→ transient draft, не сохранять
+
+первая Bee
+→ одной транзакцией сохранить точку + Bee + BEES_FOUND
+
+`Пчёлы отсутствуют`
+→ одной транзакцией сохранить точку + NO_BEES_FOUND + completed_at
 
 добавление Bee
 → сохранить
@@ -1288,7 +1307,12 @@ FlightCycle
 новое полевое наблюдение
 ```
 
-Например, исправление времени возврата допустимо как редактирование.
+Во время active observation допускается только локальная correction последнего
+обратимого действия конкретной Bee: очистить `return_time` последнего цикла,
+очистить его `azimuth_deg` без сброса `azimuth_capture_consumed` или удалить
+только открытый последний FlightCycle с `sequence_number > 1`. Эти операции
+выполняются транзакционно и не требуют отдельной persisted undo-history.
+Первый групповой FlightCycle и более ранние циклы этим workflow не удаляются.
 
 Повторная работа через несколько дней в том же месте создаёт новую ObservationPoint.
 

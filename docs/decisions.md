@@ -742,6 +742,10 @@ FlightCycle при этом сохраняется.
 
 **Статус:** ACCEPTED
 
+**Частично superseded:** D064 уточняет, что выбор и подтверждение координат
+сами по себе ещё не являются созданием исследовательской точки и не пишутся в
+Room.
+
 Не используется модель:
 
 `провести наблюдение → нажать общую кнопку "Сохранить"`
@@ -1351,6 +1355,155 @@ device-local infrastructure и safe replacement.
 
 Это решение не определяет конкретный server API, package manifest format,
 downloader, update cadence или satellite imagery lifecycle.
+
+---
+
+# D064 — ObservationPoint появляется только с первым результатом наблюдения
+
+**Статус:** ACCEPTED
+
+**Supersedes:** только часть D035, относившуюся к сохранению точки при выборе
+или подтверждении её координат.
+
+Подтверждение координат на карте начинает transient-стадию «Подготовка точки».
+Она хранит данные будущей `ObservationPoint`, включая current Territory,
+current Observer, исходное GPS-измерение и подтверждённые координаты, но не
+создаёт research record в Room.
+
+До первого содержательного результата пользователь может явным действием
+закрытия или Android system Back прекратить подготовку. Draft отбрасывается,
+открывается карта текущей Territory, и в Room не создаются `ObservationPoint`,
+`Bee` или `FlightCycle`. Для этого abort не показывается confirm dialog и не
+создаётся отдельный persisted-статус.
+
+Persistence boundary определяется первым содержательным результатом:
+
+- первая добавленная Bee одной Room-транзакцией создаёт `ObservationPoint`,
+  создаёт Bee и устанавливает `BEES_FOUND`;
+- явное подтверждение «Пчёлы отсутствуют» одной Room-транзакцией создаёт
+  `ObservationPoint`, устанавливает `NO_BEES_FOUND` и завершает точку.
+
+Операция с первой Bee не может оставить сохранённую точку без этой Bee. После
+успешной транзакции действует обычный persistent workflow; последующий выход
+не удаляет фактические данные наблюдения.
+
+`ABORTED PREPARATION` означает отсутствие начатого исследовательского
+наблюдения и не является значением `bee_presence_result`. `NO_BEES_FOUND`
+остаётся явным сохранённым отрицательным результатом проведённого наблюдения.
+
+---
+
+# D065 — Map Package contract v1 использует sidecar manifest
+
+**Статус:** ACCEPTED
+
+**Дополняет:** D063; формат map artifact остаётся PMTiles.
+
+Каждый Map Package v1 состоит из immutable PMTiles artifact и отдельного
+versioned JSON sidecar manifest, лежащего рядом с artifact при acquisition и
+staging. Manifest называет archive только переносимым basename, а не
+workstation path, external document URI или app-private installation path.
+Так manual import и future server delivery используют один contract без
+зависимости от PoC-specific paths.
+
+Обязательные поля manifest v1:
+
+- `schemaVersion` со значением `1`;
+- стабильный versioned `packageId`;
+- `territoryCompatibility` с policy `coverage_fragments_only`: package не
+  содержит `Territory.id` и совместим с Territory через coverage, а не через
+  identity;
+- `datasetVersion`, `profileId`, `profileVersion` и `styleVersion`;
+- непустой `coverageFragments` из отдельных geographic rectangles;
+- целочисленные `minZoom` и `maxZoom`;
+- basename `pmtilesFile`;
+- положительный `pmtilesByteLength`;
+- lower-case hexadecimal `pmtilesSha256` длиной 64 символа.
+
+`coverageFragments` описывает фактическое заявленное coverage package и не
+является `Territory boundary`, не заменяет desired coverage из DataStore и не
+становится Room data. Один PMTiles header bbox недостаточен, чтобы описать
+несколько fragments или доказать отсутствие пробелов между ними.
+
+При staging приложение проверяет integrity: наличие названного artifact,
+точный byte length, SHA-256 и читаемость поддерживаемого PMTiles header. Hash
+обнаруживает повреждение относительно manifest, но сам по себе не доказывает
+подлинность источника manifest; происхождение acquisition и возможная future
+signature policy остаются отдельным решением.
+
+Приложение проверяет compatibility: schema v1, допустимую пару
+`profileId`/`profileVersion` и `styleVersion`, совпадение manifest zoom range с
+PMTiles header, а также что header bbox включает каждый declared fragment.
+Для v1 desired coverage считается покрытым только когда каждый его rectangle
+целиком входит хотя бы в один `coverageFragments` package. Это намеренно
+консервативнее вычисления объединения rectangles и не допускает назвать Ready
+coverage с незакрытым промежутком.
+
+Если desired coverage изменяется, приложение не меняет active package in place
+и не удаляет его. Оно заново сравнивает desired fragments с manifest: package
+остаётся Ready, только если все они покрыты; иначе старая карта остаётся
+доступной для прежнего coverage, но новый desired coverage требует validated
+replacement. `generatedAt`, source/licensing provenance, human description,
+center, signature, server URL, download/retry state и quota не обязательны для
+v1 и могут быть добавлены future schema version без изменения immutable
+artifact.
+
+---
+
+# D066 — Локальная отмена последнего действия Bee в active observation
+
+**Статус:** ACCEPTED
+
+Для защиты от случайной регистрации полевого события active observation UI
+показывает `↶ Отменить` только в карточке той Bee, чьё последнее обратимое
+действие корректно определяется из её последнего `FlightCycle`. Это не global
+undo, не unlimited history и не отдельная persisted undo-модель.
+
+Последовательность обратимых действий выводится из current latest cycle:
+
+- если текущий цикл закрыт, отменяется его последний `return_time`;
+- если текущий открытый цикл содержит азимут, удаляется только `azimuth_deg`, а
+  `azimuth_capture_consumed` остаётся `true`;
+- если текущий открытый цикл имеет `sequence_number > 1` и азимута уже нет,
+  удаляется только этот последний вновь созданный FlightCycle.
+
+Поэтому `Улетела → Азимут → Undo → Undo` сначала удаляет азимут, а затем
+удаляет созданный повторный цикл и возвращает Bee к предыдущему `return_time`.
+Исходные timestamps не переписываются: после отмены `Прилетела` снова
+используется исходный `departure_time`, после отмены `Улетела` — исходный
+`return_time` предыдущего цикла. Специальное исключение для ошибочно
+приписанного initial group launch определено последующим D067.
+
+Каждая отмена выполняется одной Room-транзакцией и изменяет только данные
+конкретной Bee. Если позднейшее действие уже делает correction неоднозначной,
+local Undo не предлагается. После успешной correction UI перечитывает Room и
+пересортировывает Bee по обычным derived данным.
+
+---
+
+# D067 — Correction ошибочно приписанного первого группового вылета
+
+**Статус:** ACCEPTED
+
+Это решение supersedes только прежний безусловный запрет D066 на удаление
+первого группового FlightCycle.
+
+После атомарного `Выпустить всех` отдельная Bee может фактически не улететь.
+Пока её автоматически созданный первый FlightCycle остаётся открытым, создан
+именно групповой транзакцией и для него ещё ни разу не был записан `return_time`,
+локальная `↶` этой Bee может удалить только этот цикл. Это одна Room transaction;
+остальные Bee и их FlightCycle не меняются.
+
+После correction Bee остаётся на точке без FlightCycle и без фиктивного
+`return_time`. Когда она действительно улетает, `Улетела` создаёт новый
+индивидуальный `FlightCycle sequence_number = 1` с фактическим временем.
+
+Происхождение initial group launch и его ограниченная eligibility хранятся как
+минимальная persisted provenance, а не как generic undo stack: групповой
+timestamp принадлежит ObservationPoint, а цикл помечается как созданный
+групповым выпуском. Запись `return_time` необратимо закрывает eligibility этой
+особой correction; последующее обычное Undo прилёта не позволяет удалить
+исторический первый цикл. Следующий цикл также исключает такое удаление.
 
 ---
 

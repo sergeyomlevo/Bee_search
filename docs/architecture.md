@@ -402,15 +402,20 @@ Use case вводится там, где существует реальное �
 
 ## 11.1. Создание ObservationPoint и результат присутствия пчёл
 
-Создание точки является транзакционной операцией. Внутри одной Room transaction
+Создание исследовательской точки происходит только с первым содержательным
+результатом и является транзакционной операцией. Внутри одной Room transaction
 приложение проверяет ссылки на Territory и Observer, определяет локальный
 `observation_year`, получает следующий `point_number` в области `Territory +
 observation_year + observer_id` и вставляет ObservationPoint. Составной UNIQUE
-index остаётся окончательной защитой от совпадения номера.
+index остаётся окончательной защитой от совпадения номера. Подтверждённые
+координаты до этого существуют только в transient draft.
 
 `created_at` сохраняется как абсолютный Instant; локальная временная зона используется только для однократного назначения `observation_year`.
 
-Добавление первой Bee также является составной транзакцией: запись Bee и установка `BEES_FOUND` должны либо сохраниться вместе, либо не сохраниться вовсе. Явный результат `NO_BEES_FOUND` и завершение точки также записываются одной транзакцией.
+Добавление первой Bee также является составной транзакцией: ObservationPoint,
+запись Bee и установка `BEES_FOUND` должны либо сохраниться вместе, либо не
+сохраниться вовсе. Явный результат `NO_BEES_FOUND` создаёт ObservationPoint и
+завершает её одной транзакцией.
 
 ## 11.2. Первый групповой выпуск
 
@@ -557,10 +562,11 @@ Room transaction обязательна как минимум для:
 
 В Room schema v5 внешние ключи Territory/Observer, составные уникальности метки
 Bee, номера FlightCycle и номера ObservationPoint обеспечиваются ограничениями
-SQLite. Правила «одна активная ObservationPoint» и «один открытый FlightCycle на
-Bee» проверяются внутри транзакционных методов Repository; DAO остаются
-внутренней деталью слоя хранения. Создание точки, изменение результата
-присутствия пчёл и связанные записи Bee выполняются транзакционно.
+ SQLite. Правила «одна активная ObservationPoint» и «один открытый FlightCycle на
+ Bee» проверяются внутри транзакционных методов Repository; DAO остаются
+ внутренней деталью слоя хранения. Создание точки с первым результатом,
+ изменение результата присутствия пчёл и связанные записи Bee выполняются
+ транзакционно.
 
 ---
 
@@ -718,13 +724,18 @@ research data. Редактирование использует working copy и
 
 Предметная модель не должна знать формат файлов карты.
 
-Имя и внутренняя форма компонента не фиксируются до implementation. Не нужно
-строить generic provider framework или отдельный catalog для одного field
-profile.
+Первый implementation использует небольшой device-local Map Package store:
+стабильный ключ active package хранится в Preferences DataStore по
+`Territory.id`, а staged и immutable active artifacts — в app-controlled private
+storage. Это не generic provider framework и не Room-модель. Ручной Android
+Files picker является acquisition adapter текущего milestone; future downloader
+должен подать тот же manifest/PMTiles contract на границу staging/validation.
 
 Каждый активированный package имеет достаточно identity/version metadata, чтобы
 отличить установленный artifact от совместимой замены и проверить MapProfile.
-Конкретный manifest format и infrastructure store пока не фиксируются.
+D065 фиксирует переносимый Map Package contract v1: immutable PMTiles artifact
+и versioned sidecar JSON manifest рядом с ним. Device-local installation and
+activation state по-прежнему не является частью manifest и не хранится в Room.
 
 Coverage отображается app-generated GeoJSON overlay поверх обычной карты. Для
 первого milestone достаточно границ Ready, Downloading/Incomplete, Failed и
@@ -766,9 +777,34 @@ rectangle. Фрагменты могут перекрываться и долж�
 
 Replacement не изменяет активный package in place. Старая версия сохраняется,
 пока новый artifact не прошёл validation и не был атомарно активирован. Ошибка
-acquisition/staging/validation не удаляет существующую Ready-карту. Конкретные
-download, resume, quota, cleanup и manifest mechanics остаются отдельными
-решениями.
+acquisition/staging/validation не удаляет существующую Ready-карту. Renderer
+получает только active validated package текущей Territory; он не читает PoC
+fixture, внешний document URI или staging directory. Конкретные download,
+resume, quota и cleanup остаются отдельными решениями; static manifest
+validation определена D065.
+
+## 23.1. Map Package contract v1
+
+Contract v1 хранит metadata в sidecar JSON manifest рядом с immutable PMTiles,
+а не во внутреннем metadata block архива. Manifest называет PMTiles только
+переносимым basename; он не содержит workstation path, document URI или
+app-private installation path. Его обязательные поля перечислены в D065:
+schema/package identity, profile/style compatibility, declared coverage
+fragments, zoom range, filename, byte length и SHA-256.
+
+`coverageFragments` описывает фактическое заявленное package coverage, а не
+`Territory boundary` и не заменяет device-local desired coverage. Общий bbox в
+PMTiles header может подтвердить лишь внешний envelope. Поэтому v1 проверяет
+каждый desired rectangle консервативно: он должен целиком входить хотя бы в один
+declared fragment; частичное покрытие или покрытие только объединением
+нескольких fragments не даёт Ready для нового desired coverage. Generator
+должен выпускать fragments из того же coverage plan, что использован для
+создания artifact.
+
+При изменении desired coverage активный package не удаляется. Приложение заново
+сравнивает её с manifest: если все desired fragments всё ещё покрыты, package
+остаётся Ready; иначе он остаётся доступной картой предыдущего coverage, но не
+доказывает Offline Ready для нового desired coverage до validated replacement.
 
 ---
 
@@ -889,12 +925,20 @@ manual correction
         ↓
 confirmation
         ↓
-local observation year + scoped point number
+transient preparation draft
         ↓
-ObservationPoint saved to Room transactionally
+first Bee → ObservationPoint + Bee + BEES_FOUND transactionally
+        │
+        └── `Пчёлы отсутствуют` → ObservationPoint + NO_BEES_FOUND + completed_at transactionally
 ```
 
-Если сохранение кода не удалось, поток не доходит до Room. Если сохранение точки не удалось после успешной записи кода, код остаётся в DataStore для повторной попытки.
+До первого содержательного результата Close или system Back отбрасывают draft
+без записи в Room. При ошибке одной из транзакций первого результата Room
+откатывает всю операцию: не остаётся отдельной пустой ObservationPoint.
+
+Если сохранение кода не удалось, поток не доходит до Room. Если транзакция
+первого результата не удалась после успешной записи кода, код остаётся в
+DataStore для повторной попытки.
 
 GPS-позиция и итоговый marker должны оставаться различимыми.
 
