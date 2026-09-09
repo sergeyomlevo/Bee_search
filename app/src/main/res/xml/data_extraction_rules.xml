@@ -1,19 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ backup and device-transfer policy (targetSdk 31+).
+
+    Default Android Auto Backup covers most app-private data. These rules only
+    exclude large device-local assets; research data (Room database) and user
+    settings (DataStore) remain included by default.
+
+    Excluded because they are re-downloadable/importable and can reach hundreds
+    of megabytes:
+    - files/map-packages/        (staged and active offline PMTiles packages)
+    - files/dev-bootstrap/       (DEV bootstrap fixtures)
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="file" path="map-packages/" />
+        <exclude domain="file" path="dev-bootstrap/" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="map-packages/" />
+        <exclude domain="file" path="dev-bootstrap/" />
     </device-transfer>
-    -->
 </data-extraction-rules>
