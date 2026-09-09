@@ -35,11 +35,83 @@ internal const val SHOW_ALL_COVERAGE_DESCRIPTION = "Показать всё вы
 internal const val CLEAR_COVERAGE_DESCRIPTION = "Очистить выбранное покрытие"
 internal const val DONE_COVERAGE_SELECTION_DESCRIPTION = "Завершить выбор offline coverage"
 internal const val MAP_COVERAGE_SELECTION_CONTROLS_TAG = "map-coverage-selection-controls"
+internal const val CURRENT_COVERAGE_SUMMARY_TAG = "current-coverage-summary"
+internal const val COPY_SELECTED_COVERAGE_DESCRIPTION = "Копировать выбранный bbox для сборки карты"
 internal const val ENTER_BENCHMARK_BOUNDS_SELECTION_DESCRIPTION = "Выбрать BBOX для PMTiles benchmark"
+internal const val IMPORT_OFFLINE_MAP_DESCRIPTION = "Импортировать офлайн-карту"
+internal const val SELECT_OFFLINE_COVERAGE_DESCRIPTION = "Выбрать участок для офлайн-карты"
+internal const val OFFLINE_MAP_PACKAGE_PANEL_TAG = "offline-map-package-panel"
 
 private val coverageFill = Color(0xFF1565C0).copy(alpha = 0.16f)
 private val coverageBorder = Color(0xFF0D47A1).copy(alpha = 0.9f)
 private val viewportFrame = Color(0xFFF57C00).copy(alpha = 0.95f)
+
+@Composable
+internal fun OfflineMapPackagePanel(
+    desiredCoverageConfigured: Boolean,
+    availability: MapPackageAvailability,
+    isLoading: Boolean,
+    isImporting: Boolean,
+    message: String?,
+    onSelectCoverage: () -> Unit,
+    onImport: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val ready = availability as? MapPackageAvailability.Ready
+    val unavailable = availability as? MapPackageAvailability.Unavailable
+    Surface(
+        modifier = modifier
+            .widthIn(max = 288.dp)
+            .testTag(OFFLINE_MAP_PACKAGE_PANEL_TAG),
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 3.dp,
+        shadowElevation = 2.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            when {
+                isLoading -> Text("Проверка офлайн-карты…", style = MaterialTheme.typography.bodySmall)
+                ready != null -> Text("Офлайн-карта готова", style = MaterialTheme.typography.labelLarge)
+                else -> Text("Офлайн-карта не подготовлена", style = MaterialTheme.typography.labelLarge)
+            }
+            (message ?: unavailable?.message)?.let { detail ->
+                Text(detail, style = MaterialTheme.typography.bodySmall)
+            }
+            if (!desiredCoverageConfigured) {
+                Text(
+                    "Сначала выберите участок, который должен работать без сети.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Button(
+                    onClick = onSelectCoverage,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = SELECT_OFFLINE_COVERAGE_DESCRIPTION },
+                ) { Text("Выбрать участок") }
+            } else {
+                Text(
+                    "Импорт: сначала manifest, затем соответствующий PMTiles.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Button(
+                    onClick = onImport,
+                    enabled = !isImporting,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = IMPORT_OFFLINE_MAP_DESCRIPTION },
+                ) { Text(if (isImporting) "Импорт…" else if (ready == null) "Импортировать карту" else "Заменить карту") }
+                TextButton(
+                    onClick = onSelectCoverage,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = SELECT_OFFLINE_COVERAGE_DESCRIPTION },
+                ) { Text("Изменить участок") }
+            }
+        }
+    }
+}
 
 @Composable
 internal fun CoverageSelectionEntry(
@@ -75,13 +147,17 @@ internal fun BenchmarkBoundsSelectionEntry(
 @Composable
 internal fun MapCoverageSelectionControls(
     fragmentCount: Int,
-    title: String = "Выбор области",
+    viewportSummary: MapAreaBoundsSummary?,
+    selectedSummary: MapAreaBoundsSummary? = null,
+    showDevBoundsExport: Boolean = false,
+    title: String = "Участок",
     canAddFragment: Boolean,
     onAddFragment: () -> Unit,
     onUndo: () -> Unit,
     onShowAll: () -> Unit,
     onClear: () -> Unit,
     onDone: () -> Unit,
+    onCopySelectedBounds: () -> Unit = {},
     onCancel: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -99,7 +175,7 @@ internal fun MapCoverageSelectionControls(
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "$title · $fragmentCount",
+                    text = title,
                     modifier = Modifier.weight(1f).padding(start = 4.dp),
                     style = MaterialTheme.typography.labelLarge,
                 )
@@ -112,6 +188,19 @@ internal fun MapCoverageSelectionControls(
                     Text("Готово")
                 }
                 TextButton(onClick = onCancel) { Text("Выйти") }
+            }
+            viewportSummary?.let { summary ->
+                CoverageViewportSummary(summary)
+            }
+            if (showDevBoundsExport && selectedSummary != null) {
+                TextButton(
+                    onClick = onCopySelectedBounds,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = COPY_SELECTED_COVERAGE_DESCRIPTION },
+                ) {
+                    Text("Копировать bbox", maxLines = 1)
+                }
             }
             Button(
                 onClick = onAddFragment,
@@ -156,8 +245,36 @@ internal fun MapCoverageSelectionControls(
 }
 
 @Composable
+private fun CoverageViewportSummary(summary: MapAreaBoundsSummary) {
+    fun coordinate(value: Double): String = "%.6f".format(java.util.Locale.ROOT, value)
+    fun kilometers(value: Double): String = "%.1f".format(java.util.Locale.ROOT, value)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .testTag(CURRENT_COVERAGE_SUMMARY_TAG),
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        Text("Текущий участок", style = MaterialTheme.typography.labelMedium)
+        Text(
+            "С: ${coordinate(summary.bounds.north)}  Ю: ${coordinate(summary.bounds.south)}",
+            style = MaterialTheme.typography.labelSmall,
+        )
+        Text(
+            "З: ${coordinate(summary.bounds.west)}  В: ${coordinate(summary.bounds.east)}",
+            style = MaterialTheme.typography.labelSmall,
+        )
+        Text(
+            "${kilometers(summary.widthKm)} × ${kilometers(summary.heightKm)} км · ${kilometers(summary.areaKm2)} км²",
+            style = MaterialTheme.typography.labelSmall,
+        )
+    }
+}
+
+@Composable
 internal fun BenchmarkBoundsResultDialog(
-    summary: MapBenchmarkBoundsSummary,
+    summary: MapAreaBoundsSummary,
     onDismiss: () -> Unit,
 ) {
     fun coordinate(value: Double): String = "%.6f".format(java.util.Locale.ROOT, value)

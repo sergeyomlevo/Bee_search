@@ -6,9 +6,12 @@ import org.beesearch.app.ui.map.MapGeoBounds
 import org.beesearch.app.ui.map.addCoverageFragment
 import org.beesearch.app.ui.map.benchmarkBoundsSummary
 import org.beesearch.app.ui.map.clearCoverageFragments
+import org.beesearch.app.ui.map.coverageBoundsSummary
 import org.beesearch.app.ui.map.coverageReviewCameraPadding
 import org.beesearch.app.ui.map.coverageBoundsForShowAll
+import org.beesearch.app.ui.map.formatMapPackageBuilderBounds
 import org.beesearch.app.ui.map.normalMapCameraPadding
+import org.beesearch.app.ui.map.normalizeMapPackageBounds
 import org.beesearch.app.ui.map.undoLastCoverageFragment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -98,6 +101,42 @@ class MapCoverageSelectionTest {
             coverageReviewCameraPadding(controlsHeightPx = 230, edgePaddingPx = 16),
         )
         assertEquals(MapCameraPadding(), normalMapCameraPadding())
+    }
+
+    @Test
+    fun `current viewport summary reports its own coordinates and dimensions`() {
+        val summary = coverageBoundsSummary(firstViewportAtZoom15)
+
+        assertEquals(firstViewportAtZoom15, summary.bounds)
+        assertTrue(summary.widthKm > 0.0)
+        assertTrue(summary.heightKm > 0.0)
+        assertTrue(summary.areaKm2 > 0.0)
+    }
+
+    @Test
+    fun `selected bbox is normalized outward to PMTiles header precision and exports in builder order`() {
+        val raw = MapGeoBounds(
+            north = 56.444694041,
+            east = 42.729915019,
+            south = 56.153038049,
+            west = 42.288289091,
+        )
+
+        val normalized = normalizeMapPackageBounds(raw)
+
+        assertEquals(
+            MapGeoBounds(
+                north = 56.4446941,
+                east = 42.7299151,
+                south = 56.1530380,
+                west = 42.2882890,
+            ),
+            normalized,
+        )
+        assertEquals(
+            "-West 42.2882890 -South 56.1530380 -East 42.7299151 -North 56.4446941",
+            formatMapPackageBuilderBounds(normalized),
+        )
     }
 
     @Test

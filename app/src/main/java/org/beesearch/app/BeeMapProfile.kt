@@ -2,6 +2,8 @@ package org.beesearch.app
 
 import android.content.Context
 import java.io.File
+import org.beesearch.app.ui.map.ActiveMapPackage
+import org.beesearch.app.ui.map.BeeSearchMapPackageCompatibility
 
 private const val TEST_AREA_GEOJSON = """
 {"type":"FeatureCollection","features":[
@@ -93,6 +95,28 @@ internal fun beeSearchLocalTerritoryBenchmarkPmtilesMapProfile(context: Context)
         styleVersion = "vector-pmtiles-v1",
         styleJson = localVectorPmtilesStyle("pmtiles://file://$archivePath", "Territory benchmark local vector PMTiles PoC"),
         sourceMaxZoom = 15.0,
+        uiMaxZoom = 20.0,
+    )
+}
+
+/**
+ * The only normal-user local-vector profile: a D065-validated package that is
+ * active for the current Territory. Fixture and diagnostic profiles remain
+ * development-only and are never selected by this function.
+ */
+internal fun beeSearchActivePmtilesMapProfile(activePackage: ActiveMapPackage): BeeMapProfile {
+    val manifest = activePackage.manifest
+    check(manifest.profileId == BeeSearchMapPackageCompatibility.PROFILE_ID)
+    check(manifest.profileVersion == BeeSearchMapPackageCompatibility.PROFILE_VERSION)
+    check(manifest.styleVersion == BeeSearchMapPackageCompatibility.STYLE_VERSION)
+    val archivePath = activePackage.pmtilesFile.absolutePath.replace('\\', '/')
+    return BeeMapProfile(
+        profileId = manifest.profileId,
+        profileVersion = manifest.profileVersion,
+        datasetVersion = manifest.datasetVersion,
+        styleVersion = manifest.styleVersion,
+        styleJson = localVectorPmtilesStyle("pmtiles://file://$archivePath", "Bee Search offline vector map"),
+        sourceMaxZoom = manifest.maxZoom.toDouble(),
         uiMaxZoom = 20.0,
     )
 }

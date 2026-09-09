@@ -136,6 +136,42 @@ class BeeSelectorSelectionLogicTest {
         )
     }
 
+    @Test
+    fun `invalid selection keeps its color when another position is available`() {
+        val occupied = mark("WHITE", MarkPosition.NONE)
+
+        assertEquals(
+            mark("WHITE", MarkPosition.RIGHT_WING),
+            BeeSelectorSelectionLogic.reconcileSelection(occupied, available(occupied)),
+        )
+    }
+
+    @Test
+    fun `invalid exhausted color advances to first available catalog combination`() {
+        val white = BeeMarkCatalog.positions.map { position -> mark("WHITE", position) }
+
+        assertEquals(
+            mark("YELLOW", MarkPosition.NONE),
+            BeeSelectorSelectionLogic.reconcileSelection(
+                white.last(),
+                available(*white.toTypedArray()),
+            ),
+        )
+    }
+
+    @Test
+    fun `valid selection is retained when another combination becomes available`() {
+        val current = mark("GREEN", MarkPosition.RIGHT_WING)
+
+        assertEquals(
+            current,
+            BeeSelectorSelectionLogic.reconcileSelection(
+                current,
+                available(mark("WHITE", MarkPosition.NONE)),
+            ),
+        )
+    }
+
     private fun available(vararg used: BeeMarkCombination) =
         BeeMarkCatalog.availableCombinations(used.toList())
 

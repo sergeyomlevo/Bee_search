@@ -19,10 +19,13 @@ import java.time.Instant
 import java.util.UUID
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.ui.map.CANCEL_OBSERVATION_POINT_DESCRIPTION
+import org.beesearch.app.ui.map.CONFIRM_OBSERVATION_POINT_DESCRIPTION
 import org.beesearch.app.ui.map.CREATE_OBSERVATION_POINT_DESCRIPTION
 import org.beesearch.app.ui.map.CompactMapStatus
 import org.beesearch.app.ui.map.MAIN_BOTTOM_PANEL_TAG
 import org.beesearch.app.ui.map.MAIN_MAP_VIEWPORT_TAG
+import org.beesearch.app.ui.map.MapCreationControls
 import org.beesearch.app.ui.map.MapFirstScaffold
 import org.beesearch.app.ui.map.MapIdleControls
 import org.beesearch.app.ui.map.RECENTER_MAP_DESCRIPTION
@@ -177,6 +180,47 @@ class MainMapScreenTest {
         composeRule.onNodeWithContentDescription(RECENTER_MAP_DESCRIPTION).performClick()
         composeRule.onNodeWithTag("map-measurement-overlay").assertDoesNotExist()
         composeRule.onNodeWithText("0 м", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun creationControlsExposeConfirmCancelAndRecenterActions() {
+        val recentered = mutableStateOf(false)
+        val confirmed = mutableStateOf(false)
+        val cancelled = mutableStateOf(false)
+
+        composeRule.setContent {
+            Bee_searchTheme {
+                Box(Modifier.fillMaxSize()) {
+                    MapCreationControls(
+                        canRecenter = true,
+                        canConfirm = true,
+                        isSaving = false,
+                        onRecenter = { recentered.value = true },
+                        onConfirm = { confirmed.value = true },
+                        onCancel = { cancelled.value = true },
+                        modifier = Modifier.align(Alignment.BottomEnd),
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(RECENTER_MAP_DESCRIPTION)
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+        composeRule.onNodeWithContentDescription(CONFIRM_OBSERVATION_POINT_DESCRIPTION)
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+        composeRule.onNodeWithContentDescription(CANCEL_OBSERVATION_POINT_DESCRIPTION)
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+        composeRule.runOnIdle {
+            assertTrue(recentered.value)
+            assertTrue(confirmed.value)
+            assertTrue(cancelled.value)
+        }
     }
 
     @Test

@@ -30,7 +30,7 @@ object BeeMarkCatalog {
         supportedCombinations.filterNot(used.toSet()::contains)
 
     fun displayName(markColor: String, markPosition: MarkPosition): String {
-        val colorName = colors.firstOrNull { it.value == markColor }?.displayName ?: markColor
+        val colorName = colorDisplayName(markColor)
         return when (markPosition) {
             MarkPosition.NONE -> colorName
             MarkPosition.RIGHT_WING -> "$colorName КП"
@@ -38,8 +38,11 @@ object BeeMarkCatalog {
         }
     }
 
+    fun colorDisplayName(markColor: String): String =
+        colors.firstOrNull { it.value == markColor }?.displayName ?: markColor
+
     fun positionDisplayName(markPosition: MarkPosition): String = when (markPosition) {
-        MarkPosition.NONE -> "Обычная"
+        MarkPosition.NONE -> "Грудь"
         MarkPosition.RIGHT_WING -> "КП"
         MarkPosition.LEFT_WING -> "КЛ"
     }

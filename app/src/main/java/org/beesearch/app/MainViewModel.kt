@@ -62,7 +62,9 @@ sealed interface AppRoute {
     data object Loading : AppRoute
     data object Settings : AppRoute
     data object TerritoryManagement : AppRoute
+    data object OfflineMapManagement : AppRoute
     data object CurrentTerritory : AppRoute
+    data object PrepareObservationPoint : AppRoute
     data class ResumeObservation(val point: ObservationPoint) : AppRoute
 }
 
@@ -96,9 +98,11 @@ internal class MainViewModel(
     private val territoryCoverageDeletion: TerritoryCoverageDeletion,
 ) : ViewModel() {
     private val manualRoute = MutableStateFlow<AppRoute?>(null)
+    private val _coverageEditNonce = MutableStateFlow(0)
     private val _feedback = MutableStateFlow<UiFeedback?>(null)
     private val _locationState = MutableStateFlow<LocationUiState>(LocationUiState.PermissionRequired)
     private val _observationPointDraft = MutableStateFlow<ObservationPointCreationDraft?>(null)
+    private val _observationPointPreparationDraft = MutableStateFlow<ObservationPointPreparationDraft?>(null)
     private val _completingObservationPointId = MutableStateFlow<UUID?>(null)
     private val _beeMutationInProgress = MutableStateFlow(false)
     private val _beeEventInProgressIds = MutableStateFlow<Set<UUID>>(emptySet())
@@ -110,11 +114,14 @@ internal class MainViewModel(
     val locationState: StateFlow<LocationUiState> = _locationState.asStateFlow()
     val observationPointDraft: StateFlow<ObservationPointCreationDraft?> =
         _observationPointDraft.asStateFlow()
+    val observationPointPreparationDraft: StateFlow<ObservationPointPreparationDraft?> =
+        _observationPointPreparationDraft.asStateFlow()
     val completingObservationPointId: StateFlow<UUID?> = _completingObservationPointId.asStateFlow()
     val beeMutationInProgress: StateFlow<Boolean> = _beeMutationInProgress.asStateFlow()
     val beeEventInProgressIds: StateFlow<Set<UUID>> = _beeEventInProgressIds.asStateFlow()
     val flightAzimuthInProgressIds: StateFlow<Set<UUID>> =
         _flightAzimuthInProgressIds.asStateFlow()
+    val coverageEditNonce: StateFlow<Int> = _coverageEditNonce.asStateFlow()
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -149,7 +156,7 @@ internal class MainViewModel(
                     bees = bees,
                     flightCycles = flightCycles,
                     beePresenceResult = point.beePresenceResult,
-                    isReleaseStarted = flightCycles.isNotEmpty(),
+                    isReleaseStarted = point.initialGroupReleaseAt != null,
                     isLoading = false,
                 )
             }
@@ -186,6 +193,17 @@ internal class MainViewModel(
 
     fun openTerritoryManagement() {
         manualRoute.value = AppRoute.TerritoryManagement
+        clearFeedback()
+    }
+
+    fun openOfflineMaps() {
+        manualRoute.value = AppRoute.OfflineMapManagement
+        clearFeedback()
+    }
+
+    fun openMapWithCoverageEdit() {
+        manualRoute.value = AppRoute.CurrentTerritory
+        _coverageEditNonce.value += 1
         clearFeedback()
     }
 
@@ -298,14 +316,12 @@ internal class MainViewModel(
         }
     }
 
-    fun startObservationPointCreation(latitude: Double, longitude: Double) {
+    fun startObservationPointCreation() {
         val existingPoint = activePoint.value
         if (existingPoint != null) {
             openResumeObservation(existingPoint)
             return
         }
-        if (!latitude.isFinite() || latitude !in -90.0..90.0) return
-        if (!longitude.isFinite() || longitude !in -180.0..180.0) return
         val territory = currentTerritory.value
         if (territory == null) {
             showPersistentFeedback("Сначала выберите текущую территорию")
@@ -322,15 +338,13 @@ internal class MainViewModel(
             return
         }
 
-        val draft = ObservationPointCreationDraft.fromMapCenter(
+        val draft = ObservationPointCreationDraft(
             territoryId = territory.id,
             observerId = observer.id,
             originalGps = reading,
-            mapCenter = MapTarget(latitude, longitude),
         )
         _observationPointDraft.value = draft
         clearFeedback()
-        persistObservationPoint(draft)
     }
 
     fun cancelObservationPointCreation() {
@@ -338,30 +352,67 @@ internal class MainViewModel(
         clearFeedback()
     }
 
-    fun confirmObservationPointCreation() {
+    fun confirmObservationPointCreation(latitude: Double, longitude: Double) {
         val draft = _observationPointDraft.value ?: return
-        persistObservationPoint(draft)
+        if (!latitude.isFinite() || latitude !in -90.0..90.0) return
+        if (!longitude.isFinite() || longitude !in -180.0..180.0) return
+        _observationPointDraft.value = null
+        _observationPointPreparationDraft.value = ObservationPointPreparationDraft(
+            point = draft.withSelectedMapCenter(MapTarget(latitude, longitude)).toNewObservationPoint(),
+        )
+        manualRoute.value = AppRoute.PrepareObservationPoint
+        clearFeedback()
     }
 
-    private fun persistObservationPoint(draft: ObservationPointCreationDraft) {
+    fun abortObservationPointPreparation() {
+        val draft = _observationPointPreparationDraft.value ?: return
         if (draft.isSaving) return
-        _observationPointDraft.value = draft.copy(isSaving = true)
+        _observationPointPreparationDraft.value = null
+        manualRoute.value = null
+        clearFeedback()
+    }
+
+    fun addFirstPreparedBee(markColor: String, markPosition: MarkPosition) {
+        persistObservationPointPreparation(
+            successMessage = "Пчела добавлена",
+            fallbackMessage = "Не удалось сохранить точку и первую пчелу",
+        ) { point ->
+            createObservationPoint.createWithFirstBee(point, markColor, markPosition)
+        }
+    }
+
+    fun recordNoBeesFoundFromPreparation() {
+        persistObservationPointPreparation(
+            successMessage = "Отсутствие пчёл сохранено. Точка наблюдения завершена",
+            fallbackMessage = "Не удалось сохранить отсутствие пчёл",
+        ) { point ->
+            createObservationPoint.createWithNoBeesFound(point)
+        }
+    }
+
+    private fun persistObservationPointPreparation(
+        successMessage: String,
+        fallbackMessage: String,
+        operation: suspend (org.beesearch.app.domain.model.NewObservationPoint) -> Unit,
+    ) {
+        val draft = _observationPointPreparationDraft.value ?: return
+        if (draft.isSaving) return
+        _observationPointPreparationDraft.value = draft.copy(isSaving = true)
         viewModelScope.launch {
             try {
-                val point = draft.toNewObservationPoint()
-                createObservationPoint.create(point)
-                _observationPointDraft.value = null
+                operation(draft.point)
+                _observationPointPreparationDraft.value = null
                 manualRoute.value = null
-                showSuccessFeedback("Точка наблюдения сохранена")
+                showSuccessFeedback(successMessage)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: ObservationPointAlreadyActiveException) {
-                _observationPointDraft.value = null
+                _observationPointPreparationDraft.value = null
                 manualRoute.value = activePoint.value?.let(AppRoute::ResumeObservation)
-                showPersistentFeedback(userMessageFor(error, "Не удалось сохранить точку наблюдения"))
+                showPersistentFeedback(userMessageFor(error, fallbackMessage))
             } catch (error: Exception) {
-                _observationPointDraft.value = null
-                showPersistentFeedback(userMessageFor(error, "Не удалось сохранить точку наблюдения"))
+                _observationPointPreparationDraft.value = draft
+                showPersistentFeedback(userMessageFor(error, fallbackMessage))
             }
         }
     }
@@ -450,6 +501,12 @@ internal class MainViewModel(
         launchBeeEvent(beeId, fallback = "Не удалось сохранить вылет пчелы") {
             observationRepository.startNextFlight(beeId)
             showSuccessFeedback("Вылет сохранён")
+        }
+    }
+
+    fun undoLastBeeAction(beeId: UUID) {
+        launchBeeEvent(beeId, fallback = "Не удалось отменить последнее действие") {
+            observationRepository.undoLastBeeAction(beeId)
         }
     }
 

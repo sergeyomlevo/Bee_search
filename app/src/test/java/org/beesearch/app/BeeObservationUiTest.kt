@@ -46,7 +46,7 @@ class BeeObservationUiTest {
         assertEquals(startedAt, cards[0].stateStartedAt)
         assertEquals(BeeFieldState.AT_POINT, cards[1].fieldState)
         assertEquals(returnTime, cards[1].stateStartedAt)
-        assertNull(cards[2].fieldState)
+        assertEquals(BeeFieldState.AT_POINT, cards[2].fieldState)
         assertNull(cards[2].stateStartedAt)
     }
 
@@ -66,6 +66,108 @@ class BeeObservationUiTest {
         assertEquals(listOf(1, 2), card.cycles.map { it.sequenceNumber })
         assertEquals(BeeFieldState.IN_FLIGHT, card.fieldState)
         assertEquals(nextDeparture, card.stateStartedAt)
+    }
+
+    @Test
+    fun cardsGroupStatesAndKeepLongestDurationsAtTheSharedBoundary() {
+        val longestFlying = bee("WHITE")
+        val newestFlying = bee("YELLOW")
+        val longestAtPoint = bee("BLUE")
+        val newestAtPoint = bee("RED")
+        val withoutCycle = bee("GREEN")
+
+        val cards = buildBeeObservationCards(
+            bees = listOf(longestAtPoint, newestFlying, withoutCycle, longestFlying, newestAtPoint),
+            flightCycles = listOf(
+                cycle(longestFlying, 1, startedAt, null),
+                cycle(newestFlying, 1, startedAt.plusSeconds(30), null),
+                cycle(longestAtPoint, 1, startedAt, startedAt.plusSeconds(20)),
+                cycle(newestAtPoint, 1, startedAt, startedAt.plusSeconds(45)),
+            ),
+        )
+
+        assertEquals(
+            listOf(newestFlying, longestFlying, longestAtPoint, newestAtPoint, withoutCycle),
+            cards.map { it.bee },
+        )
+    }
+
+    @Test
+    fun inFlightCardsPrioritizeCycleNumberThenFlightDurationAtTheBoundary() {
+        val firstCycleLongFlight = bee("WHITE")
+        val firstCycleNewFlight = bee("YELLOW")
+        val secondCycleLongFlight = bee("BLUE")
+        val secondCycleNewFlight = bee("RED")
+        val atPoint = bee("GREEN")
+
+        val cards = buildBeeObservationCards(
+            bees = listOf(secondCycleLongFlight, atPoint, firstCycleLongFlight, secondCycleNewFlight, firstCycleNewFlight),
+            flightCycles = listOf(
+                cycle(firstCycleLongFlight, 1, startedAt, null),
+                cycle(firstCycleNewFlight, 1, startedAt.plusSeconds(30), null),
+                cycle(secondCycleLongFlight, 1, startedAt, startedAt.plusSeconds(45)),
+                cycle(secondCycleLongFlight, 2, startedAt.plusSeconds(60), null),
+                cycle(secondCycleNewFlight, 1, startedAt, startedAt.plusSeconds(45)),
+                cycle(secondCycleNewFlight, 2, startedAt.plusSeconds(90), null),
+                cycle(atPoint, 1, startedAt, startedAt.plusSeconds(50)),
+            ),
+        )
+
+        assertEquals(
+            listOf(
+                firstCycleNewFlight,
+                firstCycleLongFlight,
+                secondCycleNewFlight,
+                secondCycleLongFlight,
+                atPoint,
+            ),
+            cards.map { it.bee },
+        )
+    }
+
+    @Test
+    fun lastReversibleActionIsDerivedOnlyFromTheCurrentLatestCycle() {
+        val bee = bee("WHITE")
+        val firstReturn = startedAt.plusSeconds(20)
+        val secondDeparture = startedAt.plusSeconds(30)
+        val secondCycle = cycle(bee, 2, secondDeparture, null).copy(azimuthDeg = 142.0)
+
+        val withAzimuth = BeeObservationCardModel(bee, listOf(cycle(bee, 1, startedAt, firstReturn), secondCycle))
+        assertEquals(secondCycle.id, (withAzimuth.lastReversibleAction as BeeLastReversibleAction.Azimuth).flightCycleId)
+
+        val returned = BeeObservationCardModel(bee, listOf(secondCycle.copy(returnTime = startedAt.plusSeconds(40))))
+        assertEquals(secondCycle.id, (returned.lastReversibleAction as BeeLastReversibleAction.Return).flightCycleId)
+
+        val nextFlight = BeeObservationCardModel(bee, listOf(secondCycle.copy(azimuthDeg = null)))
+        assertEquals(secondCycle.id, (nextFlight.lastReversibleAction as BeeLastReversibleAction.NextFlight).flightCycleId)
+
+        val initialFlight = BeeObservationCardModel(bee, listOf(cycle(bee, 1, startedAt, null)))
+        assertNull(initialFlight.lastReversibleAction)
+
+        val initialGroupFlight = BeeObservationCardModel(
+            bee,
+            listOf(cycle(bee, 1, startedAt, null, isInitialGroupLaunch = true)),
+        )
+        assertEquals(
+            initialGroupFlight.latestCycle?.id,
+            (initialGroupFlight.lastReversibleAction as BeeLastReversibleAction.InitialGroupLaunch).flightCycleId,
+        )
+    }
+
+    @Test
+    fun cardsWithTheSameStateTimestampKeepInputOrder() {
+        val firstReleased = bee("WHITE")
+        val secondReleased = bee("BLUE")
+
+        val cards = buildBeeObservationCards(
+            bees = listOf(secondReleased, firstReleased),
+            flightCycles = listOf(
+                cycle(firstReleased, 1, startedAt, null),
+                cycle(secondReleased, 1, startedAt, null),
+            ),
+        )
+
+        assertEquals(listOf(secondReleased, firstReleased), cards.map { it.bee })
     }
 
     @Test
@@ -93,6 +195,8 @@ class BeeObservationUiTest {
         sequenceNumber: Int,
         departureTime: Instant,
         returnTime: Instant?,
+        isInitialGroupLaunch: Boolean = false,
+        isInitialGroupLaunchCorrectionEligible: Boolean = isInitialGroupLaunch,
     ) = FlightCycle(
         id = UUID.randomUUID(),
         beeId = bee.id,
@@ -101,6 +205,8 @@ class BeeObservationUiTest {
         returnTime = returnTime,
         azimuthDeg = null,
         azimuthCaptureConsumed = false,
+        isInitialGroupLaunch = isInitialGroupLaunch,
+        isInitialGroupLaunchCorrectionEligible = isInitialGroupLaunchCorrectionEligible,
         createdAt = departureTime,
         updatedAt = returnTime ?: departureTime,
     )

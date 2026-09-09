@@ -1,5 +1,7 @@
 package org.beesearch.app.ui.map
 
+import java.math.BigDecimal
+import java.math.RoundingMode
 import kotlin.math.asin
 import kotlin.math.cos
 import kotlin.math.sin
@@ -71,7 +73,24 @@ internal fun normalMapCameraPadding(): MapCameraPadding = MapCameraPadding()
 internal fun addCoverageFragment(
     fragments: List<MapCoverageFragment>,
     bounds: MapGeoBounds,
-): List<MapCoverageFragment> = fragments + MapCoverageFragment(bounds)
+): List<MapCoverageFragment> = fragments + MapCoverageFragment(normalizeMapPackageBounds(bounds))
+
+/** PMTiles v3 stores its header bbox in signed integers at 10^-7 degree precision. */
+internal fun normalizeMapPackageBounds(bounds: MapGeoBounds): MapGeoBounds = MapGeoBounds(
+    north = bounds.north.outwardCoordinate(RoundingMode.CEILING),
+    east = bounds.east.outwardCoordinate(RoundingMode.CEILING),
+    south = bounds.south.outwardCoordinate(RoundingMode.FLOOR),
+    west = bounds.west.outwardCoordinate(RoundingMode.FLOOR),
+)
+
+internal fun formatMapPackageBuilderBounds(bounds: MapGeoBounds): String {
+    fun coordinate(value: Double): String = "%.7f".format(java.util.Locale.ROOT, value)
+    return "-West ${coordinate(bounds.west)} -South ${coordinate(bounds.south)} " +
+        "-East ${coordinate(bounds.east)} -North ${coordinate(bounds.north)}"
+}
+
+private fun Double.outwardCoordinate(roundingMode: RoundingMode): Double =
+    BigDecimal.valueOf(this).setScale(7, roundingMode).toDouble()
 
 internal fun undoLastCoverageFragment(
     fragments: List<MapCoverageFragment>,
@@ -94,22 +113,19 @@ internal fun coverageBoundsForShowAll(
     )
 }
 
-/**
- * A temporary benchmark result derived from the viewport rectangles. It deliberately has no
- * Territory or persistence identity: the user must review the numbers before a map benchmark is
- * generated.
- */
-internal data class MapBenchmarkBoundsSummary(
+/** Geographic metrics for a map rectangle; this is not a Territory or persistence identity. */
+internal data class MapAreaBoundsSummary(
     val bounds: MapGeoBounds,
     val widthKm: Double,
     val heightKm: Double,
     val areaKm2: Double,
 )
 
-internal fun benchmarkBoundsSummary(
-    fragments: List<MapCoverageFragment>,
-): MapBenchmarkBoundsSummary? {
-    val bounds = coverageBoundsForShowAll(fragments) ?: return null
+/**
+ * Metrics for one geographic rectangle. This is map-selection UI data only;
+ * it does not turn a coverage fragment into a Territory or Room entity.
+ */
+internal fun coverageBoundsSummary(bounds: MapGeoBounds): MapAreaBoundsSummary {
     val centerLatitude = (bounds.north + bounds.south) / 2.0
     val centerLongitude = (bounds.east + bounds.west) / 2.0
     val widthKm = haversineKm(
@@ -124,12 +140,19 @@ internal fun benchmarkBoundsSummary(
         latitudeB = bounds.north,
         longitudeB = centerLongitude,
     )
-    return MapBenchmarkBoundsSummary(
+    return MapAreaBoundsSummary(
         bounds = bounds,
         widthKm = widthKm,
         heightKm = heightKm,
         areaKm2 = widthKm * heightKm,
     )
+}
+
+internal fun benchmarkBoundsSummary(
+    fragments: List<MapCoverageFragment>,
+): MapAreaBoundsSummary? {
+    val bounds = coverageBoundsForShowAll(fragments) ?: return null
+    return coverageBoundsSummary(bounds)
 }
 
 private fun haversineKm(

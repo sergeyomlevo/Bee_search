@@ -44,4 +44,16 @@ internal object BeeSelectorSelectionLogic {
             firstAvailableForColor(color.value, available)
         }
     }
+
+    fun reconcileSelection(
+        current: BeeMarkCombination?,
+        available: Collection<BeeMarkCombination>,
+    ): BeeMarkCombination? {
+        if (current in available) return current
+
+        current?.let { selection ->
+            firstAvailableForColor(selection.markColor, available)?.let { return it }
+        }
+        return available.firstOrNull()
+    }
 }

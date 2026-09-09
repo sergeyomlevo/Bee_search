@@ -10,8 +10,12 @@ internal data class ObservationPointCreationDraft(
     val originalGps: LocationReading,
     val selectedLatitude: Double = originalGps.latitude,
     val selectedLongitude: Double = originalGps.longitude,
-    val isSaving: Boolean = false,
 ) {
+    fun withSelectedMapCenter(mapCenter: MapTarget): ObservationPointCreationDraft = copy(
+        selectedLatitude = mapCenter.latitude,
+        selectedLongitude = mapCenter.longitude,
+    )
+
     fun toNewObservationPoint(): NewObservationPoint = NewObservationPoint(
         territoryId = territoryId,
         observerId = observerId,
@@ -22,18 +26,9 @@ internal data class ObservationPointCreationDraft(
         gpsAccuracyM = originalGps.accuracyMeters,
     )
 
-    companion object {
-        fun fromMapCenter(
-            territoryId: UUID,
-            observerId: UUID,
-            originalGps: LocationReading,
-            mapCenter: MapTarget,
-        ): ObservationPointCreationDraft = ObservationPointCreationDraft(
-            territoryId = territoryId,
-            observerId = observerId,
-            originalGps = originalGps,
-            selectedLatitude = mapCenter.latitude,
-            selectedLongitude = mapCenter.longitude,
-        )
-    }
 }
+
+internal data class ObservationPointPreparationDraft(
+    val point: NewObservationPoint,
+    val isSaving: Boolean = false,
+)

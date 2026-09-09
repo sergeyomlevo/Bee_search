@@ -1,10 +1,18 @@
 package org.beesearch.app
 
+import android.graphics.Bitmap
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.click
@@ -13,7 +21,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
+import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.beesearch.app.domain.heading.HeadingAccuracy
 import org.beesearch.app.domain.heading.HeadingProvider
@@ -29,7 +41,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
+import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
+import kotlin.math.abs
 
 class BeeObservationScreenTest {
     @get:Rule
@@ -102,6 +117,370 @@ class BeeObservationScreenTest {
             "Между heading и основной кнопкой должно оставаться свободное место",
             actionBounds.left > headingBounds.right,
         )
+    }
+
+    @Test
+    fun actionRowKeepsUndoAtTheSameXForFlightAndAtPointCards() {
+        val flightBee = flyingBee
+        val pointBee = atPointBee
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = listOf(flightBee, pointBee),
+                    flightCycles = listOf(
+                        cycle(flightBee, 2, releaseTime, null, azimuthDeg = 82.0),
+                        cycle(pointBee, 2, releaseTime, returnTime, azimuthDeg = 82.0),
+                    ),
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        val flightUndoBounds = composeRule.onNodeWithTag("bee-undo-${flightBee.id}")
+            .fetchSemanticsNode().boundsInRoot
+        val pointUndoBounds = composeRule.onNodeWithTag("bee-undo-${pointBee.id}")
+            .fetchSemanticsNode().boundsInRoot
+        listOf(flightBee, pointBee).forEach { bee ->
+            val azimuthBounds = composeRule.onNodeWithTag("bee-azimuth-${bee.id}")
+                .fetchSemanticsNode().boundsInRoot
+            val undoBounds = composeRule.onNodeWithTag("bee-undo-${bee.id}")
+                .fetchSemanticsNode().boundsInRoot
+            val actionBounds = composeRule.onNodeWithTag("bee-action-${bee.id}")
+                .fetchSemanticsNode().boundsInRoot
+            assertEquals(
+                "Undo must be centered between neighboring control edges",
+                (azimuthBounds.right + actionBounds.left) / 2f,
+                undoBounds.center.x,
+                1f,
+            )
+        }
+        assertTrue(
+            "Undo must have the same horizontal position in both card states",
+            abs(flightUndoBounds.center.x - pointUndoBounds.center.x) <= 1f,
+        )
+        composeRule.onNodeWithTag("bee-undo-${flightBee.id}")
+            .assertWidthIsEqualTo(48.dp)
+            .assertHeightIsEqualTo(48.dp)
+        composeRule.onNodeWithTag("bee-undo-${pointBee.id}")
+            .assertWidthIsEqualTo(48.dp)
+            .assertHeightIsEqualTo(48.dp)
+        captureActionRowScreenshot("flight-and-at-point")
+    }
+
+    @Test
+    fun actionSlotsStayStableWhenAzimuthOrUndoDisappears() {
+        val flight = cycle(flyingBee, 2, releaseTime, null, azimuthDeg = 82.0)
+        val cycles = mutableStateOf(listOf(flight))
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = listOf(flyingBee),
+                    flightCycles = cycles.value,
+                    beeEventInProgressIds = emptySet(),
+                    headingProvider = HeadingProvider { flowOf(availableHeading(132)) },
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        fun primaryRight() = composeRule.onNodeWithTag("bee-action-${flyingBee.id}")
+            .fetchSemanticsNode().boundsInRoot.right
+
+        val initialRight = primaryRight()
+        val initialUndo = composeRule.onNodeWithTag("bee-undo-${flyingBee.id}")
+            .fetchSemanticsNode().boundsInRoot
+        val initialCard = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
+            .fetchSemanticsNode().boundsInRoot
+        val cardInset = with(composeRule.density) { 10.dp.toPx() }
+        assertEquals(initialCard.right - cardInset, initialRight, 1f)
+
+        // Render reachable persisted-state snapshots without emulating domain mutations.
+        val snapshots = listOf(
+            "flight-82" to flight,
+            "flight-empty" to flight.copy(azimuthDeg = null),
+            "at-point-empty" to flight.copy(azimuthDeg = null, returnTime = returnTime),
+            "at-point-82" to flight.copy(returnTime = returnTime),
+            "at-point-no-undo" to null,
+            "flight-no-undo" to cycle(flyingBee, 1, releaseTime, null),
+        )
+        snapshots.forEach { (name, snapshot) ->
+            composeRule.runOnIdle { cycles.value = listOfNotNull(snapshot) }
+            val action = composeRule.onNodeWithTag("bee-action-${flyingBee.id}")
+                .assertIsDisplayed().assertIsEnabled()
+            assertEquals("Primary must stay at the right edge: $name", initialRight, primaryRight(), 1f)
+            val undo = composeRule.onNodeWithTag("bee-undo-${flyingBee.id}")
+            if (name.endsWith("no-undo")) {
+                undo.assertDoesNotExist()
+            } else {
+                undo.assertIsDisplayed().assertIsEnabled()
+                    .assertWidthIsEqualTo(48.dp).assertHeightIsEqualTo(48.dp)
+                assertEquals("Undo must not move: $name", initialUndo.left,
+                    undo.fetchSemanticsNode().boundsInRoot.left, 1f)
+            }
+            val azimuth = composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
+            if (name == "at-point-empty" || name == "at-point-no-undo") {
+                azimuth.assertDoesNotExist()
+            } else {
+                val azimuthBounds = azimuth.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                assertTrue("Azimuth stays left of the correction slot: $name",
+                    azimuthBounds.right < initialUndo.left)
+            }
+            assertTrue("Correction slot stays left of primary: $name",
+                initialUndo.right < action.fetchSemanticsNode().boundsInRoot.left)
+            val cardBounds = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
+                .fetchSemanticsNode().boundsInRoot
+            assertEquals("Slots must not change card height: $name", initialCard.height, cardBounds.height, 1f)
+            captureActionRowScreenshot(name)
+        }
+    }
+
+    @Test
+    fun primaryLabelsRemainFullyVisibleAtLargeFontScale() {
+        composeRule.setContent {
+            val deviceDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(deviceDensity.density, fontScale = 1.7f),
+            ) {
+                Bee_searchTheme {
+                    BeeObservationScreen(
+                        point = point(),
+                        bees = listOf(flyingBee, atPointBee),
+                        flightCycles = listOf(cycle(flyingBee, 1, releaseTime, null)),
+                        beeEventInProgressIds = emptySet(),
+                        isCompleting = false,
+                        onRegisterReturn = {},
+                        onStartNextFlight = {},
+                        onComplete = {},
+                        nowProvider = { now },
+                    )
+                }
+            }
+        }
+
+        listOf(
+            "ПРИЛЕТЕЛА" to flyingBee,
+            "УЛЕТЕЛА" to atPointBee,
+        ).forEach { (label, bee) ->
+            val action = composeRule.onNodeWithTag("bee-action-${bee.id}")
+            val actionBounds = action.fetchSemanticsNode().boundsInRoot
+            val textNode = composeRule.onNodeWithText(label)
+                .assertIsDisplayed()
+            val textSemantics = textNode.fetchSemanticsNode()
+            val layoutResults = mutableListOf<TextLayoutResult>()
+            val layoutAction = textSemantics.config
+                .getOrNull(SemanticsActions.GetTextLayoutResult)?.action
+            check(layoutAction != null) { "Text layout result is unavailable for $label" }
+            check(layoutAction.invoke(layoutResults)) { "Text layout result was not returned for $label" }
+            assertEquals(1, layoutResults.size)
+            val layout = layoutResults.single()
+            assertTrue(
+                "$label must not overflow its layout: size=${layout.size}, " +
+                    "lineCount=${layout.lineCount}, width=${textSemantics.boundsInRoot.width}, " +
+                    "actionWidth=${actionBounds.width}, overflowWidth=${layout.didOverflowWidth}, " +
+                    "overflowHeight=${layout.didOverflowHeight}",
+                !layout.hasVisualOverflow,
+            )
+            val textBounds = textSemantics.boundsInRoot
+            assertTrue("$label must fit inside its primary action", textBounds.left >= actionBounds.left)
+            assertTrue("$label must fit inside its primary action", textBounds.right <= actionBounds.right)
+            assertTrue("$label must fit inside its primary action", textBounds.top >= actionBounds.top)
+            assertTrue("$label must fit inside its primary action", textBounds.bottom <= actionBounds.bottom)
+        }
+        composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").assertDoesNotExist()
+    }
+
+    @Test
+    fun returnAndDepartureMoveOnlyTheChangedBeeAcrossTheStateBoundary() {
+        val longFlyingBee = bee(
+            UUID.fromString("00000000-0000-0000-0000-000000000211"),
+            "WHITE",
+            MarkPosition.NONE,
+        )
+        val newerFlyingBee = bee(
+            UUID.fromString("00000000-0000-0000-0000-000000000212"),
+            "YELLOW",
+            MarkPosition.RIGHT_WING,
+        )
+        val longAtPointBee = bee(
+            UUID.fromString("00000000-0000-0000-0000-000000000213"),
+            "BLUE",
+            MarkPosition.LEFT_WING,
+        )
+        val longFlyingCycle = cycle(longFlyingBee, 1, releaseTime, null)
+        val newerFlyingCycle = cycle(newerFlyingBee, 1, releaseTime.plusSeconds(20), null)
+        val longAtPointCycle = cycle(
+            longAtPointBee,
+            1,
+            releaseTime,
+            releaseTime.plusSeconds(15),
+        )
+
+        composeRule.setContent {
+            val deviceDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(deviceDensity.density, fontScale = 1.7f),
+            ) {
+                val cycles = remember {
+                    mutableStateOf(listOf(longAtPointCycle, longFlyingCycle, newerFlyingCycle))
+                }
+                Bee_searchTheme {
+                    BeeObservationScreen(
+                        point = point(),
+                        bees = listOf(longAtPointBee, longFlyingBee, newerFlyingBee),
+                        flightCycles = cycles.value,
+                        beeEventInProgressIds = emptySet(),
+                        isCompleting = false,
+                        onRegisterReturn = { beeId ->
+                            cycles.value = cycles.value.map { cycle ->
+                                if (cycle.beeId == beeId && cycle.returnTime == null) {
+                                    cycle.copy(returnTime = now)
+                                } else {
+                                    cycle
+                                }
+                            }
+                        },
+                        onStartNextFlight = { beeId ->
+                            cycles.value = cycles.value + cycle(
+                                bee = longAtPointBee.takeIf { it.id == beeId } ?: error("Unexpected Bee"),
+                                sequenceNumber = 2,
+                                departureTime = now,
+                                returnTime = null,
+                            )
+                        },
+                        onComplete = {},
+                        nowProvider = { now },
+                    )
+                }
+            }
+        }
+
+        fun cardTop(bee: Bee) = composeRule.onNodeWithTag("bee-card-${bee.id}")
+            .fetchSemanticsNode().boundsInRoot.top
+
+        assertTrue(cardTop(newerFlyingBee) < cardTop(longFlyingBee))
+        assertTrue(cardTop(longFlyingBee) < cardTop(longAtPointBee))
+
+        composeRule.onNodeWithTag("bee-action-${longFlyingBee.id}").performClick()
+
+        assertTrue(cardTop(newerFlyingBee) < cardTop(longAtPointBee))
+        assertTrue(cardTop(longAtPointBee) < cardTop(longFlyingBee))
+
+        composeRule.onNodeWithTag("bee-action-${longAtPointBee.id}").performClick()
+
+        assertTrue(cardTop(newerFlyingBee) < cardTop(longAtPointBee))
+        assertTrue(cardTop(longAtPointBee) < cardTop(longFlyingBee))
+        composeRule.onNodeWithTag("bee-state-${longAtPointBee.id}").assertIsDisplayed()
+        composeRule.onNodeWithTag("bee-state-${longFlyingBee.id}").assertIsDisplayed()
+    }
+
+    @Test
+    fun departureScrollsTheMovedBeeIntoViewForImmediateAzimuthCapture() {
+        val longListBees = (0 until 10).map { index ->
+            bee(
+                UUID.fromString("00000000-0000-0000-0000-${(300 + index).toString().padStart(12, '0')}"),
+                listOf("WHITE", "YELLOW", "BLUE", "RED", "GREEN")[index % 5],
+                listOf(MarkPosition.NONE, MarkPosition.RIGHT_WING, MarkPosition.LEFT_WING)[index % 3],
+            )
+        }
+        val departingBee = longListBees.last()
+        val cycles = mutableStateOf(
+            longListBees.mapIndexed { index, bee ->
+                cycle(
+                    bee = bee,
+                    sequenceNumber = 1,
+                    departureTime = releaseTime.plusSeconds(index.toLong()),
+                    returnTime = returnTime,
+                )
+            },
+        )
+
+        composeRule.setContent {
+            val deviceDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(deviceDensity.density, fontScale = 1.7f),
+            ) {
+                Bee_searchTheme {
+                    BeeObservationScreen(
+                        point = point(),
+                        bees = longListBees,
+                        flightCycles = cycles.value,
+                        beeEventInProgressIds = emptySet(),
+                        headingProvider = HeadingProvider { flowOf(availableHeading(247)) },
+                        isCompleting = false,
+                        onRegisterReturn = {},
+                        onStartNextFlight = { beeId ->
+                            cycles.value = cycles.value + cycle(
+                                bee = longListBees.single { it.id == beeId },
+                                sequenceNumber = 2,
+                                departureTime = now,
+                                returnTime = null,
+                            )
+                        },
+                        onComplete = {},
+                        nowProvider = { now },
+                    )
+                }
+            }
+        }
+
+        repeat(6) {
+            composeRule.onNodeWithTag("bee-observation-list")
+                .performTouchInput { swipeUp() }
+        }
+        composeRule.onNodeWithTag("bee-action-${departingBee.id}").performClick()
+
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("bee-card-${departingBee.id}").assertIsDisplayed()
+        composeRule.onNodeWithTag("bee-azimuth-${departingBee.id}")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+    }
+
+    @Test
+    fun largeTextHeaderKeepsTheObservationTitleAndCompletionActionFullyVisible() {
+        composeRule.setContent {
+            val deviceDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(deviceDensity.density, fontScale = 1.7f),
+            ) {
+                Bee_searchTheme {
+                    BeeObservationScreen(
+                        point = point(),
+                        bees = listOf(flyingBee),
+                        flightCycles = listOf(cycle(flyingBee, 1, releaseTime, null)),
+                        beeEventInProgressIds = emptySet(),
+                        isCompleting = false,
+                        onRegisterReturn = {},
+                        onStartNextFlight = {},
+                        onComplete = {},
+                        nowProvider = { now },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("observation-header-title")
+            .assertIsDisplayed()
+            .assertTextContains("Наблюдение")
+        composeRule.onNodeWithTag("complete-field-observation").assertIsDisplayed()
+
+        val titleBounds = composeRule.onNodeWithTag("observation-header-title")
+            .fetchSemanticsNode().boundsInRoot
+        val completeBounds = composeRule.onNodeWithTag("complete-field-observation")
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue("Заголовок не должен перекрывать действие завершения", titleBounds.right <= completeBounds.left)
     }
 
     @Test
@@ -209,6 +588,12 @@ class BeeObservationScreenTest {
                         }
                         onSuccess()
                     },
+                    onUndoLastBeeAction = { beeId ->
+                        assertEquals(flyingBee.id, beeId)
+                        cycles.value = cycles.value.map { cycle ->
+                            if (cycle.id == selectedCycle.id) cycle.copy(azimuthDeg = null) else cycle
+                        }
+                    },
                     onComplete = {},
                     nowProvider = { now },
                 )
@@ -220,8 +605,10 @@ class BeeObservationScreenTest {
             .assertIsEnabled()
             .assertTextContains("247°")
             .performClick()
-        composeRule.onNodeWithTag("azimuth-undo-banner").assertIsDisplayed()
-        composeRule.onNodeWithText("247° сохранён").assertIsDisplayed()
+        composeRule.onNodeWithTag("azimuth-undo-banner").assertDoesNotExist()
+        composeRule.onNodeWithTag("bee-undo-${flyingBee.id}")
+            .assertIsDisplayed()
+            .assertHeightIsAtLeast(48.dp)
         composeRule.runOnIdle { heading.value = availableHeading(250) }
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
             .assertTextContains("247°")
@@ -233,16 +620,15 @@ class BeeObservationScreenTest {
             assertEquals(1, saveRequests)
         }
 
-        composeRule.onNodeWithTag("azimuth-undo").performClick()
-        composeRule.onNodeWithTag("azimuth-undo-banner").assertDoesNotExist()
+        composeRule.onNodeWithTag("bee-undo-${flyingBee.id}").performClick()
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
             .assertTextContains("—°")
             .assertIsNotEnabled()
             .assertHeightIsAtLeast(48.dp)
             .performTouchInput { click() }
         composeRule.runOnIdle {
-            assertEquals(null, savedAzimuth)
-            assertEquals(2, saveRequests)
+            assertEquals(247.0, savedAzimuth)
+            assertEquals(1, saveRequests)
         }
     }
 
@@ -387,7 +773,7 @@ class BeeObservationScreenTest {
     }
 
     @Test
-    fun atPointWithoutAzimuthIsDisabledAndTapDoesNotPersist() {
+    fun atPointWithoutAzimuthUsesLocalReturnUndoInsteadOfAHeadingControl() {
         val heading = MutableStateFlow(availableHeading(269))
         var saveRequests = 0
         composeRule.setContent {
@@ -409,11 +795,39 @@ class BeeObservationScreenTest {
         }
 
         composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}")
+            .assertDoesNotExist()
+        composeRule.onNodeWithTag("bee-undo-${atPointBee.id}")
             .assertHeightIsAtLeast(48.dp)
-            .assertTextContains("—°")
-            .assertIsNotEnabled()
-            .performTouchInput { click() }
+            .assertWidthIsEqualTo(48.dp)
+            .assertIsEnabled()
+        composeRule.onNodeWithText("Отменить", substring = true).assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(0, saveRequests) }
+    }
+
+    @Test
+    fun beeWhoseInitialLaunchWasCorrectedStaysAtPointWithoutAFakeFlightCycle() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point().copy(initialGroupReleaseAt = releaseTime),
+                    bees = listOf(atPointBee),
+                    flightCycles = emptyList(),
+                    beeEventInProgressIds = emptySet(),
+                    headingProvider = HeadingProvider { flowOf(availableHeading(269)) },
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("bee-state-${atPointBee.id}").assertTextContains("На точке")
+        composeRule.onNodeWithTag("bee-timer-${atPointBee.id}").assertTextContains("--:--")
+        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").assertDoesNotExist()
+        composeRule.onNodeWithTag("bee-action-${atPointBee.id}").assertIsEnabled()
+            .assertTextContains("УЛЕТЕЛА")
     }
 
     @Test
@@ -484,7 +898,8 @@ class BeeObservationScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").assertIsNotEnabled()
+        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").assertDoesNotExist()
+        composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").assertIsDisplayed()
         composeRule.onNodeWithTag("bee-action-${atPointBee.id}").performClick()
         composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}")
             .assertTextContains("269°")
@@ -522,150 +937,39 @@ class BeeObservationScreenTest {
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}").assertIsEnabled()
         composeRule.onNodeWithTag("bee-action-${flyingBee.id}").performClick()
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
-            .assertTextContains("—°")
-            .assertIsNotEnabled()
-            .performTouchInput { click() }
+            .assertDoesNotExist()
+        composeRule.onNodeWithTag("bee-undo-${flyingBee.id}")
+            .assertIsEnabled()
         composeRule.runOnIdle { assertEquals(0, saveRequests) }
     }
 
     @Test
-    fun newerCaptureReplacesUndoAndOldTimeoutCannotHideOrUndoIt() {
-        val firstCycle = cycle(flyingBee, 1, releaseTime, null)
-        val secondCycle = cycle(atPointBee, 1, releaseTime, null)
-        val heading = MutableStateFlow(availableHeading(247))
-        val cycles = mutableStateOf(listOf(firstCycle, secondCycle))
-        composeRule.mainClock.autoAdvance = false
-        composeRule.setContent {
-            Bee_searchTheme {
-                BeeObservationScreen(
-                    point = point(),
-                    bees = listOf(flyingBee, atPointBee),
-                    flightCycles = cycles.value,
-                    beeEventInProgressIds = emptySet(),
-                    headingProvider = HeadingProvider { heading },
-                    isCompleting = false,
-                    onRegisterReturn = {},
-                    onStartNextFlight = {},
-                    onSetFlightAzimuth = { cycleId, _, onSuccess ->
-                        cycles.value = cycles.value.map { cycle ->
-                            if (cycle.id == cycleId) {
-                                cycle.copy(
-                                    azimuthDeg = null,
-                                )
-                            } else cycle
-                        }
-                        onSuccess()
-                    },
-                    onCaptureFlightAzimuth = { cycleId, value, onSuccess ->
-                        cycles.value = cycles.value.map { cycle ->
-                            if (cycle.id == cycleId) {
-                                cycle.copy(
-                                    azimuthDeg = value,
-                                    azimuthCaptureConsumed = true,
-                                )
-                            } else cycle
-                        }
-                        onSuccess()
-                    },
-                    onComplete = {},
-                    nowProvider = { now },
-                    undoTimeoutMillis = 5_000,
-                )
-            }
-        }
-
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(2_000)
-        composeRule.runOnIdle { heading.value = availableHeading(132) }
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithText("132° сохранён").assertIsDisplayed()
-
-        composeRule.mainClock.advanceTimeBy(3_100)
-        composeRule.onNodeWithText("132° сохранён").assertIsDisplayed()
-        composeRule.onNodeWithTag("azimuth-undo").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-
-        composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}").assertTextContains("247°")
-        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}")
-            .assertTextContains("—°")
-            .assertIsNotEnabled()
-        composeRule.runOnIdle {
-            assertEquals(247.0, cycles.value.single { it.id == firstCycle.id }.azimuthDeg)
-            assertEquals(null, cycles.value.single { it.id == secondCycle.id }.azimuthDeg)
-        }
-    }
-
-    @Test
-    fun undoBannerExpiresWithoutClearingPersistedAzimuth() {
-        val selectedCycle = cycle(flyingBee, 1, releaseTime, null)
-        val heading = MutableStateFlow(availableHeading(247))
-        composeRule.mainClock.autoAdvance = false
-        composeRule.setContent {
-            val cycles = remember { mutableStateOf(listOf(selectedCycle)) }
-            Bee_searchTheme {
-                BeeObservationScreen(
-                    point = point(),
-                    bees = listOf(flyingBee),
-                    flightCycles = cycles.value,
-                    beeEventInProgressIds = emptySet(),
-                    headingProvider = HeadingProvider { heading },
-                    isCompleting = false,
-                    onRegisterReturn = {},
-                    onStartNextFlight = {},
-                    onSetFlightAzimuth = { cycleId, value, onSuccess ->
-                        cycles.value = cycles.value.map { cycle ->
-                            if (cycle.id == cycleId) {
-                                cycle.copy(
-                                    azimuthDeg = value,
-                                    azimuthCaptureConsumed =
-                                        cycle.azimuthCaptureConsumed || value != null,
-                                )
-                            } else cycle
-                        }
-                        onSuccess()
-                    },
-                    onComplete = {},
-                    nowProvider = { now },
-                )
-            }
-        }
-
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(FEEDBACK_AUTO_DISMISS_MILLIS - 1)
-        composeRule.onNodeWithTag("azimuth-undo-banner").assertIsDisplayed()
-        composeRule.mainClock.advanceTimeBy(2)
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("azimuth-undo-banner").assertDoesNotExist()
-        composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}").assertTextContains("247°")
-    }
-
-    @Test
-    fun transientFeedbackStaysInHeaderWithoutMovingOrCoveringFirstCard() {
+    fun longTransientFeedbackIsFullyVisibleBelowTheHeaderWithoutCoveringCards() {
         val feedback = mutableStateOf<UiFeedback?>(null)
+        val message = "Вылет сохранён. Зафиксируйте азимут, пока пчела в полёте."
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
-            Bee_searchTheme {
-                BeeObservationScreen(
-                    point = point(),
-                    bees = listOf(flyingBee),
-                    flightCycles = listOf(cycle(flyingBee, 1, releaseTime, null)),
-                    beeEventInProgressIds = emptySet(),
-                    feedback = feedback.value,
-                    onDismissFeedback = { id ->
-                        if (feedback.value?.id == id) feedback.value = null
-                    },
-                    isCompleting = false,
-                    onRegisterReturn = {},
-                    onStartNextFlight = {},
-                    onComplete = {},
-                    nowProvider = { now },
-                )
+            val deviceDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(deviceDensity.density, fontScale = 1.7f),
+            ) {
+                Bee_searchTheme {
+                    BeeObservationScreen(
+                        point = point(),
+                        bees = listOf(flyingBee),
+                        flightCycles = listOf(cycle(flyingBee, 1, releaseTime, null)),
+                        beeEventInProgressIds = emptySet(),
+                        feedback = feedback.value,
+                        onDismissFeedback = { id ->
+                            if (feedback.value?.id == id) feedback.value = null
+                        },
+                        isCompleting = false,
+                        onRegisterReturn = {},
+                        onStartNextFlight = {},
+                        onComplete = {},
+                        nowProvider = { now },
+                    )
+                }
             }
         }
 
@@ -674,35 +978,24 @@ class BeeObservationScreenTest {
             .fetchSemanticsNode().boundsInRoot.top
 
         composeRule.runOnIdle {
-            feedback.value = autoFeedback(1, "Прилёт сохранён")
+            feedback.value = autoFeedback(1, message)
         }
         composeRule.mainClock.advanceTimeByFrame()
 
-        composeRule.onNodeWithText("Прилёт сохранён").assertIsDisplayed()
+        composeRule.onNodeWithText(message).assertIsDisplayed()
         val headerBounds = composeRule.onNodeWithTag("observation-header")
             .fetchSemanticsNode().boundsInRoot
         val bannerBounds = composeRule.onNodeWithTag("observation-transient-banner")
             .fetchSemanticsNode().boundsInRoot
-        val feedbackTextBounds = composeRule.onNodeWithTag("observation-transient-text")
-            .fetchSemanticsNode().boundsInRoot
-        val completeBounds = composeRule.onNodeWithTag("complete-field-observation")
+        composeRule.onNodeWithTag("complete-field-observation")
             .assertIsDisplayed()
             .assertIsEnabled()
-            .fetchSemanticsNode().boundsInRoot
         val firstCardTopWithFeedback = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
             .fetchSemanticsNode().boundsInRoot.top
 
-        assertTrue("Feedback должен начинаться внутри header", bannerBounds.top >= headerBounds.top)
-        assertTrue("Feedback должен заканчиваться внутри header", bannerBounds.bottom <= headerBounds.bottom)
-        assertTrue("Feedback не должен перекрывать кнопку завершения", bannerBounds.right <= completeBounds.left)
-        assertTrue("Однострочный текст должен помещаться по высоте header", feedbackTextBounds.height <= headerBounds.height)
-        assertTrue("Первая карточка должна начинаться ниже header", firstCardTopWithFeedback >= headerBounds.bottom)
-        assertEquals(
-            "Появление feedback не должно сдвигать список",
-            firstCardTopBefore,
-            firstCardTopWithFeedback,
-            0.5f,
-        )
+        assertTrue("Feedback должен начинаться ниже стабильного header", bannerBounds.top >= headerBounds.bottom)
+        assertTrue("Feedback не должен перекрывать первую карточку", bannerBounds.bottom <= firstCardTopWithFeedback)
+        assertTrue("Feedback может сдвинуть, но не перекрыть список", firstCardTopWithFeedback > firstCardTopBefore)
 
         composeRule.onNodeWithTag("complete-field-observation").performClick()
         composeRule.mainClock.advanceTimeByFrame()
@@ -722,106 +1015,93 @@ class BeeObservationScreenTest {
     }
 
     @Test
-    fun azimuthUndoImmediatelyReplacesOrdinaryFeedbackAndGetsItsOwnTimeout() {
-        val selectedCycle = cycle(atPointBee, 1, releaseTime, null)
-        val heading = MutableStateFlow(availableHeading(269))
-        val otherCycle = cycle(flyingBee, 1, releaseTime, null)
-        val cycles = mutableStateOf(listOf(otherCycle, selectedCycle))
-        val feedback = mutableStateOf<UiFeedback?>(autoFeedback(1, "Вылет сохранён"))
-        composeRule.mainClock.autoAdvance = false
+    fun longPersistentFeedbackIsFullyVisibleBelowTheHeaderAndCanBeDismissed() {
+        val message = "Не удалось сохранить азимут. Повторите действие после восстановления доступа к данным."
+        val feedback = mutableStateOf<UiFeedback?>(
+            UiFeedback(1, message, FeedbackDisplayMode.PERSISTENT),
+        )
         composeRule.setContent {
-            Bee_searchTheme {
-                BeeObservationScreen(
-                    point = point(),
-                    bees = listOf(flyingBee, atPointBee),
-                    flightCycles = cycles.value,
-                    beeEventInProgressIds = emptySet(),
-                    headingProvider = HeadingProvider { heading },
-                    feedback = feedback.value,
-                    onDismissFeedback = { id ->
-                        if (feedback.value?.id == id) feedback.value = null
-                    },
-                    isCompleting = false,
-                    onRegisterReturn = {},
-                    onStartNextFlight = {},
-                    onSetFlightAzimuth = { cycleId, value, onSuccess ->
-                        cycles.value = cycles.value.map { cycle ->
-                            if (cycle.id == cycleId) {
-                                cycle.copy(
-                                    azimuthDeg = value,
-                                    azimuthCaptureConsumed =
-                                        cycle.azimuthCaptureConsumed || value != null,
-                                )
-                            } else cycle
-                        }
-                        onSuccess()
-                    },
-                    onComplete = {},
-                    nowProvider = { now },
-                )
+            val deviceDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(deviceDensity.density, fontScale = 1.7f),
+            ) {
+                Bee_searchTheme {
+                    BeeObservationScreen(
+                        point = point(),
+                        bees = listOf(flyingBee),
+                        flightCycles = listOf(cycle(flyingBee, 1, releaseTime, null)),
+                        beeEventInProgressIds = emptySet(),
+                        feedback = feedback.value,
+                        onDismissFeedback = { id ->
+                            if (feedback.value?.id == id) feedback.value = null
+                        },
+                        isCompleting = false,
+                        onRegisterReturn = {},
+                        onStartNextFlight = {},
+                        onComplete = {},
+                        nowProvider = { now },
+                    )
+                }
             }
         }
 
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithText("Вылет сохранён").assertIsDisplayed()
-        composeRule.mainClock.advanceTimeBy(1_000)
-        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-
-        composeRule.onNodeWithText("Вылет сохранён").assertDoesNotExist()
-        composeRule.onNodeWithText("269° сохранён").assertIsDisplayed()
-        composeRule.onNodeWithTag("azimuth-undo").assertIsDisplayed()
-
+        composeRule.onNodeWithText(message).assertIsDisplayed()
         val headerBounds = composeRule.onNodeWithTag("observation-header")
             .fetchSemanticsNode().boundsInRoot
-        val undoBounds = composeRule.onNodeWithTag("azimuth-undo-banner")
+        val feedbackBounds = composeRule.onNodeWithTag("observation-persistent-feedback")
             .fetchSemanticsNode().boundsInRoot
-        assertTrue("Undo должен отображаться в том же header-slot", undoBounds.bottom <= headerBounds.bottom)
+        val firstCardTop = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
+            .fetchSemanticsNode().boundsInRoot.top
+        assertTrue("Persistent feedback должен находиться под header", feedbackBounds.top >= headerBounds.bottom)
+        assertTrue("Persistent feedback не должен перекрывать карточку", feedbackBounds.bottom <= firstCardTop)
 
-        composeRule.mainClock.advanceTimeBy(2_100)
-        composeRule.onNodeWithTag("azimuth-undo-banner").assertIsDisplayed()
-        composeRule.mainClock.advanceTimeBy(901)
-        composeRule.onNodeWithTag("azimuth-undo-banner").assertDoesNotExist()
+        composeRule.onNodeWithTag("feedback-dismiss").assertHeightIsAtLeast(48.dp).performClick()
+        composeRule.onNodeWithTag("observation-persistent-feedback").assertDoesNotExist()
     }
 
     @Test
-    fun ordinarySuccessCannotReplaceActiveAzimuthUndoAndIsNotDeferred() {
-        val firstCycle = cycle(flyingBee, 1, releaseTime, null)
-        val secondCycle = cycle(atPointBee, 1, releaseTime, returnTime)
+    fun localUndoUnwindsDepartureThenAzimuthOneStepAtATimeInTheSameBeeCard() {
+        val firstCycle = cycle(atPointBee, 1, releaseTime, returnTime)
         val heading = MutableStateFlow(availableHeading(269))
-        val cycles = mutableStateOf(listOf(firstCycle, secondCycle))
-        val feedback = mutableStateOf<UiFeedback?>(null)
-        var departureRequests = 0
-        composeRule.mainClock.autoAdvance = false
+        val cycles = mutableStateOf(listOf(firstCycle))
         composeRule.setContent {
             Bee_searchTheme {
                 BeeObservationScreen(
                     point = point(),
-                    bees = listOf(flyingBee, atPointBee),
+                    bees = listOf(atPointBee),
                     flightCycles = cycles.value,
                     beeEventInProgressIds = emptySet(),
                     headingProvider = HeadingProvider { heading },
-                    feedback = feedback.value,
-                    onDismissFeedback = { id ->
-                        if (feedback.value?.id == id) feedback.value = null
-                    },
                     isCompleting = false,
                     onRegisterReturn = {},
                     onStartNextFlight = {
-                        departureRequests += 1
-                        feedback.value = autoFeedback(2, "Вылет сохранён")
+                        cycles.value = cycles.value + cycle(
+                            atPointBee,
+                            2,
+                            now,
+                            null,
+                        )
                     },
-                    onSetFlightAzimuth = { cycleId, value, onSuccess ->
+                    onCaptureFlightAzimuth = { cycleId, value, onSuccess ->
                         cycles.value = cycles.value.map { cycle ->
                             if (cycle.id == cycleId) {
-                                cycle.copy(
-                                    azimuthDeg = value,
-                                    azimuthCaptureConsumed =
-                                        cycle.azimuthCaptureConsumed || value != null,
-                                )
+                                cycle.copy(azimuthDeg = value, azimuthCaptureConsumed = true)
                             } else cycle
                         }
                         onSuccess()
+                    },
+                    onUndoLastBeeAction = { beeId ->
+                        assertEquals(atPointBee.id, beeId)
+                        val latest = cycles.value.maxBy { it.sequenceNumber }
+                        cycles.value = when {
+                            latest.returnTime != null -> cycles.value.map { cycle ->
+                                if (cycle.id == latest.id) cycle.copy(returnTime = null) else cycle
+                            }
+                            latest.azimuthDeg != null -> cycles.value.map { cycle ->
+                                if (cycle.id == latest.id) cycle.copy(azimuthDeg = null) else cycle
+                            }
+                            else -> cycles.value.filterNot { it.id == latest.id }
+                        }
                     },
                     onComplete = {},
                     nowProvider = { now },
@@ -829,20 +1109,58 @@ class BeeObservationScreenTest {
             }
         }
 
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("azimuth-undo-banner").assertIsDisplayed()
         composeRule.onNodeWithTag("bee-action-${atPointBee.id}").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithText("В полёте").assertIsDisplayed()
+        composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").assertIsDisplayed()
+        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").performClick()
+        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").assertTextContains("269°")
 
-        composeRule.runOnIdle { assertEquals(1, departureRequests) }
-        composeRule.onNodeWithTag("azimuth-undo-banner").assertIsDisplayed()
-        composeRule.onNodeWithText("Вылет сохранён").assertDoesNotExist()
+        composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").performClick()
+        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").assertTextContains("—°")
+        composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").assertIsDisplayed()
 
-        composeRule.mainClock.advanceTimeBy(FEEDBACK_AUTO_DISMISS_MILLIS + 1)
+        composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").performClick()
+        composeRule.onNodeWithText("На точке").assertIsDisplayed()
+        composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertEquals(listOf(1), cycles.value.map { it.sequenceNumber })
+            assertEquals(returnTime, cycles.value.single().returnTime)
+        }
+    }
+
+    @Test
+    fun localUndoBelongsToTheBeeCardAndDoesNotReplaceOrdinaryFeedback() {
+        val flyingCycle = cycle(flyingBee, 1, releaseTime, null, azimuthDeg = 269.0)
+        val atPointCycle = cycle(atPointBee, 1, releaseTime, returnTime)
+        val feedback = mutableStateOf<UiFeedback?>(autoFeedback(1, "Вылет сохранён"))
+        var undoneBeeId: UUID? = null
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = listOf(flyingBee, atPointBee),
+                    flightCycles = listOf(flyingCycle, atPointCycle),
+                    beeEventInProgressIds = emptySet(),
+                    feedback = feedback.value,
+                    onDismissFeedback = { id -> if (feedback.value?.id == id) feedback.value = null },
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onUndoLastBeeAction = { undoneBeeId = it },
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Вылет сохранён").assertIsDisplayed()
+        composeRule.onNodeWithTag("bee-undo-${flyingBee.id}")
+            .assertIsDisplayed()
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        composeRule.runOnIdle { assertEquals(flyingBee.id, undoneBeeId) }
+        composeRule.onNodeWithText("Вылет сохранён").assertIsDisplayed()
         composeRule.onNodeWithTag("azimuth-undo-banner").assertDoesNotExist()
-        composeRule.onNodeWithText("Вылет сохранён").assertDoesNotExist()
     }
 
     @Test
@@ -933,4 +1251,14 @@ class BeeObservationScreenTest {
         message = message,
         displayMode = FeedbackDisplayMode.AUTO_DISMISS,
     )
+
+    private fun captureActionRowScreenshot(name: String) {
+        if (InstrumentationRegistry.getArguments().getString("captureActionRow") != "true") return
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val directory = File(instrumentation.targetContext.getExternalFilesDir(null), "action-row")
+        check(directory.mkdirs() || directory.isDirectory)
+        FileOutputStream(File(directory, "$name.png")).use { output ->
+            instrumentation.uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, output)
+        }
+    }
 }

@@ -45,14 +45,18 @@ import org.beesearch.app.formatMapMeasurement
 internal fun CurrentTerritoryScreen(
     territory: Territory?,
     mapCoverageStore: MapCoverageStore,
+    mapPackageStore: MapPackageStore,
     locationState: LocationUiState,
     observationPointDraft: ObservationPointCreationDraft?,
     locationPermissionGranted: Boolean,
     onRequestLocationPermission: () -> Unit,
-    onStartObservationPointCreation: (Double, Double) -> Unit,
+    onStartObservationPointCreation: () -> Unit,
+    onConfirmObservationPointCreation: (Double, Double) -> Unit,
     onCancelObservationPointCreation: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenOfflineMaps: () -> Unit = {},
     onOpenTerritories: () -> Unit,
+    coverageEditNonce: Int = 0,
 ) {
     MapFirstScaffold(
         onOpenSettings = onOpenSettings,
@@ -61,12 +65,17 @@ internal fun CurrentTerritoryScreen(
             BeeMap(
                     territoryId = territory?.id,
                     coverageStore = mapCoverageStore,
+                    packageStore = mapPackageStore,
                     locationState = locationState,
-                    isCreatingObservationPoint = observationPointDraft != null,
+                    observationPointDraft = observationPointDraft,
                     locationPermissionGranted = locationPermissionGranted,
                     onRequestLocationPermission = onRequestLocationPermission,
-                    onCreateObservationPointAt = onStartObservationPointCreation,
+                    onStartObservationPointCreation = onStartObservationPointCreation,
+                    onConfirmObservationPointCreation = onConfirmObservationPointCreation,
+                    onCancelObservationPointCreation = onCancelObservationPointCreation,
                     onCoverageTerritoryMissing = onOpenSettings,
+                    onOpenOfflineMaps = onOpenOfflineMaps,
+                    coverageEditNonce = coverageEditNonce,
                     modifier = Modifier.fillMaxSize().testTag(MAIN_MAP_VIEWPORT_TAG),
                 )
             if (territory == null) {
@@ -93,6 +102,8 @@ internal const val MAIN_MAP_VIEWPORT_TAG = "main-map-viewport"
 internal const val MAIN_BOTTOM_PANEL_TAG = "main-bottom-panel"
 internal const val RECENTER_MAP_DESCRIPTION = "Вернуться к текущему местоположению"
 internal const val CREATE_OBSERVATION_POINT_DESCRIPTION = "Создать точку наблюдения"
+internal const val CONFIRM_OBSERVATION_POINT_DESCRIPTION = "Подтвердить точку наблюдения"
+internal const val CANCEL_OBSERVATION_POINT_DESCRIPTION = "Отменить создание точки наблюдения"
 internal const val SETTINGS_DESCRIPTION = "Настройки"
 
 @Composable
@@ -261,6 +272,59 @@ internal fun MapIdleControls(
                     .semantics { contentDescription = CREATE_OBSERVATION_POINT_DESCRIPTION }
                     .testTag("create-observation-point"),
             ) { AddPointGlyph() }
+        }
+    }
+}
+
+@Composable
+internal fun MapCreationControls(
+    canRecenter: Boolean,
+    canConfirm: Boolean,
+    isSaving: Boolean,
+    onRecenter: () -> Unit,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilledTonalIconButton(
+            onClick = onRecenter,
+            enabled = canRecenter && !isSaving,
+            modifier = Modifier
+                .size(48.dp)
+                .semantics { contentDescription = RECENTER_MAP_DESCRIPTION }
+                .testTag("map-recenter"),
+        ) { RecenterGlyph() }
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 3.dp,
+            shadowElevation = 1.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Button(
+                    onClick = onConfirm,
+                    enabled = canConfirm && !isSaving,
+                    modifier = Modifier
+                        .semantics { contentDescription = CONFIRM_OBSERVATION_POINT_DESCRIPTION }
+                        .testTag("confirm-observation-point"),
+                ) {
+                    Text(if (isSaving) "Сохранение…" else "Подтвердить")
+                }
+                TextButton(
+                    onClick = onCancel,
+                    enabled = !isSaving,
+                    modifier = Modifier
+                        .semantics { contentDescription = CANCEL_OBSERVATION_POINT_DESCRIPTION }
+                        .testTag("cancel-observation-point"),
+                ) { Text("Отмена") }
+            }
         }
     }
 }

@@ -2,18 +2,24 @@ package org.beesearch.app
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.BeePresenceResult
@@ -23,6 +29,7 @@ import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import androidx.compose.ui.unit.Density
 import java.time.Instant
 import java.util.UUID
 
@@ -48,7 +55,6 @@ class ResumeObservationScreenTest {
                     onRemoveBee = {},
                     onRecordNoBeesFound = {},
                     onComplete = { completionRequests += 1 },
-                    onOpenTerritories = {},
                 )
             }
         }
@@ -80,18 +86,238 @@ class ResumeObservationScreenTest {
                     onRemoveBee = {},
                     onRecordNoBeesFound = {},
                     onComplete = {},
-                    onOpenTerritories = {},
                     onStartInitialGroupRelease = { releaseRequests += 1 },
                 )
             }
         }
 
-        composeRule.onNodeWithText("Белая КП").assertIsDisplayed()
-        composeRule.onNodeWithText("Готово к выпуску: 1").assertIsDisplayed()
-        composeRule.onNodeWithTag("bee-preparation-list")
-            .performScrollToNode(hasTestTag("initial-group-release"))
+        composeRule.onNodeWithText("Подготовка точки").assertIsDisplayed()
+        composeRule.onNodeWithText("Добавить пчелу").assertIsDisplayed()
+        composeRule.onNodeWithText("Белая").assertIsDisplayed()
+        composeRule.onAllNodesWithText("КП").assertCountEquals(2)
+        composeRule.onNodeWithText("Активная точка наблюдения").assertDoesNotExist()
+        composeRule.onNodeWithText("Готово к выпуску: 1").assertDoesNotExist()
+        composeRule.onNodeWithText("Добавляйте только фактически подготовленных пчёл.")
+            .assertDoesNotExist()
+        composeRule.onNodeWithText("Все подготовленные пчёлы получат одно общее время первого выпуска.")
+            .assertDoesNotExist()
         composeRule.onNodeWithTag("initial-group-release").assertIsEnabled().performClick()
         composeRule.runOnIdle { assertEquals(1, releaseRequests) }
+    }
+
+    @Test
+    fun preparedBeeShowsColorAndTypeAndCanBeRemovedBeforeFirstLaunch() {
+        val preparedBee = bee("GREEN", MarkPosition.NONE)
+        var removedBeeId: UUID? = null
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeePreparationScreen(
+                    point = point(),
+                    preparation = BeePreparationUiState(
+                        pointId = pointId,
+                        bees = listOf(preparedBee),
+                        beePresenceResult = BeePresenceResult.BEES_FOUND,
+                        isLoading = false,
+                    ),
+                    isMutating = false,
+                    isCompleting = false,
+                    onAddBee = { _, _ -> },
+                    onRemoveBee = { removedBeeId = it },
+                    onRecordNoBeesFound = {},
+                    onComplete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Зелёная").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Грудь").assertCountEquals(2)
+        composeRule.onAllNodesWithContentDescription("Цвет метки: Зелёная")
+            .assertCountEquals(1)
+        composeRule.onNodeWithText("Обычная").assertDoesNotExist()
+        composeRule.onNodeWithText("Удалить").performClick()
+        composeRule.runOnIdle { assertEquals(preparedBee.id, removedBeeId) }
+    }
+
+    @Test
+    fun preparedBeeListAndEditorShareOneScrollContainer() {
+        val newestBee = bee("BLUE", MarkPosition.LEFT_WING)
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeePreparationScreen(
+                    point = point(),
+                    preparation = BeePreparationUiState(
+                        pointId = pointId,
+                        bees = listOf(bee("WHITE", MarkPosition.NONE), newestBee),
+                        beePresenceResult = BeePresenceResult.BEES_FOUND,
+                        isLoading = false,
+                    ),
+                    isMutating = false,
+                    isCompleting = false,
+                    onAddBee = { _, _ -> },
+                    onRemoveBee = {},
+                    onRecordNoBeesFound = {},
+                    onComplete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("prepared-bee-list").assertIsDisplayed()
+        composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
+        BeeMarkCatalog.colors.forEach { color ->
+            composeRule.onNodeWithTag("mark-color-${color.value}").assertIsDisplayed()
+        }
+        composeRule.onNodeWithTag("add-bee").assertIsDisplayed()
+        composeRule.onNodeWithText("Синяя").assertIsDisplayed()
+        composeRule.onAllNodesWithText("КЛ").assertCountEquals(2)
+        composeRule.onNodeWithText("Цвет метки").assertIsDisplayed()
+        composeRule.onNodeWithText("Расположение метки").assertIsDisplayed()
+        composeRule.onNodeWithText("Тип метки").assertDoesNotExist()
+        composeRule.onNodeWithText("Последняя добавленная").assertDoesNotExist()
+        composeRule.onNodeWithText("ВАЖНО! Первый выпуск").assertIsDisplayed()
+        composeRule.onNodeWithText("После открытия клеточки пчёлы обычно вылетают почти одновременно, " +
+            "с разницей в несколько секунд. В этот момент нажмите «Выпустить всех» — " +
+            "для всех подготовленных пчёл будет зафиксировано одинаковое время вылета.")
+            .assertDoesNotExist()
+        composeRule.onNodeWithTag("launch-instruction-toggle").performClick()
+        composeRule.onNodeWithTag("preparation-reading-list").assertDoesNotExist()
+        composeRule.onNodeWithText("Свернуть").assertIsDisplayed()
+        composeRule.onNodeWithText("После открытия клеточки пчёлы обычно вылетают почти одновременно, " +
+            "с разницей в несколько секунд. В этот момент нажмите «Выпустить всех» — " +
+            "для всех подготовленных пчёл будет зафиксировано одинаковое время вылета.")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("launch-instruction-toggle").performClick()
+        composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
+        composeRule.onNodeWithText("Выпустить всех").assertIsDisplayed()
+    }
+
+    @Test
+    fun manualScrollGivesPreparedBeeListTheViewportWithoutASeparateReviewMode() {
+        val preparedBees = listOf(
+            bee("WHITE", MarkPosition.NONE),
+            bee("WHITE", MarkPosition.RIGHT_WING),
+            bee("WHITE", MarkPosition.LEFT_WING),
+            bee("YELLOW", MarkPosition.RIGHT_WING),
+            bee("YELLOW", MarkPosition.NONE),
+            bee("YELLOW", MarkPosition.LEFT_WING),
+            bee("BLUE", MarkPosition.LEFT_WING),
+            bee("BLUE", MarkPosition.NONE),
+        )
+        composeRule.setContent {
+            val deviceDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(deviceDensity.density, fontScale = 1.7f),
+            ) {
+                Bee_searchTheme {
+                    BeePreparationScreen(
+                        point = point(),
+                        preparation = BeePreparationUiState(
+                            pointId = pointId,
+                            bees = preparedBees,
+                            beePresenceResult = BeePresenceResult.BEES_FOUND,
+                            isLoading = false,
+                        ),
+                        isMutating = false,
+                        isCompleting = false,
+                        onAddBee = { _, _ -> },
+                        onRemoveBee = {},
+                        onRecordNoBeesFound = {},
+                        onComplete = {},
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("prepared-bee-list").performTouchInput { swipeDown() }
+
+        composeRule.onNodeWithTag("remove-prepared-bee-${preparedBees.first().id}")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("remove-prepared-bee-${preparedBees[3].id}")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("preparation-editor").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun removingPreparedBeeLeavesTheRemainingListRowAccessible() {
+        val firstBee = bee("WHITE", MarkPosition.NONE)
+        val latestBee = bee("YELLOW", MarkPosition.RIGHT_WING)
+        composeRule.setContent {
+            val preparation = remember {
+                mutableStateOf(
+                    BeePreparationUiState(
+                        pointId = pointId,
+                        bees = listOf(firstBee, latestBee),
+                        beePresenceResult = BeePresenceResult.BEES_FOUND,
+                        isLoading = false,
+                    ),
+                )
+            }
+            Bee_searchTheme {
+                BeePreparationScreen(
+                    point = point(),
+                    preparation = preparation.value,
+                    isMutating = false,
+                    isCompleting = false,
+                    onAddBee = { _, _ -> },
+                    onRemoveBee = { id ->
+                        preparation.value = preparation.value.copy(
+                            bees = preparation.value.bees.filterNot { it.id == id },
+                        )
+                    },
+                    onRecordNoBeesFound = {},
+                    onComplete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("remove-prepared-bee-${latestBee.id}").performClick()
+        composeRule.onNodeWithText("Белая").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Грудь").assertCountEquals(2)
+    }
+
+    @Test
+    fun successfulAddShowsTheNewBeeWhileTheEditorStaysVisible() {
+        val addedBeeId = UUID.fromString("00000000-0000-0000-0000-000000000222")
+        composeRule.setContent {
+            val preparation = remember {
+                mutableStateOf(
+                    BeePreparationUiState(
+                        pointId = pointId,
+                        bees = listOf(
+                            bee("YELLOW", MarkPosition.NONE),
+                            bee("YELLOW", MarkPosition.RIGHT_WING),
+                            bee("YELLOW", MarkPosition.LEFT_WING),
+                            bee("BLUE", MarkPosition.NONE),
+                            bee("BLUE", MarkPosition.RIGHT_WING),
+                            bee("BLUE", MarkPosition.LEFT_WING),
+                        ),
+                        beePresenceResult = BeePresenceResult.BEES_FOUND,
+                        isLoading = false,
+                    ),
+                )
+            }
+            Bee_searchTheme {
+                BeePreparationScreen(
+                    point = point(),
+                    preparation = preparation.value,
+                    isMutating = false,
+                    isCompleting = false,
+                    onAddBee = { color, position ->
+                        preparation.value = preparation.value.copy(
+                            bees = preparation.value.bees + bee(color, position).copy(id = addedBeeId),
+                        )
+                    },
+                    onRemoveBee = {},
+                    onRecordNoBeesFound = {},
+                    onComplete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("add-bee").assertIsEnabled().performClick()
+        composeRule.onNodeWithTag("remove-prepared-bee-$addedBeeId").assertIsDisplayed()
+        composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
     }
 
     @Test
@@ -108,13 +334,11 @@ class ResumeObservationScreenTest {
                     onRemoveBee = {},
                     onRecordNoBeesFound = { noBeesRequests += 1 },
                     onComplete = {},
-                    onOpenTerritories = {},
                 )
             }
         }
 
-        composeRule.onNodeWithTag("bee-preparation-list")
-            .performScrollToNode(hasTestTag("record-no-bees"))
+        composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
         composeRule.onNodeWithTag("record-no-bees").performClick()
         composeRule.onNodeWithText("Пчёлы отсутствуют?").assertIsDisplayed()
         composeRule.onNodeWithText(
@@ -149,7 +373,6 @@ class ResumeObservationScreenTest {
                     onRemoveBee = {},
                     onRecordNoBeesFound = {},
                     onComplete = {},
-                    onOpenTerritories = {},
                 )
             }
         }
@@ -228,33 +451,55 @@ class ResumeObservationScreenTest {
                     onRemoveBee = {},
                     onRecordNoBeesFound = {},
                     onComplete = {},
-                    onOpenTerritories = {},
                 )
             }
         }
 
-        composeRule.onNodeWithTag("bee-preparation-list")
-            .performScrollToNode(hasTestTag("add-bee"))
+        composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
         composeRule.onNodeWithTag("mark-color-WHITE").performClick()
         composeRule.onNodeWithTag("mark-position-NONE").assertIsSelected()
         composeRule.onNodeWithTag("add-bee").performClick()
 
-        composeRule.onNodeWithTag("bee-preparation-list")
-            .performScrollToNode(hasTestTag("add-bee"))
+        composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
         composeRule.onNodeWithTag("mark-color-WHITE").assertIsSelected()
         composeRule.onNodeWithTag("mark-position-RIGHT_WING").assertIsSelected()
         composeRule.onNodeWithTag("add-bee").performClick()
 
-        composeRule.onNodeWithTag("bee-preparation-list")
-            .performScrollToNode(hasTestTag("add-bee"))
+        composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
         composeRule.onNodeWithTag("mark-color-WHITE").assertIsSelected()
         composeRule.onNodeWithTag("mark-position-LEFT_WING").assertIsSelected()
         composeRule.onNodeWithTag("add-bee").performClick()
 
-        composeRule.onNodeWithTag("bee-preparation-list")
-            .performScrollToNode(hasTestTag("add-bee"))
+        composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
         composeRule.onNodeWithTag("mark-color-YELLOW").assertIsSelected()
         composeRule.onNodeWithTag("mark-position-NONE").assertIsSelected()
+    }
+
+    @Test
+    fun persistentPreparationStartsWithNextAvailableCombinationAfterFirstBee() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeePreparationScreen(
+                    point = point(),
+                    preparation = BeePreparationUiState(
+                        pointId = pointId,
+                        bees = listOf(bee("WHITE", MarkPosition.NONE)),
+                        beePresenceResult = BeePresenceResult.BEES_FOUND,
+                        isLoading = false,
+                    ),
+                    isMutating = false,
+                    isCompleting = false,
+                    onAddBee = { _, _ -> },
+                    onRemoveBee = {},
+                    onRecordNoBeesFound = {},
+                    onComplete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
+        composeRule.onNodeWithTag("mark-color-WHITE").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-RIGHT_WING").assertIsSelected()
     }
 
     @Test
@@ -283,10 +528,17 @@ class ResumeObservationScreenTest {
     }
 
     @Test
-    fun externalAvailabilityChangeClearsSelectionInsteadOfReplacingIt() {
+    fun removalRecalculatesAvailabilityWithoutLosingValidSelection() {
         lateinit var beesState: MutableState<List<Bee>>
         composeRule.setContent {
-            val bees = remember { mutableStateOf(emptyList<Bee>()) }
+            val bees = remember {
+                mutableStateOf(
+                    listOf(
+                        bee("WHITE", MarkPosition.NONE),
+                        bee("GREEN", MarkPosition.NONE),
+                    ),
+                )
+            }
             beesState = bees
             Bee_searchTheme {
                 BeeSelector(
@@ -298,13 +550,16 @@ class ResumeObservationScreenTest {
         }
 
         composeRule.onNodeWithTag("mark-color-GREEN").performClick()
-        composeRule.onNodeWithTag("mark-position-NONE").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-RIGHT_WING").assertIsSelected()
         composeRule.runOnIdle {
             beesState.value = listOf(bee("GREEN", MarkPosition.NONE))
         }
 
-        composeRule.onNodeWithTag("add-bee").assertIsNotEnabled()
-        composeRule.onNodeWithTag("mark-position-RIGHT_WING").assertIsNotSelected()
+        composeRule.onNodeWithTag("mark-color-GREEN").assertIsSelected()
+        composeRule.onNodeWithTag("mark-position-RIGHT_WING").assertIsSelected()
+        composeRule.onNodeWithTag("add-bee").assertIsEnabled()
+        composeRule.onNodeWithTag("mark-color-WHITE").performClick()
+        composeRule.onNodeWithTag("mark-position-NONE").assertIsSelected()
     }
 
     @Test

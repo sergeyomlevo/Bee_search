@@ -1,7 +1,11 @@
 package org.beesearch.app.ui.map
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.util.Log
 import android.app.Activity
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
@@ -26,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,7 +54,9 @@ import kotlinx.coroutines.launch
 import org.beesearch.app.MapCenterTarget
 import org.beesearch.app.MapGpsMarker
 import org.beesearch.app.MapTarget
+import org.beesearch.app.ObservationPointCreationDraft
 import org.beesearch.app.beeSearchFieldMapProfile
+import org.beesearch.app.beeSearchActivePmtilesMapProfile
 import org.beesearch.app.beeSearchLocalForestPmtilesMapProfile
 import org.beesearch.app.beeSearchLocalSapunovoPmtilesMapProfile
 import org.beesearch.app.beeSearchLocalSapunovoDiagnosticProfile
@@ -71,12 +78,17 @@ import org.maplibre.android.maps.Style
 internal fun BeeMap(
     territoryId: UUID?,
     coverageStore: MapCoverageStore,
+    packageStore: MapPackageStore,
     locationState: LocationUiState,
-    isCreatingObservationPoint: Boolean,
+    observationPointDraft: ObservationPointCreationDraft?,
     locationPermissionGranted: Boolean,
     onRequestLocationPermission: () -> Unit,
-    onCreateObservationPointAt: (Double, Double) -> Unit,
+    onStartObservationPointCreation: () -> Unit,
+    onConfirmObservationPointCreation: (Double, Double) -> Unit,
+    onCancelObservationPointCreation: () -> Unit,
     onCoverageTerritoryMissing: () -> Unit = {},
+    onOpenOfflineMaps: () -> Unit = {},
+    coverageEditNonce: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -96,9 +108,11 @@ internal fun BeeMap(
     var workingCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
     var coverageLoadedFor by remember { mutableStateOf<UUID?>(null) }
     var coverageLoading by remember { mutableStateOf(false) }
+    var coverageViewportBounds by remember { mutableStateOf<MapGeoBounds?>(null) }
+    var packageAvailability by remember { mutableStateOf<MapPackageAvailability>(MapPackageAvailability.Missing) }
     var clearSelectionConfirmationVisible by remember { mutableStateOf(false) }
     var benchmarkWorkingCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
-    var benchmarkResult by remember { mutableStateOf<MapBenchmarkBoundsSummary?>(null) }
+    var benchmarkResult by remember { mutableStateOf<MapAreaBoundsSummary?>(null) }
     val activity = LocalContext.current as? Activity
     val initialDeveloperBasemap = if (
         BuildConfig.DEBUG && activity?.intent?.getStringExtra("beeMapDiagnostic") == "label"
@@ -114,6 +128,7 @@ internal fun BeeMap(
     val normalCameraPadding = remember { normalMapCameraPadding() }
     val reading = (locationState as? LocationUiState.Available)?.reading
     val gpsPosition = reading?.let { MapTarget(it.latitude, it.longitude) }
+    val isCreatingObservationPoint = observationPointDraft != null
     val coverageSelectionActive = coverageSelectionMode || benchmarkBoundsSelectionMode
     val measurement = if (
         !coverageSelectionActive &&
@@ -125,6 +140,7 @@ internal fun BeeMap(
         null
     }
     val appContext = LocalContext.current.applicationContext
+    val latestTerritoryId by rememberUpdatedState(territoryId)
     val onlineMapProfile = remember { beeSearchFieldMapProfile() }
     val localMapProfile = remember(appContext) { beeSearchLocalCyclOSMMapProfile(appContext) }
     val localVectorProfile = remember(appContext) { beeSearchLocalForestPmtilesMapProfile(appContext) }
@@ -154,12 +170,48 @@ internal fun BeeMap(
             coverageLoading = false
         }
     }
+    LaunchedEffect(territoryId, persistedCoverage, coverageLoadedFor, coverageLoading, packageStore) {
+        if (territoryId == null || coverageLoading || coverageLoadedFor != territoryId) {
+            packageAvailability = MapPackageAvailability.Missing
+        } else {
+            packageAvailability = packageStore.loadActive(territoryId, persistedCoverage)
+            if (developerBasemap == DeveloperBasemap.ACTIVE_VECTOR && packageAvailability !is MapPackageAvailability.Ready) {
+                developerBasemap = DeveloperBasemap.ONLINE
+            }
+        }
+    }
+    // External request (Settings → Офлайн-карты → «Изменить участок») opens the
+    // spatial coverage-selection mode for the current territory.
+    LaunchedEffect(coverageEditNonce, territoryId, coverageLoadedFor, coverageLoading) {
+        if (
+            coverageEditNonce > 0 &&
+            territoryId != null &&
+            !coverageLoading &&
+            coverageLoadedFor == territoryId
+        ) {
+            editingTerritoryId = territoryId
+            workingCoverage = persistedCoverage
+            coverageSelectionMode = true
+        }
+    }
     val coverageFragments = when {
         coverageSelectionMode -> workingCoverage
         benchmarkBoundsSelectionMode -> benchmarkWorkingCoverage
         territoryId != null && coverageLoadedFor == territoryId && !coverageLoading -> persistedCoverage
         else -> emptyList()
     }
+    val coverageViewportSummary = if (coverageSelectionMode) {
+        coverageViewportBounds?.let(::coverageBoundsSummary)
+    } else {
+        null
+    }
+    val selectedCoverageSummary = if (coverageSelectionMode && workingCoverage.size == 1) {
+        coverageBoundsSummary(workingCoverage.single().bounds)
+    } else {
+        null
+    }
+    val activeMapPackage = (packageAvailability as? MapPackageAvailability.Ready)?.activePackage
+    val activeVectorProfile = activeMapPackage?.let(::beeSearchActivePmtilesMapProfile)
     BackHandler(enabled = coverageSelectionActive) {
         if (benchmarkBoundsSelectionMode) {
             benchmarkBoundsSelectionMode = false
@@ -168,6 +220,17 @@ internal fun BeeMap(
             coverageSelectionMode = false
             editingTerritoryId = null
             workingCoverage = emptyList()
+        }
+    }
+    BackHandler(enabled = isCreatingObservationPoint && !coverageSelectionActive) {
+        onCancelObservationPointCreation()
+    }
+
+    LaunchedEffect(coverageSelectionMode, map) {
+        coverageViewportBounds = if (coverageSelectionMode) {
+            map?.projection?.visibleRegion?.latLngBounds?.let(MapGeoBounds::fromMapLibre)
+        } else {
+            null
         }
     }
 
@@ -229,6 +292,17 @@ internal fun BeeMap(
             gpsScreenPosition = projectedMapPosition(map, mapView, gpsPosition)
         }
 
+        LaunchedEffect(map, observationPointDraft?.originalGps) {
+            val originalGps = observationPointDraft?.originalGps ?: return@LaunchedEffect
+            val mapInstance = map ?: return@LaunchedEffect
+            recenteredUntilNextGesture = true
+            mapInstance.animateCamera(
+                CameraUpdateFactory.newLatLng(
+                    LatLng(originalGps.latitude, originalGps.longitude),
+                ),
+            )
+        }
+
         DisposableEffect(map, mapView, gpsPosition) {
             val mapInstance = map
             val currentMapView = mapView
@@ -238,6 +312,11 @@ internal fun BeeMap(
                 val updateMapOverlays = {
                     gpsScreenPosition = projectedMapPosition(mapInstance, currentMapView, gpsPosition)
                     mapCameraRevision += 1
+                    if (coverageSelectionMode) {
+                        coverageViewportBounds = MapGeoBounds.fromMapLibre(
+                            mapInstance.projection.visibleRegion.latLngBounds,
+                        )
+                    }
                 }
                 val moveListener = MapLibreMap.OnCameraMoveListener(updateMapOverlays)
                 val moveStartedListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
@@ -270,25 +349,29 @@ internal fun BeeMap(
             }
         }
 
-        MapCoverageFragmentsOverlay(
-            fragments = coverageFragments,
-            map = map,
-            cameraRevision = mapCameraRevision,
-            modifier = Modifier.fillMaxSize().zIndex(1f),
-        )
         if (coverageSelectionActive) {
+            MapCoverageFragmentsOverlay(
+                fragments = coverageFragments,
+                map = map,
+                cameraRevision = mapCameraRevision,
+                modifier = Modifier.fillMaxSize().zIndex(1f),
+            )
             MapCoverageViewportFrame(Modifier.fillMaxSize().zIndex(2f))
         }
 
         if (
             developerBasemap == DeveloperBasemap.ONLINE ||
-            developerBasemap == DeveloperBasemap.LOCAL_TERRITORY_BENCHMARK
+            developerBasemap == DeveloperBasemap.ACTIVE_VECTOR
         ) {
             MapBasemapSourceSelector(
-                vectorMapSelected = developerBasemap == DeveloperBasemap.LOCAL_TERRITORY_BENCHMARK,
+                vectorMapSelected = developerBasemap == DeveloperBasemap.ACTIVE_VECTOR,
                 onSelectOnline = { developerBasemap = DeveloperBasemap.ONLINE },
                 onSelectVectorMap = {
-                    developerBasemap = DeveloperBasemap.LOCAL_TERRITORY_BENCHMARK
+                    if (packageAvailability is MapPackageAvailability.Ready) {
+                        developerBasemap = DeveloperBasemap.ACTIVE_VECTOR
+                    } else {
+                        onOpenOfflineMaps()
+                    }
                 },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -346,37 +429,61 @@ internal fun BeeMap(
         }
 
         if (!coverageSelectionActive) {
-            MapIdleControls(
-                canRecenter = reading != null,
-                canCreateObservationPoint = reading != null &&
-                    mapCenter != null &&
-                    initialGpsCenterEstablished &&
-                    !isCreatingObservationPoint,
-                onRecenter = {
-                    reading?.let { current ->
+            if (observationPointDraft == null) {
+                MapIdleControls(
+                    canRecenter = reading != null,
+                    canCreateObservationPoint = reading != null &&
+                        mapCenter != null &&
+                        initialGpsCenterEstablished,
+                    onRecenter = {
+                        reading?.let { current ->
+                            map?.let { mapInstance ->
+                                recenteredUntilNextGesture = true
+                                mapInstance.animateCamera(
+                                    CameraUpdateFactory.newLatLng(
+                                        LatLng(current.latitude, current.longitude),
+                                    ),
+                                )
+                            }
+                        }
+                    },
+                    onCreateObservationPoint = onStartObservationPointCreation,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).zIndex(3f),
+                )
+            } else {
+                MapCreationControls(
+                    canRecenter = map != null,
+                    canConfirm = map?.cameraPosition?.target != null,
+                    isSaving = false,
+                    onRecenter = {
                         map?.let { mapInstance ->
+                            val originalGps = observationPointDraft.originalGps
                             recenteredUntilNextGesture = true
                             mapInstance.animateCamera(
                                 CameraUpdateFactory.newLatLng(
-                                    LatLng(current.latitude, current.longitude),
+                                    LatLng(originalGps.latitude, originalGps.longitude),
                                 ),
                             )
                         }
-                    }
-                },
-                onCreateObservationPoint = {
-                    map?.cameraPosition?.target?.let { target ->
-                        onCreateObservationPointAt(target.latitude, target.longitude)
-                    }
-                },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).zIndex(3f),
-            )
+                    },
+                    onConfirm = {
+                        map?.cameraPosition?.target?.let { target ->
+                            onConfirmObservationPointCreation(target.latitude, target.longitude)
+                        }
+                    },
+                    onCancel = onCancelObservationPointCreation,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).zIndex(3f),
+                )
+            }
         }
 
         if (coverageSelectionActive) {
             MapCoverageSelectionControls(
                 fragmentCount = coverageFragments.size,
-                title = if (benchmarkBoundsSelectionMode) "PMTiles benchmark BBOX" else "Выбор области",
+                viewportSummary = coverageViewportSummary,
+                selectedSummary = selectedCoverageSummary,
+                showDevBoundsExport = BuildConfig.DEBUG && !benchmarkBoundsSelectionMode,
+                title = if (benchmarkBoundsSelectionMode) "PMTiles benchmark BBOX" else "Участок",
                 canAddFragment = map != null,
                 onAddFragment = {
                     map?.projection?.visibleRegion?.latLngBounds?.let { visibleBounds ->
@@ -417,21 +524,41 @@ internal fun BeeMap(
                 },
                 onClear = { clearSelectionConfirmationVisible = true },
                 onDone = {
-                    // MapLibre retains the padding passed to newLatLngBounds. It is valid for
-                    // coverage review, but would otherwise shift the normal map camera center.
-                    map?.restoreNormalCameraPadding(normalCameraPadding)
                     if (benchmarkBoundsSelectionMode) {
+                        // MapLibre retains the padding passed to newLatLngBounds. It is valid for
+                        // coverage review, but would otherwise shift the normal map camera center.
+                        map?.restoreNormalCameraPadding(normalCameraPadding)
                         benchmarkResult = benchmarkBoundsSummary(benchmarkWorkingCoverage)
                         benchmarkBoundsSelectionMode = false
                         benchmarkWorkingCoverage = emptyList()
                     } else {
                         val id = editingTerritoryId
                         if (id != null) {
-                            coroutineScope.launch { coverageStore.replace(id, workingCoverage) }
-                            if (id == territoryId) persistedCoverage = workingCoverage
+                            val selectedCoverage = workingCoverage
+                            coroutineScope.launch {
+                                try {
+                                    coverageStore.replace(id, selectedCoverage)
+                                    if (id == latestTerritoryId) persistedCoverage = selectedCoverage
+                                    map?.restoreNormalCameraPadding(normalCameraPadding)
+                                    coverageSelectionMode = false
+                                    editingTerritoryId = null
+                                } catch (_: Exception) {
+                                    Toast.makeText(
+                                        appContext,
+                                        "Не удалось сохранить участок",
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            }
                         }
-                        coverageSelectionMode = false
-                        editingTerritoryId = null
+                    }
+                },
+                onCopySelectedBounds = {
+                    workingCoverage.singleOrNull()?.let { selected ->
+                        val text = formatMapPackageBuilderBounds(selected.bounds)
+                        val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Bee Search map bbox", text))
+                        Toast.makeText(appContext, "Bbox скопирован", Toast.LENGTH_SHORT).show()
                     }
                 },
                 onCancel = {
@@ -450,20 +577,21 @@ internal fun BeeMap(
                     .onSizeChanged { coverageControlsHeightPx = it.height }
                     .zIndex(3f),
             )
-        } else {
+        } else if (!isCreatingObservationPoint && territoryId != null) {
             CoverageSelectionEntry(
                 onEnter = {
-                    if (territoryId == null) {
-                        onCoverageTerritoryMissing()
-                    } else if (coverageLoading || coverageLoadedFor != territoryId) {
-                        // Wait until the current Territory's persisted geometry is loaded.
-                    } else {
+                    if (!coverageLoading && coverageLoadedFor == territoryId) {
                         editingTerritoryId = territoryId
                         workingCoverage = persistedCoverage
                         coverageSelectionMode = true
+                    } else {
+                        onCoverageTerritoryMissing()
                     }
                 },
-                modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).zIndex(3f),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp)
+                    .zIndex(3f),
             )
         }
 
@@ -489,10 +617,11 @@ internal fun BeeMap(
         }
     }
 
-    LaunchedEffect(map, developerBasemap) {
+    LaunchedEffect(map, developerBasemap, activeMapPackage?.pmtilesFile?.absolutePath) {
         val mapInstance = map ?: return@LaunchedEffect
         val profile = when (developerBasemap) {
             DeveloperBasemap.ONLINE -> onlineMapProfile
+            DeveloperBasemap.ACTIVE_VECTOR -> activeVectorProfile ?: onlineMapProfile
             DeveloperBasemap.LOCAL_RASTER -> localMapProfile
             DeveloperBasemap.LOCAL_VECTOR -> localVectorProfile
             DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR -> localSapunovoProfile
@@ -505,7 +634,6 @@ internal fun BeeMap(
         val fitBounds = when (developerBasemap) {
             DeveloperBasemap.LOCAL_VECTOR -> FOREST_CUTLINES_BOUNDS
             DeveloperBasemap.LOCAL_SAPUNOVO_VECTOR -> SAPUNOVO_FIELDS_WATER_BOUNDS
-            DeveloperBasemap.LOCAL_TERRITORY_BENCHMARK -> TERRITORY_BENCHMARK_BOUNDS
             else -> null
         }
         mapInstance.setStyle(Style.Builder().fromJson(profile.styleJson)) {
@@ -520,6 +648,7 @@ internal fun BeeMap(
 
 private enum class DeveloperBasemap {
     ONLINE,
+    ACTIVE_VECTOR,
     LOCAL_RASTER,
     LOCAL_VECTOR,
     LOCAL_SAPUNOVO_VECTOR,
@@ -529,6 +658,7 @@ private enum class DeveloperBasemap {
 
     fun next(): DeveloperBasemap = when (this) {
         ONLINE -> LOCAL_RASTER
+        ACTIVE_VECTOR -> ONLINE
         LOCAL_RASTER -> LOCAL_VECTOR
         LOCAL_VECTOR -> LOCAL_SAPUNOVO_VECTOR
         LOCAL_SAPUNOVO_VECTOR -> LOCAL_TERRITORY_BENCHMARK
