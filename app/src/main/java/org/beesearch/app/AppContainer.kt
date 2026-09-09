@@ -8,6 +8,7 @@ import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.local.settings.settingsDataStore
 import org.beesearch.app.data.local.settings.DataStoreMapCoverageStore
+import org.beesearch.app.data.local.settings.DataStoreMapPackageStore
 import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomObserverRepository
 import org.beesearch.app.data.repository.RoomTerritoryRepository
@@ -28,6 +29,11 @@ internal class AppContainer(context: Context) {
 
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(context.settingsDataStore)
     val mapCoverageStore = DataStoreMapCoverageStore(context.settingsDataStore)
+    val mapPackageStore = DataStoreMapPackageStore(
+        contentResolver = context.contentResolver,
+        filesDir = context.filesDir,
+        dataStore = context.settingsDataStore,
+    )
     val territoryRepository: TerritoryRepository = RoomTerritoryRepository(
         territoryDao = database.territoryDao(),
         clock = clock,
