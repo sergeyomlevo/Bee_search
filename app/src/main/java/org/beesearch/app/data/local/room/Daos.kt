@@ -102,6 +102,17 @@ internal interface ObservationPointDao {
     @Query(
         """
         UPDATE observation_points
+        SET initial_group_release_at = :releaseAt
+        WHERE id = :pointId
+          AND completed_at IS NULL
+          AND initial_group_release_at IS NULL
+        """,
+    )
+    suspend fun setInitialGroupReleaseAt(pointId: UUID, releaseAt: Instant): Int
+
+    @Query(
+        """
+        UPDATE observation_points
         SET bee_presence_result = :result, completed_at = :completedAt
         WHERE id = :id AND completed_at IS NULL
         """,
@@ -169,6 +180,11 @@ internal interface FlightCycleDao {
     )
     suspend fun getOpenForBee(beeId: UUID): FlightCycleEntity?
 
+    @Query(
+        "SELECT * FROM flight_cycles WHERE bee_id = :beeId ORDER BY sequence_number DESC LIMIT 1",
+    )
+    suspend fun getLatestForBee(beeId: UUID): FlightCycleEntity?
+
     @Query("SELECT MAX(sequence_number) FROM flight_cycles WHERE bee_id = :beeId")
     suspend fun getMaximumSequenceNumber(beeId: UUID): Int?
 
@@ -199,11 +215,21 @@ internal interface FlightCycleDao {
     @Query(
         """
         UPDATE flight_cycles
-        SET return_time = :returnTime, updated_at = :updatedAt
+        SET return_time = :returnTime,
+            initial_group_launch_correction_eligible = 0,
+            updated_at = :updatedAt
         WHERE id = :id AND return_time IS NULL
         """,
     )
     suspend fun registerReturn(id: UUID, returnTime: Instant, updatedAt: Instant): Int
+
+    @Query(
+        "UPDATE flight_cycles SET return_time = NULL, updated_at = :updatedAt WHERE id = :id AND return_time IS NOT NULL",
+    )
+    suspend fun clearReturn(id: UUID, updatedAt: Instant): Int
+
+    @Query("DELETE FROM flight_cycles WHERE id = :id")
+    suspend fun deleteById(id: UUID): Int
 
     @Query(
         """

@@ -384,6 +384,102 @@ class BeeSearchMigrationTest {
         migrated.close()
     }
 
+    @Test
+    fun migrationFromFiveToSixPreservesHistoryAndBackfillsInitialLaunchProvenance() {
+        val databaseName = "$DATABASE_NAME-5-6"
+        val territoryId = UUID.randomUUID().toString()
+        val observerId = UUID.randomUUID().toString()
+        val pointId = UUID.randomUUID().toString()
+        val openBeeId = UUID.randomUUID().toString()
+        val returnedBeeId = UUID.randomUUID().toString()
+        val openCycleId = UUID.randomUUID().toString()
+        val returnedCycleId = UUID.randomUUID().toString()
+        val departureTime = Instant.parse("2026-09-08T08:00:00Z").toEpochMilli()
+        val returnTime = departureTime + 45_000
+
+        migrationHelper.createDatabase(databaseName, 5).apply {
+            execSQL(
+                """
+                INSERT INTO territories (id, code, name, region, district, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any>(territoryId, "KLZ", "Клязьма", "Область", "Район", departureTime, departureTime),
+            )
+            execSQL(
+                """
+                INSERT INTO observers (id, code, last_name, first_name, middle_name, contact, created_at, updated_at)
+                VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any>(observerId, "GSE", "Иванов", "Иван", departureTime, departureTime),
+            )
+            execSQL(
+                """
+                INSERT INTO observation_points (
+                    id, territory_id, observer_id, observation_year, point_number,
+                    bee_presence_result, code, latitude, longitude, gps_latitude,
+                    gps_longitude, gps_accuracy_m, created_at, completed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL, NULL, NULL, ?, NULL)
+                """.trimIndent(),
+                arrayOf<Any>(pointId, territoryId, observerId, 2026, 1, "BEES_FOUND", 56.1, 42.7, departureTime),
+            )
+            listOf(openBeeId to "WHITE", returnedBeeId to "BLUE").forEach { (beeId, color) ->
+                execSQL(
+                    """
+                    INSERT INTO bees (id, observation_point_id, mark_color, mark_position, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """.trimIndent(),
+                    arrayOf<Any>(beeId, pointId, color, "NONE", departureTime),
+                )
+            }
+            execSQL(
+                """
+                INSERT INTO flight_cycles (
+                    id, bee_id, sequence_number, departure_time, return_time,
+                    azimuth_deg, azimuth_capture_consumed, created_at, updated_at
+                ) VALUES (?, ?, 1, ?, NULL, NULL, 0, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any>(openCycleId, openBeeId, departureTime, departureTime, departureTime),
+            )
+            execSQL(
+                """
+                INSERT INTO flight_cycles (
+                    id, bee_id, sequence_number, departure_time, return_time,
+                    azimuth_deg, azimuth_capture_consumed, created_at, updated_at
+                ) VALUES (?, ?, 1, ?, ?, NULL, 0, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any>(returnedCycleId, returnedBeeId, departureTime, returnTime, departureTime, returnTime),
+            )
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(databaseName, 6, true, MIGRATION_5_6)
+        migrated.query(
+            "SELECT initial_group_release_at FROM observation_points WHERE id = ?",
+            arrayOf(pointId),
+        ).use { cursor ->
+            cursor.moveToFirst()
+            assertEquals(departureTime, cursor.getLong(0))
+        }
+        migrated.query(
+            "SELECT initial_group_launch, initial_group_launch_correction_eligible FROM flight_cycles WHERE id = ?",
+            arrayOf(openCycleId),
+        ).use { cursor ->
+            cursor.moveToFirst()
+            assertTrue(cursor.getInt(0) != 0)
+            assertTrue(cursor.getInt(1) != 0)
+        }
+        migrated.query(
+            "SELECT initial_group_launch, initial_group_launch_correction_eligible, return_time FROM flight_cycles WHERE id = ?",
+            arrayOf(returnedCycleId),
+        ).use { cursor ->
+            cursor.moveToFirst()
+            assertTrue(cursor.getInt(0) != 0)
+            assertFalse(cursor.getInt(1) != 0)
+            assertEquals(returnTime, cursor.getLong(2))
+        }
+        migrated.close()
+    }
+
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyPoint(
         id: String,
         territoryId: String,

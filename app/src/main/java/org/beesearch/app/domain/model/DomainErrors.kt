@@ -81,3 +81,7 @@ class AzimuthCaptureRequiresOpenFlightCycleException : IllegalStateException(
 class AzimuthCaptureAlreadyConsumedException : IllegalStateException(
     "The field azimuth capture opportunity has already been consumed.",
 )
+
+class NoReversibleBeeActionException : IllegalStateException(
+    "The bee has no last reversible action in the active observation workflow.",
+)

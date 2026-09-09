@@ -3,6 +3,7 @@ package org.beesearch.app.domain.repository
 import kotlinx.coroutines.flow.Flow
 import org.beesearch.app.domain.model.AppSettings
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeeUndoAction
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
@@ -48,7 +49,19 @@ interface ObservationPointCreator {
     ): ObservationPoint
 }
 
-interface ObservationRepository : ObservationPointCreator {
+interface ObservationPointPreparationCreator : ObservationPointCreator {
+    suspend fun createObservationPointWithFirstBee(
+        point: NewObservationPoint,
+        markColor: String,
+        markPosition: MarkPosition,
+    ): ObservationPoint
+
+    suspend fun createObservationPointWithNoBeesFound(
+        point: NewObservationPoint,
+    ): ObservationPoint
+}
+
+interface ObservationRepository : ObservationPointPreparationCreator {
     fun observeActivePoint(): Flow<ObservationPoint?>
     fun observeBees(pointId: UUID): Flow<List<Bee>>
     fun observeFlightCyclesForPoint(pointId: UUID): Flow<List<FlightCycle>>
@@ -61,6 +74,7 @@ interface ObservationRepository : ObservationPointCreator {
     suspend fun startNextFlight(beeId: UUID): FlightCycle
     suspend fun captureFlightAzimuth(flightCycleId: UUID, azimuthDeg: Double): FlightCycle
     suspend fun setFlightAzimuth(flightCycleId: UUID, azimuthDeg: Double?): FlightCycle
+    suspend fun undoLastBeeAction(beeId: UUID): BeeUndoAction
     suspend fun completeObservationPoint(pointId: UUID): ObservationPoint
     suspend fun recordNoBeesFound(pointId: UUID): ObservationPoint
 }

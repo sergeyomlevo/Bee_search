@@ -46,6 +46,12 @@ data class ObservationPoint(
     val gpsLongitude: Double?,
     val gpsAccuracyM: Double?,
     val createdAt: Instant,
+    /**
+     * Timestamp of the atomically recorded initial group release, if it has
+     * happened. This is workflow provenance, not a separate GroupRelease
+     * entity or a stored Bee state.
+     */
+    val initialGroupReleaseAt: Instant? = null,
     val completedAt: Instant?,
 )
 
@@ -76,9 +82,24 @@ data class FlightCycle(
     val returnTime: Instant?,
     val azimuthDeg: Double?,
     val azimuthCaptureConsumed: Boolean,
+    /** True only when this cycle was created by the initial group-release transaction. */
+    val isInitialGroupLaunch: Boolean = false,
+    /**
+     * The bounded initial-launch correction is safe only before a real return
+     * has ever been recorded for this cycle. Clearing an erroneous return does
+     * not reopen this historical-deletion permission.
+     */
+    val isInitialGroupLaunchCorrectionEligible: Boolean = false,
     val createdAt: Instant,
     val updatedAt: Instant,
 )
+
+enum class BeeUndoAction {
+    AZIMUTH,
+    RETURN,
+    NEXT_FLIGHT,
+    INITIAL_GROUP_LAUNCH,
+}
 
 data class NewObservationPoint(
     val territoryId: UUID,

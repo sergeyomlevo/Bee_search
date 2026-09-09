@@ -14,6 +14,7 @@ import org.beesearch.app.data.local.room.ObserverDao
 import org.beesearch.app.data.local.room.TerritoryDao
 import org.beesearch.app.data.local.room.toDomain
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeeUndoAction
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.BeePresenceResultRequiredException
 import org.beesearch.app.domain.model.BeesAlreadyFoundException
@@ -30,6 +31,7 @@ import org.beesearch.app.domain.model.InvalidEventTimeException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.NoPreparedBeesException
+import org.beesearch.app.domain.model.NoReversibleBeeActionException
 import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
@@ -67,6 +69,50 @@ internal class RoomObservationRepository(
     override suspend fun createObservationPoint(
         point: NewObservationPoint,
     ): ObservationPoint = database.withTransaction {
+        createActivePoint(point).toDomain()
+    }
+
+    override suspend fun createObservationPointWithFirstBee(
+        point: NewObservationPoint,
+        markColor: String,
+        markPosition: MarkPosition,
+    ): ObservationPoint = database.withTransaction {
+        val createdPoint = createActivePoint(point)
+        val bee = BeeEntity(
+            id = UUID.randomUUID(),
+            observationPointId = createdPoint.id,
+            markColor = markColor,
+            markPosition = markPosition,
+            createdAt = clock.instant(),
+        )
+        beeDao.insert(bee)
+        if (pointDao.setBeePresenceResult(createdPoint.id, BeePresenceResult.BEES_FOUND) != 1) {
+            throw ObservationPointNotActiveException()
+        }
+        createdPoint.copy(beePresenceResult = BeePresenceResult.BEES_FOUND).toDomain()
+    }
+
+    override suspend fun createObservationPointWithNoBeesFound(
+        point: NewObservationPoint,
+    ): ObservationPoint = database.withTransaction {
+        val createdPoint = createActivePoint(point)
+        val completedAt = clock.instant()
+        if (
+            pointDao.recordNoBeesAndComplete(
+                id = createdPoint.id,
+                result = BeePresenceResult.NO_BEES_FOUND,
+                completedAt = completedAt,
+            ) != 1
+        ) {
+            throw ObservationPointNotActiveException()
+        }
+        createdPoint.copy(
+            beePresenceResult = BeePresenceResult.NO_BEES_FOUND,
+            completedAt = completedAt,
+        ).toDomain()
+    }
+
+    private suspend fun createActivePoint(point: NewObservationPoint): ObservationPointEntity {
         if (territoryDao.getById(point.territoryId) == null) {
             throw EntityNotFoundException("Territory")
         }
@@ -98,10 +144,11 @@ internal class RoomObservationRepository(
             gpsLongitude = point.gpsLongitude,
             gpsAccuracyM = point.gpsAccuracyM,
             createdAt = createdAt,
+            initialGroupReleaseAt = null,
             completedAt = null,
         )
         pointDao.insert(entity)
-        entity.toDomain()
+        return entity
     }
 
     override suspend fun addBee(
@@ -174,6 +221,9 @@ internal class RoomObservationRepository(
             }
 
             val departureTime = clock.instant()
+            if (pointDao.setInitialGroupReleaseAt(pointId, departureTime) != 1) {
+                throw InitialReleaseAlreadyStartedException()
+            }
             val cycles = bees.map { bee ->
                 FlightCycleEntity(
                     id = UUID.randomUUID(),
@@ -183,6 +233,8 @@ internal class RoomObservationRepository(
                     returnTime = null,
                     azimuthDeg = null,
                     azimuthCaptureConsumed = false,
+                    isInitialGroupLaunch = true,
+                    isInitialGroupLaunchCorrectionEligible = true,
                     createdAt = departureTime,
                     updatedAt = departureTime,
                 )
@@ -202,26 +254,34 @@ internal class RoomObservationRepository(
         if (cycleDao.registerReturn(openCycle.id, returnTime, returnTime) != 1) {
             throw OpenFlightCycleNotFoundException()
         }
-        openCycle.copy(returnTime = returnTime, updatedAt = returnTime).toDomain()
+        openCycle.copy(
+            returnTime = returnTime,
+            isInitialGroupLaunchCorrectionEligible = false,
+            updatedAt = returnTime,
+        ).toDomain()
     }
 
     override suspend fun startNextFlight(beeId: UUID): FlightCycle = database.withTransaction {
         val bee = requireBee(beeId)
-        requireActivePoint(bee.observationPointId)
+        val point = requireActivePoint(bee.observationPointId)
         if (cycleDao.getOpenForBee(beeId) != null) {
             throw OpenFlightCycleExistsException()
         }
         val previousSequence = cycleDao.getMaximumSequenceNumber(beeId)
-            ?: throw InitialFlightCycleRequiredException()
+        if (previousSequence == null && !point.initialGroupReleaseAt.isInitialGroupReleaseRecorded()) {
+            throw InitialFlightCycleRequiredException()
+        }
         val departureTime = clock.instant()
         val entity = FlightCycleEntity(
             id = UUID.randomUUID(),
             beeId = beeId,
-            sequenceNumber = previousSequence + 1,
+            sequenceNumber = (previousSequence ?: 0) + 1,
             departureTime = departureTime,
             returnTime = null,
             azimuthDeg = null,
             azimuthCaptureConsumed = false,
+            isInitialGroupLaunch = false,
+            isInitialGroupLaunchCorrectionEligible = false,
             createdAt = departureTime,
             updatedAt = departureTime,
         )
@@ -272,6 +332,45 @@ internal class RoomObservationRepository(
             throw EntityNotFoundException("FlightCycle")
         }
         cycle.copy(azimuthDeg = azimuthDeg, updatedAt = updatedAt).toDomain()
+    }
+
+    override suspend fun undoLastBeeAction(beeId: UUID): BeeUndoAction = database.withTransaction {
+        val bee = requireBee(beeId)
+        requireActivePoint(bee.observationPointId)
+        val latest = cycleDao.getLatestForBee(beeId) ?: throw NoReversibleBeeActionException()
+        val updatedAt = clock.instant()
+
+        when {
+            // A recorded return happened after any azimuth captured during the flight.
+            // It is therefore the latest reversible event for this Bee.
+            latest.returnTime != null -> {
+                if (cycleDao.clearReturn(latest.id, updatedAt) != 1) {
+                    throw NoReversibleBeeActionException()
+                }
+                BeeUndoAction.RETURN
+            }
+            latest.azimuthDeg != null -> {
+                if (cycleDao.setAzimuth(latest.id, null, updatedAt) != 1) {
+                    throw NoReversibleBeeActionException()
+                }
+                BeeUndoAction.AZIMUTH
+            }
+            latest.sequenceNumber > 1 -> {
+                if (cycleDao.deleteById(latest.id) != 1) {
+                    throw NoReversibleBeeActionException()
+                }
+                BeeUndoAction.NEXT_FLIGHT
+            }
+            latest.sequenceNumber == 1 &&
+                latest.isInitialGroupLaunch &&
+                latest.isInitialGroupLaunchCorrectionEligible -> {
+                if (cycleDao.deleteById(latest.id) != 1) {
+                    throw NoReversibleBeeActionException()
+                }
+                BeeUndoAction.INITIAL_GROUP_LAUNCH
+            }
+            else -> throw NoReversibleBeeActionException()
+        }
     }
 
     override suspend fun completeObservationPoint(pointId: UUID): ObservationPoint =
@@ -328,4 +427,6 @@ internal class RoomObservationRepository(
 
     private suspend fun requireBee(beeId: UUID): BeeEntity =
         beeDao.getById(beeId) ?: throw EntityNotFoundException("Bee")
+
+    private fun java.time.Instant?.isInitialGroupReleaseRecorded(): Boolean = this != null
 }

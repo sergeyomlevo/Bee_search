@@ -227,6 +227,55 @@ internal val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/**
+ * Non-destructive provenance migration for the per-Bee correction of an
+ * initial group launch. Existing v5 data already defines sequence 1 as the
+ * group release, so the marker is restored from that established invariant.
+ */
+internal val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE observation_points ADD COLUMN initial_group_release_at INTEGER",
+        )
+        db.execSQL(
+            "ALTER TABLE flight_cycles ADD COLUMN initial_group_launch INTEGER NOT NULL DEFAULT 0",
+        )
+        db.execSQL(
+            "ALTER TABLE flight_cycles ADD COLUMN initial_group_launch_correction_eligible INTEGER NOT NULL DEFAULT 0",
+        )
+        db.execSQL(
+            "UPDATE flight_cycles SET initial_group_launch = 1 WHERE sequence_number = 1",
+        )
+        db.execSQL(
+            """
+            UPDATE flight_cycles
+            SET initial_group_launch_correction_eligible = 1
+            WHERE sequence_number = 1
+              AND return_time IS NULL
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            UPDATE observation_points
+            SET initial_group_release_at = (
+                SELECT MIN(flight_cycles.departure_time)
+                FROM flight_cycles
+                INNER JOIN bees ON bees.id = flight_cycles.bee_id
+                WHERE bees.observation_point_id = observation_points.id
+                  AND flight_cycles.sequence_number = 1
+            )
+            WHERE EXISTS (
+                SELECT 1
+                FROM flight_cycles
+                INNER JOIN bees ON bees.id = flight_cycles.bee_id
+                WHERE bees.observation_point_id = observation_points.id
+                  AND flight_cycles.sequence_number = 1
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
 private data class LegacyObservationPoint(
     val id: String,
     val territoryId: String,

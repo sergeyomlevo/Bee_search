@@ -41,6 +41,7 @@ internal fun ObservationPointEntity.toDomain(): ObservationPoint = ObservationPo
     gpsLongitude = gpsLongitude,
     gpsAccuracyM = gpsAccuracyM,
     createdAt = createdAt,
+    initialGroupReleaseAt = initialGroupReleaseAt,
     completedAt = completedAt,
 )
 
@@ -60,6 +61,8 @@ internal fun FlightCycleEntity.toDomain(): FlightCycle = FlightCycle(
     returnTime = returnTime,
     azimuthDeg = azimuthDeg,
     azimuthCaptureConsumed = azimuthCaptureConsumed,
+    isInitialGroupLaunch = isInitialGroupLaunch,
+    isInitialGroupLaunchCorrectionEligible = isInitialGroupLaunchCorrectionEligible,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
