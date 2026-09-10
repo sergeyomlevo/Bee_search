@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.pressBackUnconditionally
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
+import org.beesearch.app.ui.observation.ObservationPointPreparationScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule

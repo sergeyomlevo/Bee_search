@@ -35,6 +35,7 @@ import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.ObservationPoint
+import org.beesearch.app.ui.observation.BeeObservationScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

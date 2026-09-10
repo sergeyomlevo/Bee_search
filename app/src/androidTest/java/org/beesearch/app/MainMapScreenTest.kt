@@ -30,6 +30,7 @@ import org.beesearch.app.ui.map.MapFirstScaffold
 import org.beesearch.app.ui.map.MapIdleControls
 import org.beesearch.app.ui.map.RECENTER_MAP_DESCRIPTION
 import org.beesearch.app.ui.map.SETTINGS_DESCRIPTION
+import org.beesearch.app.ui.settings.SettingsScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
