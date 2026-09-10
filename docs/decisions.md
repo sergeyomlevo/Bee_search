@@ -1507,6 +1507,133 @@ timestamp принадлежит ObservationPoint, а цикл помечает�
 
 ---
 
+# D068 — Signing rotation migration policy
+
+**Статус:** ACCEPTED
+
+Текущий stable signer — signer A: существующий debug key (`CN=Android Debug`,
+RSA 2048). Будущая production-подпись использует отдельный signer B.
+
+Разрешён прямой переход `v2-only A → v3 B` с SigningCertificateLineage `A → B`.
+Криптографический transitional APK (промежуточный релиз, подписанный A по схеме
+v3 с lineage) не требуется как обязательный этап.
+
+Complete backup является обязательным operational safety gate перед реальной
+ротацией: пока существуют уникальные полевые данные, ротация подписи не
+выполняется без проверенного backup и проверенного restore path (D069–D071).
+
+Перед реальной ротацией обязателен signing spike на реальном устройстве:
+проверяются установка `v3 B` с lineage поверх установленного `v2-only A`,
+сохранение данных приложения и поведение платформы на используемых API.
+
+`rotation-min-sdk-version = 28` является текущей рекомендуемой стратегией.
+Практическая совместимость этой стратегии должна быть подтверждена
+device/API-проверкой до релиза 1.2.0; при неподтверждённой совместимости релиз
+не выполняется.
+
+Открытыми и не решёнными этим решением остаются: владение и хранение
+production keystore, порядок вывода signer A из обращения, точная device/API
+матрица проверки и необходимость v3.1-специфичных настроек.
+
+---
+
+# D069 — Logical backup archive
+
+**Статус:** ACCEPTED
+
+Канонический backup Bee Search — versioned logical archive. Архив формируется
+приложением из логических данных и содержит собственные version/identity
+метаданные, достаточные для проверки совместимости при восстановлении.
+
+Raw SQLite не является основным форматом migration/backup: копия файла БД не
+заменяет logical archive и не является контрактом восстановления. Schema
+evolution research data остаётся задачей Room migrations (`docs/data-model.md`),
+а backup/restore работает с логическим представлением данных.
+
+Конкретный container format архива и его версионирование определяются при
+реализации exporter/importer; этот выбор не изменяет statuses и ownership
+данных.
+
+---
+
+# D070 — Safe restore boundary
+
+**Статус:** ACCEPTED
+
+Восстановление из backup выполняется по безопасной границе:
+
+- полная validation архива до любой записи в research storage;
+- сохранение UUID и FK-связей research graph, без переназначения identity;
+- одна Room transaction для research graph;
+- staging для файлов (attachments): файлы попадают в рабочее хранилище только
+  после успешной проверки;
+- первая версия importer работает только с пустой research DB;
+- no silent overwrite/merge: при непустой research DB восстановление не
+  выполняется молча и не смешивается с существующими данными.
+
+Merge, частичный import и восстановление поверх непустой базы не входят в эту
+границу и требуют отдельного решения.
+
+---
+
+# D071 — Backup data classification
+
+**Статус:** ACCEPTED
+
+Данные для backup разделяются по классам:
+
+- уникальные research data обязательны в backup: Observer, Territory,
+  ObservationPoint, Bee, FlightCycle и связанные research facts;
+- settings отделены от research facts: device-local настройки не являются
+  исследовательскими данными и не восстанавливаются как research graph;
+- Complete backup включает уникальные attachments (например, изображения
+  осмотров), если они существуют;
+- повторно импортируемые map packages исключены из backup: offline PMTiles
+  Map Packages являются device-local infrastructure по D063/D065 и
+  восстанавливаются повторным импортом, а не из архива.
+
+---
+
+# D072 — Attachment storage boundary
+
+**Статус:** ACCEPTED
+
+Attachments (будущие изображения и подобные артефакты осмотров) разделяют
+metadata и bytes:
+
+- metadata хранится в Room (identity, owner-ссылка, имя, размер, SHA-256,
+  timestamps);
+- bytes хранятся в app-controlled file storage, а не в Room;
+- integrity проверяется по size и SHA-256;
+- удаление выполняется guarded: удаление записи и удаление bytes не создают
+  молчаливых orphan-файлов, orphan cleanup является отдельной безопасной
+  операцией.
+
+Точная owner/link schema attachments (какая сущность является владельцем и как
+выражается связь) пока **OPEN** и не фиксируется этим решением. Новые сущности
+только ради будущих attachments не создаются.
+
+---
+
+# D073 — Durable object/history boundary
+
+**Статус:** ACCEPTED
+
+Разделяются уровни смысла:
+
+- `ObservationPoint` остаётся событием наблюдения, а не долговечным объектом;
+- будущий `FieldObject` является долговечным объектом (например, место,
+  которое существует независимо от конкретного наблюдения);
+- `Inspection` является отдельной историей осмотров такого объекта;
+- current state не заменяет историю: актуальное состояние не отменяет и не
+  переписывает предыдущие осмотры.
+
+Конкретная Room schema для `FieldObject`, `Hollow`, `Trap` и их связей пока
+**OPEN**. Сущности и поля не вводятся заранее, до появления реализуемого
+сценария; этот документ фиксирует только границу смысла, а не схему.
+
+---
+
 # Закрытые архитектурные вопросы
 
 - O001 — формат offline vector Map Package закрыт решением D063: PMTiles;
@@ -1545,6 +1672,11 @@ timestamp принадлежит ObservationPoint, а цикл помечает�
 ## O007 — Механизм резервного копирования до появления сервера
 
 Перед длительным реальным использованием необходимо решить, как защитить данные при потере или повреждении телефона.
+
+Logical backup archive, restore boundary, классификация backup-данных и граница
+attachments зафиксированы решениями D069–D072. Открытыми остаются operational
+часть (расписание/носитель вывоза backup, проверка restore на реальном
+устройстве), а также будущий server/SyncEngine (O008).
 
 ## O008 — Сервер и SyncEngine
 
