@@ -11,6 +11,25 @@ import java.time.Instant
 import java.util.UUID
 
 @Dao
+internal abstract class BackupDao {
+    @Query("SELECT * FROM territories ORDER BY id") abstract suspend fun territories(): List<TerritoryEntity>
+    @Query("SELECT * FROM observers ORDER BY id") abstract suspend fun observers(): List<ObserverEntity>
+    @Query("SELECT * FROM observation_points ORDER BY id") abstract suspend fun observationPoints(): List<ObservationPointEntity>
+    @Query("SELECT * FROM bees ORDER BY id") abstract suspend fun bees(): List<BeeEntity>
+    @Query("SELECT * FROM flight_cycles ORDER BY id") abstract suspend fun flightCycles(): List<FlightCycleEntity>
+    @Query("SELECT COUNT(*) FROM territories") abstract suspend fun territoryCount(): Int
+    @Query("SELECT COUNT(*) FROM observers") abstract suspend fun observerCount(): Int
+    @Query("SELECT COUNT(*) FROM observation_points") abstract suspend fun observationPointCount(): Int
+    @Query("SELECT COUNT(*) FROM bees") abstract suspend fun beeCount(): Int
+    @Query("SELECT COUNT(*) FROM flight_cycles") abstract suspend fun flightCycleCount(): Int
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertTerritories(value: List<TerritoryEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertObservers(value: List<ObserverEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertObservationPoints(value: List<ObservationPointEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertBees(value: List<BeeEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertFlightCycles(value: List<FlightCycleEntity>)
+}
+
+@Dao
 internal interface TerritoryDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(territory: TerritoryEntity)

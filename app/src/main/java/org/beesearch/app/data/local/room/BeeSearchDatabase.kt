@@ -24,6 +24,7 @@ internal abstract class BeeSearchDatabase : RoomDatabase() {
     abstract fun observationPointDao(): ObservationPointDao
     abstract fun beeDao(): BeeDao
     abstract fun flightCycleDao(): FlightCycleDao
+    abstract fun backupDao(): BackupDao
 
     companion object {
         private const val DATABASE_NAME = "bee_search.db"
