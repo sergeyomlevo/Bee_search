@@ -549,6 +549,40 @@ Android projects.
 Avoid unnecessary chains of DTOs, models, wrappers, services, or layers when
 they do not solve a concrete problem.
 
+### File cohesion and decomposition
+
+Production source files should have one cohesive responsibility or one tightly
+coupled feature boundary. Related private helpers and composables may remain
+together when extraction would make the code harder to navigate.
+
+Line count is a review trigger, not a hard limit:
+
+- below 300 lines, no size-specific review is normally required;
+- at 300 lines or more, a substantial change must check whether the file
+  contains independent responsibilities, workflows, state machines, or
+  infrastructure concerns;
+- at 500 lines or more, that decomposition review is mandatory.
+
+Split a file when independent parts change for different reasons, are tested
+independently, form their own abstraction, duplicate logic, or mix UI with
+persistence, filesystem, network, archive, or platform infrastructure.
+
+Do not split a cohesive declarative screen, schema or migration definition, or
+closely coupled domain transaction merely to reduce line count. Do not create
+one-function files, interfaces, wrappers, packages, or Gradle modules without a
+meaningful boundary.
+
+New production files should be placed in the narrowest existing feature or
+layer package. A new package is justified only by a durable boundary. A new file
+expected to exceed 300 lines receives the same cohesion review before it is
+added.
+
+When a task substantially changes a file of 500 lines or more, the final report
+must state either:
+
+- `Decomposition performed: ...`
+- `Decomposition reviewed; kept cohesive because: ...`
+
 ---
 
 ## 15. Dependencies

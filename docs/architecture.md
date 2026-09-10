@@ -236,6 +236,8 @@ Dependency injection
 
 Цель разделения — сделать код понятным и тестируемым, а не увеличить количество файлов.
 
+Bee Search остаётся одним Gradle-модулем `:app`, пока размер проекта и его build graph не обосновывают отдельные модульные границы. Внутри него файлы и пакеты организуются вокруг связных feature- и layer-responsibilities; количество строк запускает review, но не является ограничением. UI не должен поглощать persistence, filesystem, network, archive или platform infrastructure concerns, domain остаётся независимым от Android, а новые пакеты или Gradle-модули вводятся только при наличии устойчивой dependency- или testability-границы.
+
 ---
 
 # 6. Предлагаемая структура Android-кода
