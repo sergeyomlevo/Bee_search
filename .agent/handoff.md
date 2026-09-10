@@ -13,8 +13,8 @@ in `AGENTS.md` and the `luna-worker` / `luna-verifier` role files. TOML parsing
 and strict Codex `config/read` verified the project defaults as Luna/medium.
 The CLI reported a successful custom-role Git smoke, but did not expose child
 model/effort metadata. Separate direct spawns explicitly passed Luna/medium;
-that tool has no custom-agent selector. Start a fresh Codex session with Astra
-to load the new project configuration. The app milestone below is unchanged.
+that tool has no custom-agent selector. Start a fresh Codex session to load the
+new project configuration. The app milestone below is unchanged.
 
 ## Large local Map Package completed (2026-09-09)
 

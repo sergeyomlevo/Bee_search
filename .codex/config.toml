@@ -1,4 +1,4 @@
-# Bee Search only. Select the root model (GPT-6 Astra) when launching Codex.
+# Bee Search project-local multi-agent settings.
 [features]
 multi_agent = true
 multi_agent_v2 = false

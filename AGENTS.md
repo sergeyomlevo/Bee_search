@@ -276,18 +276,23 @@ checklist.
 
 ### Project-specific multi-agent routing
 
-GPT-6 Astra is the root agent selected at launch. Root owns interpretation of
-ambiguous requirements, architecture, product and domain semantics, persistence
-and migrations/invariants, governance and policy, ACCEPTED D0xx and destructive
-decisions, planning, integration of delegated results, and final review and
-acceptance. Delegation does not transfer decision ownership or user approval.
+Root owns interpretation of ambiguous requirements, architecture, product and
+domain semantics, persistence and migrations/invariants, governance and policy,
+ACCEPTED D0xx and destructive decisions, planning, integration of delegated
+results, and final review and acceptance. Delegation does not transfer decision
+ownership or user approval.
 
-Prefer `luna-worker` for bounded, well-defined, reversible implementation work
-that needs no architectural, product, domain, persistence, or governance
-judgment, including local refactoring, repo exploration, mechanical edits, and
-straightforward docs once root has defined the scope, invariants, and acceptance
-criteria. Prefer `luna-verifier` for independent diff/tests/build/device
-verification when a separate check is genuinely useful.
+For bounded, well-defined, reversible implementation or test work that needs no
+architectural, product, domain, persistence, or governance judgment, root should
+first consider `luna-worker` as the primary executor. This includes tasks with
+several local stages such as inspecting existing code, making a small change,
+and running focused verification. Delegation to `luna-worker` is preferred by
+default for such work and does not require a separate user instruction to use
+Luna. Root may work directly when the task is genuinely trivial or when the cost
+of defining, waiting for, and reviewing the subtask is comparable to completing
+it directly. Prefer `luna-verifier` for independent diff/tests/build/device
+verification when a separate check is genuinely useful, but not automatically
+after every small task.
 Both roles and default subagents use `gpt-5.6-luna` with `medium` reasoning,
 configured in `.codex/config.toml` and `.codex/agents/`.
 When the spawn tool exposes model/effort overrides, pass those Luna values
@@ -298,16 +303,16 @@ its instructions in the handoff; report that fallback accurately.
 Typical workflow:
 
 ```text
-Astra root: scope, invariants, acceptance criteria
+Root: scope, invariants, acceptance criteria
     -> luna-worker: bounded implementation
     -> luna-verifier: independent evidence when justified
-    -> Astra root: final review and acceptance
+    -> Root: final review and acceptance
 ```
 
-Root chooses proportionate delegation. This is a preference, not hard
-enforcement: do not delegate merely to demonstrate multi-agent use, and work
-directly when defining and reviewing the subtask would cost about as much as
-completing it. Neither role is mandatory for every small task.
+Root chooses proportionate delegation and must not delegate merely to
+demonstrate multi-agent use. Neither role is mandatory for every small task.
+Do not report every Luna invocation to the user without a task-specific reason;
+actual use is already observed by the delegation audit hooks.
 For Room migrations, transactional invariants, ObservationPoint/Bee/FlightCycle
 lifecycle, D064/D067 or other ACCEPTED D0xx decisions, map package lifecycle or
 integrity, analysis/predictions/nests architecture, or product semantics changes,

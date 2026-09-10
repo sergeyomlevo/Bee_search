@@ -10,6 +10,7 @@ const root = __dirname;
 const handler = path.join(root, 'hook-handler.js');
 const repoRoot = path.resolve(root, '..', '..');
 const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bee-luna-audit-'));
+const reportFixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bee-luna-report-'));
 const forbidden = new Set([
   'transcript_path', 'agent_transcript_path', 'last_assistant_message', 'prompt',
   'cwd', 'permission_mode', 'stop_hook_active', 'raw'
@@ -57,6 +58,39 @@ const report = spawnSync(process.execPath, [path.join(root, 'report-audit.js'), 
 assert.strictEqual(report.status, 0, report.stderr);
 assert.match(report.stdout, /Counts: start=2 stop=1 error=2/);
 
+const pairedAgentRecords = [
+  ['01-agent-a-start.json', '2026-09-09T10:00:00.000Z', 'SubagentStart', 'agent-a'],
+  ['02-agent-a-stop.json', '2026-09-09T10:00:01.000Z', 'SubagentStop', 'agent-a'],
+  ['03-agent-b-start.json', '2026-09-09T10:00:02.000Z', 'SubagentStart', 'agent-b'],
+  ['04-agent-b-stop.json', '2026-09-09T10:00:03.000Z', 'SubagentStop', 'agent-b'],
+];
+for (const [name, observedAt, hookEventName, agentId] of pairedAgentRecords) {
+  fs.writeFileSync(path.join(reportFixtureDir, name), `${JSON.stringify({
+    schema: 'luna-delegation-audit', version: 1, observed_at: observedAt,
+    hook_event_name: hookEventName, session_id: 'session-pairs', turn_id: 'turn-pairs',
+    agent_id: agentId, agent_type: 'luna-worker', model: 'gpt-5.6-luna'
+  })}\n`);
+}
+const pairedReport = spawnSync(
+  process.execPath,
+  [path.join(root, 'report-audit.js'), reportFixtureDir],
+  { encoding: 'utf8' }
+);
+assert.strictEqual(pairedReport.status, 0, pairedReport.stderr);
+assert.match(pairedReport.stdout, /Counts: start=2 stop=2 error=0/);
+const pairedRows = pairedReport.stdout.split(/\r?\n/)
+  .filter(line => line.startsWith('2026-09-09T10:'))
+  .map(line => {
+    const columns = line.split(' | ');
+    return [columns[1], columns[4]];
+  });
+assert.deepStrictEqual(pairedRows, [
+  ['SubagentStart', 'agent-a'],
+  ['SubagentStop', 'agent-a'],
+  ['SubagentStart', 'agent-b'],
+  ['SubagentStop', 'agent-b'],
+]);
+
 const config = JSON.parse(fs.readFileSync(path.join(repoRoot, '.codex', 'hooks.json'), 'utf8'));
 for (const eventName of ['SubagentStart', 'SubagentStop']) {
   const groups = config.hooks[eventName];
@@ -74,4 +108,4 @@ for (const eventName of ['PreToolUse', 'PostToolUse']) {
 }
 assert.strictEqual(config.hooks.PermissionRequest, undefined);
 
-console.log(`PASS: ${records.length} sanitized audit fixtures, report, async hook config, Personal Core hooks preserved`);
+console.log(`PASS: ${records.length} sanitized audit fixtures, multi-agent report pairs isolated, async hook config, Personal Core hooks preserved`);
