@@ -1639,14 +1639,17 @@ Room database должна иметь явную версию схемы.
 
 # 64. Резервное копирование
 
-Полноценная стратегия backup не входит в первый прототип, но должна быть предусмотрена до длительного реального использования.
+Logical backup core реализует versioned архив согласно D069–D073. Пользовательский
+экспорт использует Android Storage Access Framework: отдельный Data ViewModel
+управляет состоянием операции, тонкий document adapter передаёт выбранный URI
+существующему `BackupService`, а UI не знает формат ZIP, manifest или правила
+целостности. Broad storage permissions не требуются.
 
-Возможные будущие варианты:
-
-* серверная синхронизация;
-* экспорт backup;
-* Android backup;
-* локальная копия базы.
+Очистка observation data проходит через repository operation и одну Room
+transaction в порядке FlightCycle → Bee → ObservationPoint. Territory, Observer,
+DataStore settings и map packages не входят в эту транзакцию. Help является
+отдельной offline presentation feature; MainActivity остаётся только app host и
+маршрутизатором существующего route mechanism.
 
 Не следует полагаться только на один телефон как единственное долговременное хранилище исследовательских данных.
 

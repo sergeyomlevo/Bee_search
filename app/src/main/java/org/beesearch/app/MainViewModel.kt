@@ -61,6 +61,8 @@ import java.util.UUID
 sealed interface AppRoute {
     data object Loading : AppRoute
     data object Settings : AppRoute
+    data object Help : AppRoute
+    data object Data : AppRoute
     data object TerritoryManagement : AppRoute
     data object OfflineMapManagement : AppRoute
     data object CurrentTerritory : AppRoute
@@ -188,6 +190,16 @@ internal class MainViewModel(
 
     fun openSettings() {
         manualRoute.value = AppRoute.Settings
+        clearFeedback()
+    }
+
+    fun openHelp() {
+        manualRoute.value = AppRoute.Help
+        clearFeedback()
+    }
+
+    fun openData() {
+        manualRoute.value = AppRoute.Data
         clearFeedback()
     }
 

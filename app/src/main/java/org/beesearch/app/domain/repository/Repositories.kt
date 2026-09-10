@@ -8,6 +8,7 @@ import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.ObservationPoint
+import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
 import java.util.UUID
@@ -61,7 +62,12 @@ interface ObservationPointPreparationCreator : ObservationPointCreator {
     ): ObservationPoint
 }
 
-interface ObservationRepository : ObservationPointPreparationCreator {
+interface ObservationDataMaintenance {
+    suspend fun getObservationDataCounts(): ObservationDataCounts
+    suspend fun clearObservationData(): ObservationDataCounts
+}
+
+interface ObservationRepository : ObservationPointPreparationCreator, ObservationDataMaintenance {
     fun observeActivePoint(): Flow<ObservationPoint?>
     fun observeBees(pointId: UUID): Flow<List<Bee>>
     fun observeFlightCyclesForPoint(pointId: UUID): Flow<List<FlightCycle>>

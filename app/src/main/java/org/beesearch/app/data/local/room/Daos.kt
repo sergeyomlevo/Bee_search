@@ -82,6 +82,12 @@ internal interface ObservationPointDao {
     @Query("SELECT COUNT(*) FROM observation_points WHERE completed_at IS NULL")
     suspend fun countActive(): Int
 
+    @Query("SELECT COUNT(*) FROM observation_points")
+    suspend fun countAll(): Int
+
+    @Query("DELETE FROM observation_points")
+    suspend fun deleteAll(): Int
+
     @Query(
         """
         SELECT COALESCE(MAX(point_number), 0) + 1
@@ -160,6 +166,12 @@ internal interface BeeDao {
     @Query("SELECT COUNT(*) FROM bees WHERE observation_point_id = :pointId")
     suspend fun countForPoint(pointId: UUID): Int
 
+    @Query("SELECT COUNT(*) FROM bees")
+    suspend fun countAll(): Int
+
+    @Query("DELETE FROM bees")
+    suspend fun deleteAll(): Int
+
     @Query("SELECT * FROM bees WHERE observation_point_id = :pointId ORDER BY created_at, id")
     fun observeForPoint(pointId: UUID): Flow<List<BeeEntity>>
 
@@ -209,6 +221,12 @@ internal interface FlightCycleDao {
 
     @Query("SELECT COUNT(*) FROM flight_cycles WHERE bee_id = :beeId")
     suspend fun countForBee(beeId: UUID): Int
+
+    @Query("SELECT COUNT(*) FROM flight_cycles")
+    suspend fun countAll(): Int
+
+    @Query("DELETE FROM flight_cycles")
+    suspend fun deleteAll(): Int
 
     @Query(
         """

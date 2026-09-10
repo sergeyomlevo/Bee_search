@@ -45,6 +45,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import org.beesearch.app.ui.map.CurrentTerritoryScreen
 import org.beesearch.app.ui.map.OfflineMapManagementScreen
+import org.beesearch.app.ui.data.DataRoute
+import org.beesearch.app.ui.help.HelpScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import kotlinx.coroutines.delay
 import org.beesearch.app.ui.observation.BeeObservationScreen
@@ -162,6 +164,13 @@ private fun BeeSearchApp(
                         onUpdateTerritory = viewModel::updateTerritory,
                         onDeleteTerritory = viewModel::deleteTerritory,
                         onOpenOfflineMaps = viewModel::openOfflineMaps,
+                        onOpenHelp = viewModel::openHelp,
+                        onOpenData = viewModel::openData,
+                    )
+                    AppRoute.Help -> HelpScreen(onBack = viewModel::openSettings)
+                    AppRoute.Data -> DataRoute(
+                        application = application,
+                        onBack = viewModel::openSettings,
                     )
                     AppRoute.TerritoryManagement -> TerritoryManagementScreen(
                         territories = territories,

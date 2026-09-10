@@ -2,6 +2,9 @@ package org.beesearch.app
 
 import android.app.Application
 import android.content.Context
+import org.beesearch.app.data.backup.BackupDocumentExporter
+import org.beesearch.app.data.backup.BackupService
+import org.beesearch.app.data.backup.SafBackupDocumentExporter
 import org.beesearch.app.data.heading.AndroidHeadingProvider
 import org.beesearch.app.data.location.AndroidLocationProvider
 import org.beesearch.app.data.local.room.BeeSearchDatabase
@@ -50,6 +53,11 @@ internal class AppContainer(context: Context) {
         beeDao = database.beeDao(),
         cycleDao = database.flightCycleDao(),
         clock = clock,
+    )
+    val backupDocumentExporter: BackupDocumentExporter = SafBackupDocumentExporter(
+        backupService = BackupService(database, context.settingsDataStore),
+        contentResolver = context.contentResolver,
+        cacheDirectory = context.cacheDir,
     )
     val createObservationPoint = CreateObservationPoint(
         settingsRepository = settingsRepository,

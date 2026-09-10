@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.beesearch.app.domain.model.Observer
@@ -47,6 +48,8 @@ internal fun SettingsScreen(
     currentTerritoryId: UUID?,
     onBack: () -> Unit,
     onOpenOfflineMaps: () -> Unit = {},
+    onOpenHelp: () -> Unit = {},
+    onOpenData: () -> Unit = {},
     onSelectObserver: (UUID) -> Unit,
     onCreateObserver: (String, String, String, String, String) -> Unit,
     onUpdateObserver: (Observer) -> Unit = {},
@@ -112,6 +115,18 @@ internal fun SettingsScreen(
                     TextButton(onClick = onOpenOfflineMaps) { Text("Открыть") }
                 }
             }
+            SettingsDestination(
+                title = "Данные",
+                description = "Экспорт и очистка данных наблюдений.",
+                testTag = "settings-data",
+                onOpen = onOpenData,
+            )
+            SettingsDestination(
+                title = "Помощь",
+                description = "Краткий старт и подробная работа с Bee Search.",
+                testTag = "settings-help",
+                onOpen = onOpenHelp,
+            )
             Text("Наблюдатель", style = MaterialTheme.typography.titleMedium)
             if (observers.isEmpty()) Text("Наблюдателей пока нет.")
             observers.forEach { observer ->
@@ -169,6 +184,26 @@ internal fun SettingsScreen(
     }
     deleteObserver?.let { observer -> AlertDialog(onDismissRequest = { deleteObserver = null }, title = { Text("Удалить наблюдателя?") }, text = { Text(observer.displayName) }, confirmButton = { TextButton(onClick = { onDeleteObserver(observer); deleteObserver = null }) { Text("Удалить") } }, dismissButton = { TextButton(onClick = { deleteObserver = null }) { Text("Отмена") } }) }
     deleteTerritory?.let { territory -> AlertDialog(onDismissRequest = { deleteTerritory = null }, title = { Text("Удалить территорию?") }, text = { Text("${territory.code} — ${territory.name}") }, confirmButton = { TextButton(onClick = { onDeleteTerritory(territory); deleteTerritory = null }) { Text("Удалить") } }, dismissButton = { TextButton(onClick = { deleteTerritory = null }) { Text("Отмена") } }) }
+}
+
+@Composable
+private fun SettingsDestination(
+    title: String,
+    description: String,
+    testTag: String,
+    onOpen: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 1.dp,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(description, style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = onOpen, modifier = Modifier.testTag(testTag)) { Text("Открыть") }
+        }
+    }
 }
 
 @Composable

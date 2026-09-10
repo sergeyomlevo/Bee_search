@@ -6,6 +6,24 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Help and data management milestone (2026-09-10)
+
+The Settings surface now routes to separate common `ui/help` and `ui/data`
+features through the existing app route mechanism. Help is fully offline and
+documents only the current workflow. Data export uses Android SAF
+`CreateDocument` and a thin adapter over the existing D069-D073 logical
+`BackupService`; restore UI remains out of scope. Observation cleanup shows
+counts and explicit confirmation, then deletes FlightCycle, Bee and
+ObservationPoint rows in one Room transaction while preserving Territory,
+Observer, DataStore settings and map packages.
+
+Production compilation, unit tests, debug assembly and androidTest compilation
+pass. On Samsung SM-S938B, the 11 focused Help/Data/export/cleanup tests pass;
+the full connected suite also passed with its expected opt-in map/bootstrap
+skips. No beta variant, restore UI, signing work or general MainViewModel
+decomposition has started. The next implementation milestone requires an
+explicit user choice.
+
 ## Agent routing setup (2026-09-08)
 
 Project routing is configured in `.codex/config.toml`; see the routing section

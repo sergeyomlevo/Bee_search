@@ -34,6 +34,7 @@ import org.beesearch.app.domain.model.NoPreparedBeesException
 import org.beesearch.app.domain.model.NoReversibleBeeActionException
 import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
 import org.beesearch.app.domain.model.ObservationPoint
+import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
 import org.beesearch.app.domain.model.OpenFlightCycleExistsException
@@ -65,6 +66,18 @@ internal class RoomObservationRepository(
 
     override fun observeFlightCycles(beeId: UUID): Flow<List<FlightCycle>> =
         cycleDao.observeForBee(beeId).map { cycles -> cycles.map(FlightCycleEntity::toDomain) }
+
+    override suspend fun getObservationDataCounts(): ObservationDataCounts =
+        database.withTransaction { observationDataCounts() }
+
+    override suspend fun clearObservationData(): ObservationDataCounts =
+        database.withTransaction {
+            val counts = observationDataCounts()
+            cycleDao.deleteAll()
+            beeDao.deleteAll()
+            pointDao.deleteAll()
+            counts
+        }
 
     override suspend fun createObservationPoint(
         point: NewObservationPoint,
@@ -427,6 +440,12 @@ internal class RoomObservationRepository(
 
     private suspend fun requireBee(beeId: UUID): BeeEntity =
         beeDao.getById(beeId) ?: throw EntityNotFoundException("Bee")
+
+    private suspend fun observationDataCounts() = ObservationDataCounts(
+        observationPoints = pointDao.countAll(),
+        bees = beeDao.countAll(),
+        flightCycles = cycleDao.countAll(),
+    )
 
     private fun java.time.Instant?.isInitialGroupReleaseRecorded(): Boolean = this != null
 }
