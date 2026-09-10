@@ -1549,10 +1549,6 @@ private fun PreparationLaunchInstruction(
                         "когда она действительно улетит.",
                     style = MaterialTheme.typography.bodySmall,
                 )
-                Text(
-                    "В первом цикле полёт длительностью менее одной минуты при анализе не учитывается.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
             }
         }
     }

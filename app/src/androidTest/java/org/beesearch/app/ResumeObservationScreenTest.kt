@@ -185,6 +185,9 @@ class ResumeObservationScreenTest {
             "с разницей в несколько секунд. В этот момент нажмите «Выпустить всех» — " +
             "для всех подготовленных пчёл будет зафиксировано одинаковое время вылета.")
             .assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "В первом цикле полёт длительностью менее одной минуты при анализе не учитывается.",
+        ).assertDoesNotExist()
         composeRule.onNodeWithTag("launch-instruction-toggle").performClick()
         composeRule.onNodeWithTag("preparation-editor").assertIsDisplayed()
         composeRule.onNodeWithText("Выпустить всех").assertIsDisplayed()
