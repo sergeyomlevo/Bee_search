@@ -96,8 +96,8 @@ internal fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .imePadding()
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -171,10 +171,10 @@ internal fun SettingsScreen(
                 val edit = editingTerritory
                 Text(if (edit == null) "Добавить территорию" else "Изменить территорию", style = MaterialTheme.typography.titleSmall)
                 val codeValue = edit?.code ?: territoryCode; val nameValue = edit?.name ?: territoryName; val regionValue = edit?.region ?: region; val districtValue = edit?.district ?: district
-                OutlinedTextField(codeValue, { if (edit == null) territoryCode = it else editingTerritory = edit.copy(code = it) }, Modifier.fillMaxWidth(), label = { Text("Код") }, singleLine = true)
+                OutlinedTextField(codeValue, { if (edit == null) territoryCode = it else editingTerritory = edit.copy(code = it) }, Modifier.fillMaxWidth().testTag("territory-code-field"), label = { Text("Код") }, singleLine = true)
                 OutlinedTextField(nameValue, { if (edit == null) territoryName = it else editingTerritory = edit.copy(name = it) }, Modifier.fillMaxWidth(), label = { Text("Название") }, singleLine = true)
                 OutlinedTextField(regionValue, { if (edit == null) region = it else editingTerritory = edit.copy(region = it) }, Modifier.fillMaxWidth(), label = { Text("Область / регион") }, singleLine = true)
-                OutlinedTextField(districtValue, { if (edit == null) district = it else editingTerritory = edit.copy(district = it) }, Modifier.fillMaxWidth(), label = { Text("Район") }, singleLine = true)
+                OutlinedTextField(districtValue, { if (edit == null) district = it else editingTerritory = edit.copy(district = it) }, Modifier.fillMaxWidth().testTag("territory-district-field"), label = { Text("Район") }, singleLine = true)
                 Button(onClick = {
                     if (edit == null) { onCreateTerritory(territoryCode, territoryName, region, district); addingTerritory = false }
                     else { onUpdateTerritory(edit); editingTerritory = null }
