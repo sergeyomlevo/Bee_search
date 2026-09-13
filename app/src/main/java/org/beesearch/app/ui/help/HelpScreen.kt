@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
@@ -81,9 +82,20 @@ private fun HelpSectionCard(section: HelpSection, index: Int) {
                     }
                     .testTag("help-section-$index"),
             ) {
+                // The visible header is the topic only: the expansion state is carried by the
+                // indicator below and by `stateDescription`, never by the wording of the title.
                 Text(
-                    text = (if (expanded) "Свернуть: " else "Развернуть: ") + section.title,
-                    modifier = Modifier.fillMaxWidth(),
+                    text = section.title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                // Decorative affordance only: cleared from semantics so the header keeps the
+                // topic as its accessible name.
+                Text(
+                    text = if (expanded) "▴" else "▾",
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .clearAndSetSemantics { },
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
