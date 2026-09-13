@@ -9,6 +9,7 @@ import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationDataCounts
+import org.beesearch.app.domain.model.CompletedObservationPointSummary
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
 import java.util.UUID
@@ -64,6 +65,8 @@ interface ObservationPointPreparationCreator : ObservationPointCreator {
 
 interface ObservationDataMaintenance {
     suspend fun getObservationDataCounts(): ObservationDataCounts
+    suspend fun getCompletedObservationPoints(): List<CompletedObservationPointSummary>
+    suspend fun deleteCompletedObservationPoint(pointId: UUID): ObservationDataCounts
     suspend fun clearObservationData(): ObservationDataCounts
 }
 

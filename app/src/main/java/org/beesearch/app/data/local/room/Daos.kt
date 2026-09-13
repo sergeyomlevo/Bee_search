@@ -1,5 +1,6 @@
 package org.beesearch.app.data.local.room
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -9,6 +10,16 @@ import kotlinx.coroutines.flow.Flow
 import org.beesearch.app.domain.model.BeePresenceResult
 import java.time.Instant
 import java.util.UUID
+
+internal data class CompletedObservationPointRow(
+    @ColumnInfo(name = "id") val id: UUID,
+    @ColumnInfo(name = "created_at") val createdAt: Instant,
+    @ColumnInfo(name = "observation_year") val observationYear: Int,
+    @ColumnInfo(name = "point_number") val pointNumber: Int,
+    @ColumnInfo(name = "territory_code") val territoryCode: String,
+    @ColumnInfo(name = "territory_name") val territoryName: String,
+    @ColumnInfo(name = "bee_count") val beeCount: Int,
+)
 
 @Dao
 internal abstract class BackupDao {
@@ -87,6 +98,28 @@ internal interface ObservationPointDao {
 
     @Query("DELETE FROM observation_points")
     suspend fun deleteAll(): Int
+
+    @Query(
+        """
+        SELECT observation_points.id,
+               observation_points.created_at,
+               observation_points.observation_year,
+               observation_points.point_number,
+               territories.code AS territory_code,
+               territories.name AS territory_name,
+               COUNT(bees.id) AS bee_count
+        FROM observation_points
+        INNER JOIN territories ON territories.id = observation_points.territory_id
+        LEFT JOIN bees ON bees.observation_point_id = observation_points.id
+        WHERE observation_points.completed_at IS NOT NULL
+        GROUP BY observation_points.id
+        ORDER BY observation_points.created_at DESC, observation_points.id
+        """,
+    )
+    suspend fun getCompletedSummaries(): List<CompletedObservationPointRow>
+
+    @Query("DELETE FROM observation_points WHERE id = :id AND completed_at IS NOT NULL")
+    suspend fun deleteCompletedById(id: UUID): Int
 
     @Query(
         """
@@ -172,6 +205,9 @@ internal interface BeeDao {
     @Query("DELETE FROM bees")
     suspend fun deleteAll(): Int
 
+    @Query("DELETE FROM bees WHERE observation_point_id = :pointId")
+    suspend fun deleteForObservationPoint(pointId: UUID): Int
+
     @Query("SELECT * FROM bees WHERE observation_point_id = :pointId ORDER BY created_at, id")
     fun observeForPoint(pointId: UUID): Flow<List<BeeEntity>>
 
@@ -227,6 +263,16 @@ internal interface FlightCycleDao {
 
     @Query("DELETE FROM flight_cycles")
     suspend fun deleteAll(): Int
+
+    @Query(
+        """
+        DELETE FROM flight_cycles
+        WHERE bee_id IN (
+            SELECT id FROM bees WHERE observation_point_id = :pointId
+        )
+        """,
+    )
+    suspend fun deleteForObservationPoint(pointId: UUID): Int
 
     @Query(
         """

@@ -110,6 +110,8 @@ class HelpContentTest {
         assertTrue(text, text.contains("не отправляет"))
         assertTrue(text, text.contains("в экспорт не входят"))
         assertTrue(text, text.contains("покрытие карты"))
+        assertTrue(text, text.contains("Одну завершённую точку можно удалить выборочно"))
+        assertTrue(text, text.contains("не удаляя остальные наблюдения"))
     }
 
     @Test

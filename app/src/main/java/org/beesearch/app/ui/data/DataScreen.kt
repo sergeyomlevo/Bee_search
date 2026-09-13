@@ -57,6 +57,7 @@ internal fun DataRoute(
         state = state,
         onBack = onBack,
         onExport = { createDocument.launch(BACKUP_DOCUMENT_NAME) },
+        onDeleteCompletedPoint = viewModel::deleteCompletedObservationPoint,
         onClearObservationData = viewModel::clearObservationData,
         onDismissStatus = viewModel::dismissStatus,
     )
@@ -67,6 +68,7 @@ internal fun DataScreen(
     state: DataUiState,
     onBack: () -> Unit,
     onExport: () -> Unit,
+    onDeleteCompletedPoint: (java.util.UUID) -> Unit,
     onClearObservationData: () -> Unit,
     onDismissStatus: () -> Unit = {},
 ) {
@@ -113,6 +115,14 @@ internal fun DataScreen(
                         Text(if (state.operation == DataOperation.EXPORT) "Экспорт…" else "Экспортировать данные")
                     }
                 }
+            }
+            item {
+                CompletedObservationPointDeletionSection(
+                    points = state.completedPoints,
+                    isBusy = busy,
+                    isDeleting = state.operation == DataOperation.DELETE_POINT,
+                    onDelete = onDeleteCompletedPoint,
+                )
             }
             item {
                 val counts = state.counts
@@ -169,7 +179,7 @@ internal fun DataScreen(
 }
 
 @Composable
-private fun DataSection(
+internal fun DataSection(
     title: String,
     description: String,
     content: @Composable () -> Unit,

@@ -9,12 +9,16 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import org.beesearch.app.domain.model.ObservationDataCounts
+import org.beesearch.app.domain.model.CompletedObservationPointSummary
 import org.beesearch.app.ui.settings.SettingsScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.time.Instant
+import java.util.UUID
 
 class DataScreenTest {
     @get:Rule
@@ -56,6 +60,7 @@ class DataScreenTest {
                     ),
                     onBack = {},
                     onExport = { exported.value = true },
+                    onDeleteCompletedPoint = {},
                     onClearObservationData = {},
                 )
             }
@@ -63,7 +68,7 @@ class DataScreenTest {
 
         composeRule.onNodeWithTag("export-data").performClick()
         composeRule.runOnIdle { assertTrue(exported.value) }
-        composeRule.onNodeWithTag("data-screen").performScrollToIndex(2)
+        composeRule.onNodeWithTag("data-screen").performScrollToIndex(3)
         composeRule.onNodeWithTag("data-success").assertIsDisplayed()
     }
 
@@ -78,11 +83,12 @@ class DataScreenTest {
                     ),
                     onBack = {},
                     onExport = {},
+                    onDeleteCompletedPoint = {},
                     onClearObservationData = {},
                 )
             }
         }
-        composeRule.onNodeWithTag("data-screen").performScrollToIndex(2)
+        composeRule.onNodeWithTag("data-screen").performScrollToIndex(3)
         composeRule.onNodeWithTag("data-error").assertIsDisplayed()
     }
 
@@ -95,20 +101,65 @@ class DataScreenTest {
                     state = DataUiState(counts = ObservationDataCounts(2, 3, 4)),
                     onBack = {},
                     onExport = {},
+                    onDeleteCompletedPoint = {},
                     onClearObservationData = { cleared.value = true },
                 )
             }
         }
 
-        composeRule.onNodeWithTag("clear-observation-data").performScrollTo().performClick()
+        composeRule.onNodeWithTag("data-screen").performScrollToIndex(2)
+        composeRule.onNodeWithTag("clear-observation-data").performClick()
         composeRule.onNodeWithText("Очистить данные наблюдений?").assertIsDisplayed()
         composeRule.onNodeWithText("точки наблюдения: 2", substring = true).assertIsDisplayed()
         composeRule.onNodeWithTag("cancel-clear-observation-data").performClick()
         composeRule.runOnIdle { assertFalse(cleared.value) }
         composeRule.onNodeWithText("Очистить данные наблюдений?").assertDoesNotExist()
 
-        composeRule.onNodeWithTag("clear-observation-data").performScrollTo().performClick()
+        composeRule.onNodeWithTag("data-screen").performScrollToIndex(2)
+        composeRule.onNodeWithTag("clear-observation-data").performClick()
         composeRule.onNodeWithTag("confirm-clear-observation-data").performClick()
         composeRule.runOnIdle { assertTrue(cleared.value) }
     }
+
+    @Test
+    fun selectiveDeleteRequiresConfirmationAndTargetsOnlyTheSelectedPoint() {
+        val selected = pointSummary(1)
+        val other = pointSummary(2)
+        val deletedIds = mutableListOf<UUID>()
+        composeRule.setContent {
+            Bee_searchTheme {
+                DataScreen(
+                    state = DataUiState(
+                        counts = ObservationDataCounts(2, 3, 4),
+                        completedPoints = listOf(selected, other),
+                    ),
+                    onBack = {},
+                    onExport = {},
+                    onDeleteCompletedPoint = { deletedIds += it },
+                    onClearObservationData = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("show-completed-points").performScrollTo().performClick()
+        composeRule.onNodeWithTag("delete-point-${selected.id}").performScrollTo().performClick()
+        composeRule.onNodeWithText("Удалить точку наблюдения?").assertIsDisplayed()
+        composeRule.onNodeWithTag("delete-point-details-${selected.id}").assertIsDisplayed()
+        composeRule.onNodeWithTag("cancel-delete-point").performClick()
+        composeRule.runOnIdle { assertTrue(deletedIds.isEmpty()) }
+
+        composeRule.onNodeWithTag("delete-point-${other.id}").performScrollTo().performClick()
+        composeRule.onNodeWithTag("confirm-delete-point").performClick()
+        composeRule.runOnIdle { assertEquals(listOf(other.id), deletedIds) }
+    }
+
+    private fun pointSummary(number: Int) = CompletedObservationPointSummary(
+        id = UUID.randomUUID(),
+        createdAt = Instant.parse("2026-09-0${number}T08:00:00Z"),
+        observationYear = 2026,
+        pointNumber = number,
+        territoryCode = "T01",
+        territoryName = "Территория",
+        beeCount = number,
+    )
 }

@@ -15,6 +15,7 @@ import org.beesearch.app.data.local.room.TerritoryDao
 import org.beesearch.app.data.local.room.toDomain
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.BeeUndoAction
+import org.beesearch.app.domain.model.CompletedObservationPointSummary
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.BeePresenceResultRequiredException
 import org.beesearch.app.domain.model.BeesAlreadyFoundException
@@ -37,6 +38,7 @@ import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
+import org.beesearch.app.domain.model.ObservationPointNotCompletedException
 import org.beesearch.app.domain.model.OpenFlightCycleExistsException
 import org.beesearch.app.domain.model.OpenFlightCycleNotFoundException
 import org.beesearch.app.domain.repository.ObservationRepository
@@ -69,6 +71,35 @@ internal class RoomObservationRepository(
 
     override suspend fun getObservationDataCounts(): ObservationDataCounts =
         database.withTransaction { observationDataCounts() }
+
+    override suspend fun getCompletedObservationPoints(): List<CompletedObservationPointSummary> =
+        pointDao.getCompletedSummaries().map { point ->
+            CompletedObservationPointSummary(
+                id = point.id,
+                createdAt = point.createdAt,
+                observationYear = point.observationYear,
+                pointNumber = point.pointNumber,
+                territoryCode = point.territoryCode,
+                territoryName = point.territoryName,
+                beeCount = point.beeCount,
+            )
+        }
+
+    override suspend fun deleteCompletedObservationPoint(pointId: UUID): ObservationDataCounts =
+        database.withTransaction {
+            val point = pointDao.getById(pointId)
+                ?: throw EntityNotFoundException("ObservationPoint")
+            if (point.completedAt == null) {
+                throw ObservationPointNotCompletedException()
+            }
+
+            cycleDao.deleteForObservationPoint(pointId)
+            beeDao.deleteForObservationPoint(pointId)
+            if (pointDao.deleteCompletedById(pointId) != 1) {
+                throw EntityNotFoundException("ObservationPoint")
+            }
+            observationDataCounts()
+        }
 
     override suspend fun clearObservationData(): ObservationDataCounts =
         database.withTransaction {

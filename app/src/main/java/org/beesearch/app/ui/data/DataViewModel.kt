@@ -11,12 +11,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.beesearch.app.BeeSearchApplication
 import org.beesearch.app.data.backup.BackupDocumentExporter
+import org.beesearch.app.domain.model.CompletedObservationPointSummary
+import org.beesearch.app.domain.model.EntityNotFoundException
 import org.beesearch.app.domain.model.ObservationDataCounts
+import org.beesearch.app.domain.model.ObservationPointNotCompletedException
 import org.beesearch.app.domain.repository.ObservationDataMaintenance
+import java.util.UUID
 
 internal enum class DataOperation {
     LOADING,
     EXPORT,
+    DELETE_POINT,
     CLEAR,
 }
 
@@ -27,6 +32,7 @@ internal data class DataStatus(
 
 internal data class DataUiState(
     val counts: ObservationDataCounts? = null,
+    val completedPoints: List<CompletedObservationPointSummary> = emptyList(),
     val operation: DataOperation? = null,
     val status: DataStatus? = null,
 )
@@ -45,6 +51,7 @@ internal class DataViewModel(
             try {
                 _state.value = _state.value.copy(
                     counts = observationData.getObservationDataCounts(),
+                    completedPoints = observationData.getCompletedObservationPoints(),
                     operation = null,
                 )
             } catch (error: CancellationException) {
@@ -98,6 +105,42 @@ internal class DataViewModel(
                 _state.value = _state.value.copy(
                     operation = null,
                     status = DataStatus("Не удалось очистить данные наблюдений.", isError = true),
+                )
+            }
+        }
+    }
+
+    fun deleteCompletedObservationPoint(pointId: UUID) {
+        if (_state.value.operation != null) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(operation = DataOperation.DELETE_POINT, status = null)
+            try {
+                val counts = observationData.deleteCompletedObservationPoint(pointId)
+                _state.value = _state.value.copy(
+                    counts = counts,
+                    completedPoints = _state.value.completedPoints.filterNot { it.id == pointId },
+                    operation = null,
+                    status = DataStatus("Точка наблюдения удалена.", isError = false),
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: ObservationPointNotCompletedException) {
+                _state.value = _state.value.copy(
+                    operation = null,
+                    status = DataStatus(
+                        "Можно удалить только завершённую точку наблюдения.",
+                        isError = true,
+                    ),
+                )
+            } catch (_: EntityNotFoundException) {
+                _state.value = _state.value.copy(
+                    operation = null,
+                    status = DataStatus("Точка наблюдения больше не найдена.", isError = true),
+                )
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(
+                    operation = null,
+                    status = DataStatus("Не удалось удалить точку наблюдения.", isError = true),
                 )
             }
         }

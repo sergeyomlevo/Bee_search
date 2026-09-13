@@ -20,6 +20,10 @@ class ObservationPointNotActiveException : IllegalStateException(
     "The observation point is not active.",
 )
 
+class ObservationPointNotCompletedException : IllegalStateException(
+    "Only a completed observation point can be deleted.",
+)
+
 class InitialReleaseAlreadyStartedException : IllegalStateException(
     "The initial group release has already started.",
 )
