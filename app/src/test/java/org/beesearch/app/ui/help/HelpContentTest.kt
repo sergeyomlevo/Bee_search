@@ -58,7 +58,10 @@ class HelpContentTest {
         assertTrue(text, text.contains("первым результатом"))
         assertTrue(text, text.contains("первая добавленная пчела"))
         assertTrue(text, text.contains("«Пчёлы отсутствуют»"))
-        assertTrue(text, text.contains("другой день"))
+        assertTrue(text, text.contains("Для нового наблюдения в другой день создайте новую точку"))
+        assertTrue(text, text.contains("Завершённая точка повторно не открывается"))
+        // The app does not detect a new day itself; the guidance must ask the user to create the point.
+        assertFalse(text, text.contains("создаёт новую точку"))
     }
 
     @Test
