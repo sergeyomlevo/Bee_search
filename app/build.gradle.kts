@@ -26,6 +26,13 @@ android {
         debug {
             applicationIdSuffix = ".dev"
         }
+        create("beta") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".beta"
+            versionNameSuffix = "-beta.1"
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             optimization {
                 enable = false
