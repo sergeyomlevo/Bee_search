@@ -16,9 +16,15 @@ from backup_reader import (
     require_fields,
 )
 
-EXPLORER_VERSION = "0.1.0"
+EXPLORER_VERSION = "0.2.0"
 RESULT_SCHEMA_VERSION = 1
 RULE_SET_VERSION = 1
+D058_THRESHOLD_MS = 60_000
+APPLIED_RULES = ({
+    "ruleId": "D058",
+    "ruleSetVersion": RULE_SET_VERSION,
+    "thresholdMs": D058_THRESHOLD_MS,
+},)
 
 
 def _number(value: Any, label: str, minimum: float | None = None,
@@ -257,14 +263,22 @@ def build_evidence(path: Path) -> dict[str, Any]:
             for cycle in cycles_by_bee.get(bee["id"], []):
                 returned = cycle["returnTime"]
                 duration = None if returned is None else returned - cycle["departureTime"]
-                excluded_by_d058 = cycle["sequenceNumber"] == 1 and duration is not None and duration < 60_000
+                excluded_by_d058 = (
+                    cycle["sequenceNumber"] == 1
+                    and duration is not None
+                    and duration < D058_THRESHOLD_MS
+                )
                 if duration is None:
                     status = "NO_DURATION_OPEN"; open_count += 1
                 elif excluded_by_d058:
                     status = "EXCLUDED_BY_D058"; completed_count += 1; excluded += 1
                 else:
                     status = "ELIGIBLE"; completed_count += 1; eligible += 1
-                diagnostics = ["D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE"] if excluded_by_d058 and not cycle["initialGroupLaunch"] else []
+                diagnostics = sorted(
+                    ["D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE"]
+                    if excluded_by_d058 and not cycle["initialGroupLaunch"]
+                    else []
+                )
                 cycles_output.append({**{field: cycle[field] for field in cycle_fields},
                                       "durationMs": duration, "durationEvidenceStatus": status,
                                       "diagnosticCodes": diagnostics})
@@ -272,7 +286,7 @@ def build_evidence(path: Path) -> dict[str, Any]:
             bees_output.append({**{field: bee[field] for field in bee_fields},
                                  "counts": {"totalCycles": len(cycles_output), "completedCycles": completed_count,
                                             "openCycles": open_count, "eligibleDurations": eligible,
-                                            "excludedDurations": excluded},
+                                            "excludedByD058": excluded},
                                  "flightCycles": cycles_output})
         points_output.append({**{field: point[field] for field in point_fields},
                               "counts": {"bees": len(bees_output), "flightCycles": point_cycle_count},
@@ -288,6 +302,7 @@ def build_evidence(path: Path) -> dict[str, Any]:
         "resultSchemaVersion": RESULT_SCHEMA_VERSION,
         "explorerVersion": EXPLORER_VERSION,
         "ruleSetVersion": RULE_SET_VERSION,
+        "appliedRules": [dict(rule) for rule in APPLIED_RULES],
         "provenance": {
             "sourceArchiveSha256": parsed.source_archive_sha256,
             "sourceArchiveByteLength": parsed.source_archive_byte_length,

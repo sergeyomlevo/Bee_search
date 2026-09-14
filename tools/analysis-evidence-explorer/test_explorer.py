@@ -18,6 +18,9 @@ import backup_reader
 import explorer
 
 
+TESTDATA = Path(__file__).parent / "testdata"
+
+
 def uid(number: int) -> str:
     return str(uuid.UUID(f"00000000-0000-0000-0000-{number:012d}"))
 
@@ -127,15 +130,109 @@ def write_backup(
         "profile": "COMPLETE_BACKUP", "collections": descriptors,
     }
     manifest.update(manifest_overrides or {})
+    def write_entry(archive: zipfile.ZipFile, name: str, payload: bytes) -> None:
+        info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+        info.compress_type = zipfile.ZIP_STORED
+        info.create_system = 0
+        info.external_attr = 0
+        archive.writestr(info, payload)
+
     with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("manifest.json", json.dumps(manifest, separators=(",", ":")).encode("utf-8"))
+        write_entry(archive, "manifest.json", json.dumps(manifest, separators=(",", ":")).encode("utf-8"))
         for name, collection_path in explorer.COLLECTIONS.items():
-            archive.writestr(collection_path, payloads[name])
+            write_entry(archive, collection_path, payloads[name])
         for name, payload in (extra_entries or {}).items():
-            archive.writestr(name, payload)
+            write_entry(archive, name, payload)
+
+
+def golden_rows() -> dict[str, list[dict]]:
+    rows = base_rows()
+    first_point = rows["observation-points"][0]
+    first_point.update({
+        "latitude": 55.5,
+        "longitude": 37.5,
+        "createdAt": 1_000,
+        "initialGroupReleaseAt": 2_000,
+        "completedAt": 500_000,
+    })
+    second_point = point_record(30, year=2025, point_number=2)
+    second_point.update({
+        "latitude": 55.5,
+        "longitude": 37.5,
+        "createdAt": 900,
+        "completedAt": 901,
+    })
+    rows["observation-points"] = [first_point, second_point]
+    rows["bees"] = [
+        {
+            "id": uid(4), "observationPointId": uid(3), "markColor": "red",
+            "markPosition": "LEFT_WING", "createdAt": 3_000,
+        },
+        {
+            "id": uid(8), "observationPointId": uid(3), "markColor": "blue",
+            "markPosition": "RIGHT_WING", "createdAt": 2_500,
+        },
+    ]
+    rows["flight-cycles"] = [
+        cycle_record(5, bee_id=uid(4), sequence=1, departure=3_000,
+                     returned=62_999, azimuth=None, initial=False),
+        cycle_record(6, bee_id=uid(4), sequence=2, departure=70_000,
+                     returned=130_000, azimuth=45.5, consumed=True, initial=False),
+        cycle_record(7, bee_id=uid(4), sequence=3, departure=140_000,
+                     returned=140_001, azimuth=None, initial=False),
+        cycle_record(9, bee_id=uid(4), sequence=4, departure=150_000,
+                     returned=None, azimuth=None, initial=False),
+        cycle_record(10, bee_id=uid(8), sequence=1, departure=2_000,
+                     returned=62_000, azimuth=0.0, initial=True),
+    ]
+    return rows
 
 
 class ExplorerTest(unittest.TestCase):
+    def test_full_canonical_result_matches_golden_v1(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / "golden-input.zip"
+            second_archive = root / "golden-input-two.zip"
+            write_backup(archive, rows=golden_rows())
+            write_backup(second_archive, rows=golden_rows())
+            first = explorer.write_evidence(archive, root / "first").read_bytes()
+            second = explorer.write_evidence(archive, root / "second").read_bytes()
+            rebuilt = explorer.write_evidence(second_archive, root / "rebuilt").read_bytes()
+            expected = (TESTDATA / "golden_evidence_v1.json").read_bytes()
+
+            self.assertEqual(archive.read_bytes(), second_archive.read_bytes())
+            self.assertEqual(first, expected)
+            self.assertEqual(second, expected)
+            self.assertEqual(rebuilt, expected)
+            self.assertFalse(first.startswith(b"\xef\xbb\xbf"))
+            self.assertNotIn(b"\r", first)
+            self.assertTrue(first.endswith(b"\n"))
+            self.assertFalse(first.endswith(b"\n\n"))
+            result = json.loads(first)
+            self.assertEqual(result["resultSchemaVersion"], 1)
+            self.assertEqual(result["explorerVersion"], "0.2.0")
+            self.assertEqual(result["ruleSetVersion"], 1)
+            self.assertEqual(result["appliedRules"], [{
+                "ruleId": "D058", "ruleSetVersion": 1, "thresholdMs": 60_000,
+            }])
+            for point in result["observationPoints"]:
+                for bee in point["bees"]:
+                    counts = bee["counts"]
+                    self.assertEqual(
+                        counts["totalCycles"],
+                        counts["eligibleDurations"] + counts["excludedByD058"] + counts["openCycles"],
+                    )
+                    self.assertEqual(
+                        counts["completedCycles"],
+                        counts["eligibleDurations"] + counts["excludedByD058"],
+                    )
+                    for cycle in bee["flightCycles"]:
+                        self.assertEqual(cycle["diagnosticCodes"], sorted(cycle["diagnosticCodes"]))
+            forbidden = {"generatedAt", "sourceFilename", "sourcePath", "hostName", "executionDuration"}
+            self.assertTrue(forbidden.isdisjoint(result))
+            self.assertTrue(forbidden.isdisjoint(result["provenance"]))
+
     def test_empty_research_and_no_bees_found_are_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             archive = Path(directory) / "empty.zip"
