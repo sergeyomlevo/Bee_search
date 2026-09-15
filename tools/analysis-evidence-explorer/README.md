@@ -1,16 +1,27 @@
 # Analysis Evidence Explorer
 
 Offline, read-only developer tool for Bee Search logical backup v1. It accepts
-the standard `COMPLETE_BACKUP` ZIP and publishes one canonical machine-readable
-artifact only after validation succeeds:
+the standard `COMPLETE_BACKUP` ZIP and publishes the complete output set only
+after validation and rendering succeed:
 
 ```text
 python explorer.py backup.zip output-directory
 ```
 
-The output is `evidence.json`. Future Markdown and CSV outputs are renderings of
-this canonical model; they must not introduce new evidence semantics. The tool
-uses Python 3.11 standard-library modules only and never contacts a device,
+```text
+output-directory/
+  evidence.json    canonical machine-readable artifact
+  evidence.md      human-readable report
+  points.csv       one row per ObservationPoint
+  bees.csv         one row per Bee
+  cycles.csv       one row per FlightCycle
+```
+
+`evidence.json` is the only canonical artifact. `evidence.md` and the three CSV
+files are derived presentations of the same immutable result object produced by
+a single `build_evidence` call; they must not introduce new evidence semantics,
+recompute eligibility or diagnostics, or become a second source of truth. The
+tool uses Python 3.11 standard-library modules only and never contacts a device,
 network, Room, or DataStore.
 
 ## Canonical result v1
@@ -36,7 +47,11 @@ and its 60,000 ms threshold. D067 is not an applied eligibility rule.
 Per-cycle `diagnosticCodes` is a sorted array of non-error observations. The
 code `D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE` does not change eligibility, assert
 a defect, or add biological interpretation. No top-level diagnostic summary is
-stored.
+stored. The values of `diagnosticCodes` are stable machine identifiers:
+consumers may branch on them. A code must not be renamed or redefined without a
+contract and version review. Adding a code is allowed only as a new diagnostic
+condition and must not change existing eligibility semantics without a rule set
+or version decision.
 
 Bee counts obey:
 
@@ -76,11 +91,24 @@ changes, or changed field semantics require a `resultSchemaVersion` bump.
 Bug fixes that restore documented semantics, stricter pre-result validation,
 README clarifications, and renderer-only changes do not.
 
+Adding a canonical field is never a silent extension of frozen v1. A
+consumer-visible addition requires an `explorerVersion` bump, and when the
+addition changes compatibility or the required interpretation of the existing
+machine contract it also requires a `resultSchemaVersion` bump. Adding a field
+always changes canonical bytes, so it must be an explicit, reviewed contract
+change rather than a side effect of other work.
+
+Renderer capability is deliberately outside the canonical evidence contract:
+`explorerVersion` identifies the component that produces `evidence.json`, so
+adding or changing `evidence.md` and the CSV renderings does not by itself
+change `explorerVersion` or canonical bytes.
+
 `testdata/golden_evidence_v1.json` freezes the complete canonical bytes. A
 golden change requires an explained semantic reason and an explicit check of
 whether `resultSchemaVersion` must change; ordinary test runs never regenerate
 it automatically.
 
-The Explorer intentionally has no Markdown/CSV yet, distance or aggregation
-estimator, clustering, confidence/probability, geometry, ground truth, or
-biological inference.
+The Explorer intentionally has no distance or aggregation estimator, clustering,
+confidence/probability, geometry, ground truth, or biological inference. The
+Markdown and CSV renderings preserve the same boundary: they add no analysis of
+their own.

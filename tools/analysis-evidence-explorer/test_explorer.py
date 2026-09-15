@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import copy
+import csv
 import hashlib
+import io
 import json
 import shutil
+import socket
 import sys
 import tempfile
 import unittest
 import uuid
 import warnings
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -522,6 +526,202 @@ class ExplorerTest(unittest.TestCase):
             write_backup(archive)
             self.assertEqual(explorer.main([str(archive), str(output)]), 2)
             self.assertEqual(target.read_bytes(), b"keep")
+
+
+class RendererTest(unittest.TestCase):
+    def _write(self, directory: Path, rows: dict | None = None) -> tuple[Path, Path]:
+        archive = directory / "render-input.zip"
+        output = directory / "output"
+        write_backup(archive, rows=rows if rows is not None else golden_rows())
+        explorer.write_evidence(archive, output)
+        return archive, output
+
+    def test_all_five_artifacts_are_published_and_canonical_json_is_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            _, output = self._write(Path(directory))
+            self.assertEqual(
+                sorted(path.name for path in output.iterdir()),
+                ["bees.csv", "cycles.csv", "evidence.json", "evidence.md", "points.csv"],
+            )
+            self.assertEqual(
+                (output / "evidence.json").read_bytes(),
+                (TESTDATA / "golden_evidence_v1.json").read_bytes(),
+            )
+
+    def test_renderings_are_deterministic_across_builds_and_do_not_mutate_the_result(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first_archive = root / "one.zip"
+            second_archive = root / "two.zip"
+            write_backup(first_archive, rows=golden_rows())
+            write_backup(second_archive, rows=golden_rows())
+            first = explorer.build_evidence(first_archive)
+            second = explorer.build_evidence(second_archive)
+            snapshot = copy.deepcopy(first)
+            for renderer in (
+                explorer.render_markdown,
+                explorer.render_points_csv,
+                explorer.render_bees_csv,
+                explorer.render_cycles_csv,
+            ):
+                with self.subTest(renderer=renderer.__name__):
+                    self.assertEqual(renderer(first), renderer(first))
+                    self.assertEqual(renderer(first), renderer(second))
+            self.assertEqual(first, snapshot)
+
+    def test_points_csv_carries_both_presence_results_and_empty_optional_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            _, output = self._write(Path(directory))
+            rows = list(csv.reader((output / "points.csv").read_text(encoding="utf-8").splitlines()))
+            header, body = rows[0], rows[1:]
+            self.assertEqual(header, [
+                "observationPointId", "territoryId", "observerId", "observationYear",
+                "pointNumber", "beePresence", "latitude", "longitude", "gpsAccuracyM",
+                "createdAt", "initialGroupReleaseAt", "completedAt", "beeCount",
+                "flightCycleCount",
+            ])
+            self.assertEqual(len(body), 2)
+            self.assertEqual([row[5] for row in body], ["NO_BEES_FOUND", "BEES_FOUND"])
+            no_bees = body[0]
+            self.assertEqual(no_bees[8], "")            # gpsAccuracyM is null
+            self.assertEqual(no_bees[10], "")           # initialGroupReleaseAt is null
+            self.assertEqual(no_bees[12:], ["0", "0"])
+            bees_found = body[1]
+            self.assertEqual(bees_found[10], "2000")
+            self.assertEqual(bees_found[12:], ["2", "5"])
+
+    def test_bees_csv_lists_exactly_the_stored_bees(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            _, output = self._write(Path(directory))
+            rows = list(csv.reader((output / "bees.csv").read_text(encoding="utf-8").splitlines()))
+            self.assertEqual(rows[0], [
+                "beeId", "observationPointId", "markColor", "markPosition", "createdAt",
+                "totalCycles", "completedCycles", "openCycles", "eligibleDurations",
+                "excludedByD058",
+            ])
+            self.assertEqual(
+                [(row[0], row[2], row[3]) for row in rows[1:]],
+                [(uid(8), "blue", "RIGHT_WING"), (uid(4), "red", "LEFT_WING")],
+            )
+            self.assertEqual(rows[1][5:], ["1", "1", "0", "1", "0"])
+            self.assertEqual(rows[2][5:], ["4", "3", "1", "2", "1"])
+
+    def test_cycles_csv_covers_every_canonical_evidence_case(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            _, output = self._write(Path(directory))
+            rows = list(csv.reader((output / "cycles.csv").read_text(encoding="utf-8").splitlines()))
+            self.assertEqual(rows[0], [
+                "flightCycleId", "beeId", "observationPointId", "sequenceNumber",
+                "departureTime", "returnTime", "durationMs", "durationEvidenceStatus",
+                "azimuthDeg", "azimuthCaptureConsumed", "initialGroupLaunch",
+                "initialGroupLaunchCorrectionEligible", "diagnosticCodes", "createdAt",
+                "updatedAt",
+            ])
+            cycles = {row[3] + ":" + row[1][-2:]: row for row in rows[1:]}
+            self.assertEqual(len(cycles), 5)
+
+            boundary = cycles["1:08"]
+            self.assertEqual(boundary[6], "60000")
+            self.assertEqual(boundary[7], "ELIGIBLE")
+            self.assertEqual(boundary[8], "0.0")        # azimuth 0 is stored, not absent
+            self.assertEqual(boundary[10], "true")      # initial group launch
+            self.assertEqual(boundary[12], "")
+
+            d058 = cycles["1:04"]
+            self.assertEqual(d058[6], "59999")
+            self.assertEqual(d058[7], "EXCLUDED_BY_D058")
+            self.assertEqual(d058[8], "")               # azimuth is null, so empty field
+            self.assertEqual(d058[12], "D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE")
+
+            self.assertEqual(cycles["2:04"][6], "60000")
+            self.assertEqual(cycles["2:04"][7], "ELIGIBLE")
+            self.assertEqual(cycles["2:04"][8], "45.5")
+            self.assertEqual(cycles["2:04"][9], "true")  # azimuth capture consumed
+
+            self.assertEqual(cycles["3:04"][6], "1")     # later short cycle stays eligible
+            self.assertEqual(cycles["3:04"][7], "ELIGIBLE")
+
+            opened = cycles["4:04"]
+            self.assertEqual(opened[5], "")              # returnTime is null
+            self.assertEqual(opened[6], "")              # no duration for an open cycle
+            self.assertEqual(opened[7], "NO_DURATION_OPEN")
+
+    def test_csv_headers_are_present_for_an_empty_dataset(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            rows = base_rows()
+            for name in ("territories", "observers", "observation-points", "bees",
+                         "flight-cycles", "map-coverage"):
+                rows[name] = []
+            rows["portable-settings"] = [{"currentTerritoryId": None, "currentObserverId": None}]
+            _, output = self._write(Path(directory), rows=rows)
+            for name, column_count in (("points.csv", 14), ("bees.csv", 10), ("cycles.csv", 15)):
+                with self.subTest(artifact=name):
+                    text = (output / name).read_text(encoding="utf-8")
+                    self.assertEqual(text.count("\n"), 1)
+                    self.assertEqual(len(text.splitlines()[0].split(",")), column_count)
+            markdown = (output / "evidence.md").read_text(encoding="utf-8")
+            self.assertIn("No ObservationPoint is recorded in this archive.", markdown)
+            self.assertIn("| Observation points | 0 |", markdown)
+
+    def test_renderings_contain_no_run_metadata_paths_or_time(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / "distinctive-archive-name.zip"
+            output = root / "distinctive-output-directory"
+            write_backup(archive, rows=golden_rows())
+            explorer.write_evidence(archive, output)
+            now_prefix = datetime.now(timezone.utc).strftime("%Y-%m-%dT")
+            for name in ("evidence.md", "points.csv", "bees.csv", "cycles.csv"):
+                text = (output / name).read_text(encoding="utf-8")
+                with self.subTest(artifact=name):
+                    self.assertNotIn(archive.name, text)
+                    self.assertNotIn(str(root), text)
+                    self.assertNotIn(str(output), text)
+                    self.assertNotIn(socket.gethostname(), text)
+                    self.assertNotIn(now_prefix, text)
+                    self.assertNotIn("\\", text)
+
+    def test_markdown_reports_exact_evidence_without_interpretation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            _, output = self._write(Path(directory))
+            markdown = (output / "evidence.md").read_text(encoding="utf-8")
+            self.assertTrue(markdown.startswith("# Analysis Evidence Explorer\n"))
+            self.assertIn("| D058 | 1 | 60000 |", markdown)
+            self.assertIn("00:00:59.999 (59999 ms)", markdown)
+            self.assertIn("00:01:00.000 (60000 ms)", markdown)
+            self.assertIn("00:00:00.001 (1 ms)", markdown)
+            self.assertIn("(no duration)", markdown)
+            self.assertIn("| OPEN |", markdown)
+            self.assertIn("| 0.0 |", markdown)
+            self.assertIn("D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE", markdown)
+            self.assertIn("not an exclusion area and not a statement about nest location", markdown)
+            lowered = markdown.lower()
+            for forbidden in (
+                "probable nest", "belongs to nest", "distance to nest", "distance",
+                "confidence", "probability", "bad observation", "erroneous cycle",
+                "orientation flight", "mean", "median", "cluster", "annulus",
+            ):
+                with self.subTest(forbidden=forbidden):
+                    self.assertNotIn(forbidden, lowered)
+
+    def test_csv_quoting_survives_comma_quote_and_newline(self) -> None:
+        awkward_mark = 'red,"quoted"\nsecond line'
+        with tempfile.TemporaryDirectory() as directory:
+            rows = base_rows()
+            rows["bees"][0]["markColor"] = awkward_mark
+            rows["observation-points"][0]["code"] = "code|with|pipes\nand newline"
+            archive = Path(directory) / "awkward.zip"
+            output = Path(directory) / "output"
+            write_backup(archive, rows=rows)
+            explorer.write_evidence(archive, output)
+
+            bees_text = (output / "bees.csv").read_text(encoding="utf-8")
+            self.assertIn('"red,""quoted""', bees_text)
+            parsed = list(csv.reader(io.StringIO(bees_text, newline="")))
+            self.assertEqual(parsed[1][2], awkward_mark)
+
+            markdown = (output / "evidence.md").read_text(encoding="utf-8")
+            self.assertIn("| Point code | code\\|with\\|pipes and newline |", markdown)
 
 
 if __name__ == "__main__":
