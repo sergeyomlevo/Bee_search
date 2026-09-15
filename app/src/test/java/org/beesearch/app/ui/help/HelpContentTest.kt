@@ -80,6 +80,22 @@ class HelpContentTest {
     }
 
     @Test
+    fun markingGuidanceCoversConsecutivePointsOfOneSearch() {
+        val text = sectionText("Подготовка пчёл и первый выпуск")
+        assertTrue(text, text.contains("последовательных точках одного поиска"))
+        assertTrue(text, text.contains("отличимые от меток предыдущих точек"))
+        assertTrue(text, text.contains("могут прилетать"))
+        assertTrue(text, text.contains("невозможно надёжно определить"))
+        // The distinction is a choice of marking, not a colour-only rule.
+        assertTrue(text, text.contains("цветом"))
+        assertTrue(text, text.contains("положением метки"))
+        assertTrue(text, text.contains("их сочетанием"))
+        // Guidance about marking only: no nest claim and no app-side restriction.
+        assertFalse(text, text.contains("одного гнезда"))
+        assertFalse(text, text.contains("запрещ"))
+    }
+
+    @Test
     fun theRemovedSubMinuteFlightRuleIsNotRestored() {
         val text = allHelpText()
         assertFalse(text, text.contains("одной минуты"))
