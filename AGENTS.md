@@ -9,12 +9,55 @@ detailed product, domain, data, or architecture documentation.
 
 Before making changes:
 
-1. inspect the relevant existing implementation;
-2. read the smallest relevant set of project documents;
-3. apply the decision policy from `.agent/decision-policy.yaml`;
-4. make the smallest coherent change;
-5. verify the result;
-6. update project documentation when the change affects documented behavior.
+1. research the relevant external technology before designing or implementing
+   the change;
+2. prefer primary sources: official documentation, the official upstream
+   repository and source code, release notes, issues/discussions maintained by
+   the upstream project, and documentation matching the version actually in use;
+3. check whether the requested capability, integration pattern, plugin,
+   extension, library, or recommended workflow already exists before building
+   a custom solution;
+4. inspect the relevant existing implementation;
+5. read the smallest relevant set of project documents;
+6. apply the decision policy from `.agent/decision-policy.yaml`;
+7. make the smallest coherent change;
+8. verify the result;
+9. update project documentation when the change affects documented behavior.
+
+### External research before implementation
+
+Do not start implementation or design a custom mechanism before checking the
+available primary information about the relevant technology.
+
+For changes that do not depend on an external technology or ecosystem, record
+this research step as `not applicable` rather than performing unrelated
+external research.
+
+For external frameworks, libraries, tools, platforms, APIs, plugins, build
+systems, protocols, or integrations:
+
+- check the official documentation first;
+- inspect the official upstream GitHub repository and relevant source code when
+  behavior depends on implementation details;
+- prefer documentation and source matching the version actually installed or
+  used by the project over newer `main` / `master` documentation;
+- check whether an official or established plugin, extension, API, workflow, or
+  reference implementation already solves the problem;
+- use issues, discussions, release notes, and community projects as secondary
+  evidence when the official documentation is incomplete;
+- distinguish documented behavior from behavior inferred from source code or
+  observed experimentally.
+
+Before creating a custom tool, adapter, runner, integration, or workflow,
+also inspect the capabilities already installed and available in the current
+runtime/profile. Prefer an existing platform-native mechanism when it satisfies
+the requirement without weakening project constraints.
+
+Do not implement a custom solution merely because an existing capability was
+not known at the start of the task.
+
+If primary-source research materially changes the proposed approach, revise the
+plan before implementation.
 
 ---
 

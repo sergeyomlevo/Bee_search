@@ -21,7 +21,7 @@
 # For example, a database migration should be verified by migration tests
 # rather than trusted merely because an agent reports that it is safe.
 
-version: 7
+version: 8
 
 policy:
   principle: >
@@ -83,6 +83,34 @@ rules:
       Existing implementation may be incomplete or wrong. When code conflicts
       with documented project truth, investigate rather than preserving the
       code automatically.
+    action: enforce
+
+  - id: research_before_implementation
+    description: >
+      Before designing or implementing a change involving an external
+      technology, framework, library, tool, platform, API, plugin system, or
+      integration, first inspect the available primary sources. Prefer official
+      documentation, the official upstream repository and source code, release
+      notes, and documentation matching the version actually in use. Check
+      whether an official or established mechanism already solves the problem
+      before creating a custom solution.
+    action: enforce
+
+  - id: installed_version_over_latest_docs
+    description: >
+      When external documentation or upstream source may differ by version,
+      treat the behavior of the version actually installed or used by the
+      project as the relevant baseline. Latest or main-branch documentation may
+      be used as additional evidence but must not silently override version-
+      specific behavior.
+    action: enforce
+
+  - id: distinguish_external_evidence
+    description: >
+      Keep documented, source-derived, experimentally observed, and inferred
+      external behavior distinguishable. Do not present an assumption based on
+      documentation, source inspection, or absence of evidence as if it had
+      already been verified in the project's actual runtime.
     action: enforce
 
 
@@ -246,6 +274,9 @@ assessment:
     architecture commitment, or difficulty of reversal.
 
   questions:
+    - Has the relevant official documentation, upstream repository, existing
+      implementation ecosystem, and already-installed platform capabilities been
+      checked before designing a custom solution?
     - Does this change alter user-visible behavior?
     - Does it alter domain meaning or invariants?
     - Does it change persistent data or its interpretation?
