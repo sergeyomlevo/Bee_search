@@ -14,24 +14,22 @@ import org.beesearch.app.data.local.room.ObserverDao
 import org.beesearch.app.data.local.room.TerritoryDao
 import org.beesearch.app.data.local.room.toDomain
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeeLimitReachedException
+import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.BeeUndoAction
 import org.beesearch.app.domain.model.CompletedObservationPointSummary
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.BeePresenceResultRequiredException
 import org.beesearch.app.domain.model.BeesAlreadyFoundException
-import org.beesearch.app.domain.model.BeeHasFlightHistoryException
 import org.beesearch.app.domain.model.AzimuthCaptureAlreadyConsumedException
 import org.beesearch.app.domain.model.AzimuthCaptureRequiresOpenFlightCycleException
 import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.EntityNotFoundException
 import org.beesearch.app.domain.model.FlightCycle
-import org.beesearch.app.domain.model.InitialFlightCycleRequiredException
-import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
 import org.beesearch.app.domain.model.InvalidAzimuthException
 import org.beesearch.app.domain.model.InvalidEventTimeException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
-import org.beesearch.app.domain.model.NoPreparedBeesException
 import org.beesearch.app.domain.model.NoReversibleBeeActionException
 import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
 import org.beesearch.app.domain.model.ObservationPoint
@@ -39,6 +37,7 @@ import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
 import org.beesearch.app.domain.model.ObservationPointNotCompletedException
+import org.beesearch.app.domain.model.StartedBeeFlight
 import org.beesearch.app.domain.model.OpenFlightCycleExistsException
 import org.beesearch.app.domain.model.OpenFlightCycleNotFoundException
 import org.beesearch.app.domain.repository.ObservationRepository
@@ -116,26 +115,6 @@ internal class RoomObservationRepository(
         createActivePoint(point).toDomain()
     }
 
-    override suspend fun createObservationPointWithFirstBee(
-        point: NewObservationPoint,
-        markColor: String,
-        markPosition: MarkPosition,
-    ): ObservationPoint = database.withTransaction {
-        val createdPoint = createActivePoint(point)
-        val bee = BeeEntity(
-            id = UUID.randomUUID(),
-            observationPointId = createdPoint.id,
-            markColor = markColor,
-            markPosition = markPosition,
-            createdAt = clock.instant(),
-        )
-        beeDao.insert(bee)
-        if (pointDao.setBeePresenceResult(createdPoint.id, BeePresenceResult.BEES_FOUND) != 1) {
-            throw ObservationPointNotActiveException()
-        }
-        createdPoint.copy(beePresenceResult = BeePresenceResult.BEES_FOUND).toDomain()
-    }
-
     override suspend fun createObservationPointWithNoBeesFound(
         point: NewObservationPoint,
     ): ObservationPoint = database.withTransaction {
@@ -195,30 +174,45 @@ internal class RoomObservationRepository(
         return entity
     }
 
-    override suspend fun addBee(
+    override suspend fun startFirstFlight(
         pointId: UUID,
         markColor: String,
         markPosition: MarkPosition,
-    ): Bee = database.withTransaction {
+    ): StartedBeeFlight = database.withTransaction {
         val point = requireActivePoint(pointId)
         if (point.beePresenceResult == BeePresenceResult.NO_BEES_FOUND) {
             throw NoBeesFoundAlreadyRecordedException()
         }
-        if (cycleDao.countForObservationPoint(pointId) != 0) {
-            throw InitialReleaseAlreadyStartedException()
+        if (beeDao.countForPoint(pointId) >= BeeMarkCatalog.MAX_BEES_PER_OBSERVATION_POINT) {
+            throw BeeLimitReachedException()
         }
         if (beeDao.countByMark(pointId, markColor, markPosition) != 0) {
             throw DuplicateBeeMarkException()
         }
 
-        val entity = BeeEntity(
+        val departureTime = clock.instant()
+        val bee = BeeEntity(
             id = UUID.randomUUID(),
             observationPointId = pointId,
             markColor = markColor,
             markPosition = markPosition,
-            createdAt = clock.instant(),
+            createdAt = departureTime,
         )
-        beeDao.insert(entity)
+        beeDao.insert(bee)
+        val cycle = FlightCycleEntity(
+            id = UUID.randomUUID(),
+            beeId = bee.id,
+            sequenceNumber = 1,
+            departureTime = departureTime,
+            returnTime = null,
+            azimuthDeg = null,
+            azimuthCaptureConsumed = false,
+            isInitialGroupLaunch = false,
+            isFirstDepartureCancellationEligible = true,
+            createdAt = departureTime,
+            updatedAt = departureTime,
+        )
+        cycleDao.insert(cycle)
         if (point.beePresenceResult != BeePresenceResult.BEES_FOUND) {
             if (
                 pointDao.setBeePresenceResult(pointId, BeePresenceResult.BEES_FOUND) != 1
@@ -226,66 +220,8 @@ internal class RoomObservationRepository(
                 throw ObservationPointNotActiveException()
             }
         }
-        entity.toDomain()
+        StartedBeeFlight(bee = bee.toDomain(), flightCycle = cycle.toDomain())
     }
-
-    override suspend fun removePreparedBee(beeId: UUID) {
-        database.withTransaction {
-            val bee = requireBee(beeId)
-            requireActivePoint(bee.observationPointId)
-            if (cycleDao.countForObservationPoint(bee.observationPointId) != 0) {
-                throw InitialReleaseAlreadyStartedException()
-            }
-            if (cycleDao.countForBee(beeId) != 0) {
-                throw BeeHasFlightHistoryException()
-            }
-            if (beeDao.delete(bee) != 1) {
-                throw EntityNotFoundException("Bee")
-            }
-            if (beeDao.countForPoint(bee.observationPointId) == 0) {
-                if (pointDao.setBeePresenceResult(bee.observationPointId, null) != 1) {
-                    throw ObservationPointNotActiveException()
-                }
-            }
-        }
-    }
-
-    override suspend fun startInitialGroupRelease(pointId: UUID): List<FlightCycle> =
-        database.withTransaction {
-            val point = requireActivePoint(pointId)
-            val bees = beeDao.getForPoint(pointId)
-            if (bees.isEmpty()) {
-                throw NoPreparedBeesException()
-            }
-            if (point.beePresenceResult != BeePresenceResult.BEES_FOUND) {
-                throw BeePresenceResultRequiredException()
-            }
-            if (cycleDao.countForObservationPoint(pointId) != 0) {
-                throw InitialReleaseAlreadyStartedException()
-            }
-
-            val departureTime = clock.instant()
-            if (pointDao.setInitialGroupReleaseAt(pointId, departureTime) != 1) {
-                throw InitialReleaseAlreadyStartedException()
-            }
-            val cycles = bees.map { bee ->
-                FlightCycleEntity(
-                    id = UUID.randomUUID(),
-                    beeId = bee.id,
-                    sequenceNumber = 1,
-                    departureTime = departureTime,
-                    returnTime = null,
-                    azimuthDeg = null,
-                    azimuthCaptureConsumed = false,
-                    isInitialGroupLaunch = true,
-                    isInitialGroupLaunchCorrectionEligible = true,
-                    createdAt = departureTime,
-                    updatedAt = departureTime,
-                )
-            }
-            cycleDao.insertAll(cycles)
-            cycles.map(FlightCycleEntity::toDomain)
-        }
 
     override suspend fun registerBeeReturn(beeId: UUID): FlightCycle = database.withTransaction {
         val bee = requireBee(beeId)
@@ -300,21 +236,18 @@ internal class RoomObservationRepository(
         }
         openCycle.copy(
             returnTime = returnTime,
-            isInitialGroupLaunchCorrectionEligible = false,
+            isFirstDepartureCancellationEligible = false,
             updatedAt = returnTime,
         ).toDomain()
     }
 
     override suspend fun startNextFlight(beeId: UUID): FlightCycle = database.withTransaction {
         val bee = requireBee(beeId)
-        val point = requireActivePoint(bee.observationPointId)
+        requireActivePoint(bee.observationPointId)
         if (cycleDao.getOpenForBee(beeId) != null) {
             throw OpenFlightCycleExistsException()
         }
         val previousSequence = cycleDao.getMaximumSequenceNumber(beeId)
-        if (previousSequence == null && !point.initialGroupReleaseAt.isInitialGroupReleaseRecorded()) {
-            throw InitialFlightCycleRequiredException()
-        }
         val departureTime = clock.instant()
         val entity = FlightCycleEntity(
             id = UUID.randomUUID(),
@@ -325,7 +258,7 @@ internal class RoomObservationRepository(
             azimuthDeg = null,
             azimuthCaptureConsumed = false,
             isInitialGroupLaunch = false,
-            isInitialGroupLaunchCorrectionEligible = false,
+            isFirstDepartureCancellationEligible = false,
             createdAt = departureTime,
             updatedAt = departureTime,
         )
@@ -405,13 +338,19 @@ internal class RoomObservationRepository(
                 }
                 BeeUndoAction.NEXT_FLIGHT
             }
-            latest.sequenceNumber == 1 &&
-                latest.isInitialGroupLaunch &&
-                latest.isInitialGroupLaunchCorrectionEligible -> {
+            latest.sequenceNumber == 1 && latest.isFirstDepartureCancellationEligible -> {
                 if (cycleDao.deleteById(latest.id) != 1) {
                     throw NoReversibleBeeActionException()
                 }
-                BeeUndoAction.INITIAL_GROUP_LAUNCH
+                if (beeDao.delete(bee) != 1) {
+                    throw NoReversibleBeeActionException()
+                }
+                if (beeDao.countForPoint(bee.observationPointId) == 0) {
+                    if (pointDao.setBeePresenceResult(bee.observationPointId, null) != 1) {
+                        throw ObservationPointNotActiveException()
+                    }
+                }
+                BeeUndoAction.FIRST_DEPARTURE
             }
             else -> throw NoReversibleBeeActionException()
         }
@@ -478,5 +417,4 @@ internal class RoomObservationRepository(
         flightCycles = cycleDao.countAll(),
     )
 
-    private fun java.time.Instant?.isInitialGroupReleaseRecorded(): Boolean = this != null
 }

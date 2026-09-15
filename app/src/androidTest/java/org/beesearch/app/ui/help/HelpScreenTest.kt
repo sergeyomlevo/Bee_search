@@ -6,12 +6,14 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import org.beesearch.app.ui.settings.SettingsScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertTrue
@@ -54,11 +56,16 @@ class HelpScreenTest {
         composeRule.onNodeWithTag("help-screen")
             .performScrollToIndex(FIRST_SECTION_INDEX + PREPARATION_SECTION_INDEX)
         composeRule.onNodeWithTag("help-section-$PREPARATION_SECTION_INDEX").performClick()
-        composeRule.onNodeWithText(
-            "Если пчела не улетела, отмените для неё вылет и дождитесь, когда она действительно улетит.",
-        ).assertIsDisplayed()
+        val firstFlightGuidance = "Если первый вылет отмечен ошибочно, отмените его в карточке пчелы: " +
+            "пчела и её цикл будут удалены, а метка снова станет доступным вариантом. После " +
+            "зарегистрированного возврата такая отмена недоступна."
+        composeRule.onNodeWithTag("help-screen").performScrollToNode(hasText(firstFlightGuidance))
+        composeRule.onNodeWithText(firstFlightGuidance).assertIsDisplayed()
         composeRule.onNodeWithText(
             "В первом цикле полёт длительностью менее одной минуты при анализе не учитывается.",
+        ).assertDoesNotExist()
+        composeRule.onNodeWithText(
+            "Первый выпуск запускается одновременно для всей подготовленной группы.",
         ).assertDoesNotExist()
     }
 

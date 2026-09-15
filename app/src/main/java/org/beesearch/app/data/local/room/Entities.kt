@@ -139,7 +139,7 @@ internal data class FlightCycleEntity(
     @ColumnInfo(name = "initial_group_launch", defaultValue = "0")
     val isInitialGroupLaunch: Boolean,
     @ColumnInfo(name = "initial_group_launch_correction_eligible", defaultValue = "0")
-    val isInitialGroupLaunchCorrectionEligible: Boolean,
+    val isFirstDepartureCancellationEligible: Boolean,
     @ColumnInfo(name = "created_at") val createdAt: Instant,
     @ColumnInfo(name = "updated_at") val updatedAt: Instant,
 )

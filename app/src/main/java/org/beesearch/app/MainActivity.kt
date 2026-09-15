@@ -50,7 +50,6 @@ import org.beesearch.app.ui.help.HelpScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import kotlinx.coroutines.delay
 import org.beesearch.app.ui.observation.BeeObservationScreen
-import org.beesearch.app.ui.observation.BeePreparationScreen
 import org.beesearch.app.ui.observation.ObservationPointPreparationScreen
 import org.beesearch.app.ui.settings.SettingsScreen
 import org.beesearch.app.ui.territory.TerritoryManagementScreen
@@ -124,8 +123,7 @@ private fun BeeSearchApp(
     val resumeRoute = route as? AppRoute.ResumeObservation
     val observationScreenVisible = resumeRoute != null &&
         !beePreparation.isLoading &&
-        beePreparation.pointId == resumeRoute.point.id &&
-        activePointWorkflowPhase(beePreparation.isReleaseStarted) == ActivePointWorkflowPhase.OBSERVATION
+        beePreparation.pointId == resumeRoute.point.id
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, _ ->
@@ -206,20 +204,21 @@ private fun BeeSearchApp(
                     AppRoute.PrepareObservationPoint -> observationPointPreparationDraft?.let { draft ->
                         ObservationPointPreparationScreen(
                             draft = draft,
-                            onAddFirstBee = viewModel::addFirstPreparedBee,
+                            onConfirmPoint = viewModel::confirmObservationPointPreparation,
                             onRecordNoBeesFound = viewModel::recordNoBeesFoundFromPreparation,
                             onAbort = viewModel::abortObservationPointPreparation,
                         )
                     } ?: LoadingScreen()
                     is AppRoute.ResumeObservation -> {
                         val stateMatchesPoint = beePreparation.pointId == currentRoute.point.id
-                        when {
-                            beePreparation.isLoading || !stateMatchesPoint -> LoadingScreen()
-                            activePointWorkflowPhase(beePreparation.isReleaseStarted) ==
-                                ActivePointWorkflowPhase.OBSERVATION -> BeeObservationScreen(
+                        if (beePreparation.isLoading || !stateMatchesPoint) {
+                            LoadingScreen()
+                        } else {
+                            BeeObservationScreen(
                                 point = currentRoute.point,
                                 bees = beePreparation.bees,
                                 flightCycles = beePreparation.flightCycles,
+                                isStartingFirstFlight = beeMutationInProgress,
                                 beeEventInProgressIds = beeEventInProgressIds,
                                 flightAzimuthInProgressIds = flightAzimuthInProgressIds,
                                 headingProvider = application.container.headingProvider,
@@ -227,30 +226,17 @@ private fun BeeSearchApp(
                                 onDismissFeedback = viewModel::clearFeedback,
                                 isCompleting = completingObservationPointId == currentRoute.point.id,
                                 onRegisterReturn = viewModel::registerBeeReturn,
+                                onStartFirstFlight = { color, position ->
+                                    viewModel.startFirstFlight(currentRoute.point.id, color, position)
+                                },
                                 onStartNextFlight = viewModel::startNextFlight,
+                                onRecordNoBeesFound = {
+                                    viewModel.recordNoBeesFound(currentRoute.point.id)
+                                },
                                 onUndoLastBeeAction = viewModel::undoLastBeeAction,
                                 onCaptureFlightAzimuth = viewModel::captureFlightAzimuth,
                                 onComplete = {
                                     viewModel.completeObservationPoint(currentRoute.point.id)
-                                },
-                            )
-                            else -> BeePreparationScreen(
-                                point = currentRoute.point,
-                                preparation = beePreparation,
-                                isMutating = beeMutationInProgress,
-                                isCompleting = completingObservationPointId == currentRoute.point.id,
-                                onAddBee = { color, position ->
-                                    viewModel.addPreparedBee(currentRoute.point.id, color, position)
-                                },
-                                onRemoveBee = viewModel::removePreparedBee,
-                                onRecordNoBeesFound = {
-                                    viewModel.recordNoBeesFound(currentRoute.point.id)
-                                },
-                                onComplete = {
-                                    viewModel.completeObservationPoint(currentRoute.point.id)
-                                },
-                                onStartInitialGroupRelease = {
-                                    viewModel.startInitialGroupRelease(currentRoute.point.id)
                                 },
                             )
                         }

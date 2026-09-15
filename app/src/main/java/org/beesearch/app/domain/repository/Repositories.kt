@@ -8,6 +8,7 @@ import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.ObservationPoint
+import org.beesearch.app.domain.model.StartedBeeFlight
 import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.CompletedObservationPointSummary
 import org.beesearch.app.domain.model.Observer
@@ -52,12 +53,6 @@ interface ObservationPointCreator {
 }
 
 interface ObservationPointPreparationCreator : ObservationPointCreator {
-    suspend fun createObservationPointWithFirstBee(
-        point: NewObservationPoint,
-        markColor: String,
-        markPosition: MarkPosition,
-    ): ObservationPoint
-
     suspend fun createObservationPointWithNoBeesFound(
         point: NewObservationPoint,
     ): ObservationPoint
@@ -76,9 +71,11 @@ interface ObservationRepository : ObservationPointPreparationCreator, Observatio
     fun observeFlightCyclesForPoint(pointId: UUID): Flow<List<FlightCycle>>
     fun observeFlightCycles(beeId: UUID): Flow<List<FlightCycle>>
 
-    suspend fun addBee(pointId: UUID, markColor: String, markPosition: MarkPosition): Bee
-    suspend fun removePreparedBee(beeId: UUID)
-    suspend fun startInitialGroupRelease(pointId: UUID): List<FlightCycle>
+    suspend fun startFirstFlight(
+        pointId: UUID,
+        markColor: String,
+        markPosition: MarkPosition,
+    ): StartedBeeFlight
     suspend fun registerBeeReturn(beeId: UUID): FlightCycle
     suspend fun startNextFlight(beeId: UUID): FlightCycle
     suspend fun captureFlightAzimuth(flightCycleId: UUID, azimuthDeg: Double): FlightCycle

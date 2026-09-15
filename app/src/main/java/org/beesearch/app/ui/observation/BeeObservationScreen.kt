@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +46,7 @@ import org.beesearch.app.domain.heading.HeadingProvider
 import org.beesearch.app.domain.heading.HeadingReference
 import org.beesearch.app.domain.heading.HeadingState
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.ObservationPoint
 import java.util.UUID
@@ -59,12 +61,14 @@ import org.beesearch.app.FeedbackBanner
 import org.beesearch.app.FeedbackDisplayMode
 import org.beesearch.app.UiFeedback
 import org.beesearch.app.buildBeeObservationCards
+import org.beesearch.app.availableBeeMarks
 
 @Composable
 internal fun BeeObservationScreen(
     point: ObservationPoint,
     bees: List<Bee>,
     flightCycles: List<FlightCycle>,
+    isStartingFirstFlight: Boolean = false,
     beeEventInProgressIds: Set<UUID>,
     flightAzimuthInProgressIds: Set<UUID> = emptySet(),
     headingProvider: HeadingProvider = HeadingProvider {
@@ -74,6 +78,8 @@ internal fun BeeObservationScreen(
     onDismissFeedback: (Long) -> Unit = {},
     isCompleting: Boolean,
     onRegisterReturn: (UUID) -> Unit,
+    onStartFirstFlight: (String, org.beesearch.app.domain.model.MarkPosition) -> Unit = { _, _ -> },
+    onRecordNoBeesFound: () -> Unit = {},
     onStartNextFlight: (UUID) -> Unit,
     onUndoLastBeeAction: (UUID) -> Unit = {},
     onSetFlightAzimuth: (UUID, Double?, () -> Unit) -> Unit = { _, _, onSuccess -> onSuccess() },
@@ -85,12 +91,22 @@ internal fun BeeObservationScreen(
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var showCompletionConfirmation by rememberSaveable { mutableStateOf(false) }
+    var showNoBeesConfirmation by rememberSaveable { mutableStateOf(false) }
     var pendingViewportTarget by remember { mutableStateOf<BeeViewportTarget?>(null) }
     var nowEpochMillis by remember { mutableLongStateOf(nowProvider().toEpochMilli()) }
     val observationListState = rememberLazyListState()
     val cards = remember(bees, flightCycles) {
         buildBeeObservationCards(bees, flightCycles)
     }
+    val availableMarks = remember(bees) { availableBeeMarks(bees) }
+    val beeLimitReached = bees.size >= BeeMarkCatalog.MAX_BEES_PER_OBSERVATION_POINT
+
+    /**
+     * A negative research result can be recorded only while no bee has ever been
+     * observed at this point; once a real Bee exists, the presence result is
+     * already BEES_FOUND.
+     */
+    val canRecordNoBeesFound = bees.isEmpty() && point.beePresenceResult == null
     val headingFlow = remember(headingProvider, point.latitude, point.longitude) {
         headingProvider.updates(
             HeadingReference(
@@ -168,6 +184,36 @@ internal fun BeeObservationScreen(
                     onClick = { showCompletionConfirmation = false },
                     enabled = !isCompleting,
                     modifier = Modifier.testTag("cancel-field-observation-completion"),
+                ) { Text("Отмена") }
+            },
+        )
+    }
+
+    if (showNoBeesConfirmation) {
+        AlertDialog(
+            onDismissRequest = { if (!isCompleting) showNoBeesConfirmation = false },
+            title = { Text("Пчёлы отсутствуют?") },
+            text = {
+                Text(
+                    "Точка наблюдения будет сохранена с результатом " +
+                        "«пчёлы отсутствуют» и завершена.",
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showNoBeesConfirmation = false
+                        onRecordNoBeesFound()
+                    },
+                    enabled = !isCompleting,
+                    modifier = Modifier.testTag("confirm-no-bees-from-observation"),
+                ) { Text("Подтвердить") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showNoBeesConfirmation = false },
+                    enabled = !isCompleting,
+                    modifier = Modifier.testTag("cancel-no-bees-from-observation"),
                 ) { Text("Отмена") }
             },
         )
@@ -256,14 +302,14 @@ internal fun BeeObservationScreen(
                                     is BeeLastReversibleAction.Azimuth -> BeeFieldState.IN_FLIGHT
                                     is BeeLastReversibleAction.Return -> BeeFieldState.IN_FLIGHT
                                     is BeeLastReversibleAction.NextFlight -> BeeFieldState.AT_POINT
-                                    is BeeLastReversibleAction.InitialGroupLaunch -> BeeFieldState.AT_POINT
+                                    is BeeLastReversibleAction.FirstDeparture -> BeeFieldState.AT_POINT
                                 },
                                 expectedLatestCycleId = when (action) {
                                     is BeeLastReversibleAction.NextFlight -> card.cycles
                                         .dropLast(1)
                                         .lastOrNull()
                                         ?.id
-                                    is BeeLastReversibleAction.InitialGroupLaunch -> null
+                                    is BeeLastReversibleAction.FirstDeparture -> null
                                     else -> action.flightCycleId
                                 },
                             )
@@ -273,6 +319,29 @@ internal fun BeeObservationScreen(
                             onCaptureFlightAzimuth(cycle.id, value.toDouble()) {}
                         },
                     )
+                }
+                items(
+                    items = availableMarks,
+                    key = { mark -> "${mark.markColor}-${mark.markPosition.name}" },
+                ) { mark ->
+                    AvailableBeeMarkCard(
+                        mark = mark,
+                        enabled = !beeLimitReached && !isStartingFirstFlight,
+                        onStartFirstFlight = {
+                            onStartFirstFlight(mark.markColor, mark.markPosition)
+                        },
+                    )
+                }
+                if (canRecordNoBeesFound) {
+                    item(key = "record-no-bees") {
+                        OutlinedButton(
+                            onClick = { showNoBeesConfirmation = true },
+                            enabled = !isCompleting,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("record-no-bees-from-observation"),
+                        ) { Text("Пчёлы отсутствуют") }
+                    }
                 }
             }
         }

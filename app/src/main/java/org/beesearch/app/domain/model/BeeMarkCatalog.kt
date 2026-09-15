@@ -11,6 +11,8 @@ data class BeeMarkCombination(
 )
 
 object BeeMarkCatalog {
+    const val MAX_BEES_PER_OBSERVATION_POINT = 10
+
     val colors = listOf(
         MarkColorOption("WHITE", "Белая"),
         MarkColorOption("YELLOW", "Жёлтая"),

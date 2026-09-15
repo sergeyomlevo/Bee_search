@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import org.beesearch.app.domain.heading.HeadingAccuracy
 import org.beesearch.app.domain.heading.HeadingState
 import org.beesearch.app.domain.model.BeeMarkCatalog
+import org.beesearch.app.domain.model.BeeMarkCombination
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
 import java.time.Instant
@@ -78,7 +79,7 @@ internal fun BeeObservationCard(
         is BeeLastReversibleAction.Azimuth -> "Отменить последний азимут"
         is BeeLastReversibleAction.Return -> "Отменить последний прилёт"
         is BeeLastReversibleAction.NextFlight -> "Отменить последний вылет"
-        is BeeLastReversibleAction.InitialGroupLaunch -> "Отменить групповой вылет"
+        is BeeLastReversibleAction.FirstDeparture -> "Отменить первый вылет"
         null -> null
     }
     val openCycle = latestCycle?.takeIf { it.returnTime == null }
@@ -253,6 +254,89 @@ internal fun BeeObservationCard(
 }
 
 @Composable
+internal fun AvailableBeeMarkCard(
+    mark: BeeMarkCombination,
+    enabled: Boolean,
+    onStartFirstFlight: () -> Unit,
+) {
+    val key = "${mark.markColor}-${mark.markPosition.name}"
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                stateDescription = if (enabled) "Выбор" else "Выбор; лимит 10 пчёл достигнут"
+            }
+            .testTag("available-mark-$key"),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ObservationBeeMark(
+                    markColor = mark.markColor,
+                    markPosition = mark.markPosition,
+                    withPositionLabel = false,
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 10.dp),
+                ) {
+                    Text(
+                        text = "Выбор",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier.testTag("available-mark-state-$key"),
+                    )
+                    Text(
+                        text = BeeMarkCatalog.positionDisplayName(mark.markPosition),
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        modifier = Modifier.testTag("available-mark-position-$key"),
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f))
+                Box(Modifier.width(BeePrimaryActionWidth), contentAlignment = Alignment.CenterEnd) {
+                    Button(
+                        onClick = onStartFirstFlight,
+                        enabled = enabled,
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minWidth = 104.dp, minHeight = 48.dp)
+                            .testTag("available-mark-action-$key"),
+                    ) {
+                        Text(
+                            text = "УЛЕТЕЛА",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun BeeUndoIconButton(
     description: String,
     enabled: Boolean,
@@ -295,6 +379,7 @@ private val BeePrimaryActionWidth = 156.dp
 private fun ObservationBeeMark(
     markColor: String,
     markPosition: MarkPosition,
+    withPositionLabel: Boolean = true,
 ) {
     val background = markColorValue(markColor)
     val foreground = if (markColor == "WHITE" || markColor == "YELLOW") Color.Black else Color.White
@@ -302,7 +387,7 @@ private fun ObservationBeeMark(
         MarkPosition.NONE -> null
         MarkPosition.RIGHT_WING -> "КП"
         MarkPosition.LEFT_WING -> "КЛ"
-    }
+    }.takeIf { withPositionLabel }
     Box(
         modifier = Modifier
             .size(40.dp)

@@ -82,23 +82,27 @@ data class FlightCycle(
     val returnTime: Instant?,
     val azimuthDeg: Double?,
     val azimuthCaptureConsumed: Boolean,
-    /** True only when this cycle was created by the initial group-release transaction. */
+    /** Legacy backup provenance. New individual departures always store false. */
     val isInitialGroupLaunch: Boolean = false,
     /**
-     * The bounded initial-launch correction is safe only before a real return
-     * has ever been recorded for this cycle. Clearing an erroneous return does
-     * not reopen this historical-deletion permission.
+     * The first departure may be cancelled only until its first return is
+     * recorded. Clearing an erroneous return does not reopen this permission.
      */
-    val isInitialGroupLaunchCorrectionEligible: Boolean = false,
+    val isFirstDepartureCancellationEligible: Boolean = false,
     val createdAt: Instant,
     val updatedAt: Instant,
+)
+
+data class StartedBeeFlight(
+    val bee: Bee,
+    val flightCycle: FlightCycle,
 )
 
 enum class BeeUndoAction {
     AZIMUTH,
     RETURN,
     NEXT_FLIGHT,
-    INITIAL_GROUP_LAUNCH,
+    FIRST_DEPARTURE,
 }
 
 data class NewObservationPoint(

@@ -17,7 +17,7 @@ class HelpContentTest {
         "О приложении",
         "Территория и наблюдатель",
         "Точка наблюдения",
-        "Подготовка пчёл и первый выпуск",
+        "Метки и первый вылет",
         "Возвраты и следующие циклы",
         "Азимут",
         "Экспорт и очистка данных",
@@ -55,11 +55,14 @@ class HelpContentTest {
         assertTrue(text, text.contains("открывается автоматически"))
         assertFalse(text, text.contains("предложит"))
         assertTrue(text, text.contains("прицел"))
-        assertTrue(text, text.contains("первым результатом"))
-        assertTrue(text, text.contains("первая добавленная пчела"))
+        assertTrue(text, text.contains("«Добавить»"))
+        assertTrue(text, text.contains("Заранее пчёлы не создаются"))
         assertTrue(text, text.contains("«Пчёлы отсутствуют»"))
         assertTrue(text, text.contains("Для нового наблюдения в другой день создайте новую точку"))
         assertTrue(text, text.contains("Завершённая точка повторно не открывается"))
+        // The point no longer waits for a first research result to be persisted.
+        assertFalse(text, text.contains("первым результатом"))
+        assertFalse(text, text.contains("первая добавленная пчела"))
         // The app does not detect a new day itself; the guidance must ask the user to create the point.
         assertFalse(text, text.contains("создаёт новую точку"))
     }
@@ -67,21 +70,36 @@ class HelpContentTest {
     @Test
     fun flyingAwayGuidanceKeepsTheCurrentPhrase() {
         val required =
-            "Если пчела не улетела, отмените для неё вылет и дождитесь, когда она действительно улетит."
+            "Если первый вылет отмечен ошибочно, отмените его в карточке пчелы: пчела и её цикл " +
+                "будут удалены, а метка снова станет доступным вариантом. После зарегистрированного " +
+                "возврата такая отмена недоступна."
         val text = allHelpText()
         assertTrue(text, text.contains(required))
     }
 
     @Test
-    fun noBeesActionIsExplainedInThePreparationSection() {
-        val text = sectionText("Подготовка пчёл и первый выпуск")
+    fun firstFlightIsRegisteredPerBeeWithoutPreparedBees() {
+        val text = sectionText("Метки и первый вылет")
+        assertTrue(text, text.contains("«УЛЕТЕЛА»"))
+        assertTrue(text, text.contains("индивидуальное время вылета"))
+        assertTrue(text, text.contains("не расходуют лимит"))
+        assertTrue(text, text.contains("не более 10 пчёл"))
+        // The retired group release must not come back into user-facing guidance.
+        assertFalse(text, text.contains("группов"))
+        assertFalse(text, text.contains("Выпустить всех"))
+        assertFalse(text, text.contains("подготовленных пчёл"))
+    }
+
+    @Test
+    fun noBeesActionIsExplainedInTheFirstFlightSection() {
+        val text = sectionText("Метки и первый вылет") + sectionText("Точка наблюдения")
         assertTrue(text, text.contains("«Пчёлы отсутствуют»"))
         assertTrue(text, text.contains("завершается"))
     }
 
     @Test
     fun markingGuidanceCoversConsecutivePointsOfOneSearch() {
-        val text = sectionText("Подготовка пчёл и первый выпуск")
+        val text = sectionText("Метки и первый вылет")
         assertTrue(text, text.contains("последовательных точках одного поиска"))
         assertTrue(text, text.contains("отличимые от меток предыдущих точек"))
         assertTrue(text, text.contains("могут прилетать"))

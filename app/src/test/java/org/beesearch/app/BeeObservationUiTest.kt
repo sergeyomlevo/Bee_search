@@ -4,6 +4,7 @@ import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.Instant
@@ -11,6 +12,22 @@ import java.util.UUID
 
 class BeeObservationUiTest {
     private val startedAt = Instant.parse("2026-08-28T12:00:00Z")
+
+    @Test
+    fun availableMarksAreDerivedFromCatalogMinusPersistedBees() {
+        assertEquals(15, availableBeeMarks(emptyList()).size)
+
+        val used = bee("WHITE")
+        val remaining = availableBeeMarks(listOf(used))
+
+        assertEquals(14, remaining.size)
+        assertFalse(
+            remaining.any {
+                it.markColor == used.markColor && it.markPosition == used.markPosition
+            },
+        )
+        assertEquals(remaining, availableBeeMarks(listOf(used)))
+    }
 
     @Test
     fun elapsedTimerUsesFieldFormatBoundaries() {
@@ -141,16 +158,13 @@ class BeeObservationUiTest {
         val nextFlight = BeeObservationCardModel(bee, listOf(secondCycle.copy(azimuthDeg = null)))
         assertEquals(secondCycle.id, (nextFlight.lastReversibleAction as BeeLastReversibleAction.NextFlight).flightCycleId)
 
-        val initialFlight = BeeObservationCardModel(bee, listOf(cycle(bee, 1, startedAt, null)))
-        assertNull(initialFlight.lastReversibleAction)
-
-        val initialGroupFlight = BeeObservationCardModel(
+        val firstDeparture = BeeObservationCardModel(
             bee,
-            listOf(cycle(bee, 1, startedAt, null, isInitialGroupLaunch = true)),
+            listOf(cycle(bee, 1, startedAt, null, cancellationEligible = true)),
         )
         assertEquals(
-            initialGroupFlight.latestCycle?.id,
-            (initialGroupFlight.lastReversibleAction as BeeLastReversibleAction.InitialGroupLaunch).flightCycleId,
+            firstDeparture.latestCycle?.id,
+            (firstDeparture.lastReversibleAction as BeeLastReversibleAction.FirstDeparture).flightCycleId,
         )
     }
 
@@ -170,18 +184,6 @@ class BeeObservationUiTest {
         assertEquals(listOf(secondReleased, firstReleased), cards.map { it.bee })
     }
 
-    @Test
-    fun persistedCyclePresenceSelectsObservationWorkflow() {
-        assertEquals(
-            ActivePointWorkflowPhase.PREPARATION,
-            activePointWorkflowPhase(hasFlightCycles = false),
-        )
-        assertEquals(
-            ActivePointWorkflowPhase.OBSERVATION,
-            activePointWorkflowPhase(hasFlightCycles = true),
-        )
-    }
-
     private fun bee(color: String) = Bee(
         id = UUID.randomUUID(),
         observationPointId = UUID.randomUUID(),
@@ -195,8 +197,7 @@ class BeeObservationUiTest {
         sequenceNumber: Int,
         departureTime: Instant,
         returnTime: Instant?,
-        isInitialGroupLaunch: Boolean = false,
-        isInitialGroupLaunchCorrectionEligible: Boolean = isInitialGroupLaunch,
+        cancellationEligible: Boolean = false,
     ) = FlightCycle(
         id = UUID.randomUUID(),
         beeId = bee.id,
@@ -205,8 +206,7 @@ class BeeObservationUiTest {
         returnTime = returnTime,
         azimuthDeg = null,
         azimuthCaptureConsumed = false,
-        isInitialGroupLaunch = isInitialGroupLaunch,
-        isInitialGroupLaunchCorrectionEligible = isInitialGroupLaunchCorrectionEligible,
+        isFirstDepartureCancellationEligible = cancellationEligible,
         createdAt = departureTime,
         updatedAt = returnTime ?: departureTime,
     )

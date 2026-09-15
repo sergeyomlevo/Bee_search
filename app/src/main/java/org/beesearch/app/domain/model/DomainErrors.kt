@@ -40,6 +40,10 @@ class DuplicateBeeMarkException : IllegalStateException(
     "A bee with the same mark already exists in this observation point.",
 )
 
+class BeeLimitReachedException : IllegalStateException(
+    "An observation point may contain at most 10 bees.",
+)
+
 class BeePresenceResultRequiredException : IllegalStateException(
     "Bee presence must be established before the observation point is completed.",
 )

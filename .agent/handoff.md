@@ -6,6 +6,36 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Observation workflow milestone (D075, 2026-09-15)
+
+The initial group release is retired. Confirming a prepared point with `Добавить`
+creates the `ObservationPoint` with `bee_presence_result = null` and opens the
+observation; no Bee is created in advance. The observation screen derives the
+available mark choices (5 catalog colors × `NONE` / `RIGHT_WING` / `LEFT_WING`,
+minus marks of existing bees); `NONE` is displayed as `Грудь`. A choice card has
+a grey background, the state `Выбор` and the action `УЛЕТЕЛА`; it is not a Bee
+and does not consume the limit.
+
+`startFirstFlight` atomically creates the real Bee, its `FlightCycle 1` with that
+bee's individual `departure_time`, and `BEES_FOUND`. The real bee card appears
+above the choices and reuses the existing in-flight card. Local `↶` on a first
+departure deletes the bee together with its cycle and returns the mark as a
+choice, but only until a `return_time` was ever recorded; afterwards that
+deletion is impossible even if the return is later undone. At most 10 real bees
+per point. First-cycle 60-second analysis exclusion (D058) is retired; D022,
+D058 and D067 are SUPERSEDED by D075. The negative result `NO_BEES_FOUND` remains
+available both from the preparation draft and from an open observation with no
+bees yet.
+
+Room schema and the backup contract are unchanged: the column
+`initial_group_launch_correction_eligible` keeps its name and type while its
+meaning narrows to "this first departure can still be cancelled".
+
+Legacy UI still present but unreachable from the active route:
+`ui/observation/BeePreparationScreen.kt` and `BeeSelector` remain in the tree
+together with `ResumeObservationScreenTest`; their removal is a separate
+decision and was not part of this milestone.
+
 ## Help and data management milestone (2026-09-10)
 
 The Settings surface now routes to separate common `ui/help` and `ui/data`

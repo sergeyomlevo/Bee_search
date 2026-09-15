@@ -1,15 +1,12 @@
 package org.beesearch.app
 
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeeMarkCatalog
+import org.beesearch.app.domain.model.BeeMarkCombination
 import org.beesearch.app.domain.model.FlightCycle
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
-
-internal enum class ActivePointWorkflowPhase {
-    PREPARATION,
-    OBSERVATION,
-}
 
 internal enum class BeeFieldState {
     IN_FLIGHT,
@@ -22,11 +19,6 @@ internal data class BeeObservationCardModel(
 ) {
     val latestCycle: FlightCycle? = cycles.maxByOrNull(FlightCycle::sequenceNumber)
 
-    /**
-     * A Bee whose group-release cycle was locally corrected has no persisted
-     * cycle yet. It is nevertheless on the active-observation screen and is
-     * ready for its real first takeoff.
-     */
     val fieldState: BeeFieldState
         get() = latestCycle?.let { cycle ->
             if (cycle.returnTime == null) BeeFieldState.IN_FLIGHT else BeeFieldState.AT_POINT
@@ -46,10 +38,8 @@ internal data class BeeObservationCardModel(
                 cycle.returnTime != null -> BeeLastReversibleAction.Return(cycle.id)
                 cycle.azimuthDeg != null -> BeeLastReversibleAction.Azimuth(cycle.id)
                 cycle.sequenceNumber > 1 -> BeeLastReversibleAction.NextFlight(cycle.id)
-                cycle.sequenceNumber == 1 &&
-                    cycle.isInitialGroupLaunch &&
-                    cycle.isInitialGroupLaunchCorrectionEligible ->
-                    BeeLastReversibleAction.InitialGroupLaunch(cycle.id)
+                cycle.sequenceNumber == 1 && cycle.isFirstDepartureCancellationEligible ->
+                    BeeLastReversibleAction.FirstDeparture(cycle.id)
                 else -> null
             }
         }
@@ -61,15 +51,8 @@ internal sealed interface BeeLastReversibleAction {
     data class Azimuth(override val flightCycleId: UUID) : BeeLastReversibleAction
     data class Return(override val flightCycleId: UUID) : BeeLastReversibleAction
     data class NextFlight(override val flightCycleId: UUID) : BeeLastReversibleAction
-    data class InitialGroupLaunch(override val flightCycleId: UUID) : BeeLastReversibleAction
+    data class FirstDeparture(override val flightCycleId: UUID) : BeeLastReversibleAction
 }
-
-internal fun activePointWorkflowPhase(hasFlightCycles: Boolean): ActivePointWorkflowPhase =
-    if (hasFlightCycles) {
-        ActivePointWorkflowPhase.OBSERVATION
-    } else {
-        ActivePointWorkflowPhase.PREPARATION
-    }
 
 internal fun buildBeeObservationCards(
     bees: List<Bee>,
@@ -124,6 +107,11 @@ internal fun buildBeeObservationCards(
         }
     }
 }
+
+internal fun availableBeeMarks(bees: List<Bee>): List<BeeMarkCombination> =
+    BeeMarkCatalog.availableCombinations(
+        bees.map { BeeMarkCombination(it.markColor, it.markPosition) },
+    )
 
 private fun fieldStateGroup(state: BeeFieldState): Int = when (state) {
     BeeFieldState.IN_FLIGHT -> 0

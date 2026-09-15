@@ -16,10 +16,13 @@ import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
@@ -31,6 +34,8 @@ import org.beesearch.app.domain.heading.HeadingAccuracy
 import org.beesearch.app.domain.heading.HeadingProvider
 import org.beesearch.app.domain.heading.HeadingState
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeeMarkCatalog
+import org.beesearch.app.domain.model.BeeMarkCombination
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
@@ -65,6 +70,166 @@ class BeeObservationScreenTest {
         color = "BLUE",
         position = MarkPosition.RIGHT_WING,
     )
+
+    @Test
+    fun emptyObservationShowsDerivedMarkChoicesAndStartsSelectedMark() {
+        var selected: Pair<String, MarkPosition>? = null
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point().copy(beePresenceResult = null),
+                    bees = emptyList(),
+                    flightCycles = emptyList(),
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartFirstFlight = { color, position -> selected = color to position },
+                    onStartNextFlight = {},
+                    onComplete = {},
+                )
+            }
+        }
+
+        assertEquals(15, BeeMarkCatalog.supportedCombinations.size)
+        composeRule.onNodeWithTag("available-mark-WHITE-NONE").assertIsDisplayed()
+        composeRule.onNodeWithTag("available-mark-action-WHITE-NONE")
+            .assertIsEnabled()
+            .performClick()
+        composeRule.runOnIdle { assertEquals("WHITE" to MarkPosition.NONE, selected) }
+    }
+
+    @Test
+    fun persistedBeeIsAboveChoicesAndItsMarkIsNoLongerAvailable() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = listOf(flyingBee),
+                    flightCycles = listOf(cycle(flyingBee, 1, releaseTime, null)),
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("available-mark-WHITE-NONE").assertDoesNotExist()
+        val beeBounds = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
+            .fetchSemanticsNode().boundsInRoot
+        val choiceBounds = composeRule.onNodeWithTag("available-mark-WHITE-RIGHT_WING")
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(beeBounds.top < choiceBounds.top)
+    }
+
+    @Test
+    fun markChoiceNamesTheChestPositionAsGryd() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point().copy(beePresenceResult = null),
+                    bees = emptyList(),
+                    flightCycles = emptyList(),
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onComplete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("available-mark-position-WHITE-NONE").assertTextContains("Грудь")
+        composeRule.onNodeWithTag("available-mark-position-WHITE-RIGHT_WING").assertTextContains("КП")
+        composeRule.onNodeWithTag("available-mark-position-WHITE-LEFT_WING").assertTextContains("КЛ")
+    }
+
+    @Test
+    fun noBeesFoundResultIsRecordableOnlyWhileNoBeeExistsAndNeedsConfirmation() {
+        var noBeesRequests = 0
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point().copy(beePresenceResult = null),
+                    bees = emptyList(),
+                    flightCycles = emptyList(),
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onRecordNoBeesFound = { noBeesRequests += 1 },
+                    onComplete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("bee-observation-list")
+            .performScrollToNode(hasTestTag("record-no-bees-from-observation"))
+        composeRule.onNodeWithTag("record-no-bees-from-observation").performClick()
+        composeRule.onNodeWithText("Пчёлы отсутствуют?").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(0, noBeesRequests) }
+        composeRule.onNodeWithTag("confirm-no-bees-from-observation").performClick()
+        composeRule.runOnIdle { assertEquals(1, noBeesRequests) }
+    }
+
+    @Test
+    fun noBeesFoundResultIsUnavailableWhenABeeWasAlreadyObserved() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = listOf(flyingBee),
+                    flightCycles = listOf(cycle(flyingBee, 1, releaseTime, null)),
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onComplete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("record-no-bees-from-observation").assertDoesNotExist()
+    }
+
+    @Test
+    fun tenthRealBeeDisablesRemainingMarkChoices() {
+        val tenBees = BeeMarkCatalog.supportedCombinations.take(10).mapIndexed { index, mark ->
+            bee(
+                id = UUID.fromString("00000000-0000-0000-0000-0000000003%02d".format(index)),
+                color = mark.markColor,
+                position = mark.markPosition,
+            )
+        }
+
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = tenBees,
+                    flightCycles = tenBees.map { cycle(it, 1, releaseTime, null) },
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onComplete = {},
+                )
+            }
+        }
+
+        val remaining = BeeMarkCatalog.availableCombinations(
+            tenBees.map { BeeMarkCombination(it.markColor, it.markPosition) },
+        )
+        assertEquals(5, remaining.size)
+        remaining.forEach { mark ->
+            val tag = "available-mark-action-${mark.markColor}-${mark.markPosition.name}"
+            composeRule.onNodeWithTag("bee-observation-list").performScrollToNode(hasTestTag(tag))
+            composeRule.onNodeWithTag(tag).assertIsNotEnabled()
+        }
+    }
+
     @Test
     fun cardsShowIndependentPersistedStatesTimersAndNaturalActions() {
         var returnedBeeId: UUID? = null
@@ -275,7 +440,9 @@ class BeeObservationScreenTest {
         ).forEach { (label, bee) ->
             val action = composeRule.onNodeWithTag("bee-action-${bee.id}")
             val actionBounds = action.fetchSemanticsNode().boundsInRoot
-            val textNode = composeRule.onNodeWithText(label)
+            val textNode = composeRule.onNode(
+                hasText(label) and hasTestTag("bee-action-${bee.id}"),
+            )
                 .assertIsDisplayed()
             val textSemantics = textNode.fetchSemanticsNode()
             val layoutResults = mutableListOf<TextLayoutResult>()

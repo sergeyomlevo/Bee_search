@@ -19,7 +19,7 @@ import org.beesearch.app.domain.model.AppSettings
 import org.beesearch.app.domain.model.AzimuthCaptureAlreadyConsumedException
 import org.beesearch.app.domain.model.AzimuthCaptureRequiresOpenFlightCycleException
 import org.beesearch.app.domain.model.Bee
-import org.beesearch.app.domain.model.BeeHasFlightHistoryException
+import org.beesearch.app.domain.model.BeeLimitReachedException
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.BeePresenceResultRequiredException
 import org.beesearch.app.domain.model.BeesAlreadyFoundException
@@ -28,13 +28,10 @@ import org.beesearch.app.domain.model.DuplicateTerritoryCodeException
 import org.beesearch.app.domain.model.DuplicateObserverCodeException
 import org.beesearch.app.domain.model.EntityNotFoundException
 import org.beesearch.app.domain.model.FlightCycle
-import org.beesearch.app.domain.model.InitialFlightCycleRequiredException
-import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
 import org.beesearch.app.domain.model.InvalidAzimuthException
 import org.beesearch.app.domain.model.InvalidEventTimeException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
-import org.beesearch.app.domain.model.NoPreparedBeesException
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
@@ -75,6 +72,7 @@ data class BeePreparationUiState(
     val bees: List<Bee> = emptyList(),
     val flightCycles: List<FlightCycle> = emptyList(),
     val beePresenceResult: BeePresenceResult? = null,
+    /** Legacy preparation-screen input; the active route no longer uses this phase. */
     val isReleaseStarted: Boolean = false,
     val isLoading: Boolean = true,
 )
@@ -158,7 +156,6 @@ internal class MainViewModel(
                     bees = bees,
                     flightCycles = flightCycles,
                     beePresenceResult = point.beePresenceResult,
-                    isReleaseStarted = point.initialGroupReleaseAt != null,
                     isLoading = false,
                 )
             }
@@ -384,12 +381,12 @@ internal class MainViewModel(
         clearFeedback()
     }
 
-    fun addFirstPreparedBee(markColor: String, markPosition: MarkPosition) {
+    fun confirmObservationPointPreparation() {
         persistObservationPointPreparation(
-            successMessage = "Пчела добавлена",
-            fallbackMessage = "Не удалось сохранить точку и первую пчелу",
+            successMessage = "Точка наблюдения сохранена",
+            fallbackMessage = "Не удалось сохранить точку наблюдения",
         ) { point ->
-            createObservationPoint.createWithFirstBee(point, markColor, markPosition)
+            createObservationPoint.create(point)
         }
     }
 
@@ -465,40 +462,16 @@ internal class MainViewModel(
         }
     }
 
-    fun addPreparedBee(pointId: UUID, markColor: String, markPosition: MarkPosition) {
+    fun startFirstFlight(pointId: UUID, markColor: String, markPosition: MarkPosition) {
         val preparation = beePreparation.value
         if (preparation.isLoading || preparation.pointId != pointId) return
-        if (preparation.isReleaseStarted) {
-            showPersistentFeedback("Первый выпуск уже начат: набор пчёл зафиксирован")
-            return
-        }
         if (preparation.bees.any { it.markColor == markColor && it.markPosition == markPosition }) {
             showPersistentFeedback("Такая метка уже добавлена")
             return
         }
-        launchBeeMutation {
-            observationRepository.addBee(pointId, markColor, markPosition)
-            showSuccessFeedback("Пчела добавлена")
-        }
-    }
-
-    fun removePreparedBee(beeId: UUID) {
-        launchBeeMutation {
-            observationRepository.removePreparedBee(beeId)
-            showSuccessFeedback("Пчела удалена из подготовки")
-        }
-    }
-
-    fun startInitialGroupRelease(pointId: UUID) {
-        val preparation = beePreparation.value
-        if (preparation.isLoading || preparation.pointId != pointId) return
-        if (preparation.isReleaseStarted) {
-            showPersistentFeedback("Первый групповой выпуск уже выполнен")
-            return
-        }
-        launchBeeMutation(fallback = "Не удалось выполнить первый групповой выпуск") {
-            observationRepository.startInitialGroupRelease(pointId)
-            showSuccessFeedback("Первый групповой выпуск сохранён")
+        launchBeeMutation(fallback = "Не удалось сохранить первый вылет") {
+            observationRepository.startFirstFlight(pointId, markColor, markPosition)
+            showSuccessFeedback("Вылет сохранён")
         }
     }
 
@@ -653,8 +626,8 @@ internal class MainViewModel(
                 throw error
             } catch (error: DuplicateBeeMarkException) {
                 showPersistentFeedback("Такая метка уже добавлена")
-            } catch (error: InitialReleaseAlreadyStartedException) {
-                showPersistentFeedback("Первый выпуск уже начат: набор пчёл зафиксирован")
+            } catch (error: BeeLimitReachedException) {
+                showPersistentFeedback("На точке уже отслеживается максимум 10 пчёл")
             } catch (error: Exception) {
                 showPersistentFeedback(userMessageFor(error, fallback))
             } finally {
@@ -745,11 +718,7 @@ internal fun userMessageFor(error: Throwable, fallback: String): String = when (
         "Сначала завершите текущую точку наблюдения"
     is ObservationPointNotActiveException ->
         "Эта точка наблюдения уже завершена или больше не активна"
-    is InitialReleaseAlreadyStartedException ->
-        "Первый выпуск уже начат: набор пчёл зафиксирован"
-    is NoPreparedBeesException -> "Сначала добавьте хотя бы одну пчелу"
-    is BeeHasFlightHistoryException ->
-        "Нельзя удалить пчелу, для которой уже началось наблюдение"
+    is BeeLimitReachedException -> "На точке уже отслеживается максимум 10 пчёл"
     is DuplicateBeeMarkException -> "Такая метка уже добавлена"
     is BeePresenceResultRequiredException ->
         "Сначала добавьте пчёл или отметьте, что пчёлы отсутствуют"
@@ -759,7 +728,6 @@ internal fun userMessageFor(error: Throwable, fallback: String): String = when (
         "Пчёлы уже добавлены. Нельзя отметить, что они отсутствуют"
     is OpenFlightCycleExistsException -> "У этой пчелы уже есть незавершённый вылет"
     is OpenFlightCycleNotFoundException -> "У этой пчелы нет текущего вылета"
-    is InitialFlightCycleRequiredException -> "Сначала выполните первый групповой выпуск"
     is InvalidEventTimeException -> "Время события противоречит предыдущему событию"
     is InvalidAzimuthException -> "Азимут должен быть от 0° до 359,9°"
     is AzimuthCaptureRequiresOpenFlightCycleException ->

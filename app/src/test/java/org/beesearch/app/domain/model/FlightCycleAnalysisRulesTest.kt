@@ -1,20 +1,19 @@
 package org.beesearch.app.domain.model
 
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import java.util.UUID
 
 class FlightCycleAnalysisRulesTest {
     @Test
-    fun firstCycleLasting20SecondsIsExcluded() {
-        assertTrue(cycle(sequenceNumber = 1, durationMillis = 20_000).isExcludedFromFlightDurationAnalysis)
+    fun firstCycleLasting20SecondsUsesNormalEligibilityPath() {
+        assertFalse(cycle(sequenceNumber = 1, durationMillis = 20_000).isExcludedFromFlightDurationAnalysis)
     }
 
     @Test
-    fun firstCycleLasting59999MillisecondsIsExcluded() {
-        assertTrue(cycle(sequenceNumber = 1, durationMillis = 59_999).isExcludedFromFlightDurationAnalysis)
+    fun firstCycleLasting59999MillisecondsUsesNormalEligibilityPath() {
+        assertFalse(cycle(sequenceNumber = 1, durationMillis = 59_999).isExcludedFromFlightDurationAnalysis)
     }
 
     @Test

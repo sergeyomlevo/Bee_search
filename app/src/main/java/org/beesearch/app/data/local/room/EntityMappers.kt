@@ -62,7 +62,7 @@ internal fun FlightCycleEntity.toDomain(): FlightCycle = FlightCycle(
     azimuthDeg = azimuthDeg,
     azimuthCaptureConsumed = azimuthCaptureConsumed,
     isInitialGroupLaunch = isInitialGroupLaunch,
-    isInitialGroupLaunchCorrectionEligible = isInitialGroupLaunchCorrectionEligible,
+    isFirstDepartureCancellationEligible = isFirstDepartureCancellationEligible,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )

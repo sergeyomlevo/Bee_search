@@ -29,13 +29,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.ObservationPointPreparationDraft
 
 @Composable
 internal fun ObservationPointPreparationScreen(
     draft: ObservationPointPreparationDraft,
-    onAddFirstBee: (String, MarkPosition) -> Unit,
+    onConfirmPoint: () -> Unit,
     onRecordNoBeesFound: () -> Unit,
     onAbort: () -> Unit,
 ) {
@@ -109,18 +108,28 @@ internal fun ObservationPointPreparationScreen(
                 )
             }
             item {
+                Text(
+                    "После добавления откроется наблюдение, где метка пчелы " +
+                        "выбирается при первом вылете. Заранее пчёлы не создаются.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            item {
+                Button(
+                    onClick = onConfirmPoint,
+                    enabled = !draft.isSaving,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 48.dp)
+                        .testTag("add-observation-point"),
+                ) { Text(if (draft.isSaving) "Сохранение…" else "Добавить") }
+            }
+            item {
                 OutlinedButton(
                     onClick = { showNoBeesConfirmation = true },
                     enabled = !draft.isSaving,
                     modifier = Modifier.fillMaxWidth().testTag("record-no-bees-from-draft"),
                 ) { Text("Пчёлы отсутствуют") }
-            }
-            item {
-                BeeSelector(
-                    bees = emptyList(),
-                    enabled = !draft.isSaving,
-                    onAddBee = onAddFirstBee,
-                )
             }
         }
     }
