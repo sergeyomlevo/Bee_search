@@ -216,10 +216,8 @@ class ExplorerTest(unittest.TestCase):
             result = json.loads(first)
             self.assertEqual(result["resultSchemaVersion"], 1)
             self.assertEqual(result["explorerVersion"], "0.2.0")
-            self.assertEqual(result["ruleSetVersion"], 1)
-            self.assertEqual(result["appliedRules"], [{
-                "ruleId": "D058", "ruleSetVersion": 1, "thresholdMs": 60_000,
-            }])
+            self.assertEqual(result["ruleSetVersion"], 2)
+            self.assertEqual(result["appliedRules"], [])
             for point in result["observationPoints"]:
                 for bee in point["bees"]:
                     counts = bee["counts"]
@@ -258,9 +256,9 @@ class ExplorerTest(unittest.TestCase):
             self.assertEqual(point["beePresenceResult"], "NO_BEES_FOUND")
             self.assertEqual(point["bees"], [])
 
-    def test_d058_boundaries_open_cycle_and_diagnostic(self) -> None:
+    def test_first_cycle_duration_is_eligible_without_d058_diagnostic(self) -> None:
         cases = (
-            (59_999, 60_999, 1, False, "EXCLUDED_BY_D058", ["D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE"]),
+            (59_999, 60_999, 1, False, "ELIGIBLE", []),
             (60_000, 61_000, 1, True, "ELIGIBLE", []),
         )
         for duration, returned, sequence, initial, expected_status, expected_diagnostics in cases:
@@ -604,7 +602,7 @@ class RendererTest(unittest.TestCase):
                 [(uid(8), "blue", "RIGHT_WING"), (uid(4), "red", "LEFT_WING")],
             )
             self.assertEqual(rows[1][5:], ["1", "1", "0", "1", "0"])
-            self.assertEqual(rows[2][5:], ["4", "3", "1", "2", "1"])
+            self.assertEqual(rows[2][5:], ["4", "3", "1", "3", "0"])
 
     def test_cycles_csv_covers_every_canonical_evidence_case(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -627,11 +625,11 @@ class RendererTest(unittest.TestCase):
             self.assertEqual(boundary[10], "true")      # initial group launch
             self.assertEqual(boundary[12], "")
 
-            d058 = cycles["1:04"]
-            self.assertEqual(d058[6], "59999")
-            self.assertEqual(d058[7], "EXCLUDED_BY_D058")
-            self.assertEqual(d058[8], "")               # azimuth is null, so empty field
-            self.assertEqual(d058[12], "D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE")
+            short_first = cycles["1:04"]
+            self.assertEqual(short_first[6], "59999")
+            self.assertEqual(short_first[7], "ELIGIBLE")
+            self.assertEqual(short_first[8], "")        # azimuth is null, so empty field
+            self.assertEqual(short_first[12], "")
 
             self.assertEqual(cycles["2:04"][6], "60000")
             self.assertEqual(cycles["2:04"][7], "ELIGIBLE")
@@ -686,14 +684,14 @@ class RendererTest(unittest.TestCase):
             _, output = self._write(Path(directory))
             markdown = (output / "evidence.md").read_text(encoding="utf-8")
             self.assertTrue(markdown.startswith("# Analysis Evidence Explorer\n"))
-            self.assertIn("| D058 | 1 | 60000 |", markdown)
+            self.assertNotIn("| D058 | 1 | 60000 |", markdown)
             self.assertIn("00:00:59.999 (59999 ms)", markdown)
             self.assertIn("00:01:00.000 (60000 ms)", markdown)
             self.assertIn("00:00:00.001 (1 ms)", markdown)
             self.assertIn("(no duration)", markdown)
             self.assertIn("| OPEN |", markdown)
             self.assertIn("| 0.0 |", markdown)
-            self.assertIn("D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE", markdown)
+            self.assertNotIn("D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE", markdown)
             self.assertIn("not an exclusion area and not a statement about nest location", markdown)
             lowered = markdown.lower()
             for forbidden in (

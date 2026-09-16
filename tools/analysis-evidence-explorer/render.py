@@ -276,28 +276,33 @@ def render_markdown(result: dict[str, Any]) -> bytes:
 
     append("## Applied rules")
     append("")
-    append("| Rule | Rule set version | Threshold (ms) |")
-    append("| --- | --- | --- |")
-    for rule in result["appliedRules"]:
-        append(
-            "| {ruleId} | {ruleSetVersion} | {thresholdMs} |".format(
-                ruleId=rule["ruleId"],
-                ruleSetVersion=rule["ruleSetVersion"],
-                thresholdMs=rule["thresholdMs"],
+    applied_rules = result["appliedRules"]
+    if applied_rules:
+        append("| Rule | Rule set version | Threshold (ms) |")
+        append("| --- | --- | --- |")
+        for rule in applied_rules:
+            append(
+                "| {ruleId} | {ruleSetVersion} | {thresholdMs} |".format(
+                    ruleId=rule["ruleId"],
+                    ruleSetVersion=rule["ruleSetVersion"],
+                    thresholdMs=rule["thresholdMs"],
+                )
             )
+        append("")
+        append(
+            "The applied rules are evidence eligibility rules. They are not "
+            "biological rules."
+        )
+    else:
+        append(
+            f"Rule set {result['ruleSetVersion']} applies no duration eligibility "
+            "rule, so no completed cycle is excluded by sequence number or "
+            "duration. D058 fields are preserved as raw provenance only."
         )
     append("")
     append(
-        "The applied rules are evidence eligibility rules. A completed "
-        "`sequenceNumber` 1 FlightCycle shorter than the D058 threshold is excluded "
-        "from duration-based analysis. This is not a biological rule."
-    )
-    append("")
-    append(
-        "`diagnosticCodes` are stable non-error observations. "
-        "`D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE` records that D058 was applied to a "
-        "first cycle whose stored provenance does not mark it as an initial group "
-        "launch. It does not change eligibility and does not assert a defect."
+        "`diagnosticCodes` are stable non-error observations. The retired D058 "
+        f"case does not produce a diagnostic in rule set {result['ruleSetVersion']}."
     )
     append("")
 
@@ -319,7 +324,7 @@ def render_markdown(result: dict[str, Any]) -> bytes:
     append(f"| Bees | {totals['bees']} |")
     append(f"| Flight cycles | {totals['flightCycles']} |")
     append(f"| Eligible durations | {eligible} |")
-    append(f"| Excluded by D058 | {excluded} |")
+    append(f"| Excluded by D058 (retired) | {excluded} |")
     append(f"| Open cycles | {open_cycles} |")
     append("")
 
@@ -382,7 +387,8 @@ def render_markdown(result: dict[str, Any]) -> bytes:
         append("")
         append(
             "| Bee id | Mark color | Mark position | Created at | Total cycles | "
-            "Completed cycles | Open cycles | Eligible durations | Excluded by D058 |"
+            "Completed cycles | Open cycles | Eligible durations | "
+            "Excluded by D058 (retired) |"
         )
         append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
         for bee in point["bees"]:

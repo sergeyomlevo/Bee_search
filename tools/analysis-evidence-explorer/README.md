@@ -36,18 +36,20 @@ not part of the result contract.
 `durationEvidenceStatus` is mutually exclusive and exhaustive for every valid
 FlightCycle:
 
-- `ELIGIBLE` — a completed duration not excluded by D058;
-- `EXCLUDED_BY_D058` — sequence 1, completed, and shorter than 60,000 ms;
+- `ELIGIBLE` — every completed duration; retired D058 no longer excludes short
+  first cycles;
+- `EXCLUDED_BY_D058` — retained only as a compatibility status and never
+  emitted by rule set 2;
 - `NO_DURATION_OPEN` — an open cycle, for which `durationMs` is null.
 
 Invalid input fails closed instead of becoming another status. `appliedRules`
-identifies the deterministic rule set actually applied; v1 contains only D058
-and its 60,000 ms threshold. D067 is not an applied eligibility rule.
+identifies the deterministic rule set actually applied; rule set 2 has no
+active duration eligibility rules. D058 fields remain raw provenance, but D058
+is not applied or diagnosed by this Explorer version.
 
-Per-cycle `diagnosticCodes` is a sorted array of non-error observations. The
-code `D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE` does not change eligibility, assert
-a defect, or add biological interpretation. No top-level diagnostic summary is
-stored. The values of `diagnosticCodes` are stable machine identifiers:
+Per-cycle `diagnosticCodes` is a sorted array of non-error observations and is
+empty for the retired D058 case. No top-level diagnostic summary is stored.
+The values of `diagnosticCodes` are stable machine identifiers:
 consumers may branch on them. A code must not be renamed or redefined without a
 contract and version review. Adding a code is allowed only as a new diagnostic
 condition and must not change existing eligibility semantics without a rule set

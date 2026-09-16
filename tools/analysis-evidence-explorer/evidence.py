@@ -18,13 +18,11 @@ from backup_reader import (
 
 EXPLORER_VERSION = "0.2.0"
 RESULT_SCHEMA_VERSION = 1
-RULE_SET_VERSION = 1
-D058_THRESHOLD_MS = 60_000
-APPLIED_RULES = ({
-    "ruleId": "D058",
-    "ruleSetVersion": RULE_SET_VERSION,
-    "thresholdMs": D058_THRESHOLD_MS,
-},)
+RULE_SET_VERSION = 2
+# D058 was retired from the Explorer analytical rule set.  The raw launch
+# provenance remains in every cycle for compatibility, but no cycle is
+# excluded solely because it is sequence 1 or shorter than one minute.
+APPLIED_RULES: tuple[dict[str, Any], ...] = ()
 
 
 def _number(value: Any, label: str, minimum: float | None = None,
@@ -259,26 +257,17 @@ def build_evidence(path: Path) -> dict[str, Any]:
         point_cycle_count = 0
         for bee in sorted(bees_by_point.get(point["id"], []), key=lambda item: (item["createdAt"], item["id"])):
             cycles_output: list[dict[str, Any]] = []
+            # excluded stays a v1 compatibility count: rule set 2 never excludes a
+            # cycle, so it is emitted as 0 rather than dropped from the contract.
             eligible = excluded = completed_count = open_count = 0
             for cycle in cycles_by_bee.get(bee["id"], []):
                 returned = cycle["returnTime"]
                 duration = None if returned is None else returned - cycle["departureTime"]
-                excluded_by_d058 = (
-                    cycle["sequenceNumber"] == 1
-                    and duration is not None
-                    and duration < D058_THRESHOLD_MS
-                )
                 if duration is None:
                     status = "NO_DURATION_OPEN"; open_count += 1
-                elif excluded_by_d058:
-                    status = "EXCLUDED_BY_D058"; completed_count += 1; excluded += 1
                 else:
                     status = "ELIGIBLE"; completed_count += 1; eligible += 1
-                diagnostics = sorted(
-                    ["D058_APPLIED_TO_NON_GROUP_FIRST_CYCLE"]
-                    if excluded_by_d058 and not cycle["initialGroupLaunch"]
-                    else []
-                )
+                diagnostics: list[str] = []
                 cycles_output.append({**{field: cycle[field] for field in cycle_fields},
                                       "durationMs": duration, "durationEvidenceStatus": status,
                                       "diagnosticCodes": diagnostics})
