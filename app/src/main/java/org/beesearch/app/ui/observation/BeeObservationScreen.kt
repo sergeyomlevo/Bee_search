@@ -131,19 +131,27 @@ internal fun BeeObservationScreen(
 
     LaunchedEffect(pendingViewportTarget, cards) {
         val target = pendingViewportTarget ?: return@LaunchedEffect
-        val targetIndex = cards.indexOfFirst { it.bee.id == target.beeId }
-        val targetCard = cards.getOrNull(targetIndex)
-        val stateMatches = targetCard?.fieldState == target.expectedState
+        val targetIndex = when {
+            target.beeId != null -> cards.indexOfFirst { it.bee.id == target.beeId }
+            target.beeMark != null -> cards.indexOfFirst { card ->
+                card.bee.markColor == target.beeMark.first &&
+                    card.bee.markPosition == target.beeMark.second
+            }
+            else -> -1
+        }
+        if (targetIndex < 0) return@LaunchedEffect
+        val targetCard = cards[targetIndex]
+        val stateMatches = targetCard.fieldState == target.expectedState
         val cycleMatches = target.expectedLatestCycleId == null ||
-            targetCard?.latestCycle?.id == target.expectedLatestCycleId
-        if (!stateMatches || !cycleMatches || targetIndex < 0) return@LaunchedEffect
+            targetCard.latestCycle?.id == target.expectedLatestCycleId
+        if (!stateMatches || !cycleMatches) return@LaunchedEffect
 
         // The card can move between groups at the same time as feedback changes
         // the Scaffold viewport. Inspect the post-layout position so a newly
         // moved card is not treated as visible at its former location.
         withFrameNanos { }
         val layoutInfo = observationListState.layoutInfo
-        val visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == target.beeId }
+        val visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == targetCard.bee.id }
         val targetIsFullyVisible = visibleTarget != null &&
             visibleTarget.offset >= layoutInfo.viewportStartOffset &&
             visibleTarget.offset + visibleTarget.size <= layoutInfo.viewportEndOffset
@@ -328,6 +336,10 @@ internal fun BeeObservationScreen(
                         mark = mark,
                         enabled = !beeLimitReached && !isStartingFirstFlight,
                         onStartFirstFlight = {
+                            pendingViewportTarget = BeeViewportTarget(
+                                beeMark = mark.markColor to mark.markPosition,
+                                expectedState = BeeFieldState.IN_FLIGHT,
+                            )
                             onStartFirstFlight(mark.markColor, mark.markPosition)
                         },
                     )
@@ -360,7 +372,9 @@ private fun ObservationHeaderTitle() {
 }
 
 private data class BeeViewportTarget(
-    val beeId: UUID,
+    val beeId: UUID? = null,
+    /** Used right after the first departure, when the new Bee id is not known yet. */
+    val beeMark: Pair<String, org.beesearch.app.domain.model.MarkPosition>? = null,
     val expectedState: BeeFieldState,
     val expectedLatestCycleId: UUID? = null,
 )

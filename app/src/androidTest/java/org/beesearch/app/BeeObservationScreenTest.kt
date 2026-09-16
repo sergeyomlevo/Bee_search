@@ -125,25 +125,96 @@ class BeeObservationScreenTest {
     }
 
     @Test
-    fun markChoiceNamesTheChestPositionAsGryd() {
+    fun choiceCardMirrorsBeeCardLayoutWithoutASeparatePositionLine() {
         composeRule.setContent {
             Bee_searchTheme {
                 BeeObservationScreen(
-                    point = point().copy(beePresenceResult = null),
-                    bees = emptyList(),
-                    flightCycles = emptyList(),
+                    point = point(),
+                    bees = listOf(atPointBee),
+                    flightCycles = listOf(cycle(atPointBee, 1, releaseTime, returnTime)),
                     beeEventInProgressIds = emptySet(),
                     isCompleting = false,
                     onRegisterReturn = {},
                     onStartNextFlight = {},
                     onComplete = {},
+                    nowProvider = { now },
                 )
             }
         }
 
-        composeRule.onNodeWithTag("available-mark-position-WHITE-NONE").assertTextContains("Грудь")
-        composeRule.onNodeWithTag("available-mark-position-WHITE-RIGHT_WING").assertTextContains("КП")
-        composeRule.onNodeWithTag("available-mark-position-WHITE-LEFT_WING").assertTextContains("КЛ")
+        // The mark itself carries the position, exactly like on a Bee card;
+        // the retired second text line must not come back.
+        composeRule.onNodeWithTag("bee-mark-WHITE-RIGHT_WING").assertExists()
+        composeRule.onNodeWithTag("bee-mark-WHITE-LEFT_WING").assertExists()
+        composeRule.onNodeWithTag("available-mark-position-WHITE-RIGHT_WING").assertDoesNotExist()
+
+        val beeCardHeight = composeRule.onNodeWithTag("bee-card-${atPointBee.id}")
+            .fetchSemanticsNode().boundsInRoot.height
+        val choiceCardHeight = composeRule.onNodeWithTag("available-mark-WHITE-RIGHT_WING")
+            .fetchSemanticsNode().boundsInRoot.height
+        assertTrue(
+            "Choice card must not be taller than a Bee card: " +
+                "choice=$choiceCardHeight, bee=$beeCardHeight",
+            choiceCardHeight <= beeCardHeight,
+        )
+    }
+
+    @Test
+    fun firstFlightFromAChoiceScrollsTheNewBeeIntoView() {
+        val existingBees = (0 until 9).map { index ->
+            bee(
+                UUID.fromString("00000000-0000-0000-0000-${(400 + index).toString().padStart(12, '0')}"),
+                listOf("WHITE", "YELLOW", "BLUE", "RED", "GREEN")[index % 5],
+                listOf(MarkPosition.NONE, MarkPosition.RIGHT_WING, MarkPosition.LEFT_WING)[index % 3],
+            )
+        }
+        val bees = mutableStateOf(existingBees)
+        val cycles = mutableStateOf(
+            existingBees.mapIndexed { index, bee ->
+                cycle(bee, 1, releaseTime.plusSeconds(index.toLong()), returnTime)
+            },
+        )
+        val remaining = BeeMarkCatalog.availableCombinations(
+            existingBees.map { BeeMarkCombination(it.markColor, it.markPosition) },
+        ).first()
+        var startedBee: Bee? = null
+
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = bees.value,
+                    flightCycles = cycles.value,
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onStartFirstFlight = { color, position ->
+                        val started = bee(UUID.randomUUID(), color, position)
+                        startedBee = started
+                        bees.value = bees.value + started
+                        cycles.value = cycles.value + cycle(started, 1, now, null)
+                    },
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        val choiceActionTag = "available-mark-action-" +
+            "${remaining.markColor}-${remaining.markPosition.name}"
+        composeRule.onNodeWithTag("bee-observation-list")
+            .performScrollToNode(hasTestTag(choiceActionTag))
+        composeRule.onNodeWithTag(choiceActionTag).performClick()
+        composeRule.waitForIdle()
+
+        val started = requireNotNull(startedBee)
+        // The new Bee card is inserted above the choices, so the viewport must
+        // follow it instead of leaving the observer at the former scroll offset.
+        composeRule.onNodeWithTag("bee-card-${started.id}").assertIsDisplayed()
+        composeRule.onNodeWithTag("bee-state-${started.id}").assertIsDisplayed()
+        composeRule.onNodeWithTag("available-mark-action-" +
+            "${remaining.markColor}-${remaining.markPosition.name}").assertDoesNotExist()
     }
 
     @Test

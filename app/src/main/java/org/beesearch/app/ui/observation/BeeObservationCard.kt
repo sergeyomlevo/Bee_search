@@ -18,6 +18,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -260,6 +261,7 @@ internal fun AvailableBeeMarkCard(
     onStartFirstFlight: () -> Unit,
 ) {
     val key = "${mark.markColor}-${mark.markPosition.name}"
+    val darkTheme = isSystemInDarkTheme()
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -268,15 +270,17 @@ internal fun AvailableBeeMarkCard(
             }
             .testTag("available-mark-$key"),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            containerColor = if (darkTheme) ChoiceCardBackgroundDark else ChoiceCardBackground,
+            contentColor = if (darkTheme) ChoiceCardContentDark else ChoiceCardContent,
         ),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(2.dp, if (darkTheme) ChoiceCardBorderDark else ChoiceCardBorder),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            // Same first row as a Bee card: the mark carries its own position, and
+            // only the state word differs ("Выбор" instead of "На точке").
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -284,27 +288,18 @@ internal fun AvailableBeeMarkCard(
                 ObservationBeeMark(
                     markColor = mark.markColor,
                     markPosition = mark.markPosition,
-                    withPositionLabel = false,
                 )
-                Column(
+                Text(
+                    text = "Выбор",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 10.dp),
-                ) {
-                    Text(
-                        text = "Выбор",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        modifier = Modifier.testTag("available-mark-state-$key"),
-                    )
-                    Text(
-                        text = BeeMarkCatalog.positionDisplayName(mark.markPosition),
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        modifier = Modifier.testTag("available-mark-position-$key"),
-                    )
-                }
+                        .padding(horizontal = 10.dp)
+                        .testTag("available-mark-state-$key"),
+                )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -372,6 +367,12 @@ private val InFlightCardBorder = Color(0xFF176394)
 private val CorrectionActionContainer = Color(0xFFFFE1C6)
 private val CorrectionActionContent = Color(0xFF713B00)
 private val CorrectionActionBorder = Color(0xFF9A5200)
+private val ChoiceCardBackground = Color(0xFFD6D6D6)
+private val ChoiceCardContent = Color(0xFF1F1F1F)
+private val ChoiceCardBorder = Color(0xFF8A8A8A)
+private val ChoiceCardBackgroundDark = Color(0xFF3C3C3C)
+private val ChoiceCardContentDark = Color(0xFFEDEDED)
+private val ChoiceCardBorderDark = Color(0xFF9C9C9C)
 private val BeeAzimuthSlotWidth = 72.dp
 private val BeePrimaryActionWidth = 156.dp
 
@@ -379,7 +380,6 @@ private val BeePrimaryActionWidth = 156.dp
 private fun ObservationBeeMark(
     markColor: String,
     markPosition: MarkPosition,
-    withPositionLabel: Boolean = true,
 ) {
     val background = markColorValue(markColor)
     val foreground = if (markColor == "WHITE" || markColor == "YELLOW") Color.Black else Color.White
@@ -387,7 +387,7 @@ private fun ObservationBeeMark(
         MarkPosition.NONE -> null
         MarkPosition.RIGHT_WING -> "КП"
         MarkPosition.LEFT_WING -> "КЛ"
-    }.takeIf { withPositionLabel }
+    }
     Box(
         modifier = Modifier
             .size(40.dp)
