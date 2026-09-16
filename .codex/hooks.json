@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "^apply_patch$",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
@@ -16,7 +16,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "^apply_patch$",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
