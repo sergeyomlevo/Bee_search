@@ -1,4 +1,4 @@
-version: 1
+version: 2
 
 purpose: >
   Maintain a small signal log for significant governance events. The log is not
@@ -25,6 +25,10 @@ recording:
     - destructive_risk_handling_failure
     - governance_ambiguity_required_resolution
     - governance_rule_demonstrably_prevented_meaningful_error
+    - adversarial_review_found_material_issue
+    - adversarial_review_left_blocking_uncertainty_unresolved
+    - recurring_minor_review_defect_suggesting_a_rule_gap
+    - review_cycle_limit_reached_with_uncertainty_remaining
 
   do_not_record:
     - ordinary_successful_build
@@ -35,11 +39,21 @@ recording:
     - routine_preference_application
     - every_hypothesis
     - ordinary_successful_workflow
+    - passing_adversarial_review
+    - ordinary_application_of_the_review_requirement
+    - retroactive_reconstruction_of_past_reviews
 
   evidence_rule: >
     Record an event only when observable evidence supports the material
     governance signal. Do not reconstruct past incidents from memory or treat
     absence of log entries as evidence of effectiveness.
+
+  review_event_rule: >
+    A recorded review event carries the decision class, the triggers that were
+    evaluated, and an explicit qualifier that it is a failure or inconclusive
+    record and not a measure of coverage. Ordinary outcomes of the review
+    requirement are not recordable events, so the log over-represents problems
+    by construction.
 
   unnecessary_escalation_rule: >
     Do not classify every approval as unnecessary escalation. This event needs
@@ -80,9 +94,160 @@ classification_ownership:
       - evidence_reference
     result_required_when: status_is_completed
 
+adversarial_review:
+
+  purpose: >
+    Check the quality of a draft's evidence-to-claim links before a significant
+    conclusion becomes final or becomes the basis for an action. It is not a
+    second implementation attempt, not a search for support, and not a
+    correctness certificate.
+
+  required_by: .agent/decision-policy.yaml (adversarial_review section)
+
+  reviewer_attitude: >
+    Attack the draft. Look for defects, insufficient evidence, contradictions,
+    scope overreach, and unsupported conclusions. Do not re-solve the task and
+    do not look for reasons to agree.
+
+  checklist:
+
+    - id: epistemic_status_consistency
+      attack: >
+        Does the same claim receive different statuses (OBSERVED, DERIVED,
+        HYPOTHESIS, UNKNOWN) in different parts of the result?
+
+    - id: observed_vs_derived
+      attack: >
+        Is something labelled OBSERVED that was actually inferred, summarized,
+        or carried over from earlier work rather than checked directly?
+
+    - id: claim_strength
+      attack: >
+        Does the wording assert more than the evidence supports: proved,
+        verified, works, always, never, safe, root cause, fully covered?
+
+    - id: evidence_scope
+      attack: >
+        Is the evidence extended beyond what was actually checked: one path, one
+        case, one file, one run, one sample, one platform, one session?
+
+    - id: negative_evidence
+      attack: >
+        Does absence (no error, no record, nothing found, no mention, no
+        counterexample, empty search result) serve as proof that a problem does
+        not exist or that a capability is absent?
+
+    - id: hidden_assumptions
+      attack: >
+        Does a conclusion depend on an assumption that is neither stated nor
+        verified, including assumptions about environment, configuration,
+        version, ordering, or user intent?
+
+    - id: event_semantics
+      attack: >
+        Is an event name, role name, file name, field name, or label treated as
+        proof of its real semantics or of the behavior it is presumed to
+        represent?
+
+    - id: verification_scope
+      attack: >
+        Was a narrower check promoted into a broader guarantee: build implies
+        install works, unit test implies device behavior, tool completed implies
+        task correct, telemetry event implies result quality, mock implies real
+        integration?
+
+    - id: source_scope
+      attack: >
+        Is a cross-project, cross-context, or general claim supported by only
+        one project, one repository, one session, or one observation?
+
+    - id: unresolved_unknowns
+      attack: >
+        Are there UNKNOWN or UNVERIFIED items that could materially change the
+        conclusion, and are they reported with their consequence for the
+        conclusion?
+
+    - id: internal_consistency
+      attack: >
+        Do the summary, the body, and the epistemic accounting contradict each
+        other, including statuses, numbers, scope, and conclusions?
+
+  outcomes:
+
+    allowed:
+      - PASS
+      - MINOR_ISSUES
+      - MATERIAL_ISSUES
+      - BLOCKING_UNCERTAINTY
+
+    reporting_requirement: >
+      Every verdict is reported together with the mode that produced it and an
+      explicit independence status: a self-review is reported as a limited-
+      independence review, and neither mode may be reported as verification.
+      A PASS is a review result, never a status label for the conclusion.
+
+    semantics:
+
+      PASS:
+        meaning: >
+          No material defect found in the evidence-to-claim links, the labels,
+          and the scope of the claims.
+        is_not: >
+          Proof that the conclusion is correct, independently verified, or
+          approved.
+        response: treat_as_final
+
+      MINOR_ISSUES:
+        meaning: >
+          Wording, label, or scope defects that do not change the main
+          conclusion, recommendation, or basis for action.
+        response: correct_wording_or_status_then_final
+
+      MATERIAL_ISSUES:
+        meaning: >
+          A defect that can change the conclusion, the recommendation, or the
+          basis for an action.
+        response: revise_draft_then_review_again
+
+      BLOCKING_UNCERTAINTY:
+        meaning: >
+          The significant conclusion cannot be made without additional evidence
+          or a user decision.
+        response: keep_unknown_and_ask_only_if_action_depends_on_it
+
+  independence:
+    self_review: >
+      A separate adversarial pass by the working agent. Not independent
+      evidence, and not a substitute for verification or approval.
+    separate_reviewer: >
+      A separate reviewer context. More independent than a self-review, but
+      still not approval and still not proof of correctness.
+    verdict_is_not_approval: true
+    reviewer_receives:
+      - the task
+      - the draft or result under review
+      - the evidence the draft relies on
+      - the applicable policy constraints
+    reviewer_must_not_receive:
+      - the desired verdict
+      - a request to confirm the draft
+
+  limits:
+    - a completed review reduces only the defects it names
+    - a self-review cannot establish independence
+    - the review cycle limit is owned by .agent/decision-policy.yaml (adversarial_review.cycles) and is not restated here
+    - an adversarial review is not runtime enforcement and cannot inspect a draft automatically
+    - this pilot defines required review behavior; it does not prove that review is effective
+    - passing and skipped reviews both leave no record, so compliance, trigger accuracy, and coverage are not measurable from the log
+    - one test on one draft is not evidence that the checklist is accurate, complete, or free of over-reporting
+
+
 evaluation_limits:
   - the log alone does not prove governance improvement or regression
   - the absence of recorded events does not prove effectiveness
   - event counts without a comparable baseline do not establish outcomes
   - future independent audit may consume selected evaluation evidence
   - this policy does not define an audit bundle or audit tooling
+  - a completed adversarial review does not prove that a conclusion is correct
+  - a self-review cannot be counted as independent evidence of correctness
+  - passing reviews are not recorded, so the log must never be read as review coverage

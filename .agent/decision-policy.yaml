@@ -123,6 +123,7 @@ decision_classes:
   routine:
     action: decide_and_continue
     report: only_if_relevant
+    review: not_required
 
     description: >
       Small implementation choices that are local, reversible, and do not
@@ -143,6 +144,7 @@ decision_classes:
   low_impact:
     action: decide_and_continue
     report: summarize_afterwards
+    review: not_required
 
     description: >
       Decisions with more than one reasonable implementation where the choice
@@ -162,6 +164,10 @@ decision_classes:
     action: propose_preferred_option
     approval_required: false
     report: before_implementation
+    review: self_review
+    review_note: >
+      A short adversarial self-review of the proposed option and its stated
+      reason, before implementation. No separate reviewer context is required.
 
     report_after_implementation_allowed_only_if:
       - >
@@ -194,6 +200,10 @@ decision_classes:
   project_decision:
     action: ask_before_implementation
     approval_required: true
+    review: required
+    review_note: >
+      Adversarial review of the draft rationale before it is presented as the
+      basis for the decision. Review never substitutes for approval_required.
 
     description: >
       A choice that changes or establishes product behavior, domain semantics,
@@ -225,6 +235,11 @@ decision_classes:
 
     action: ask_before_implementation
     approval_required: true
+    review: required
+    review_note: >
+      Adversarial review of the safety argument, in addition to the existing
+      approval requirement and external-verification preference. Review never
+      substitutes for approval_required or for deterministic safety checks.
 
     description: >
       A change that may destroy, overwrite, invalidate, corrupt, or make
@@ -250,6 +265,11 @@ decision_classes:
 
     action: stop_and_explain
     approval_required: true
+    review: required
+    review_note: >
+      Adversarial review of the claimed conflict and of the proposed smallest
+      coherent resolution, in addition to the existing stop-and-explain rule.
+      Review never converts a conflict into an approved change.
 
     description: >
       The requested implementation conflicts with an ACCEPTED decision in
@@ -328,6 +348,12 @@ assessment:
     When more than one escalation condition matches, use the class requiring
     the greatest degree of user control. destructive and
     accepted_decision_conflict must never be downgraded by another match.
+
+  review_note: >
+    The review requirement follows the resulting class and is refined by the
+    independent triggers in the adversarial_review section. Classifying a
+    change as routine never removes a review that an independent trigger
+    requires.
 
 
 # ---------------------------------------------------------------------------
@@ -1024,6 +1050,277 @@ verification:
 
 
 # ---------------------------------------------------------------------------
+# Adversarial review
+# ---------------------------------------------------------------------------
+
+adversarial_review:
+
+  purpose: >
+    Attack a draft's evidence-to-claim links before a significant conclusion is
+    treated as final or becomes the basis for an action. The reviewer does not
+    solve the task again, does not look for support for the draft, and does not
+    certify correctness: it looks for unsupported inference, epistemic
+    overclaim, hidden assumptions, internal contradiction, and unresolved
+    uncertainty.
+
+  is_not:
+    - a second attempt to solve the task
+    - a confirmation or agreement step
+    - an approval mechanism
+    - proof that the result is correct
+    - a replacement for verification
+
+  required_when:
+
+    modality: >
+      "required" is a normative obligation on the agent, not a mechanism. Nothing
+      in this repository prevents, detects, records, or penalizes a skipped
+      review; a missed trigger leaves no trace. Review obligations are
+      obligations to comply with, never guarantees that review happened.
+
+    evaluation_basis: >
+      Triggers are evaluated over the claims the draft itself makes, and over
+      the task's classification. No telemetry source, log, or runtime feed is
+      read to decide whether review is required, and review is not coupled to
+      the runtime telemetry pilot. Triggers routinely co-occur; they are not
+      statistically independent.
+
+    from_decision_class:
+      routine: false
+      low_impact: false
+      significant_reversible: true
+      project_decision: true
+      destructive: true
+      accepted_decision_conflict: true
+
+    independent_triggers:
+
+      - id: governance_change
+        description: >
+          The task changes governance, policy, or agent-behavior rules.
+        mode: SEPARATE_REVIEWER
+
+      - id: cross_project_generalization
+        description: >
+          A conclusion, pattern, rule, or preference is applied beyond the
+          project, repository, context, or sample that produced it.
+        mode: SEPARATE_REVIEWER
+
+      - id: material_epistemic_claim
+        description: >
+          The main value of the result is a claim about evidence, reliability,
+          interpretation, or what is actually known.
+        mode: SEPARATE_REVIEWER
+
+      - id: interpretation_of_runtime_telemetry
+        description: >
+          The result interprets runtime telemetry, logs, or observed events as
+          evidence of behavior or of absence of behavior.
+        mode: SEPARATE_REVIEWER
+
+      - id: claim_of_verified_success
+        description: >
+          The result asserts that something works, is fixed, passes, or is
+          verified.
+        mode: SEPARATE_REVIEWER
+
+      - id: conclusion_based_on_negative_evidence
+        description: >
+          The result concludes from absence: no error, no record, nothing
+          found, no mention, no counterexample.
+        mode: SEPARATE_REVIEWER
+
+    trigger_rule: >
+      Triggers are evaluated on the claims the draft makes, not on effort, file
+      count, or diff size. An ordinary routine or low-impact change whose
+      report makes none of these claims requires no review and must not receive
+      an expensive second pass. Conversely, a small change whose report makes
+      such a claim still requires review. Whether a claim is "material" or a
+      conclusion "significant" remains the agent's judgement; that judgement is
+      itself part of what review examines, so a doubtful trigger is treated as
+      fired rather than as exempt.
+
+    trigger_check: >
+      Each trigger is decidable from the draft's text: it fires when the draft
+      contains a claim of that kind. If the trigger decision itself is genuinely
+      uncertain, treat the trigger as fired.
+
+    independence_rule: >
+      Review is triggered by the draft, not requested by the user. A significant
+      conclusion must not be finalized merely because the user did not ask for a
+      review.
+
+  modes:
+
+    SELF_REVIEW:
+      independence: limited
+      description: >
+        The working agent performs a separate adversarial pass over its own
+        draft, after the draft exists and before the conclusion is treated as
+        final.
+      used_for:
+        - significant_reversible
+      rule: >
+        It is a defect search, not a re-reading for agreement. A self-review is
+        not independent evidence, and its PASS must never be reported as
+        independent verification.
+
+    SEPARATE_REVIEWER:
+      independence: higher
+      description: >
+        A separate reviewer context — a subagent, a distinct review pass, or
+        another independent context where the environment genuinely provides
+        one — receives the task, the draft, the evidence it relies on, and the
+        applicable policy constraints, and returns a verdict.
+      used_for:
+        - project_decision
+        - destructive
+        - accepted_decision_conflict
+        - governance_change
+        - cross_project_generalization
+        - material_epistemic_claim
+        - interpretation_of_runtime_telemetry
+        - claim_of_verified_success
+        - conclusion_based_on_negative_evidence
+
+    selection:
+      rule: >
+        Prefer SEPARATE_REVIEWER whenever the environment can actually provide a
+        separate reviewer context. Do not assume that a particular model,
+        provider, or reviewer product exists. When no separate context is
+        available, fall back to SELF_REVIEW and state explicitly in the final
+        report that independence was reduced.
+      reviewer_brief:
+        include:
+          - the task
+          - the draft or result under review
+          - the evidence the draft relies on
+          - the applicable policy constraints
+        exclude:
+          - the desired verdict
+          - any instruction to confirm, defend, or agree with the draft
+        framing: >
+          Phrase the request negatively: find defects, insufficient evidence,
+          contradictions, scope overreach, and unsupported conclusions. Never
+          ask whether the draft is correct.
+
+  timing:
+    rule: >
+      Review happens after a draft exists and before its significant conclusion
+      is treated as final, is reported as verified, or becomes the basis for an
+      action. Review does not replace verification, and it does not replace
+      approval_required.
+
+  checklist:
+    defined_in: .agent/evaluation-policy.yaml
+    note: >
+      The reviewer works the checklist defined there and records which items
+      produced findings.
+
+  verdicts:
+    defined_in: .agent/evaluation-policy.yaml
+    values:
+      - PASS
+      - MINOR_ISSUES
+      - MATERIAL_ISSUES
+      - BLOCKING_UNCERTAINTY
+
+  response:
+
+    PASS:
+      action: treat_as_final
+
+    MINOR_ISSUES:
+      action: correct_wording_or_status_then_final
+      consumes_cycle: false
+      rule: >
+        Correct the wording, label, or scope error and report the correction. No
+        further review is required for a wording or status defect. The
+        correction must not change what the draft claims: if fixing the defect
+        changes a claim, its scope, or its basis, treat the finding as
+        MATERIAL_ISSUES and follow that path instead. A correction made after a
+        verdict invalidates that verdict for the corrected claim.
+
+    MATERIAL_ISSUES:
+      action: revise_draft_then_review_again
+      rule: >
+        Revise the draft, then run exactly one more review. The defect and the
+        revision must be named in the final report.
+
+    BLOCKING_UNCERTAINTY:
+      action: keep_unknown_and_ask_only_if_action_depends_on_it
+      rule: >
+        Do not invent the missing evidence. Keep the item UNKNOWN or UNVERIFIED
+        with its consequence, and when an action depends on it, follow the
+        approval rule of the applicable decision class.
+
+  finding_requirements: >
+    A finding must be concrete: it names the claim, the checklist item, and the
+    evidence basis it attacks. A style preference, a vague concern, or a
+    suspicion that cannot be tied to a claim is not a finding, and must not be
+    reported as MATERIAL_ISSUES or BLOCKING_UNCERTAINTY.
+
+  no_relitigation: >
+    A review must not re-raise a defect that the draft or an earlier cycle
+    already resolved, and must not reopen a question the user already decided.
+    Reopening either requires new evidence, and the finding must name it;
+    without such evidence the item stays closed and must not be presented again
+    as a blocker.
+
+  cycles:
+    max_cycles: 2
+    unit: >
+      One cycle is one draft-to-review-to-verdict sequence. A cycle count of 2
+      therefore permits at most two review executions for one conclusion,
+      regardless of how many tables, sections, or restatements the conclusion
+      spans.
+    counting: >
+      The first review is cycle 1. A review performed after a MATERIAL_ISSUES
+      revision is cycle 2. Correcting a MINOR_ISSUES wording or status defect
+      does not start a new cycle, and no correction authorizes a third review
+      execution.
+    after_max_cycles: >
+      Stop reviewing; do not keep iterating to reach PASS. The conclusion is
+      then final only with its defects attached: list every unresolved finding,
+      its checklist item, and its consequence in the final report, mark the
+      affected claims UNKNOWN or UNVERIFIED rather than final, and withhold any
+      dependent action until the user decides. A conclusion that still carries
+      MATERIAL_ISSUES after cycle 2 must never be presented as settled.
+
+  independence_rules:
+    - A reviewer verdict is not an approval and never authorizes an action.
+    - Review never weakens proposal, approval, stop-and-explain, or destructive-action requirements.
+    - Review supplements delegation-based verification; it neither replaces nor outranks it.
+    - Review operates inside Decision Precedence and never overrides it.
+    - A no-conflict review verdict does not discharge the accepted_decision_conflict duty to identify the decision, explain the consequence, propose the resolution, and obtain approval.
+    - When review follows a user approval, a MATERIAL_ISSUES or BLOCKING_UNCERTAINTY verdict does not authorize proceeding, and the action returns to the user.
+    - A self-review is not independent evidence of correctness.
+    - Do not transmit the expected verdict, or a request for agreement, to a separate reviewer.
+    - Absence of findings is not proof that the draft is correct.
+    - A completed review does not prove that the conclusion is correct; it only removes the specific defects it names.
+
+  logging:
+    rule: >
+      Review outcomes are logged only when they satisfy the significant
+      governance event definition in .agent/evaluation-policy.yaml. Passing
+      reviews are not logged, and past reviews are never reconstructed
+      retroactively.
+    consequence: >
+      Because passing and skipped reviews are both unrecorded, the log
+      over-represents problems and can never be used to measure review coverage,
+      trigger accuracy, or compliance. No coverage claim may be inferred from
+      the log.
+
+  enforcement_note: >
+    This section is declarative governance followed by a model. It defines when
+    review is required and how it must be conducted; it is not runtime
+    enforcement, and nothing here inspects a draft automatically. "required"
+    means an obligation the agent must satisfy, not a check that happens. An
+    external check that detects a missing review is possible in principle but is
+    not part of this pilot, and no such check exists today.
+
+
+# ---------------------------------------------------------------------------
 # Reporting
 # ---------------------------------------------------------------------------
 
@@ -1070,6 +1367,16 @@ reporting:
     rule: >
       Do not reopen the accepted choice, exaggerate minor trade-offs, or create
       speculative future work merely to produce a warning.
+
+  adversarial_review:
+    include_when_review_ran:
+      - which review mode ran, and whether independence was reduced by a fallback
+      - the verdict
+      - the defects found and what changed in response
+      - remaining UNKNOWN or UNVERIFIED items after the cycle limit
+    avoid:
+      - presenting a PASS as proof that the conclusion is correct
+      - describing a self-review as independent verification
 
   avoid:
     - lengthy explanations of trivial implementation choices
