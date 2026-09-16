@@ -27,10 +27,11 @@ authoritative documentation instead of copying it here.
 **Status:** `idea`
 
 **Description:** Future analysis mode for suitable ObservationPoint records.
-Use estimated nest distance derived from bee flight observations to visualize a
-circle around each point. Intersections or combined evidence from several
-observations may indicate a probable nest location. Future versions may also
-incorporate recorded azimuths.
+Use estimated nest distance derived from bee flight observations to visualize
+one or more annular probable-distance zones around each point. Intersections or
+combined evidence from several observations may indicate a probable nest
+location. Future versions may also incorporate recorded azimuths and weather
+context such as wind.
 
 **Motivation / expected value:** Help researchers combine observations from
 multiple points into an evidence-based estimate of a probable nest area.
@@ -38,8 +39,112 @@ multiple points into an evidence-based estimate of a probable nest area.
 **Dependencies / prerequisites:** Stable field-observation data; an accepted and
 validated method for deriving distance from FlightCycle observations; an
 analysis design that treats azimuth as optional supporting evidence rather than
-a direct direction to the nest; application of D058 so short first cycles that
-represent a delayed departure do not contribute flight-duration evidence.
+a direct direction to the nest.
+
+**Analysis principle — preserve the individual bee:** Analysis must not begin by
+averaging all bees or all FlightCycle durations at an ObservationPoint. Each bee
+is analysed separately across several cycles first. For one bee, the useful
+distance signal is expected to be a repeatable lower flight-time level rather
+than the arithmetic mean: a bee can be delayed away from the nest, making a
+cycle longer, while such a delay does not make the true nest round trip shorter.
+For example, durations around 5, 6, 10 and 12 minutes suggest that the repeated
+short level around 5–6 minutes is more informative than the overall mean.
+
+A single isolated shortest cycle must not automatically become the estimate. A
+short-time level should be supported by at least two sufficiently consistent
+cycles before it is used as the bee's distance evidence. The exact rule for
+what counts as sufficiently close (absolute tolerance, relative tolerance,
+clustering, or another robust method) is deliberately not decided yet and must
+be validated against real observations. Every first cycle is now an ordinary
+individual flight with its own departure time, so no cycle is excluded from this
+analysis automatically by its sequence number.
+
+Only after per-bee estimates exist should bees at the same ObservationPoint be
+compared. If one bee has a repeatable lower flight-time level that is markedly
+longer than the corresponding levels of the other bees, this is evidence that
+it may belong to a different nest. Such a bee should not simply be averaged into
+the main group. The method for deciding whether bees form one or several nest
+groups, and the threshold for `markedly longer`, remain research questions.
+
+The intended hierarchy is therefore `FlightCycle -> Bee -> possible nest group
+at ObservationPoint -> cross-point probable nest analysis`. Raw observations
+remain unchanged; these are derived analytical interpretations.
+
+**Multiple-nest principle at one point:** If per-bee analysis indicates two or
+more plausible nest groups at the same ObservationPoint, each group must remain
+separate in subsequent distance analysis and map visualization. Each probable
+nest group should produce its own annular distance zone. Distinct groups must
+not be collapsed into one artificially wide ring merely because they were
+observed from the same point.
+
+**Temporal-compatibility principle:** Before combining ObservationPoints for a
+current nest search, analysis should allow filtering by observation date/time
+and should prefer points collected within a sufficiently close time window.
+Different years, or otherwise widely separated observation periods, must not be
+silently merged into one current-search estimate. Cross-year comparison may
+still be valuable for a different question: whether repeated evidence is
+consistent with long-term persistence or reuse of the same nest. The exact
+maximum time gap for combining points in a current-search analysis remains
+undecided and should be validated against field practice rather than fixed
+arbitrarily.
+
+**Wind as a future explanatory factor:** Wind speed and direction may affect
+flight duration and possibly the interpretation of recorded azimuths, but no
+wind correction is accepted yet. Wind should initially be treated as contextual
+analysis data so its value can be tested later against known Nest locations.
+Because wind can be retrieved retrospectively from a weather service, the
+minimum provenance needed for later enrichment is the observation coordinates
+and the exact observation date/time. Where possible, analysis may use the
+actual FlightCycle timestamps together with the ObservationPoint coordinates,
+rather than a coarse point-level date, so weather can be matched to the period
+in which the flight was observed. Any future wind adjustment must be a
+versioned analytical-model feature and must never modify the raw recorded
+FlightCycle times.
+
+**Distance-model principle — literature formula is a hypothesis, not a fixed
+domain rule:** A published beelining relation such as `distance_m = 150 *
+flight_minutes - 500` may be retained as a reference/baseline model, but must not
+be hard-coded as a universally valid conversion. Field observations already
+show that it can produce physically impossible results at short flight times
+(e.g. 2 minutes gives -200 m). The actual time-to-distance relation may require
+different coefficients, different behaviour in different distance ranges, or a
+non-linear/piecewise model. The exact form is deliberately undecided until it
+can be tested against ground-truth nests.
+
+The analysis architecture should therefore treat time-to-distance conversion as
+a replaceable/versioned analytical model. When a nest is actually found, the
+known ObservationPoint-to-Nest distance together with the per-bee repeatable
+lower flight-time evidence should form calibration/validation data. Raw
+FlightCycle data must remain available so historical observations can be
+re-analysed when the model changes. If derived distance estimates are persisted
+or exported, they should retain enough model/version provenance to distinguish
+which calculation produced them. Negative or otherwise physically impossible
+outputs must not be presented as valid nest-distance estimates.
+
+**Uncertainty / map-visualization principle — probable distance band, not a
+single circle:** A derived distance such as 700 m must not be visualized as if
+the nest were known to lie exactly on a thin 700 m circumference, nor as a
+filled circle implying that the whole area from 0 to 700 m is equally plausible.
+The primary visualization should instead be a ring/annular probable-distance
+zone with an inner and outer bound. Its width should reflect the uncertainty in
+the evidence rather than an arbitrary fixed graphic width.
+
+The bounds may initially derive from the spread of the bee's supported lower
+flight-time level (for example, repeated short cycles around 5 and 6 minutes)
+converted through the selected distance model. As ground-truth Nest records
+accumulate, empirically measured model error may also widen or otherwise adjust
+the band. Additional correction/error terms may be introduced only when they
+have an explicit rationale and can be validated. Until a statistical model is
+actually established, this should be described as a `probable distance range`
+or `uncertainty zone`, not as a formal confidence interval.
+
+With several ObservationPoints, overlaps/combined evidence from their annular
+zones should progressively narrow the probable search area. Recorded azimuths
+may later weight or constrain parts of a ring, producing annular sectors or
+other probability-weighted areas rather than being treated as an exact ray to
+the nest. The visualization should communicate uncertainty honestly and avoid
+false precision. The exact method for calculating ring bounds and combining
+multiple zones remains a research question to be validated against known nests.
 
 **Notes:** This is a research-analysis feature, not a current MVP requirement.
 It is consistent with D049 but must not be implemented as part of the field-data
@@ -158,7 +263,240 @@ arbitrary manual angular offset, block field work, or add diagnostic details to
 the compact observation cards. Any future persisted manual offset would change
 research semantics and requires a separate durable decision.
 
-## I006 — Пользовательский полевой слой дорог и троп
+## I006 — Settings information architecture and autosave
+
+**Status:** `idea`
+
+**Description:** Redesign Settings as a small navigation section rather than a
+single technical form. The top-level Settings screen should use a standard back
+arrow and contain entries for `Настройки пользователя`, `Помощь`, and
+`О программе`. `Настройки пользователя` should open a second screen with its
+own back arrow and visually separate Territory data from observer data:
+
+- Territory: territory code and territory name;
+- Observer: observer code and observer name.
+
+Replace the explicit `Сохранить` button with automatic persistence as fields
+are validly edited. Returning with the app back arrow, Android back gesture, or
+system Back should therefore require no separate confirmation action. Invalid
+required values must not be silently accepted.
+
+**Motivation / expected value:** Make Settings simpler on mobile, remove an
+unnecessary explicit save action, establish a scalable Settings hierarchy for
+future sections, and present Territory and observer information in a clearer
+form.
+
+**Dependencies / prerequisites:** Settings/navigation redesign; validation and
+persistence behavior for editable fields; an explicit product/data-model
+decision before adding the observer-name field, because observer name is new
+stored information rather than a purely visual UI change.
+
+**Notes:** The UI may group Territory and Observer information on the same
+screen, but they must remain separate concepts in the data model. Territory
+code/name continue to belong to `Territory`; observer information must not be
+merged into the Territory entity. Prefer the user-facing label `Имя
+наблюдателя` over `ФИО наблюдателя` so the field does not assume a particular
+name structure. This idea complements I004 and leaves room for future Settings
+entries such as the compass diagnostic proposed in I005.
+
+## I007 — Compact field UI for the active observation workflow
+
+**Status:** `idea`
+
+**Description:** Keep the working field screen compact and low-noise for fast
+repeated use. Reduce headings and section labels to approximately the text size
+used for primary action labels such as `Сохранить`. Avoid explanatory or status
+text that does not change what the observer does next, and avoid blocks that
+push the working controls out of the viewport.
+
+Keep an explicit action for the negative research result; use red text to make
+that result clearly distinguishable while keeping the button/background visually
+neutral rather than presenting it as an error.
+
+Mark choice is a derived set of available variants, not a list of Bees created
+in advance. Any future presentation change to it should keep the mark color
+recognizable by appearance and keep the position variant readable as text
+(`Грудь`, `КП`, `КЛ`), because these variants cannot be communicated by color
+alone.
+
+**Motivation / expected value:** Reduce vertical space, reading load, and visual
+noise during time-sensitive field work, while keeping the most frequent
+selection recognizable by appearance.
+
+**Dependencies / prerequisites:** The active observation workflow and its label
+semantics; physical-device/daylight testing; accessible selection indication
+must not rely only on subtle color differences. Exact sizing and spacing remain
+a UI implementation detail.
+
+**Notes:** This is a presentation idea only. The earlier bee-preparation screen,
+its prepared-bee list and the group-release action no longer exist: D075 replaced
+them with individually registered first flights and derived mark choices, so this
+idea now concerns the active observation screen. The negative-result action
+records an explicit observation result, not an application error. This idea
+complements the broader field UI simplification in I004.
+
+## I008 — Found nest documentation
+
+**Status:** `idea`
+
+**Description:** Extend Bee Search beyond flight tracking to document a wild-bee
+nest after it has been located. Treat this as the natural final stage of the
+same research workflow: field search → ObservationPoint evidence → probable
+location → found nest → structured documentation.
+
+Do not invent a new nest-description scheme from scratch. Use the existing
+Obsidian nest-recording workflow as the source for the future Bee Search form
+and data model, adapting its established fields and terminology to a mobile
+field UI. The demonstrated Obsidian form includes nest type and physical nest
+parameters, tree information, entrance orientation, photo/video, track, and
+additional information. Context already known to Bee Search, such as location,
+date, Territory, and observer, should be filled automatically where possible
+rather than entered again.
+
+Model the research object as a general nest (`Nest`) rather than specifically as
+a hollow (`Hollow`). A tree hollow can be one nest type, allowing the same model
+to represent other encountered nest-site types later without changing the core
+entity.
+
+Allow a documented nest to carry media such as photographs and video and, where
+appropriate, a track/reference to supporting field material. Media should be
+capturable or attachable from the nest record while remaining usable offline.
+The database should store the structured record and media references rather
+than embedding large media content directly in Room.
+
+Where possible, preserve provenance by linking a found nest to the
+ObservationPoint records or other Bee Search observations that contributed to
+finding it. This relationship should support later validation of probable-nest
+analysis against actually located nests.
+
+**Motivation / expected value:** Complete the field-research workflow inside Bee
+Search instead of stopping at the moment a nest is located. Reuse an already
+worked-out Obsidian recording practice, reduce duplicate field entry, preserve
+photos/video together with structured nest data, and create ground-truth records
+that can later be compared with the point-analysis/probable-location methods in
+I001.
+
+**Dependencies / prerequisites:** The existing Obsidian nest form and resulting
+note structure must be reviewed as the authoritative starting point before the
+exact Bee Search fields are specified. A separate durable data-model decision is
+required before implementation. Media storage/export, nest-to-observation
+relationships, offline lifecycle, and any automatic heading/location capture
+must also be designed explicitly. Existing Territory and observer semantics
+must be reused rather than duplicated.
+
+**Notes:** This idea does not turn Bee Search into a general-purpose field
+notebook. Its intended product boundary is the search for and documentation of
+wild honey-bee nests. Obsidian can remain a long-term viewing, note-taking, and
+analysis environment, while Bee Search provides structured field capture. A
+future export should preserve enough structure to remain compatible with, or be
+straightforward to transform into, the established Obsidian nest records.
+
+## I009 — Long-term nest inspections
+
+**Status:** `idea`
+
+**Description:** Treat a found `Nest` as a long-lived research object that can
+receive any number of dated follow-up inspections over the lifetime of the
+project. Represent each visit as a separate `NestInspection` rather than
+rewriting the current state on the `Nest` record. Use the existing Obsidian
+nest-inspection form as the starting point for the future Bee Search inspection
+form and exact field specification.
+
+Keep stable nest characteristics on `Nest` and time-varying observations on
+`NestInspection`. The demonstrated Obsidian workflow includes observations such
+as bee activity, pollen carrying, nest status, photo/video, planned follow-up,
+a follow-up date, and additional notes. The exact vocabulary and scales should
+be reviewed from the existing Obsidian form before implementation rather than
+recreated from memory.
+
+Weather associated with an inspection should use a deliberately mixed capture
+strategy based on field experience with the existing Obsidian workflow:
+
+- temperature — retrieve automatically from a weather service using the nest
+  coordinates and inspection date/time;
+- atmospheric pressure — retrieve automatically;
+- wind speed — retrieve automatically;
+- wind direction — retrieve automatically;
+- cloud cover — enter manually at the inspection location;
+- precipitation — enter manually at the inspection location.
+
+Cloud cover and precipitation must not be overwritten by later weather-service
+retrieval. If internet access is unavailable in the field, the inspection must
+still be saved immediately. Automatically retrievable weather fields may remain
+pending and be populated later from historical weather for the recorded
+coordinates and timestamp.
+
+Allow inspection-specific photographs and video to be associated with the
+inspection that produced them, rather than treating all later media as timeless
+properties of the nest. A planned follow-up and its date may later support a
+simple nest-review workflow, while remaining subordinate to the research record
+rather than turning Bee Search into a general task manager.
+
+**Motivation / expected value:** Support multi-year monitoring of located wild
+honey-bee nests and preserve their history as a sequence of observations. This
+allows the database to distinguish permanent nest characteristics from changing
+colony condition and provides structured longitudinal data for later analysis.
+It also avoids repeatedly entering weather variables that have proven suitable
+for automatic historical retrieval while preserving direct field observation
+for locally unreliable variables such as cloud cover and precipitation.
+
+**Dependencies / prerequisites:** I008 and an accepted `Nest` data model; review
+of the existing Obsidian inspection form and its scales/terminology; an accepted
+`NestInspection` schema; offline-safe media handling; a weather retrieval and
+retry mechanism capable of historical lookup by coordinates and timestamp.
+Weather source/provenance and pending/loaded/error state semantics require a
+separate implementation decision.
+
+**Notes:** Conceptually, Bee Search would have two related long-lived branches:
+`Territory → ObservationPoint → Bee → FlightCycle` for search evidence and
+`Territory → Nest → NestInspection` for located nests and subsequent monitoring.
+A nest may be linked to the ObservationPoint evidence that led to its discovery.
+This remains within the product boundary of searching for, documenting, and
+monitoring wild honey-bee nests rather than becoming a general-purpose field
+notebook.
+
+## I010 — Reproducible dev state and offline-map restoration
+
+**Status:** `idea`
+
+**Description:** Make the Bee Search `dev` application reproducibly restorable
+across destructive installs, data clears, test resets, and other development
+operations that would otherwise remove its working state. A restored dev build
+should return to the same practical state as before the destructive operation:
+Room data, DataStore/user settings, current Territory selection, observer data,
+offline-map packages, and the metadata required to activate those maps again.
+
+Treat an offline map as a self-describing package rather than as a bare
+`.pmtiles` file. Its persisted metadata must include the exact original
+coverage geometry/bounds and the identifiers/integrity data needed to restore
+or validate it. Restoration of an existing map must never require the user to
+manually redraw the original area or reproduce an exactly matching selection.
+
+Keep the canonical development snapshot outside the Android app sandbox so it
+survives `adb uninstall`, `pm clear`, package replacement, and application-data
+loss. A PC-side snapshot associated with the Bee Search development workflow is
+an acceptable primary mechanism. Support both restoration of the last captured
+working state and, separately, restoration of a known-good baseline state.
+
+**Motivation / expected value:** Repeated loss of settings and locally installed
+offline maps interrupts development and makes device testing dependent on Codex
+or manual reconstruction of map coverage. Reproducible restoration turns the
+dev package into a persistent test environment rather than a disposable clean
+install and removes the impossible requirement to redraw an identical map area.
+
+**Dependencies / prerequisites:** Define the snapshot contents and versioning;
+define export/import or adb-safe procedures for Room and DataStore; preserve
+map-package manifests/descriptors and map files; handle schema migrations and
+incompatible snapshots safely; distinguish `org.beesearch.app.dev` from the
+stable package; define a known-good baseline policy.
+
+**Notes:** Ordinary APK updates should preserve app data and use a non-destructive
+update path. Destructive reset remains useful for explicit clean-install tests,
+but it must be intentional and must not be the default development workflow.
+Operational guardrails for Codex/agents belong in project agent instructions or
+development documentation and can be adopted before I010 is fully implemented.
+
+## I011 — Пользовательский полевой слой дорог и троп
 
 **Status:** `idea`
 
