@@ -72,8 +72,6 @@ data class BeePreparationUiState(
     val bees: List<Bee> = emptyList(),
     val flightCycles: List<FlightCycle> = emptyList(),
     val beePresenceResult: BeePresenceResult? = null,
-    /** Legacy preparation-screen input; the active route no longer uses this phase. */
-    val isReleaseStarted: Boolean = false,
     val isLoading: Boolean = true,
 )
 

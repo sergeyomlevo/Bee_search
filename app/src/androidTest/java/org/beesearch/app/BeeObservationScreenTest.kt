@@ -241,6 +241,13 @@ class BeeObservationScreenTest {
         composeRule.onNodeWithTag("record-no-bees-from-observation").performClick()
         composeRule.onNodeWithText("Пчёлы отсутствуют?").assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(0, noBeesRequests) }
+
+        // Cancelling the confirmation must not record the negative research result.
+        composeRule.onNodeWithTag("cancel-no-bees-from-observation").performClick()
+        composeRule.onNodeWithText("Пчёлы отсутствуют?").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(0, noBeesRequests) }
+
+        composeRule.onNodeWithTag("record-no-bees-from-observation").performClick()
         composeRule.onNodeWithTag("confirm-no-bees-from-observation").performClick()
         composeRule.runOnIdle { assertEquals(1, noBeesRequests) }
     }

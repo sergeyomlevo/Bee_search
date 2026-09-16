@@ -27,7 +27,6 @@ import org.beesearch.app.domain.model.DuplicateBeeMarkException
 import org.beesearch.app.domain.model.DuplicateTerritoryCodeException
 import org.beesearch.app.domain.model.DuplicateObserverCodeException
 import org.beesearch.app.domain.model.RequiredFieldException
-import org.beesearch.app.domain.model.InitialReleaseAlreadyStartedException
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException

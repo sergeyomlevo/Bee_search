@@ -24,18 +24,6 @@ class ObservationPointNotCompletedException : IllegalStateException(
     "Only a completed observation point can be deleted.",
 )
 
-class InitialReleaseAlreadyStartedException : IllegalStateException(
-    "The initial group release has already started.",
-)
-
-class NoPreparedBeesException : IllegalStateException(
-    "At least one prepared bee is required for the initial group release.",
-)
-
-class BeeHasFlightHistoryException : IllegalStateException(
-    "A bee with flight history cannot be removed as a prepared bee.",
-)
-
 class DuplicateBeeMarkException : IllegalStateException(
     "A bee with the same mark already exists in this observation point.",
 )
@@ -62,10 +50,6 @@ class OpenFlightCycleExistsException : IllegalStateException(
 
 class OpenFlightCycleNotFoundException : IllegalStateException(
     "The bee has no open flight cycle.",
-)
-
-class InitialFlightCycleRequiredException : IllegalStateException(
-    "The initial group release must happen before a later flight can start.",
 )
 
 class InvalidEventTimeException : IllegalStateException(

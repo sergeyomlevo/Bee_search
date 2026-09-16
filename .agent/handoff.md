@@ -31,10 +31,15 @@ Room schema and the backup contract are unchanged: the column
 `initial_group_launch_correction_eligible` keeps its name and type while its
 meaning narrows to "this first departure can still be cancelled".
 
-Legacy UI still present but unreachable from the active route:
-`ui/observation/BeePreparationScreen.kt` and `BeeSelector` remain in the tree
-together with `ResumeObservationScreenTest`; their removal is a separate
-decision and was not part of this milestone.
+The retired Bee preparation UI is gone: `ui/observation/BeePreparationScreen.kt`,
+`BeeSelector`, `BeeSelectorSelectionLogic`, their layout-only helpers and the
+`ResumeObservationScreenTest` coverage were removed in the legacy UI cleanup
+commit, because they were unreachable from the active route and asserted the
+superseded group-release workflow. Persisted compatibility (Room columns,
+`initialGroupLaunch` / `initialGroupLaunchCorrectionEligible`,
+`initialGroupReleaseAt`, backup keys, migrations, `LegacyObservationTestFixtures`)
+was deliberately left untouched. `BeePreparationUiState` keeps its historical
+name because it is the active observation screen state holder.
 
 ## Help and data management milestone (2026-09-10)
 
@@ -270,22 +275,13 @@ activation boundary rather than a parallel map architecture.
 
 ## Next task
 
-Samsung SM-S938B verification at `font_scale=1.7` confirms that five 56dp
-visible circles, `Грудь`/`КП`/`КЛ`, `Добавить`, `Выпустить всех`, and collapsed
-`ВАЖНО! Первый выпуск` fit above the navigation bar in that order. A normal
-scroll toward the list showed all three prepared Bee rows at once while the
-editor left the viewport; scrolling back restored the editor. UIAutomator
-inspection also confirmed that expanded guidance is in that same scrollable
-layout with all three paragraphs outside the editor area. The direct Android
-instrumentation class `ResumeObservationScreenTest` now passes 16/16,
-including successful Add showing the new Bee while the editor remains visible
-and a manual-scroll scenario at explicit `fontScale=1.7`: an eight-Bee list
-gets the viewport while the editor naturally moves below it. The transient
-preparation class `ObservationPointPreparationScreenTest` passes 4/4. The
-draft header no longer uses ellipsis for `Подготовка точки`, and the redundant
-visual color swatch in a prepared Bee row is decorative rather than a second
-accessibility label. These direct checks are implementation evidence; user
-visual acceptance is recorded above.
+No pending implementation task is recorded for the Observation workflow. The
+paragraph that used to stand here described the retired preparation screen
+(`Добавить`, `Выпустить всех`, collapsed `ВАЖНО! Первый выпуск`, prepared Bee
+rows) and its `ResumeObservationScreenTest` results; that screen and those tests
+no longer exist, so it was replaced by this note. Current device evidence for
+the active workflow is in the Observation workflow milestone section above.
+
 The manual-import milestone was directly checked on Samsung SM-S938B through
 `org.beesearch.app.dev`: valid D065 fixture import reached Ready; active vector
 rendering survived a cold start and rendered while airplane mode was enabled;
@@ -293,11 +289,14 @@ a bad-SHA replacement was rejected while the prior package stayed Ready; a
 coverage fragment outside the fixture made the active package not Ready until
 the valid desired coverage was restored. The field package metadata remained
 unchanged. `connectedDebugAndroidTest` then passed `108/108` (the 8 fixture-
-dependent legacy Map PoC tests were SKIPPED); Gradle removed the development
-container as part of that test deployment, and the current debug APK was
-reinstalled without recreating any dev data. This is current device evidence
-for the stated paths only; it does not prove a future downloader or other
-package artifacts.
+dependent legacy Map PoC tests were SKIPPED); at that time Gradle removed the
+development container as part of the test deployment, and the current debug APK
+was reinstalled without recreating any dev data. Connected runs now keep the DEV
+package and its app-private state instead, because
+`android.injected.androidTest.leaveApksInstalledAfterRun=true` is set in
+`gradle.properties` (see AGENTS.md "Development and field package safety"). This
+is current device evidence for the stated paths only; it does not prove a future
+downloader or other package artifacts.
 
 Earlier Gradle builds remain reported evidence only for their directly checked
 properties.
