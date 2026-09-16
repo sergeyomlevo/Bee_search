@@ -709,6 +709,25 @@ artifact application ID. Do not target the field package with `pm clear`,
 uninstall, or a release install unless the current task explicitly authorizes
 a field-release or recovery operation.
 
+Connected Android tests on the physical device must preserve the DEV package and
+its app-private state. `connectedDebugAndroidTest` installs
+`org.beesearch.app.dev`; without
+`android.injected.androidTest.leaveApksInstalledAfterRun=true` (set in
+`gradle.properties`) AGP uninstalls every APK installed by the test run, which
+removes the DEV package together with its Room database, DataStore settings and
+imported offline Map Package. A normal connected test run must not destroy that
+DEV state, so the option stays enabled; pass
+`-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=false` only for a
+deliberately clean DEV sandbox.
+
+`gradlew :app:uninstallDebug`, `gradlew :app:uninstallAll` and
+`pm clear org.beesearch.app.dev` are destructive operations. Do not run them
+without an explicit need and approval. An intentionally empty DEV sandbox is a
+separate, deliberate operation, not normal post-test cleanup.
+
+The device-test workflow must not affect `org.beesearch.app.beta` or the field
+package `org.beesearch.app`.
+
 ---
 
 ## 18. Documentation Discipline
