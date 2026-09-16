@@ -624,8 +624,8 @@ class BeeObservationScreenTest {
 
         composeRule.onNodeWithTag("bee-action-${longAtPointBee.id}").performClick()
 
-        assertTrue(cardTop(newerFlyingBee) < cardTop(longAtPointBee))
-        assertTrue(cardTop(longAtPointBee) < cardTop(longFlyingBee))
+        assertTrue(cardTop(longAtPointBee) < cardTop(newerFlyingBee))
+        assertTrue(cardTop(newerFlyingBee) < cardTop(longFlyingBee))
         composeRule.onNodeWithTag("bee-state-${longAtPointBee.id}").assertIsDisplayed()
         composeRule.onNodeWithTag("bee-state-${longFlyingBee.id}").assertIsDisplayed()
     }

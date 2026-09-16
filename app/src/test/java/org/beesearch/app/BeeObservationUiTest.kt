@@ -1,6 +1,7 @@
 package org.beesearch.app
 
 import org.beesearch.app.domain.model.Bee
+import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
 import org.junit.Assert.assertEquals
@@ -26,6 +27,7 @@ class BeeObservationUiTest {
                 it.markColor == used.markColor && it.markPosition == used.markPosition
             },
         )
+        assertEquals(BeeMarkCatalog.supportedCombinations.drop(1), remaining)
         assertEquals(remaining, availableBeeMarks(listOf(used)))
     }
 
@@ -110,36 +112,62 @@ class BeeObservationUiTest {
     }
 
     @Test
-    fun inFlightCardsPrioritizeCycleNumberThenFlightDurationAtTheBoundary() {
-        val firstCycleLongFlight = bee("WHITE")
-        val firstCycleNewFlight = bee("YELLOW")
-        val secondCycleLongFlight = bee("BLUE")
-        val secondCycleNewFlight = bee("RED")
-        val atPoint = bee("GREEN")
+    fun cycleNumberDoesNotChangeTimeBasedOrderWithinStateGroups() {
+        val shortFlightCycleFive = bee("WHITE")
+        val longFlightCycleTwo = bee("YELLOW")
+        val middleFlightCycleSeven = bee("BLUE")
+        val shortAtPointNextCycleSix = bee("RED")
+        val longAtPointNextCycleThree = bee("GREEN")
+        val middleAtPointNextCycleEight = bee("ORANGE")
 
         val cards = buildBeeObservationCards(
-            bees = listOf(secondCycleLongFlight, atPoint, firstCycleLongFlight, secondCycleNewFlight, firstCycleNewFlight),
+            bees = listOf(
+                middleAtPointNextCycleEight,
+                longFlightCycleTwo,
+                shortAtPointNextCycleSix,
+                middleFlightCycleSeven,
+                longAtPointNextCycleThree,
+                shortFlightCycleFive,
+            ),
             flightCycles = listOf(
-                cycle(firstCycleLongFlight, 1, startedAt, null),
-                cycle(firstCycleNewFlight, 1, startedAt.plusSeconds(30), null),
-                cycle(secondCycleLongFlight, 1, startedAt, startedAt.plusSeconds(45)),
-                cycle(secondCycleLongFlight, 2, startedAt.plusSeconds(60), null),
-                cycle(secondCycleNewFlight, 1, startedAt, startedAt.plusSeconds(45)),
-                cycle(secondCycleNewFlight, 2, startedAt.plusSeconds(90), null),
-                cycle(atPoint, 1, startedAt, startedAt.plusSeconds(50)),
+                cycle(shortFlightCycleFive, 5, startedAt.plusSeconds(170), null),
+                cycle(longFlightCycleTwo, 2, startedAt, null),
+                cycle(middleFlightCycleSeven, 7, startedAt.plusSeconds(100), null),
+                cycle(shortAtPointNextCycleSix, 5, startedAt, startedAt.plusSeconds(160)),
+                cycle(longAtPointNextCycleThree, 2, startedAt, startedAt.plusSeconds(10)),
+                cycle(middleAtPointNextCycleEight, 7, startedAt, startedAt.plusSeconds(90)),
             ),
         )
 
         assertEquals(
             listOf(
-                firstCycleNewFlight,
-                firstCycleLongFlight,
-                secondCycleNewFlight,
-                secondCycleLongFlight,
-                atPoint,
+                shortFlightCycleFive,
+                middleFlightCycleSeven,
+                longFlightCycleTwo,
+                longAtPointNextCycleThree,
+                middleAtPointNextCycleEight,
+                shortAtPointNextCycleSix,
             ),
             cards.map { it.bee },
         )
+    }
+
+    @Test
+    fun newlyStartedCycleIsOrderedByFlightTimeInsteadOfCycleNumber() {
+        val olderCycleShortFlight = bee("WHITE")
+        val newCycleLongFlight = bee("BLUE")
+        val previousReturn = startedAt.plusSeconds(20)
+
+        val cards = buildBeeObservationCards(
+            bees = listOf(newCycleLongFlight, olderCycleShortFlight),
+            flightCycles = listOf(
+                cycle(olderCycleShortFlight, 1, startedAt.plusSeconds(90), null),
+                cycle(newCycleLongFlight, 1, startedAt, previousReturn),
+                cycle(newCycleLongFlight, 2, startedAt.plusSeconds(30), null),
+            ),
+        )
+
+        assertEquals(listOf(olderCycleShortFlight, newCycleLongFlight), cards.map { it.bee })
     }
 
     @Test

@@ -71,17 +71,6 @@ internal fun buildBeeObservationCards(
         if (groupComparison != 0) {
             groupComparison
         } else {
-            val cycleComparison = if (first.fieldState == BeeFieldState.IN_FLIGHT) {
-                compareValues(
-                    first.latestCycle?.sequenceNumber,
-                    second.latestCycle?.sequenceNumber,
-                )
-            } else {
-                0
-            }
-            if (cycleComparison != 0) {
-                cycleComparison
-            } else {
             val durationComparison = when (first.fieldState) {
                 BeeFieldState.IN_FLIGHT -> compareValues(
                     second.stateStartedAt,
@@ -102,7 +91,6 @@ internal fun buildBeeObservationCards(
                 durationComparison
             } else {
                 inputOrder.getValue(first.bee.id).compareTo(inputOrder.getValue(second.bee.id))
-            }
             }
         }
     }
