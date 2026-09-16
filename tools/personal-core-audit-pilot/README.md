@@ -192,6 +192,18 @@ failures.
 | absolute | routine → decide_and_continue | ALLOW | MATCH |
 | dot-relative | routine → decide_and_continue | ALLOW | MATCH |
 
+### Codex and DeepSeek Harness
+
+Codex reaches this observer through `.codex/hooks.json`; the DeepSeek Harness
+reaches it through a registered Cordis plugin row, not through that file. The
+harness transport, the field mapping with its confidence labels, the live
+evidence, and the limitations are documented in
+[`DSH-INTEGRATION.md`](DSH-INTEGRATION.md).
+
+```powershell
+node tools/personal-core-audit-pilot/run-dsh-adapter-fixtures.js   # harness adapter mapping
+```
+
 ### Controlled live smoke
 
 Restart Codex after changing `hooks.json`, then use `/hooks` to review and trust
