@@ -53,7 +53,6 @@ import kotlinx.coroutines.launch
 import org.beesearch.app.MapCenterTarget
 import org.beesearch.app.MapGpsMarker
 import org.beesearch.app.MapTarget
-import org.beesearch.app.ObservationPointCreationDraft
 import org.beesearch.app.beeSearchFieldMapProfile
 import org.beesearch.app.beeSearchActivePmtilesMapProfile
 import org.beesearch.app.BuildConfig
@@ -79,12 +78,9 @@ internal fun BeeMap(
     coverageStore: MapCoverageStore,
     packageStore: MapPackageStore,
     locationState: LocationUiState,
-    observationPointDraft: ObservationPointCreationDraft?,
     locationPermissionGranted: Boolean,
     onRequestLocationPermission: () -> Unit,
-    onStartObservationPointCreation: () -> Unit,
-    onConfirmObservationPointCreation: (Double, Double) -> Unit,
-    onCancelObservationPointCreation: () -> Unit,
+    onRequestCreateRecord: (Double, Double) -> Unit,
     onCoverageTerritoryMissing: () -> Unit = {},
     onOpenOfflineMaps: () -> Unit = {},
     coverageEditNonce: Int = 0,
@@ -119,7 +115,6 @@ internal fun BeeMap(
     val normalCameraPadding = remember { normalMapCameraPadding() }
     val reading = (locationState as? LocationUiState.Available)?.reading
     val gpsPosition = reading?.let { MapTarget(it.latitude, it.longitude) }
-    val isCreatingObservationPoint = observationPointDraft != null
     val coverageSelectionActive = coverageSelectionMode
     val measurement = if (
         !coverageSelectionActive &&
@@ -200,9 +195,6 @@ internal fun BeeMap(
         coverageSelectionMode = false
         editingTerritoryId = null
         workingCoverage = emptyList()
-    }
-    BackHandler(enabled = mode == BeeMapMode.FIELD && isCreatingObservationPoint && !coverageSelectionActive) {
-        onCancelObservationPointCreation()
     }
 
     LaunchedEffect(coverageSelectionMode, map) {
@@ -297,17 +289,6 @@ internal fun BeeMap(
                     ),
                 )
             }
-        }
-
-        LaunchedEffect(map, observationPointDraft?.originalGps) {
-            val originalGps = observationPointDraft?.originalGps ?: return@LaunchedEffect
-            val mapInstance = map ?: return@LaunchedEffect
-            recenteredUntilNextGesture = true
-            mapInstance.animateCamera(
-                CameraUpdateFactory.newLatLng(
-                    LatLng(originalGps.latitude, originalGps.longitude),
-                ),
-            )
         }
 
         DisposableEffect(map, mapView, gpsPosition) {
@@ -443,52 +424,30 @@ internal fun BeeMap(
         }
 
         if (mode == BeeMapMode.FIELD && !coverageSelectionActive) {
-            if (observationPointDraft == null) {
-                MapIdleControls(
-                    canRecenter = reading != null,
-                    canCreateObservationPoint = reading != null &&
-                        mapCenter != null &&
-                        initialGpsCenterEstablished,
-                    onRecenter = {
-                        reading?.let { current ->
-                            map?.let { mapInstance ->
-                                recenteredUntilNextGesture = true
-                                mapInstance.animateCamera(
-                                    CameraUpdateFactory.newLatLng(
-                                        LatLng(current.latitude, current.longitude),
-                                    ),
-                                )
-                            }
-                        }
-                    },
-                    onCreateObservationPoint = onStartObservationPointCreation,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).zIndex(3f),
-                )
-            } else {
-                MapCreationControls(
-                    canRecenter = map != null,
-                    canConfirm = map?.cameraPosition?.target != null,
-                    isSaving = false,
-                    onRecenter = {
+            MapIdleControls(
+                canRecenter = reading != null,
+                canCreateRecord = reading != null &&
+                    mapCenter != null &&
+                    initialGpsCenterEstablished,
+                onRecenter = {
+                    reading?.let { current ->
                         map?.let { mapInstance ->
-                            val originalGps = observationPointDraft.originalGps
                             recenteredUntilNextGesture = true
                             mapInstance.animateCamera(
                                 CameraUpdateFactory.newLatLng(
-                                    LatLng(originalGps.latitude, originalGps.longitude),
+                                    LatLng(current.latitude, current.longitude),
                                 ),
                             )
                         }
-                    },
-                    onConfirm = {
-                        map?.cameraPosition?.target?.let { target ->
-                            onConfirmObservationPointCreation(target.latitude, target.longitude)
-                        }
-                    },
-                    onCancel = onCancelObservationPointCreation,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).zIndex(3f),
-                )
-            }
+                    }
+                },
+                onCreateRecord = {
+                    map?.cameraPosition?.target?.let { target ->
+                        onRequestCreateRecord(target.latitude, target.longitude)
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).zIndex(3f),
+            )
         }
 
         if (mode == BeeMapMode.FIELD && coverageSelectionActive) {
@@ -568,7 +527,7 @@ internal fun BeeMap(
                     .onSizeChanged { coverageControlsHeightPx = it.height }
                     .zIndex(3f),
             )
-        } else if (mode == BeeMapMode.FIELD && !isCreatingObservationPoint && territoryId != null) {
+        } else if (mode == BeeMapMode.FIELD && territoryId != null) {
             CoverageSelectionEntry(
                 onEnter = {
                     if (!coverageLoading && coverageLoadedFor == territoryId) {

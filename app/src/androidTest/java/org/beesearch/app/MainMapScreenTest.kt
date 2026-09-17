@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -19,13 +20,12 @@ import java.time.Instant
 import java.util.UUID
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
-import org.beesearch.app.ui.map.CANCEL_OBSERVATION_POINT_DESCRIPTION
-import org.beesearch.app.ui.map.CONFIRM_OBSERVATION_POINT_DESCRIPTION
-import org.beesearch.app.ui.map.CREATE_OBSERVATION_POINT_DESCRIPTION
+import org.beesearch.app.ui.map.CREATE_RECORD_DESCRIPTION
+import org.beesearch.app.ui.map.OBJECTS_DESCRIPTION
 import org.beesearch.app.ui.map.CompactMapStatus
 import org.beesearch.app.ui.map.MAIN_BOTTOM_PANEL_TAG
 import org.beesearch.app.ui.map.MAIN_MAP_VIEWPORT_TAG
-import org.beesearch.app.ui.map.MapCreationControls
+import org.beesearch.app.ui.map.CreateRecordTypeChooserDialog
 import org.beesearch.app.ui.map.MapFirstScaffold
 import org.beesearch.app.ui.map.MapIdleControls
 import org.beesearch.app.ui.map.RECENTER_MAP_DESCRIPTION
@@ -45,10 +45,12 @@ class MainMapScreenTest {
         val settingsOpened = mutableStateOf(false)
         val recentered = mutableStateOf(false)
         val creationStarted = mutableStateOf(false)
+        val objectsOpened = mutableStateOf(false)
 
         composeRule.setContent {
             Bee_searchTheme {
                 MapFirstScaffold(
+                    onOpenObjects = { objectsOpened.value = true },
                     onOpenSettings = { settingsOpened.value = true },
                 ) { mapModifier ->
                     Box(mapModifier.testTag(MAIN_MAP_VIEWPORT_TAG)) {
@@ -60,9 +62,9 @@ class MainMapScreenTest {
                         MapCenterTarget(Modifier.align(Alignment.Center))
                         MapIdleControls(
                             canRecenter = true,
-                            canCreateObservationPoint = true,
+                            canCreateRecord = true,
                             onRecenter = { recentered.value = true },
-                            onCreateObservationPoint = { creationStarted.value = true },
+                            onCreateRecord = { creationStarted.value = true },
                             modifier = Modifier.align(Alignment.BottomEnd),
                         )
                     }
@@ -107,12 +109,17 @@ class MainMapScreenTest {
             .assertIsEnabled()
             .assertHasClickAction()
         val createNode = composeRule
-            .onNodeWithContentDescription(CREATE_OBSERVATION_POINT_DESCRIPTION)
+            .onNodeWithContentDescription(CREATE_RECORD_DESCRIPTION)
             .assertIsDisplayed()
             .assertIsEnabled()
             .assertHasClickAction()
         val settingsNode = composeRule
             .onNodeWithContentDescription(SETTINGS_DESCRIPTION)
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .assertHasClickAction()
+        val objectsNode = composeRule
+            .onNodeWithContentDescription(OBJECTS_DESCRIPTION)
             .assertIsDisplayed()
             .assertIsEnabled()
             .assertHasClickAction()
@@ -122,6 +129,8 @@ class MainMapScreenTest {
         assertTrue(createNode.fetchSemanticsNode().boundsInRoot.height >= minimumTouchTargetPx)
         assertTrue(settingsNode.fetchSemanticsNode().boundsInRoot.width >= minimumTouchTargetPx)
         assertTrue(settingsNode.fetchSemanticsNode().boundsInRoot.height >= minimumTouchTargetPx)
+        assertTrue(objectsNode.fetchSemanticsNode().boundsInRoot.width >= minimumTouchTargetPx)
+        assertTrue(objectsNode.fetchSemanticsNode().boundsInRoot.height >= minimumTouchTargetPx)
         assertTrue(
             "Settings belongs at the right edge of the panel",
             settingsNode.fetchSemanticsNode().boundsInRoot.right > panelBounds.right - maximumPanelHeightPx,
@@ -130,10 +139,12 @@ class MainMapScreenTest {
         recenterNode.performClick()
         createNode.performClick()
         settingsNode.performClick()
+        objectsNode.performClick()
         composeRule.runOnIdle {
             assertTrue(recentered.value)
             assertTrue(creationStarted.value)
             assertTrue(settingsOpened.value)
+            assertTrue(objectsOpened.value)
         }
     }
 
@@ -149,6 +160,7 @@ class MainMapScreenTest {
         composeRule.setContent {
             Bee_searchTheme {
                 MapFirstScaffold(
+                    onOpenObjects = {},
                     onOpenSettings = {},
                 ) { mapModifier ->
                     Box(mapModifier.fillMaxSize().testTag(MAIN_MAP_VIEWPORT_TAG)) {
@@ -160,9 +172,9 @@ class MainMapScreenTest {
                         MapCenterTarget(Modifier.align(Alignment.Center))
                         MapIdleControls(
                             canRecenter = true,
-                            canCreateObservationPoint = true,
+                            canCreateRecord = true,
                             onRecenter = { measurement.value = null },
-                            onCreateObservationPoint = {},
+                            onCreateRecord = {},
                             modifier = Modifier.align(Alignment.BottomEnd),
                         )
                     }
@@ -184,43 +196,47 @@ class MainMapScreenTest {
     }
 
     @Test
-    fun creationControlsExposeConfirmCancelAndRecenterActions() {
-        val recentered = mutableStateOf(false)
-        val confirmed = mutableStateOf(false)
-        val cancelled = mutableStateOf(false)
+    fun createRecordOpensChooserAndOnlyObservationPointIsEnabled() {
+        var observationPointSelected = false
 
         composeRule.setContent {
             Bee_searchTheme {
                 Box(Modifier.fillMaxSize()) {
-                    MapCreationControls(
-                        canRecenter = true,
-                        canConfirm = true,
-                        isSaving = false,
-                        onRecenter = { recentered.value = true },
-                        onConfirm = { confirmed.value = true },
-                        onCancel = { cancelled.value = true },
-                        modifier = Modifier.align(Alignment.BottomEnd),
+                    CreateRecordTypeChooserDialog(
+                        onDismiss = {},
+                        onCreateObservationPoint = { observationPointSelected = true },
                     )
                 }
             }
         }
 
-        composeRule.onNodeWithContentDescription(RECENTER_MAP_DESCRIPTION)
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
-        composeRule.onNodeWithContentDescription(CONFIRM_OBSERVATION_POINT_DESCRIPTION)
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
-        composeRule.onNodeWithContentDescription(CANCEL_OBSERVATION_POINT_DESCRIPTION)
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
+        composeRule.onNodeWithTag("create-type-chooser").assertIsDisplayed()
+        composeRule.onNodeWithTag("create-observation-point-type").assertIsEnabled().performClick()
+        composeRule.onNodeWithTag("future-create-type-дупло").assertIsNotEnabled()
+        composeRule.onNodeWithTag("future-create-type-колода").assertIsNotEnabled()
+        composeRule.onNodeWithTag("future-create-type-ловушка").assertIsNotEnabled()
+        composeRule.onNodeWithTag("future-create-type-пасека").assertIsNotEnabled()
+        composeRule.runOnIdle { assertTrue(observationPointSelected) }
+    }
+
+    @Test
+    fun dismissingCreateChooserDoesNotStartAnyWorkflow() {
+        var dismissed = false
+        var observationPointSelected = false
+        composeRule.setContent {
+            Bee_searchTheme {
+                CreateRecordTypeChooserDialog(
+                    onDismiss = { dismissed = true },
+                    onCreateObservationPoint = { observationPointSelected = true },
+                )
+            }
+        }
+
+        composeRule.runOnIdle { assertTrue(!observationPointSelected) }
+        composeRule.onNodeWithTag("dismiss-create-type-chooser").performClick()
         composeRule.runOnIdle {
-            assertTrue(recentered.value)
-            assertTrue(confirmed.value)
-            assertTrue(cancelled.value)
+            assertTrue(dismissed)
+            assertTrue(!observationPointSelected)
         }
     }
 
@@ -247,6 +263,10 @@ class MainMapScreenTest {
                 )
             }
         }
+
+        composeRule.onNodeWithTag("settings-data").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-help").assertIsDisplayed()
+        composeRule.onNodeWithText("Точки").assertDoesNotExist()
 
         composeRule
             .onNodeWithText("Наблюдатель")

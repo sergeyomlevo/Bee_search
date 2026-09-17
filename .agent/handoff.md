@@ -6,9 +6,33 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Navigation shell milestone (D077, 2026-09-17)
+
+The main map is now the common creation entry. Its red center point is the
+selected coordinate; tapping the plus captures that exact map-center latitude
+and longitude in a transient draft and opens `Что создать?`. Choosing the only
+implemented type, `Точка наблюдения`, opens the existing preparation workflow
+without another GPS fix or coordinate-confirmation screen. Later GPS updates do
+not mutate the captured coordinates. Opening or dismissing the chooser does not
+persist research data, and cancelling preparation still discards the draft.
+
+The chooser visibly reserves disabled entries for `Дупло`, `Колода`, `Ловушка`
+and `Пасека`; no entity, form, placeholder record, Room migration, or backup
+change exists for them. The separate bottom action `Объекты` opens a small
+view-only catalog whose implemented entry `Точки наблюдения` routes to the
+unchanged Points Browser v1. Points was removed from Settings. Back navigation
+is detail -> Points Browser -> Objects -> main map.
+
+Debug compilation, the full debug unit suite, lint, androidTest compilation and
+debug assembly pass. On Samsung SM-S938B at `font_scale=1.7`, 15 focused UI
+tests passed while preserving `org.beesearch.app.dev`. Manual checks covered a
+manually displaced red point, the create-type chooser, direct preparation
+entry, cancellation without a new point, Settings without Points, the full
+Objects/Points/detail back chain, and the retained offline vector Map Package.
+
 ## Points Browser v1 milestone (D076, 2026-09-17)
 
-Settings now opens a dedicated `Точки` route for the current Territory. A
+The Objects catalog now opens a dedicated `Точки` route for the current Territory. A
 single ViewModel state filters the Territory's saved ObservationPoint summaries
 by the most recent available year, another available year, or all years, and
 feeds both the MapLibre map and compact table. Points are ordered newest first;

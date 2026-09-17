@@ -202,9 +202,9 @@ revisable UI detail rather than a domain rule.
 - move Settings to bottom navigation;
 - replace textual `Центр` with a compact crosshair or recenter icon;
 - show compact `Точность: 3,8 м` instead of `Точность GPS: 3,8 м`;
-- rename `Новая точка` to `Создать точку наблюдения`;
+- further refine the accepted general `Создать запись здесь` entry if field evidence requires it;
 - remove the large `Управление территориями` action from the main map screen;
-- introduce bottom navigation such as `Map/Home | Points | Settings`.
+- further refine the accepted bottom actions `Объекты | Настройки` without mixing creation and browsing.
 
 **Motivation / expected value:** Give the map more space and reduce visual noise
 during frequent field work.
@@ -213,10 +213,11 @@ during frequent field work.
 device testing; a replacement way to keep the current Territory unambiguous and
 Territory management safely reachable.
 
-**Notes:** This remains an idea until the navigation and UX are explicitly
-accepted. Removing Territory information without an adequate replacement would
-conflict with the current workflow requirement that the active Territory be
-clear on the working screen.
+**Notes:** D077 accepts only the general create chooser and the
+`Объекты | Настройки` navigation shell. The broader visual simplification in
+this idea remains unaccepted. Removing Territory information without an adequate
+replacement would conflict with the current workflow requirement that the active
+Territory be clear on the working screen.
 
 ## I005 — Pre-field compass check and HeadingProvider diagnostics
 

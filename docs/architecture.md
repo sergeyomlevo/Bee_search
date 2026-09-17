@@ -917,36 +917,32 @@ timestamp
 Предполагаемый поток:
 
 ```text
-Пользователь выбирает создание точки
+GPS position → Map screen
+        ↓
+пользователь корректирует карту под красным прицелом
+        ↓
+крестик фиксирует текущий map center
+        ↓
+chooser типа записи
+        ↓
+`Точка наблюдения`
         ↓
 current Territory и current Observer валидны?
         │
-       нет → карта остаётся доступной; создание точки показывает сообщение и предлагает Settings
+       нет → chooser закрывается; карта показывает сообщение и предлагает Settings
         ↓
-сохранить immutable territory_id + observer_id
+transient preparation draft с зафиксированными coordinates,
+original GPS, immutable territory_id + observer_id
         ↓
-LocationProvider
-        ↓
-GPS position
-        ↓
-Map screen
-        ↓
-temporary marker
-        ↓
-manual correction
-        ↓
-confirmation
-        ↓
-transient preparation draft
-        ↓
-first Bee → ObservationPoint + Bee + BEES_FOUND transactionally
+`Добавить` → ObservationPoint с nullable result
         │
-        └── `Пчёлы отсутствуют` → ObservationPoint + NO_BEES_FOUND + completed_at transactionally
+        └── `Пчёлы отсутствуют` → ObservationPoint + NO_BEES_FOUND + completed_at
 ```
 
-До первого содержательного результата Close или system Back отбрасывают draft
-без записи в Room. При ошибке одной из транзакций первого результата Room
-откатывает всю операцию: не остаётся отдельной пустой ObservationPoint.
+Открытие или отмена chooser не записывает данные. После выбора типа дальнейшие
+GPS updates не меняют зафиксированные coordinates. Close или system Back из
+preparation отбрасывают draft без записи в Room. Persistence и атомарность
+дальнейшего Observation workflow определяются D075.
 
 Если сохранение кода не удалось, поток не доходит до Room. Если транзакция
 первого результата не удалась после успешной записи кода, код остаётся в

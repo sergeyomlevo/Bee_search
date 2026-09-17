@@ -2,6 +2,7 @@
 
 package org.beesearch.app.ui.points
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +56,7 @@ internal fun PointDetailScreen(
     state: PointDetailUiState,
     onBack: () -> Unit,
 ) {
+    BackHandler(onBack = onBack)
     Scaffold(
         topBar = {
             TopAppBar(

@@ -60,6 +60,7 @@ sealed interface AppRoute {
     data object Settings : AppRoute
     data object Help : AppRoute
     data object Data : AppRoute
+    data object Objects : AppRoute
     data object Points : AppRoute
     data class PointDetail(val pointId: UUID) : AppRoute
     data object TerritoryManagement : AppRoute
@@ -200,6 +201,11 @@ internal class MainViewModel(
         clearFeedback()
     }
 
+    fun openObjects() {
+        manualRoute.value = AppRoute.Objects
+        clearFeedback()
+    }
+
     fun openPoints() {
         manualRoute.value = AppRoute.Points
         clearFeedback()
@@ -335,12 +341,14 @@ internal class MainViewModel(
         }
     }
 
-    fun startObservationPointCreation() {
+    fun requestCreateRecord(latitude: Double, longitude: Double) {
         val existingPoint = activePoint.value
         if (existingPoint != null) {
             openResumeObservation(existingPoint)
             return
         }
+        if (!latitude.isFinite() || latitude !in -90.0..90.0) return
+        if (!longitude.isFinite() || longitude !in -180.0..180.0) return
         val territory = currentTerritory.value
         if (territory == null) {
             showPersistentFeedback("Сначала выберите текущую территорию")
@@ -361,23 +369,21 @@ internal class MainViewModel(
             territoryId = territory.id,
             observerId = observer.id,
             originalGps = reading,
-        )
+        ).withSelectedMapCenter(MapTarget(latitude, longitude))
         _observationPointDraft.value = draft
         clearFeedback()
     }
 
-    fun cancelObservationPointCreation() {
+    fun dismissCreateRecordChooser() {
         _observationPointDraft.value = null
         clearFeedback()
     }
 
-    fun confirmObservationPointCreation(latitude: Double, longitude: Double) {
+    fun createObservationPointFromChooser() {
         val draft = _observationPointDraft.value ?: return
-        if (!latitude.isFinite() || latitude !in -90.0..90.0) return
-        if (!longitude.isFinite() || longitude !in -180.0..180.0) return
         _observationPointDraft.value = null
         _observationPointPreparationDraft.value = ObservationPointPreparationDraft(
-            point = draft.withSelectedMapCenter(MapTarget(latitude, longitude)).toNewObservationPoint(),
+            point = draft.toNewObservationPoint(),
         )
         manualRoute.value = AppRoute.PrepareObservationPoint
         clearFeedback()

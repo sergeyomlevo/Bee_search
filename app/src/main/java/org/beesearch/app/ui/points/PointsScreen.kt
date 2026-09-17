@@ -2,6 +2,7 @@
 
 package org.beesearch.app.ui.points
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -100,6 +101,7 @@ internal fun PointsScreen(
     onSelectPoint: (UUID) -> Unit,
     onOpenPoint: (UUID) -> Unit,
 ) {
+    BackHandler(onBack = onBack)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -125,12 +127,9 @@ internal fun PointsScreen(
                         coverageStore = mapCoverageStore,
                         packageStore = mapPackageStore,
                         locationState = LocationUiState.PermissionRequired,
-                        observationPointDraft = null,
                         locationPermissionGranted = false,
                         onRequestLocationPermission = {},
-                        onStartObservationPointCreation = {},
-                        onConfirmObservationPointCreation = { _, _ -> },
-                        onCancelObservationPointCreation = {},
+                        onRequestCreateRecord = { _, _ -> },
                         mode = BeeMapMode.POINT_BROWSER,
                         savedObservationPoints = state.points,
                         onSelectSavedObservationPoint = onSelectPoint,

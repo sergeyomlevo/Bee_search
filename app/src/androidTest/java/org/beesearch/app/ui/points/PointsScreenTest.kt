@@ -21,7 +21,6 @@ import org.beesearch.app.domain.model.ObservationPointSummary
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.ui.map.SavedObservationPointMarker
-import org.beesearch.app.ui.settings.SettingsScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -30,30 +29,6 @@ import org.junit.Test
 class PointsScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
-
-    @Test
-    fun settingsEntryOpensPoints() {
-        var opened = false
-        composeRule.setContent {
-            Bee_searchTheme {
-                SettingsScreen(
-                    observers = listOf(observer),
-                    currentObserverId = observer.id,
-                    territories = listOf(territory),
-                    currentTerritoryId = territory.id,
-                    onBack = {},
-                    onOpenPoints = { opened = true },
-                    onSelectObserver = {},
-                    onCreateObserver = { _, _, _, _, _ -> },
-                    onSelectTerritory = {},
-                    onCreateTerritory = { _, _, _, _ -> },
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag("settings-points").performScrollTo().performClick()
-        composeRule.runOnIdle { assertEquals(true, opened) }
-    }
 
     @Test
     fun tableShowsResultsCountsAndOpensTheCorrectPoint() {

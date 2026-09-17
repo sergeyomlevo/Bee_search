@@ -50,15 +50,17 @@ internal fun CurrentTerritoryScreen(
     observationPointDraft: ObservationPointCreationDraft?,
     locationPermissionGranted: Boolean,
     onRequestLocationPermission: () -> Unit,
-    onStartObservationPointCreation: () -> Unit,
-    onConfirmObservationPointCreation: (Double, Double) -> Unit,
-    onCancelObservationPointCreation: () -> Unit,
+    onRequestCreateRecord: (Double, Double) -> Unit,
+    onDismissCreateRecordChooser: () -> Unit,
+    onCreateObservationPoint: () -> Unit,
+    onOpenObjects: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenOfflineMaps: () -> Unit = {},
     onOpenTerritories: () -> Unit,
     coverageEditNonce: Int = 0,
 ) {
     MapFirstScaffold(
+        onOpenObjects = onOpenObjects,
         onOpenSettings = onOpenSettings,
     ) { mapModifier ->
         Box(modifier = mapModifier) {
@@ -67,17 +69,20 @@ internal fun CurrentTerritoryScreen(
                     coverageStore = mapCoverageStore,
                     packageStore = mapPackageStore,
                     locationState = locationState,
-                    observationPointDraft = observationPointDraft,
                     locationPermissionGranted = locationPermissionGranted,
                     onRequestLocationPermission = onRequestLocationPermission,
-                    onStartObservationPointCreation = onStartObservationPointCreation,
-                    onConfirmObservationPointCreation = onConfirmObservationPointCreation,
-                    onCancelObservationPointCreation = onCancelObservationPointCreation,
+                    onRequestCreateRecord = onRequestCreateRecord,
                     onCoverageTerritoryMissing = onOpenSettings,
                     onOpenOfflineMaps = onOpenOfflineMaps,
                     coverageEditNonce = coverageEditNonce,
                     modifier = Modifier.fillMaxSize().testTag(MAIN_MAP_VIEWPORT_TAG),
                 )
+            if (observationPointDraft != null) {
+                CreateRecordTypeChooserDialog(
+                    onDismiss = onDismissCreateRecordChooser,
+                    onCreateObservationPoint = onCreateObservationPoint,
+                )
+            }
             if (territory == null) {
                 Surface(
                     modifier = Modifier.align(Alignment.Center).padding(24.dp),
@@ -101,13 +106,13 @@ internal fun CurrentTerritoryScreen(
 internal const val MAIN_MAP_VIEWPORT_TAG = "main-map-viewport"
 internal const val MAIN_BOTTOM_PANEL_TAG = "main-bottom-panel"
 internal const val RECENTER_MAP_DESCRIPTION = "Вернуться к текущему местоположению"
-internal const val CREATE_OBSERVATION_POINT_DESCRIPTION = "Создать точку наблюдения"
-internal const val CONFIRM_OBSERVATION_POINT_DESCRIPTION = "Подтвердить точку наблюдения"
-internal const val CANCEL_OBSERVATION_POINT_DESCRIPTION = "Отменить создание точки наблюдения"
+internal const val CREATE_RECORD_DESCRIPTION = "Создать запись здесь"
+internal const val OBJECTS_DESCRIPTION = "Объекты"
 internal const val SETTINGS_DESCRIPTION = "Настройки"
 
 @Composable
 internal fun MapFirstScaffold(
+    onOpenObjects: () -> Unit,
     onOpenSettings: () -> Unit,
     content: @Composable BoxScope.(Modifier) -> Unit,
 ) {
@@ -115,7 +120,7 @@ internal fun MapFirstScaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            MapBottomPanel(onOpenSettings = onOpenSettings)
+            MapBottomPanel(onOpenObjects = onOpenObjects, onOpenSettings = onOpenSettings)
         },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -126,6 +131,7 @@ internal fun MapFirstScaffold(
 
 @Composable
 internal fun MapBottomPanel(
+    onOpenObjects: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Surface(tonalElevation = 3.dp) {
@@ -139,12 +145,43 @@ internal fun MapBottomPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
+                onClick = onOpenObjects,
+                modifier = Modifier
+                    .size(48.dp)
+                    .semantics { contentDescription = OBJECTS_DESCRIPTION }
+                    .testTag("open-objects"),
+            ) {
+                ObjectsGlyph(Modifier.size(28.dp))
+            }
+            IconButton(
                 onClick = onOpenSettings,
                 modifier = Modifier
                     .size(48.dp)
                     .semantics { contentDescription = SETTINGS_DESCRIPTION },
             ) {
                 SettingsGlyph(Modifier.size(30.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ObjectsGlyph(modifier: Modifier = Modifier) {
+    val color = LocalContentColor.current
+    Canvas(modifier) {
+        val cell = size.minDimension * 0.28f
+        val gap = size.minDimension * 0.12f
+        val total = cell * 2f + gap
+        val startX = (size.width - total) / 2f
+        val startY = (size.height - total) / 2f
+        repeat(2) { row ->
+            repeat(2) { column ->
+                drawRect(
+                    color = color,
+                    topLeft = Offset(startX + column * (cell + gap), startY + row * (cell + gap)),
+                    size = androidx.compose.ui.geometry.Size(cell, cell),
+                    style = Stroke(width = 2.dp.toPx()),
+                )
             }
         }
     }
@@ -244,9 +281,9 @@ internal fun CompactGpsAccuracy(
 @Composable
 internal fun MapIdleControls(
     canRecenter: Boolean,
-    canCreateObservationPoint: Boolean,
+    canCreateRecord: Boolean,
     onRecenter: () -> Unit,
-    onCreateObservationPoint: () -> Unit,
+    onCreateRecord: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -262,69 +299,16 @@ internal fun MapIdleControls(
                 .semantics { contentDescription = RECENTER_MAP_DESCRIPTION }
                 .testTag("map-recenter"),
         ) { RecenterGlyph() }
-        if (canCreateObservationPoint) {
+        if (canCreateRecord) {
             Button(
-                onClick = onCreateObservationPoint,
+                onClick = onCreateRecord,
                 shape = CircleShape,
                 contentPadding = PaddingValues(0.dp),
                 modifier = Modifier
                     .size(56.dp)
-                    .semantics { contentDescription = CREATE_OBSERVATION_POINT_DESCRIPTION }
-                    .testTag("create-observation-point"),
+                    .semantics { contentDescription = CREATE_RECORD_DESCRIPTION }
+                    .testTag("create-record"),
             ) { AddPointGlyph() }
-        }
-    }
-}
-
-@Composable
-internal fun MapCreationControls(
-    canRecenter: Boolean,
-    canConfirm: Boolean,
-    isSaving: Boolean,
-    onRecenter: () -> Unit,
-    onConfirm: () -> Unit,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        FilledTonalIconButton(
-            onClick = onRecenter,
-            enabled = canRecenter && !isSaving,
-            modifier = Modifier
-                .size(48.dp)
-                .semantics { contentDescription = RECENTER_MAP_DESCRIPTION }
-                .testTag("map-recenter"),
-        ) { RecenterGlyph() }
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            tonalElevation = 3.dp,
-            shadowElevation = 1.dp,
-        ) {
-            Column(
-                modifier = Modifier.padding(4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Button(
-                    onClick = onConfirm,
-                    enabled = canConfirm && !isSaving,
-                    modifier = Modifier
-                        .semantics { contentDescription = CONFIRM_OBSERVATION_POINT_DESCRIPTION }
-                        .testTag("confirm-observation-point"),
-                ) {
-                    Text(if (isSaving) "Сохранение…" else "Подтвердить")
-                }
-                TextButton(
-                    onClick = onCancel,
-                    enabled = !isSaving,
-                    modifier = Modifier
-                        .semantics { contentDescription = CANCEL_OBSERVATION_POINT_DESCRIPTION }
-                        .testTag("cancel-observation-point"),
-                ) { Text("Отмена") }
-            }
         }
     }
 }
