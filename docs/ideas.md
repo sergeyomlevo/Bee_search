@@ -183,14 +183,13 @@ found.
 observations visible in the field and during later review.
 
 **Dependencies / prerequisites:** D056 provides stored observation year and
-scoped point numbering; D057 provides the explicit Bee presence result.
-Historical point queries, Points-screen navigation, and map visualization still
-require their own implementation milestone.
+scoped point numbering; D057 provides the explicit Bee presence result. Points
+Browser v1 implements the historical summary query, dedicated navigation,
+Territory/year filtering, map/table views, and read-only point history.
 
-**Notes:** The general ability to review saved points is already part of product
-requirements. The dedicated Points navigation, year filtering, result-based
-map distinction, and exact presentation remain ideas. Exact marker colors are
-not decided.
+**Notes:** The remaining idea scope is refinement beyond v1, such as additional
+filters and exact long-term marker presentation. Exact marker colors remain a
+revisable UI detail rather than a domain rule.
 
 ## I004 — Main field UI simplification
 

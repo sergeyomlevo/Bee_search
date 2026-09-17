@@ -250,6 +250,7 @@ class MainMapScreenTest {
 
         composeRule
             .onNodeWithText("Наблюдатель")
+            .performScrollTo()
             .assertIsDisplayed()
         composeRule
             .onNodeWithText("Сделать текущей")

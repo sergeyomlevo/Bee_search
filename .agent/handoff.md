@@ -6,6 +6,30 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Points Browser v1 milestone (D076, 2026-09-17)
+
+Settings now opens a dedicated `Точки` route for the current Territory. A
+single ViewModel state filters the Territory's saved ObservationPoint summaries
+by the most recent available year, another available year, or all years, and
+feeds both the MapLibre map and compact table. Points are ordered newest first;
+summary rows include Bee and completed-FlightCycle aggregates. Map markers
+distinguish `BEES_FOUND`, `NO_BEES_FOUND`, and unresolved `null` results and
+open the same read-only detail route as table rows.
+
+Detail loads one ObservationPoint transactionally with its Territory, Observer,
+Bees, and ordered FlightCycles. It shows persisted coordinates/GPS accuracy,
+raw result, completed duration, optional azimuth, and explicitly labels an open
+cycle. Room remains version 6; no entity, migration, backup, observation-entry,
+or analysis behavior changed. I003 remains an idea only for refinements beyond
+this accepted v1.
+
+Debug compilation, the full debug unit suite, lint, androidTest compilation,
+and debug assembly pass. On Samsung SM-S938B, 11 focused Points/Room/main-map
+tests pass while preserving `org.beesearch.app.dev`. Manual checks at system
+`font_scale=1.7` used existing DEV research data to open Points, switch
+Map/Table, select all years, open the same point from a row and marker, inspect
+Bee/FlightCycle history, and render the retained offline vector Map Package.
+
 ## Observation workflow milestone (D075, 2026-09-15)
 
 The initial group release is retired. Confirming a prepared point with `Добавить`

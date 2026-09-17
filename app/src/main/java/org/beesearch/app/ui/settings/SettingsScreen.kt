@@ -50,6 +50,7 @@ internal fun SettingsScreen(
     onOpenOfflineMaps: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
     onOpenData: () -> Unit = {},
+    onOpenPoints: () -> Unit = {},
     onSelectObserver: (UUID) -> Unit,
     onCreateObserver: (String, String, String, String, String) -> Unit,
     onUpdateObserver: (Observer) -> Unit = {},
@@ -115,6 +116,12 @@ internal fun SettingsScreen(
                     TextButton(onClick = onOpenOfflineMaps) { Text("Открыть") }
                 }
             }
+            SettingsDestination(
+                title = "Точки",
+                description = "Карта, таблица и история сохранённых наблюдений.",
+                testTag = "settings-points",
+                onOpen = onOpenPoints,
+            )
             SettingsDestination(
                 title = "Данные",
                 description = "Экспорт и очистка данных наблюдений.",

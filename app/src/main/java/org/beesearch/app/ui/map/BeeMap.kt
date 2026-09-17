@@ -58,6 +58,7 @@ import org.beesearch.app.beeSearchFieldMapProfile
 import org.beesearch.app.beeSearchActivePmtilesMapProfile
 import org.beesearch.app.BuildConfig
 import org.beesearch.app.domain.location.LocationUiState
+import org.beesearch.app.domain.model.ObservationPointSummary
 import org.beesearch.app.visibleMapMeasurement
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
@@ -66,6 +67,11 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+
+internal enum class BeeMapMode {
+    FIELD,
+    POINT_BROWSER,
+}
 
 @Composable
 internal fun BeeMap(
@@ -82,6 +88,9 @@ internal fun BeeMap(
     onCoverageTerritoryMissing: () -> Unit = {},
     onOpenOfflineMaps: () -> Unit = {},
     coverageEditNonce: Int = 0,
+    mode: BeeMapMode = BeeMapMode.FIELD,
+    savedObservationPoints: List<ObservationPointSummary> = emptyList(),
+    onSelectSavedObservationPoint: (UUID) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -187,12 +196,12 @@ internal fun BeeMap(
     }
     val activeMapPackage = (packageAvailability as? MapPackageAvailability.Ready)?.activePackage
     val activeVectorProfile = activeMapPackage?.let(::beeSearchActivePmtilesMapProfile)
-    BackHandler(enabled = coverageSelectionActive) {
+    BackHandler(enabled = mode == BeeMapMode.FIELD && coverageSelectionActive) {
         coverageSelectionMode = false
         editingTerritoryId = null
         workingCoverage = emptyList()
     }
-    BackHandler(enabled = isCreatingObservationPoint && !coverageSelectionActive) {
+    BackHandler(enabled = mode == BeeMapMode.FIELD && isCreatingObservationPoint && !coverageSelectionActive) {
         onCancelObservationPointCreation()
     }
 
@@ -239,7 +248,11 @@ internal fun BeeMap(
             }
         }
 
-        LaunchedEffect(reading, map, mapView) {
+        LaunchedEffect(reading, map, mapView, mode) {
+            if (mode != BeeMapMode.FIELD) {
+                gpsScreenPosition = null
+                return@LaunchedEffect
+            }
             val current = reading
             if (current == null) {
                 gpsScreenPosition = null
@@ -260,6 +273,30 @@ internal fun BeeMap(
                 }
             }
             gpsScreenPosition = projectedMapPosition(map, mapView, gpsPosition)
+        }
+
+        LaunchedEffect(map, mode, savedObservationPoints.map(ObservationPointSummary::id)) {
+            if (mode != BeeMapMode.POINT_BROWSER || savedObservationPoints.isEmpty()) {
+                return@LaunchedEffect
+            }
+            val mapInstance = map ?: return@LaunchedEffect
+            val north = savedObservationPoints.maxOf(ObservationPointSummary::latitude)
+            val east = savedObservationPoints.maxOf(ObservationPointSummary::longitude)
+            val south = savedObservationPoints.minOf(ObservationPointSummary::latitude)
+            val west = savedObservationPoints.minOf(ObservationPointSummary::longitude)
+            if (north == south && east == west) {
+                mapInstance.moveCamera(
+                    CameraUpdateFactory.newLatLngZoom(LatLng(north, east), 15.0),
+                )
+            } else {
+                mapInstance.moveCamera(
+                    CameraUpdateFactory.newLatLngBounds(
+                        MapGeoBounds(north = north, east = east, south = south, west = west)
+                            .toLatLngBounds(),
+                        80,
+                    ),
+                )
+            }
         }
 
         LaunchedEffect(map, observationPointDraft?.originalGps) {
@@ -353,11 +390,18 @@ internal fun BeeMap(
         gpsScreenPosition?.let { position ->
             MapGpsMarker(screenPosition = position, modifier = Modifier.zIndex(1f))
         }
-        if (!coverageSelectionActive) {
+        if (mode == BeeMapMode.FIELD && !coverageSelectionActive) {
             MapCenterTarget(Modifier.align(Alignment.Center).zIndex(2f))
         }
 
-        if (locationPermissionGranted && locationState is LocationUiState.Available) {
+        if (mode == BeeMapMode.POINT_BROWSER) {
+            mapZoom?.let { zoom ->
+                MapZoomIndicator(
+                    zoom = zoom,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(8.dp).zIndex(3f),
+                )
+            }
+        } else if (locationPermissionGranted && locationState is LocationUiState.Available) {
             Row(
                 modifier = Modifier.align(Alignment.TopStart).padding(8.dp).zIndex(3f),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -398,7 +442,7 @@ internal fun BeeMap(
             }
         }
 
-        if (!coverageSelectionActive) {
+        if (mode == BeeMapMode.FIELD && !coverageSelectionActive) {
             if (observationPointDraft == null) {
                 MapIdleControls(
                     canRecenter = reading != null,
@@ -447,7 +491,7 @@ internal fun BeeMap(
             }
         }
 
-        if (coverageSelectionActive) {
+        if (mode == BeeMapMode.FIELD && coverageSelectionActive) {
             MapCoverageSelectionControls(
                 fragmentCount = coverageFragments.size,
                 viewportSummary = coverageViewportSummary,
@@ -524,7 +568,7 @@ internal fun BeeMap(
                     .onSizeChanged { coverageControlsHeightPx = it.height }
                     .zIndex(3f),
             )
-        } else if (!isCreatingObservationPoint && territoryId != null) {
+        } else if (mode == BeeMapMode.FIELD && !isCreatingObservationPoint && territoryId != null) {
             CoverageSelectionEntry(
                 onEnter = {
                     if (!coverageLoading && coverageLoadedFor == territoryId) {
@@ -549,6 +593,18 @@ internal fun BeeMap(
                     clearSelectionConfirmationVisible = false
                 },
                 onDismiss = { clearSelectionConfirmationVisible = false },
+            )
+        }
+
+
+        if (mode == BeeMapMode.POINT_BROWSER) {
+            SavedObservationPointMarkersOverlay(
+                points = savedObservationPoints,
+                map = map,
+                mapView = mapView,
+                cameraRevision = mapCameraRevision,
+                onSelectPoint = onSelectSavedObservationPoint,
+                modifier = Modifier.fillMaxSize().zIndex(2f),
             )
         }
     }

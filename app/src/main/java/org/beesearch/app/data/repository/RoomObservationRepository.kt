@@ -33,6 +33,9 @@ import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.NoReversibleBeeActionException
 import org.beesearch.app.domain.model.NoBeesFoundAlreadyRecordedException
 import org.beesearch.app.domain.model.ObservationPoint
+import org.beesearch.app.domain.model.ObservationPointSummary
+import org.beesearch.app.domain.model.ObservationPointDetail
+import org.beesearch.app.domain.model.BeeObservationHistory
 import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
@@ -55,6 +58,50 @@ internal class RoomObservationRepository(
     private val clock: Clock,
     private val observationZoneIdProvider: () -> ZoneId = { ZoneId.systemDefault() },
 ) : ObservationRepository {
+    override fun observeObservationPointSummaries(
+        territoryId: UUID,
+        observationYear: Int?,
+    ): Flow<List<ObservationPointSummary>> = pointDao.observeSummaries(territoryId, observationYear)
+        .map { rows ->
+            rows.map { row ->
+                ObservationPointSummary(
+                    id = row.id,
+                    territoryId = row.territoryId,
+                    observationYear = row.observationYear,
+                    pointNumber = row.pointNumber,
+                    code = row.code,
+                    beePresenceResult = row.beePresenceResult,
+                    latitude = row.latitude,
+                    longitude = row.longitude,
+                    gpsAccuracyM = row.gpsAccuracyM,
+                    createdAt = row.createdAt,
+                    completedAt = row.completedAt,
+                    beeCount = row.beeCount,
+                    completedFlightCycleCount = row.completedFlightCycleCount,
+                )
+            }
+        }
+
+    override suspend fun getObservationPointDetail(pointId: UUID): ObservationPointDetail? =
+        database.withTransaction {
+            val point = pointDao.getById(pointId) ?: return@withTransaction null
+            val territory = territoryDao.getById(point.territoryId) ?: return@withTransaction null
+            val observer = observerDao.getById(point.observerId) ?: return@withTransaction null
+            val bees = beeDao.getForPoint(pointId)
+            val cyclesByBee = cycleDao.getForObservationPoint(pointId).groupBy { it.beeId }
+            ObservationPointDetail(
+                point = point.toDomain(),
+                territory = territory.toDomain(),
+                observer = observer.toDomain(),
+                beeHistories = bees.map { bee ->
+                    BeeObservationHistory(
+                        bee = bee.toDomain(),
+                        flightCycles = cyclesByBee[bee.id].orEmpty().map(FlightCycleEntity::toDomain),
+                    )
+                },
+            )
+        }
+
     override fun observeActivePoint(): Flow<ObservationPoint?> = pointDao.observeActive()
         .map { point -> point?.toDomain() }
 

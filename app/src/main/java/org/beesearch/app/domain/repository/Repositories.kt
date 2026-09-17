@@ -13,6 +13,8 @@ import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.CompletedObservationPointSummary
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.domain.model.ObservationPointSummary
+import org.beesearch.app.domain.model.ObservationPointDetail
 import java.util.UUID
 
 interface SettingsRepository {
@@ -66,6 +68,11 @@ interface ObservationDataMaintenance {
 }
 
 interface ObservationRepository : ObservationPointPreparationCreator, ObservationDataMaintenance {
+    fun observeObservationPointSummaries(
+        territoryId: UUID,
+        observationYear: Int? = null,
+    ): Flow<List<ObservationPointSummary>>
+    suspend fun getObservationPointDetail(pointId: UUID): ObservationPointDetail?
     fun observeActivePoint(): Flow<ObservationPoint?>
     fun observeBees(pointId: UUID): Flow<List<Bee>>
     fun observeFlightCyclesForPoint(pointId: UUID): Flow<List<FlightCycle>>

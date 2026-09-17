@@ -1778,6 +1778,27 @@ provenance восстановленных backup-записей. Backup contract
 
 ---
 
+# D076 — Points Browser v1 использует общий read-only срез Territory/year
+
+**Статус:** ACCEPTED
+
+Сохранённые ObservationPoint просматриваются в разделе `Точки` текущей Territory.
+Карта и компактная таблица получают один и тот же read-only summary-срез и общий
+фильтр `observation_year`; доступны конкретный год и `Все годы`, а начальным
+является последний доступный год.
+
+Summary вычисляет число Bee и завершённых FlightCycle запросом из существующих
+таблиц. `BEES_FOUND`, `NO_BEES_FOUND` и nullable unresolved result остаются
+разными состояниями. Маркер и строка открывают один read-only detail, который
+показывает ObservationPoint, Observer, Bee и упорядоченные FlightCycle без
+редактирования или аналитических выводов.
+
+Points Browser не вводит persisted read model, новую domain entity или Room
+migration. Online/offline basemap, PMTiles lifecycle, GPS, создание наблюдения,
+backup и analysis остаются без изменений.
+
+---
+
 # Закрытые архитектурные вопросы
 
 - O001 — формат offline vector Map Package закрыт решением D063: PMTiles;

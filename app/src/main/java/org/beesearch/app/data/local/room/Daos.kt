@@ -21,6 +21,22 @@ internal data class CompletedObservationPointRow(
     @ColumnInfo(name = "bee_count") val beeCount: Int,
 )
 
+internal data class ObservationPointSummaryRow(
+    @ColumnInfo(name = "id") val id: UUID,
+    @ColumnInfo(name = "territory_id") val territoryId: UUID,
+    @ColumnInfo(name = "observation_year") val observationYear: Int,
+    @ColumnInfo(name = "point_number") val pointNumber: Int,
+    @ColumnInfo(name = "code") val code: String?,
+    @ColumnInfo(name = "bee_presence_result") val beePresenceResult: BeePresenceResult?,
+    @ColumnInfo(name = "latitude") val latitude: Double,
+    @ColumnInfo(name = "longitude") val longitude: Double,
+    @ColumnInfo(name = "gps_accuracy_m") val gpsAccuracyM: Double?,
+    @ColumnInfo(name = "created_at") val createdAt: Instant,
+    @ColumnInfo(name = "completed_at") val completedAt: Instant?,
+    @ColumnInfo(name = "bee_count") val beeCount: Int,
+    @ColumnInfo(name = "completed_flight_cycle_count") val completedFlightCycleCount: Int,
+)
+
 @Dao
 internal abstract class BackupDao {
     @Query("SELECT * FROM territories ORDER BY id") abstract suspend fun territories(): List<TerritoryEntity>
@@ -89,6 +105,27 @@ internal interface ObservationPointDao {
 
     @Query("SELECT * FROM observation_points WHERE id = :id")
     suspend fun getById(id: UUID): ObservationPointEntity?
+
+    @Query(
+        """
+        SELECT p.id, p.territory_id, p.observation_year, p.point_number, p.code,
+               p.bee_presence_result, p.latitude, p.longitude, p.gps_accuracy_m,
+               p.created_at, p.completed_at,
+               COUNT(DISTINCT b.id) AS bee_count,
+               COUNT(CASE WHEN c.return_time IS NOT NULL THEN 1 END) AS completed_flight_cycle_count
+        FROM observation_points AS p
+        LEFT JOIN bees AS b ON b.observation_point_id = p.id
+        LEFT JOIN flight_cycles AS c ON c.bee_id = b.id
+        WHERE p.territory_id = :territoryId
+          AND (:observationYear IS NULL OR p.observation_year = :observationYear)
+        GROUP BY p.id
+        ORDER BY p.created_at DESC, p.id
+        """,
+    )
+    fun observeSummaries(
+        territoryId: UUID,
+        observationYear: Int?,
+    ): Flow<List<ObservationPointSummaryRow>>
 
     @Query("SELECT COUNT(*) FROM observation_points WHERE completed_at IS NULL")
     suspend fun countActive(): Int
@@ -294,6 +331,17 @@ internal interface FlightCycleDao {
         """,
     )
     fun observeForObservationPoint(pointId: UUID): Flow<List<FlightCycleEntity>>
+
+    @Query(
+        """
+        SELECT flight_cycles.*
+        FROM flight_cycles
+        INNER JOIN bees ON bees.id = flight_cycles.bee_id
+        WHERE bees.observation_point_id = :pointId
+        ORDER BY bees.created_at, bees.id, flight_cycles.sequence_number
+        """,
+    )
+    suspend fun getForObservationPoint(pointId: UUID): List<FlightCycleEntity>
 
     @Query(
         """

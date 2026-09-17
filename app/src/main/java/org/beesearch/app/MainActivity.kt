@@ -47,6 +47,8 @@ import org.beesearch.app.ui.map.CurrentTerritoryScreen
 import org.beesearch.app.ui.map.OfflineMapManagementScreen
 import org.beesearch.app.ui.data.DataRoute
 import org.beesearch.app.ui.help.HelpScreen
+import org.beesearch.app.ui.points.PointDetailRoute
+import org.beesearch.app.ui.points.PointsRoute
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import kotlinx.coroutines.delay
 import org.beesearch.app.ui.observation.BeeObservationScreen
@@ -164,11 +166,26 @@ private fun BeeSearchApp(
                         onOpenOfflineMaps = viewModel::openOfflineMaps,
                         onOpenHelp = viewModel::openHelp,
                         onOpenData = viewModel::openData,
+                        onOpenPoints = viewModel::openPoints,
                     )
                     AppRoute.Help -> HelpScreen(onBack = viewModel::openSettings)
                     AppRoute.Data -> DataRoute(
                         application = application,
                         onBack = viewModel::openSettings,
+                    )
+                    AppRoute.Points -> PointsRoute(
+                        territory = currentTerritory,
+                        repository = application.container.observationRepository,
+                        mapCoverageStore = application.container.mapCoverageStore,
+                        mapPackageStore = application.container.mapPackageStore,
+                        onBack = viewModel::openSettings,
+                        onChooseTerritory = viewModel::openTerritoryManagement,
+                        onOpenPoint = viewModel::openPointDetail,
+                    )
+                    is AppRoute.PointDetail -> PointDetailRoute(
+                        pointId = currentRoute.pointId,
+                        repository = application.container.observationRepository,
+                        onBack = viewModel::openPoints,
                     )
                     AppRoute.TerritoryManagement -> TerritoryManagementScreen(
                         territories = territories,
