@@ -253,13 +253,13 @@ internal interface BeeDao {
         SELECT COUNT(*) FROM bees
         WHERE observation_point_id = :pointId
           AND mark_color = :markColor
-          AND mark_position = :markPosition
+          AND mark_position IN (:markPositionTokens)
         """,
     )
     suspend fun countByMark(
         pointId: UUID,
         markColor: String,
-        markPosition: org.beesearch.app.domain.model.MarkPosition,
+        markPositionTokens: Collection<String>,
     ): Int
 }
 

@@ -2,11 +2,13 @@ package org.beesearch.app
 
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.BeeMarkCatalog
+import org.beesearch.app.domain.model.BeeMarkCombination
 import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.MarkPosition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import java.util.UUID
@@ -16,12 +18,12 @@ class BeeObservationUiTest {
 
     @Test
     fun availableMarksAreDerivedFromCatalogMinusPersistedBees() {
-        assertEquals(15, availableBeeMarks(emptyList()).size)
+        assertEquals(10, availableBeeMarks(emptyList()).size)
 
         val used = bee("WHITE")
         val remaining = availableBeeMarks(listOf(used))
 
-        assertEquals(14, remaining.size)
+        assertEquals(9, remaining.size)
         assertFalse(
             remaining.any {
                 it.markColor == used.markColor && it.markPosition == used.markPosition
@@ -29,6 +31,39 @@ class BeeObservationUiTest {
         )
         assertEquals(BeeMarkCatalog.supportedCombinations.drop(1), remaining)
         assertEquals(remaining, availableBeeMarks(listOf(used)))
+    }
+
+    /**
+     * Real field data recorded abdomen marks as `RIGHT_WING` and thorax marks as
+     * `NONE`, so those persisted bees must consume the abdomen and thorax slots.
+     */
+    @Test
+    fun legacyPersistedPositionsConsumeTheirMappedSlots() {
+        val legacyAbdomenBee = bee("YELLOW", MarkPosition.fromPersistedToken("RIGHT_WING")!!)
+        val legacyThoraxBee = bee("BLUE", MarkPosition.fromPersistedToken("NONE")!!)
+
+        val remaining = availableBeeMarks(listOf(legacyAbdomenBee, legacyThoraxBee))
+
+        assertEquals(8, remaining.size)
+        assertFalse(BeeMarkCombination("YELLOW", MarkPosition.ABDOMEN) in remaining)
+        assertFalse(BeeMarkCombination("BLUE", MarkPosition.THORAX) in remaining)
+        assertTrue(BeeMarkCombination("YELLOW", MarkPosition.THORAX) in remaining)
+        assertTrue(BeeMarkCombination("BLUE", MarkPosition.ABDOMEN) in remaining)
+    }
+
+    /**
+     * A legacy `LEFT_WING` row is readable and keeps its own place, but it never
+     * removes one of the ten real marks from the offered list.
+     */
+    @Test
+    fun legacyLeftWingBeeIsReadableWithoutConsumingAnAvailableMark() {
+        val legacyBee = bee("GREEN", MarkPosition.LEFT_WING)
+
+        val remaining = availableBeeMarks(listOf(legacyBee))
+
+        assertEquals(10, remaining.size)
+        assertTrue(BeeMarkCombination("GREEN", MarkPosition.THORAX) in remaining)
+        assertTrue(BeeMarkCombination("GREEN", MarkPosition.ABDOMEN) in remaining)
     }
 
     @Test
@@ -212,11 +247,11 @@ class BeeObservationUiTest {
         assertEquals(listOf(secondReleased, firstReleased), cards.map { it.bee })
     }
 
-    private fun bee(color: String) = Bee(
+    private fun bee(color: String, position: MarkPosition = MarkPosition.THORAX) = Bee(
         id = UUID.randomUUID(),
         observationPointId = UUID.randomUUID(),
         markColor = color,
-        markPosition = MarkPosition.NONE,
+        markPosition = position,
         createdAt = startedAt,
     )
 

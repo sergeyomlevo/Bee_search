@@ -315,9 +315,10 @@ neutral rather than presenting it as an error.
 
 Mark choice is a derived set of available variants, not a list of Bees created
 in advance. Any future presentation change to it should keep the mark color
-recognizable by appearance and keep the position variant readable as text
-(`Грудь`, `КП`, `КЛ`), because these variants cannot be communicated by color
-alone.
+recognizable by appearance and keep the position variant readable without a text
+label, because these variants cannot be communicated by color alone. The current
+implementation of that requirement is the parametric `BeeMarkIcon` (D078), where
+the mark color is painted on the thorax or on the abdomen.
 
 **Motivation / expected value:** Reduce vertical space, reading load, and visual
 noise during time-sensitive field work, while keeping the most frequent

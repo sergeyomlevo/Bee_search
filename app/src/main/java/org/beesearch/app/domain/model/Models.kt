@@ -60,10 +60,53 @@ enum class BeePresenceResult {
     NO_BEES_FOUND,
 }
 
+/**
+ * Position of the colour mark on a Bee.
+ *
+ * A new Bee is always marked on the thorax or on the abdomen. [LEFT_WING] is a
+ * legacy compatibility value: it can only be read from data written before the
+ * thorax/abdomen marking system, it is never offered for a new Bee, and it is
+ * deliberately not reinterpreted as either real position.
+ */
 enum class MarkPosition {
-    NONE,
-    RIGHT_WING,
+    THORAX,
+    ABDOMEN,
     LEFT_WING,
+    ;
+
+    /** Whether this position may be chosen while marking a new Bee. */
+    val isOfferedForNewBee: Boolean
+        get() = this != LEFT_WING
+
+    /**
+     * Persisted tokens that denote this position. A position may answer to more
+     * than one token because earlier releases persisted `NONE` and `RIGHT_WING`,
+     * which are confirmed to have meant the thorax and the abdomen in real field
+     * data. Persistence and backup code must match on the whole set, otherwise a
+     * legacy row would stop participating in duplicate-mark protection.
+     */
+    val persistedTokens: List<String>
+        get() = when (this) {
+            THORAX -> listOf("THORAX", "NONE")
+            ABDOMEN -> listOf("ABDOMEN", "RIGHT_WING")
+            LEFT_WING -> listOf("LEFT_WING")
+        }
+
+    companion object {
+        /** Positions offered when marking a new Bee, in presentation order. */
+        val newBeePositions: List<MarkPosition> = listOf(THORAX, ABDOMEN)
+
+        /**
+         * Reads a persisted mark position token, including the legacy tokens of
+         * earlier releases. Returns `null` for an unknown token.
+         */
+        fun fromPersistedToken(token: String): MarkPosition? = when (token) {
+            "THORAX", "NONE" -> THORAX
+            "ABDOMEN", "RIGHT_WING" -> ABDOMEN
+            "LEFT_WING" -> LEFT_WING
+            else -> null
+        }
+    }
 }
 
 data class Bee(

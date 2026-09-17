@@ -2,12 +2,14 @@ package org.beesearch.app.ui.points
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import java.time.Instant
 import java.util.UUID
 import org.beesearch.app.domain.model.Bee
@@ -71,8 +73,8 @@ class PointsScreenTest {
 
     @Test
     fun detailShowsMultipleBeesCyclesOpenStateAndOnlyPersistedAzimuth() {
-        val firstBee = bee("WHITE", MarkPosition.NONE)
-        val secondBee = bee("BLUE", MarkPosition.RIGHT_WING)
+        val firstBee = bee("WHITE", MarkPosition.THORAX)
+        val secondBee = bee("BLUE", MarkPosition.ABDOMEN)
         val firstDeparture = Instant.parse("2026-09-17T06:00:00Z")
         val detail = ObservationPointDetail(
             point = point(),
@@ -102,12 +104,20 @@ class PointsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Белая").performScrollTo().assertIsDisplayed()
+        // The history identifies each Bee by the drawn mark, so no text label
+        // and no wing terminology may remain.
+        composeRule.onNodeWithText("Белая").assertDoesNotExist()
+        composeRule.onNodeWithText("Синяя КП").assertDoesNotExist()
+        composeRule.onNodeWithTag("point-detail-list")
+            .performScrollToNode(hasTestTag("bee-mark-WHITE-THORAX"))
+        composeRule.onNodeWithTag("bee-mark-WHITE-THORAX").assertExists()
+        composeRule.onNodeWithTag("point-detail-list")
+            .performScrollToNode(hasTestTag("bee-mark-BLUE-ABDOMEN"))
+        composeRule.onNodeWithTag("bee-mark-BLUE-ABDOMEN").assertExists()
         composeRule.onNodeWithText("Цикл 2").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Открыт").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("00:01:10").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("91°").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Синяя КП").assertExists()
         composeRule.onNodeWithText("—°").assertDoesNotExist()
     }
 
