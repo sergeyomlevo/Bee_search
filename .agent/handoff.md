@@ -6,7 +6,7 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
-## Offline-map coverage editor UX and in-app help (D078, 2026-09-18)
+## Offline-map coverage editor UX and in-app help (D079, 2026-09-18)
 
 The coverage editor no longer offers a plain exit. `Готово` is the only way out
 and it saves the selected areas and closes the editor, so a finished selection
