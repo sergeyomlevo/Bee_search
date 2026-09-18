@@ -1,5 +1,7 @@
 package org.beesearch.app
 
+import java.time.Instant
+import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -7,85 +9,109 @@ import org.beesearch.app.domain.model.EntityNotFoundException
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.model.TerritoryInUseException
 import org.beesearch.app.domain.repository.TerritoryRepository
-import org.beesearch.app.ui.map.MapCoverageFragment
-import org.beesearch.app.ui.map.MapCoverageStore
+import org.beesearch.app.ui.map.MapAreaCodec
+import org.beesearch.app.ui.map.MapAreaReadResult
+import org.beesearch.app.ui.map.MapAreaSaveResult
+import org.beesearch.app.ui.map.MapAreaStore
 import org.beesearch.app.ui.map.MapGeoBounds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
-import java.util.UUID
 
 class TerritoryCoverageDeletionTest {
     private val a = UUID.randomUUID()
     private val b = UUID.randomUUID()
-    private val coverageA = listOf(MapCoverageFragment(MapGeoBounds(10.0, 20.0, 0.0, 0.0)))
-    private val coverageB = listOf(MapCoverageFragment(MapGeoBounds(30.0, 40.0, 20.0, 20.0)))
+    private val valueA = MapAreaCodec.encodeLegacy(listOf(MapGeoBounds(10.0, 20.0, 0.0, 0.0)))
+    private val valueB = MapAreaCodec.encodeLegacy(listOf(MapGeoBounds(30.0, 40.0, 20.0, 20.0)))
 
-    @Test fun `deleting unused territory removes only its coverage`() = runBlocking {
+    @Test fun `deleting unused territory removes only its area value`() = runBlocking {
         val territories = FakeTerritoryRepository(setOf(a, b))
-        val coverage = FakeMapCoverageStore(mapOf(a to coverageA, b to coverageB))
+        val areas = FakeMapAreaStore(mapOf(a to valueA, b to valueB))
 
-        TerritoryCoverageDeletion(territories, coverage).delete(a)
+        TerritoryCoverageDeletion(territories, areas).delete(a)
 
         assertFalse(territories.contains(a))
-        assertTrue(coverage.load(a).isEmpty())
-        assertEquals(coverageB, coverage.load(b))
+        assertNull(areas.snapshot(a))
+        assertEquals(valueB, areas.snapshot(b))
     }
 
-    @Test fun `blocked territory deletion keeps its coverage`() = runBlocking {
+    @Test fun `blocked territory deletion keeps its area value`() = runBlocking {
         val territories = FakeTerritoryRepository(setOf(a), usedTerritoryIds = setOf(a))
-        val coverage = FakeMapCoverageStore(mapOf(a to coverageA))
+        val areas = FakeMapAreaStore(mapOf(a to valueA))
 
         try {
-            TerritoryCoverageDeletion(territories, coverage).delete(a)
+            TerritoryCoverageDeletion(territories, areas).delete(a)
             throw AssertionError("Expected TerritoryInUseException")
         } catch (_: TerritoryInUseException) {
             // Expected: the preliminary check happens before map infrastructure is changed.
         }
 
         assertTrue(territories.contains(a))
-        assertEquals(coverageA, coverage.load(a))
+        assertEquals(valueA, areas.snapshot(a))
     }
 
-    @Test fun `failed delete restores coverage after its preliminary cleanup`() = runBlocking {
+    @Test fun `failed delete restores the exact stored value`() = runBlocking {
         val territories = FakeTerritoryRepository(setOf(a), failDeletion = true)
-        val coverage = FakeMapCoverageStore(mapOf(a to coverageA))
+        val areas = FakeMapAreaStore(mapOf(a to valueA))
 
         try {
-            TerritoryCoverageDeletion(territories, coverage).delete(a)
+            TerritoryCoverageDeletion(territories, areas).delete(a)
             throw AssertionError("Expected delete failure")
         } catch (_: IllegalStateException) {
             // Expected: Room deletion failed after the preflight check.
         }
 
         assertTrue(territories.contains(a))
-        assertEquals(coverageA, coverage.load(a))
+        assertEquals(valueA, areas.snapshot(a))
     }
 
-    @Test fun `editing territory metadata preserves coverage with the same id`() = runBlocking {
+    @Test fun `a damaged value is restored as well, not silently dropped`() = runBlocking {
+        val territories = FakeTerritoryRepository(setOf(a), failDeletion = true)
+        val areas = FakeMapAreaStore(mapOf(a to "v2|{"))
+
+        try {
+            TerritoryCoverageDeletion(territories, areas).delete(a)
+            throw AssertionError("Expected delete failure")
+        } catch (_: IllegalStateException) {
+            // Expected.
+        }
+
+        assertEquals("v2|{", areas.snapshot(a))
+    }
+
+    @Test fun `editing territory metadata preserves the area value with the same id`() = runBlocking {
         val territories = FakeTerritoryRepository(setOf(a))
-        val coverage = FakeMapCoverageStore(mapOf(a to coverageA))
+        val areas = FakeMapAreaStore(mapOf(a to valueA))
 
         territories.updateTerritory(
             Territory(a, "A01", "Новое имя", "Регион", "Район", Instant.EPOCH, Instant.EPOCH),
         )
 
-        assertEquals(coverageA, coverage.load(a))
+        assertEquals(valueA, areas.snapshot(a))
     }
 
-    private class FakeMapCoverageStore(initial: Map<UUID, List<MapCoverageFragment>>) : MapCoverageStore {
+    private class FakeMapAreaStore(initial: Map<UUID, String>) : MapAreaStore {
         private val values = initial.toMutableMap()
 
-        override suspend fun load(territoryId: UUID): List<MapCoverageFragment> = values[territoryId].orEmpty()
+        override suspend fun load(territoryId: UUID, territoryName: String?): MapAreaReadResult =
+            MapAreaCodec.decode(values[territoryId])
 
-        override suspend fun replace(territoryId: UUID, fragments: List<MapCoverageFragment>) {
-            values[territoryId] = fragments
-        }
+        override suspend fun saveBounds(
+            territoryId: UUID,
+            bounds: List<MapGeoBounds>,
+            territoryName: String?,
+        ): MapAreaSaveResult = throw UnsupportedOperationException()
 
         override suspend fun clear(territoryId: UUID) {
             values.remove(territoryId)
+        }
+
+        override suspend fun snapshot(territoryId: UUID): String? = values[territoryId]
+
+        override suspend fun restore(territoryId: UUID, value: String?) {
+            if (value == null) values.remove(territoryId) else values[territoryId] = value
         }
     }
 

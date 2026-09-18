@@ -15,7 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import org.beesearch.app.data.local.settings.DataStoreMapCoverageStore
+import org.beesearch.app.data.local.settings.DataStoreMapAreaStore
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomObserverRepository
@@ -27,6 +27,7 @@ import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.ObservationPointNotCompletedException
 import org.beesearch.app.domain.usecase.StartupDestination
 import org.beesearch.app.domain.usecase.StartupRouter
+import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapCoverageFragment
 import org.beesearch.app.ui.map.MapGeoBounds
 import org.junit.After
@@ -148,12 +149,12 @@ class ObservationDataMaintenanceTest {
         try {
             val dataStore = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferenceFile })
             val settings = DataStoreSettingsRepository(dataStore)
-            val coverageStore = DataStoreMapCoverageStore(dataStore)
+            val areaStore = DataStoreMapAreaStore(dataStore)
             val coverage = listOf(MapCoverageFragment(MapGeoBounds(57.0, 43.0, 56.0, 42.0)))
             val activeMapKey = stringPreferencesKey("map_package_active_${territory.id}")
             settings.setCurrentTerritoryId(territory.id)
             settings.setCurrentObserverId(observer.id)
-            coverageStore.replace(territory.id, coverage)
+            areaStore.saveBounds(territory.id, coverage.map { it.bounds }, null)
             dataStore.edit { it[activeMapKey] = mapFile.absolutePath }
             mapFile.writeText("device-local map marker")
 
@@ -180,7 +181,8 @@ class ObservationDataMaintenanceTest {
             assertEquals(1, database.backupDao().observerCount())
             assertEquals(territory.id, settings.getSettings().currentTerritoryId)
             assertEquals(observer.id, settings.getSettings().currentObserverId)
-            assertEquals(coverage, coverageStore.load(territory.id))
+            val storedArea = areaStore.load(territory.id, null) as MapAreaReadResult.Present
+            assertEquals(coverage.map { it.bounds }, storedArea.area.bounds)
             assertEquals(mapFile.absolutePath, dataStore.data.first()[activeMapKey])
             assertTrue(mapFile.exists())
         } finally {

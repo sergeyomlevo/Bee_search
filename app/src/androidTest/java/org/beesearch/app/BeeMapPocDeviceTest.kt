@@ -32,8 +32,10 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.net.ConnectivityReceiver
+import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapPackageAvailability
 import org.beesearch.app.ui.map.MapPackageImportResult
+import org.beesearch.app.ui.map.coverageFragments
 
 /**
  * Opt-in real-endpoint checks for the development Map Data PoC.
@@ -54,7 +56,7 @@ class BeeMapPocDeviceTest {
         val container = (instrumentation.targetContext.applicationContext as BeeSearchApplication).container
         val (territoryId, coverage, before) = runBlocking {
             val territoryId = requireNotNull(container.settingsRepository.getSettings().currentTerritoryId)
-            val coverage = container.mapCoverageStore.load(territoryId)
+            val coverage = storedCoverage(container, territoryId)
             val ready = container.mapPackageStore.loadActive(territoryId, coverage) as? MapPackageAvailability.Ready
             Triple(territoryId, coverage, requireNotNull(ready).activePackage)
         }
@@ -89,7 +91,7 @@ class BeeMapPocDeviceTest {
         val activePackage = runBlocking {
             val container = (instrumentation.targetContext.applicationContext as BeeSearchApplication).container
             val territoryId = requireNotNull(container.settingsRepository.getSettings().currentTerritoryId)
-            val coverage = container.mapCoverageStore.load(territoryId)
+            val coverage = storedCoverage(container, territoryId)
             val ready = container.mapPackageStore.loadActive(territoryId, coverage) as? MapPackageAvailability.Ready
             requireNotNull(ready) { "The selected large package is not active and compatible" }
             ready.activePackage
@@ -524,3 +526,9 @@ private fun View.findMapView(): MapView? {
     }
     return null
 }
+
+/** The участки of the territory's Ареал, as the map package validator expects them. */
+private suspend fun storedCoverage(container: AppContainer, territoryId: java.util.UUID) =
+    container.mapAreaStore
+        .load(territoryId, container.territoryRepository.getTerritory(territoryId)?.name)
+        .let { (it as? MapAreaReadResult.Present)?.area?.coverageFragments().orEmpty() }

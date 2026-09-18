@@ -715,7 +715,7 @@ internal class MainViewModel(
                         locationProvider = application.container.locationProvider,
                         territoryCoverageDeletion = TerritoryCoverageDeletion(
                             territoryRepository = application.container.territoryRepository,
-                            coverageStore = application.container.mapCoverageStore,
+                            areaStore = application.container.mapAreaStore,
                         ),
                     ) as T
                 }

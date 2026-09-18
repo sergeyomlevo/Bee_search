@@ -34,7 +34,6 @@ import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
 import org.beesearch.app.data.exchange.ExchangeFolder
 import org.beesearch.app.data.exchange.OpenExchangeDocument
 import org.beesearch.app.domain.model.Territory
-
 /**
  * Administrative offline-map page (Settings → Офлайн-карты).
  *
@@ -56,7 +55,7 @@ import org.beesearch.app.domain.model.Territory
 @Composable
 internal fun OfflineMapManagementScreen(
     territory: Territory?,
-    mapCoverageStore: MapCoverageStore,
+    mapAreaStore: MapAreaStore,
     mapPackageStore: MapPackageStore,
     exchangeStorage: BeeSearchExchangeStorage,
     onBack: () -> Unit,
@@ -87,13 +86,15 @@ internal fun OfflineMapManagementScreen(
         exchangeStorage.ensure()
     }
 
-    LaunchedEffect(territoryId) {
+    LaunchedEffect(territoryId, mapAreaStore, territory?.name) {
         if (territoryId == null) return@LaunchedEffect
-        val loadedCoverage = try {
-            mapCoverageStore.load(territoryId)
+        // Reading also migrates a readable legacy selection into a named Ареал.
+        val loadedArea = try {
+            mapAreaStore.load(territoryId, territory.name)
         } catch (_: Exception) {
-            emptyList()
+            MapAreaReadResult.Corrupt(CORRUPT_AREA_MESSAGE)
         }
+        val loadedCoverage = (loadedArea as? MapAreaReadResult.Present)?.area?.coverageFragments().orEmpty()
         coverage = loadedCoverage
         checking = true
         availability = mapPackageStore.loadActive(territoryId, loadedCoverage)

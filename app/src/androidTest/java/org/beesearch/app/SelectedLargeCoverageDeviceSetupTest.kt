@@ -3,6 +3,7 @@ package org.beesearch.app
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
+import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapCoverageFragment
 import org.beesearch.app.ui.map.MapGeoBounds
 import org.junit.Assert.assertEquals
@@ -42,9 +43,14 @@ class SelectedLargeCoverageDeviceSetupTest {
             ),
         )
 
-        container.mapCoverageStore.replace(territoryId, coverage)
+        val territory = requireNotNull(container.territoryRepository.getTerritory(territoryId)) {
+            "Bee Search DEV has no current Territory"
+        }
 
-        assertEquals(coverage, container.mapCoverageStore.load(territoryId))
+        container.mapAreaStore.saveBounds(territoryId, coverage.map { it.bounds }, territory.name)
+
+        val stored = container.mapAreaStore.load(territoryId, territory.name) as MapAreaReadResult.Present
+        assertEquals(coverage.map { it.bounds }, stored.area.bounds)
     }
 
     private companion object {

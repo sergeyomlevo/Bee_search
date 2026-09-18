@@ -54,14 +54,14 @@ import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.repository.ObservationRepository
 import org.beesearch.app.ui.map.BeeMap
 import org.beesearch.app.ui.map.BeeMapMode
-import org.beesearch.app.ui.map.MapCoverageStore
+import org.beesearch.app.ui.map.MapAreaStore
 import org.beesearch.app.ui.map.MapPackageStore
 
 @Composable
 internal fun PointsRoute(
     territory: Territory?,
     repository: ObservationRepository,
-    mapCoverageStore: MapCoverageStore,
+    mapAreaStore: MapAreaStore,
     mapPackageStore: MapPackageStore,
     onBack: () -> Unit,
     onChooseTerritory: () -> Unit,
@@ -79,7 +79,7 @@ internal fun PointsRoute(
     PointsScreen(
         territory = territory,
         state = state,
-        mapCoverageStore = mapCoverageStore,
+        mapAreaStore = mapAreaStore,
         mapPackageStore = mapPackageStore,
         onBack = onBack,
         onSelectYear = pointsViewModel::selectYear,
@@ -93,7 +93,7 @@ internal fun PointsRoute(
 internal fun PointsScreen(
     territory: Territory,
     state: PointsUiState,
-    mapCoverageStore: MapCoverageStore,
+    mapAreaStore: MapAreaStore,
     mapPackageStore: MapPackageStore,
     onBack: () -> Unit,
     onSelectYear: (PointsYearFilter) -> Unit,
@@ -124,7 +124,8 @@ internal fun PointsScreen(
                 state.viewMode == PointsViewMode.MAP -> Box(Modifier.fillMaxSize()) {
                     BeeMap(
                         territoryId = territory.id,
-                        coverageStore = mapCoverageStore,
+                        territoryName = territory.name,
+                        areaStore = mapAreaStore,
                         packageStore = mapPackageStore,
                         locationState = LocationUiState.PermissionRequired,
                         locationPermissionGranted = false,

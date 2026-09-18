@@ -74,7 +74,8 @@ internal enum class BeeMapMode {
 @Composable
 internal fun BeeMap(
     territoryId: UUID?,
-    coverageStore: MapCoverageStore,
+    territoryName: String?,
+    areaStore: MapAreaStore,
     packageStore: MapPackageStore,
     locationState: LocationUiState,
     locationPermissionGranted: Boolean,
@@ -100,6 +101,7 @@ internal fun BeeMap(
     var recenteredUntilNextGesture by remember { mutableStateOf(false) }
     var coverageSelectionMode by remember { mutableStateOf(false) }
     var editingTerritoryId by remember { mutableStateOf<UUID?>(null) }
+    var persistedArea by remember { mutableStateOf<MapAreaReadResult>(MapAreaReadResult.Absent) }
     var persistedCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
     var workingCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
     var coverageLoadedFor by remember { mutableStateOf<UUID?>(null) }
@@ -129,21 +131,25 @@ internal fun BeeMap(
     val latestTerritoryId by rememberUpdatedState(territoryId)
     val onlineMapProfile = remember { beeSearchFieldMapProfile() }
     val coroutineScope = rememberCoroutineScope()
-    LaunchedEffect(territoryId, coverageStore) {
+    LaunchedEffect(territoryId, areaStore, territoryName) {
         if (editingTerritoryId != null && editingTerritoryId != territoryId) {
             coverageSelectionMode = false
             editingTerritoryId = null
             workingCoverage = emptyList()
         }
         coverageLoadedFor = null
+        persistedArea = MapAreaReadResult.Absent
         persistedCoverage = emptyList()
         if (territoryId != null) {
             coverageLoading = true
-            persistedCoverage = try {
-                coverageStore.load(territoryId)
+            // Reading also migrates a readable legacy selection into a named Ареал.
+            val read = try {
+                areaStore.load(territoryId, territoryName)
             } catch (_: Exception) {
-                emptyList()
+                MapAreaReadResult.Corrupt("не удалось прочитать сохранённый ареал")
             }
+            persistedArea = read
+            persistedCoverage = (read as? MapAreaReadResult.Present)?.area?.coverageFragments().orEmpty()
             coverageLoadedFor = territoryId
             coverageLoading = false
         } else {
@@ -219,17 +225,33 @@ internal fun BeeMap(
         }
         val selectedCoverage = workingCoverage
         coroutineScope.launch {
-            try {
-                coverageStore.replace(id, selectedCoverage)
-                if (id == latestTerritoryId) persistedCoverage = selectedCoverage
-                leaveCoverageSelection(restoreDraft = false)
+            val result = try {
+                areaStore.saveBounds(id, selectedCoverage.map { it.bounds }, territoryName)
             } catch (_: Exception) {
-                // Persistence failed: stay in the editor with the draft intact so nothing is lost.
-                Toast.makeText(
-                    appContext,
-                    "Не удалось сохранить участок",
-                    Toast.LENGTH_SHORT,
-                ).show()
+                MapAreaSaveResult.Refused(CORRUPT_AREA_MESSAGE)
+            }
+            when (result) {
+                is MapAreaSaveResult.Saved -> {
+                    if (id == latestTerritoryId) {
+                        persistedArea = MapAreaReadResult.Present(result.area)
+                        persistedCoverage = result.area.coverageFragments()
+                    }
+                    leaveCoverageSelection(restoreDraft = false)
+                }
+
+                // The territory has no Ареал yet, so the selection is stored as before.
+                MapAreaSaveResult.SavedLegacySelection -> {
+                    if (id == latestTerritoryId) {
+                        persistedArea = MapAreaReadResult.Absent
+                        persistedCoverage = selectedCoverage
+                    }
+                    leaveCoverageSelection(restoreDraft = false)
+                }
+
+                // The stored value stays untouched: stay in the editor with the draft intact.
+                is MapAreaSaveResult.Refused -> {
+                    Toast.makeText(appContext, result.reason, Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -552,6 +574,10 @@ internal fun BeeMap(
             CoverageSelectionEntry(
                 onEnter = {
                     if (!coverageLoading && coverageLoadedFor == territoryId) {
+                        // A damaged stored value is not silently replaced by an empty editor.
+                        if (persistedArea is MapAreaReadResult.Corrupt) {
+                            Toast.makeText(appContext, CORRUPT_AREA_MESSAGE, Toast.LENGTH_LONG).show()
+                        }
                         editingTerritoryId = territoryId
                         workingCoverage = persistedCoverage
                         coverageSelectionMode = true

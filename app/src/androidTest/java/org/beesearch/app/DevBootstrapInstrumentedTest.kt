@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
+import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapCoverageFragment
 import org.beesearch.app.ui.map.MapGeoBounds
 import org.beesearch.app.ui.map.MapPackageAvailability
@@ -73,7 +74,7 @@ class DevBootstrapInstrumentedTest {
                 ),
             ),
         )
-        container.mapCoverageStore.replace(territory.id, coverage)
+        container.mapAreaStore.saveBounds(territory.id, coverage.map { it.bounds }, territory.name)
         val import = container.mapPackageStore.import(
             territoryId = territory.id,
             desiredCoverage = coverage,
@@ -129,7 +130,8 @@ class DevBootstrapInstrumentedTest {
         val settings = container.settingsRepository.getSettings()
         assertEquals(territory.id, settings.currentTerritoryId)
         assertEquals(observer.id, settings.currentObserverId)
-        assertEquals(coverage, container.mapCoverageStore.load(territory.id))
+        val storedArea = container.mapAreaStore.load(territory.id, territory.name) as MapAreaReadResult.Present
+        assertEquals(coverage.map { it.bounds }, storedArea.area.bounds)
         assertNotNull(container.observationRepository.observeActivePoint().first())
         assertEquals(10, container.observationRepository.observeBees(point.id).first().size)
         val flightCycles = container.observationRepository.observeFlightCyclesForPoint(point.id).first()

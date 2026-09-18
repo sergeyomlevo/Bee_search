@@ -44,7 +44,7 @@ import org.beesearch.app.formatMapMeasurement
 @Composable
 internal fun CurrentTerritoryScreen(
     territory: Territory?,
-    mapCoverageStore: MapCoverageStore,
+    mapAreaStore: MapAreaStore,
     mapPackageStore: MapPackageStore,
     locationState: LocationUiState,
     observationPointDraft: ObservationPointCreationDraft?,
@@ -66,7 +66,8 @@ internal fun CurrentTerritoryScreen(
         Box(modifier = mapModifier) {
             BeeMap(
                     territoryId = territory?.id,
-                    coverageStore = mapCoverageStore,
+                    territoryName = territory?.name,
+                    areaStore = mapAreaStore,
                     packageStore = mapPackageStore,
                     locationState = locationState,
                     locationPermissionGranted = locationPermissionGranted,

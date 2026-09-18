@@ -189,7 +189,7 @@ private fun BeeSearchApp(
                     AppRoute.Points -> PointsRoute(
                         territory = currentTerritory,
                         repository = application.container.observationRepository,
-                        mapCoverageStore = application.container.mapCoverageStore,
+                        mapAreaStore = application.container.mapAreaStore,
                         mapPackageStore = application.container.mapPackageStore,
                         onBack = viewModel::openObjects,
                         onChooseTerritory = viewModel::openTerritoryManagement,
@@ -210,7 +210,7 @@ private fun BeeSearchApp(
                     )
                     AppRoute.OfflineMapManagement -> OfflineMapManagementScreen(
                         territory = currentTerritory,
-                        mapCoverageStore = application.container.mapCoverageStore,
+                        mapAreaStore = application.container.mapAreaStore,
                         mapPackageStore = application.container.mapPackageStore,
                         exchangeStorage = application.container.exchangeStorage,
                         onBack = viewModel::returnToStartup,
@@ -218,7 +218,7 @@ private fun BeeSearchApp(
                     )
                     AppRoute.CurrentTerritory -> CurrentTerritoryScreen(
                         territory = currentTerritory,
-                        mapCoverageStore = application.container.mapCoverageStore,
+                        mapAreaStore = application.container.mapAreaStore,
                         mapPackageStore = application.container.mapPackageStore,
                         locationState = locationState,
                         observationPointDraft = observationPointDraft,

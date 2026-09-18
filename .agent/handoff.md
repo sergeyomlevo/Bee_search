@@ -6,6 +6,53 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Named Ареал Phase A: model, codec v2 and migration (D081, 2026-09-18)
+
+Phase A of the Area model is implemented without any user-facing change. A Territory now
+has at most one named Ареал holding a stable UUID, a human-readable name and 1..N
+участки (`MapArea` in `ui/map/MapArea.kt`), persisted in the existing
+`map_coverage_<territoryId>` DataStore entry as `v2|{"areaId":…,"name":…,"bounds":[…]}`.
+The `v1` encoding stays readable, so old archives still restore, and an existing non-empty
+selection is migrated once on first read: one DataStore transaction, a new stable UUID and
+an initial name taken from `Territory.name` (trimmed, otherwise `Ареал`). Geometry is
+carried over untouched — no re-rounding, re-normalisation, merging, sorting or
+de-overlapping.
+
+Reading now distinguishes "no Ареал", "Ареал read" and "stored value damaged"
+(`MapAreaReadResult`). A damaged value is never reported as absent, never replaced by an
+empty selection and never overwritten: saving is refused and the editor says so. An empty
+legacy `v1` means no Ареал, never an Ареал with zero участки.
+
+The territory name reaches the store as a plain parameter from the screen that already has
+the Territory, so the DataStore layer gained no dependency on Room. `MapCoverageValidator`
+now validates `v2` structurally instead of by prefix, which makes a damaged value fail the
+backup export explicitly while leaving it in DataStore; `backupFormatVersion`,
+`archiveSchemaVersion` and `roomSchemaVersion` are unchanged and the Ареал travels in the
+existing `map-coverage` settings rows. `TerritoryCoverageDeletion` snapshots and restores
+the exact stored value, so even a damaged one survives a failed territory deletion.
+
+Transitional behaviour until Phase B owns first creation: a territory without an Ареал
+still stores an unnamed legacy selection, and an existing Ареал refuses to be saved with
+zero участки. Both are marked `PHASE B` in `DataStoreMapAreaStore`.
+
+Map workflow compatibility is unchanged: `Area.bounds` are passed as `desiredCoverage` to
+the existing D065 containment check, the active package stays keyed by Territory and no
+`areaId` enters the manifest.
+
+Verification: full debug unit suite green (150 tests; new `MapAreaCodecTest` 22,
+`MapAreaMigrationTest` 10, `MapCoverageValidatorTest` 5, `TerritoryCoverageDeletionTest` 5)
+and 50 instrumented tests on the SM-S938B (`DataStoreMapAreaStoreTest` 11, `BackupServiceTest`
+including a new v2 round-trip, `ObservationDataMaintenanceTest`, plus the map/help/data UI
+tests). On-device migration was exercised for real: two участка saved through the UI while no
+Ареал existed, then a restart migrated the value to `v2` with `"name":"DEV Territory"`; the
+UUID stayed identical across further restarts. The DEV DataStore was backed up first
+(md5 `f7061adad65f60b6ad76e8b46b157d86`, 293 bytes) and restored byte-identically afterwards.
+Note: the DEV saved selection was already the empty legacy value before this work, so no user
+geometry was in the file; the cause of that earlier emptying is not established.
+
+Phase B is next: the first-`Готово` name dialog (prefilled from the Territory name), the
+`Objects → Ареал` card, rename and delete. Nothing else of the Area design is implemented yet.
+
 ## Bee Search file exchange directory (D080, 2026-09-18)
 
 User-facing file exchange now has one predictable place per build variant:

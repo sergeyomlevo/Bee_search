@@ -17,6 +17,10 @@ import org.beesearch.app.data.local.room.*
 import org.beesearch.app.domain.backup.*
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.MarkPosition
+import org.beesearch.app.ui.map.MapArea
+import org.beesearch.app.ui.map.MapAreaCodec
+import org.beesearch.app.ui.map.MapAreaReadResult
+import org.beesearch.app.ui.map.MapGeoBounds
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -88,8 +92,29 @@ class BackupServiceTest {
         assertFalse(zipEntries(archive).values.any { String(it).contains("source.pmtiles") || String(it).contains("/private/source/path") })
     }
 
-    @Test fun manifestContainsAllSevenRequiredCollections() = runBlocking {
-        seed(source); service(source, sourceStore).export(archive)
+    /** A named Ареал travels in the existing map-coverage settings section, with no archive change. */
+    @Test fun aV2AreaRoundTripsThroughTheExistingSettingsSection() = runBlocking {
+        val ids = seed(source)
+        val area = MapArea(
+            id = UUID.fromString("7e82a310-1f4c-4a2b-9c3d-8e5f6a7b8c9d"),
+            name = "Лух",
+            bounds = listOf(MapGeoBounds(north = 57.111673, east = 39.026918, south = 56.562186, west = 38.470994)),
+        )
+        val encoded = MapAreaCodec.encode(area)
+        sourceStore.edit {
+            it[stringPreferencesKey("current_territory_id")] = ids.territory1.toString()
+            it[stringPreferencesKey("map_coverage_${ids.territory1}")] = encoded
+        }
+
+        service(source, sourceStore).export(archive)
+        service(target, targetStore).restore(archive)
+
+        val restored = targetStore.data.first()[stringPreferencesKey("map_coverage_${ids.territory1}")]
+        assertEquals(encoded, restored)
+        assertEquals(MapAreaReadResult.Present(area), MapAreaCodec.decode(restored))
+    }
+
+    @Test fun manifestContainsAllSevenRequiredCollections() = runBlocking {        seed(source); service(source, sourceStore).export(archive)
         val manifest = String(zipEntries(archive).getValue("manifest.json"))
         BackupContractV1.collections.forEach { (name, path) ->
             assertTrue(manifest.contains("\"name\":\"$name\"")); assertTrue(manifest.contains("\"path\":\"$path\""))
