@@ -108,11 +108,34 @@ class HelpScreenTest {
         composeRule.onNodeWithText("Карты").assertIsDisplayed()
     }
 
+    @Test
+    fun helpExposesCoverageCreationAndMapLoadingSections() {
+        composeRule.setContent { Bee_searchTheme { HelpScreen(onBack = {}) } }
+
+        val coverageIndex = detailedHelpSections.indexOfFirst { it.title == "Создание участка офлайн-карты" }
+        val loadingIndex = detailedHelpSections.indexOfFirst { it.title == "Загрузка офлайн-карты" }
+        assertTrue("both offline-map sections must exist", coverageIndex > 0 && loadingIndex > coverageIndex)
+
+        composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX + coverageIndex)
+        composeRule.onNodeWithText("Создание участка офлайн-карты").assertIsDisplayed()
+        composeRule.onNodeWithTag("help-section-$coverageIndex").performClick()
+        composeRule.onNodeWithTag("help-screen").performScrollToNode(hasText(DONE_SAVES_FRAGMENT, substring = true))
+        composeRule.onNodeWithText(DONE_SAVES_FRAGMENT, substring = true).assertIsDisplayed()
+
+        composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX + loadingIndex)
+        composeRule.onNodeWithText("Загрузка офлайн-карты").assertIsDisplayed()
+        composeRule.onNodeWithTag("help-section-$loadingIndex").performClick()
+        composeRule.onNodeWithTag("help-screen").performScrollToNode(hasText(FILE_PAIR_FRAGMENT, substring = true))
+        composeRule.onNodeWithText(FILE_PAIR_FRAGMENT, substring = true).assertIsDisplayed()
+    }
+
     private companion object {
         /** LazyColumn index of `detailedHelpSections[0]`: two headings plus the three quick steps. */
         const val FIRST_SECTION_INDEX = 5
         const val PREPARATION_SECTION_INDEX = 3
         const val COLLAPSED_STATE = "Свёрнуто"
         const val EXPANDED_STATE = "Развёрнуто"
+        const val DONE_SAVES_FRAGMENT = "сохраняет выбранные участки и завершает редактирование"
+        const val FILE_PAIR_FRAGMENT = "*.pmtiles.manifest.json"
     }
 }

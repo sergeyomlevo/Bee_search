@@ -1,20 +1,38 @@
 package org.beesearch.app
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import org.beesearch.app.ui.map.ADD_COVERAGE_FRAGMENT_LABEL
+import org.beesearch.app.ui.map.CLEAR_COVERAGE_CONFIRM_LABEL
+import org.beesearch.app.ui.map.CLEAR_COVERAGE_DIALOG_TAG
+import org.beesearch.app.ui.map.CLEAR_COVERAGE_LABEL
 import org.beesearch.app.ui.map.COPY_SELECTED_COVERAGE_DESCRIPTION
+import org.beesearch.app.ui.map.COPY_SELECTED_COVERAGE_LABEL
 import org.beesearch.app.ui.map.CURRENT_COVERAGE_SUMMARY_TAG
+import org.beesearch.app.ui.map.ClearCoverageSelectionDialog
+import org.beesearch.app.ui.map.CoverageUnsavedChangesDialog
+import org.beesearch.app.ui.map.DISCARD_COVERAGE_CHANGES_LABEL
+import org.beesearch.app.ui.map.DONE_COVERAGE_SELECTION_LABEL
 import org.beesearch.app.ui.map.MapCoverageSelectionControls
 import org.beesearch.app.ui.map.MapGeoBounds
 import org.beesearch.app.ui.map.MapPackageAvailability
 import org.beesearch.app.ui.map.OfflineMapPackagePanel
 import org.beesearch.app.ui.map.OFFLINE_MAP_PACKAGE_PANEL_TAG
+import org.beesearch.app.ui.map.SAVE_COVERAGE_CHANGES_LABEL
+import org.beesearch.app.ui.map.SHOW_ALL_COVERAGE_LABEL
+import org.beesearch.app.ui.map.STAY_IN_COVERAGE_SELECTION_LABEL
+import org.beesearch.app.ui.map.UNDO_COVERAGE_FRAGMENT_LABEL
+import org.beesearch.app.ui.map.UNSAVED_COVERAGE_CHANGES_DIALOG_TAG
 import org.beesearch.app.ui.map.coverageBoundsSummary
 import org.beesearch.app.ui.theme.Bee_searchTheme
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -57,6 +75,173 @@ class MapCoverageSelectionUiTest {
     }
 
     @Test
+    fun editorHasNoActionThatLeavesWithoutSaving() {
+        composeRule.setContent { Bee_searchTheme { EditorControls() } }
+
+        // "Готово" is the only exit from the editor. The removed plain exit is what discarded a
+        // finished selection without asking, so it must not come back under any label.
+        composeRule.onNodeWithText("Выйти").assertDoesNotExist()
+        composeRule.onNodeWithText(DONE_COVERAGE_SELECTION_LABEL).assertIsDisplayed()
+    }
+
+    @Test
+    fun editorActionsCarryUnambiguousNames() {
+        composeRule.setContent { Bee_searchTheme { EditorControls() } }
+
+        composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithText(UNDO_COVERAGE_FRAGMENT_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithText(SHOW_ALL_COVERAGE_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithText(CLEAR_COVERAGE_LABEL).assertIsDisplayed()
+
+        composeRule.onNodeWithText("Отмена").assertDoesNotExist()
+        composeRule.onNodeWithText("Сброс").assertDoesNotExist()
+    }
+
+    @Test
+    fun editorActionsAreDisabledWhileNothingIsSelected() {
+        composeRule.setContent { Bee_searchTheme { EditorControls(fragmentCount = 0) } }
+
+        composeRule.onNodeWithText(UNDO_COVERAGE_FRAGMENT_LABEL).assertIsNotEnabled()
+        composeRule.onNodeWithText(SHOW_ALL_COVERAGE_LABEL).assertIsNotEnabled()
+        composeRule.onNodeWithText(CLEAR_COVERAGE_LABEL).assertIsNotEnabled()
+        // Adding is always possible: it is how the first fragment appears.
+        composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertIsEnabled()
+    }
+
+    @Test
+    fun bboxExportIsAvailableForOneSelectedRectangle() {
+        var copied = false
+        val selected = coverageBoundsSummary(
+            MapGeoBounds(north = 56.4, east = 42.8, south = 56.1, west = 42.2),
+        )
+        composeRule.setContent {
+            Bee_searchTheme {
+                MapCoverageSelectionControls(
+                    fragmentCount = 1,
+                    viewportSummary = selected,
+                    selectedSummary = selected,
+                    canAddFragment = true,
+                    onAddFragment = {},
+                    onUndo = {},
+                    onShowAll = {},
+                    onClear = {},
+                    onDone = {},
+                    onCopySelectedBounds = { copied = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(COPY_SELECTED_COVERAGE_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(COPY_SELECTED_COVERAGE_DESCRIPTION).performClick()
+        assertTrue(copied)
+    }
+
+    @Test
+    fun bboxExportIsHiddenWhileSeveralRectanglesAreSelected() {
+        val selected = coverageBoundsSummary(
+            MapGeoBounds(north = 56.4, east = 42.8, south = 56.1, west = 42.2),
+        )
+        composeRule.setContent {
+            Bee_searchTheme {
+                // A builder bbox describes exactly one rectangle, so the action stays scoped to one.
+                MapCoverageSelectionControls(
+                    fragmentCount = 2,
+                    viewportSummary = selected,
+                    selectedSummary = null,
+                    canAddFragment = true,
+                    onAddFragment = {},
+                    onUndo = {},
+                    onShowAll = {},
+                    onClear = {},
+                    onDone = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(COPY_SELECTED_COVERAGE_LABEL).assertDoesNotExist()
+    }
+
+    @Test
+    fun clearingAllAsksForConfirmationBeforeTouchingTheSelection() {
+        var confirmed = false
+        var dismissed = false
+        composeRule.setContent {
+            Bee_searchTheme {
+                ClearCoverageSelectionDialog(
+                    onConfirm = { confirmed = true },
+                    onDismiss = { dismissed = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(CLEAR_COVERAGE_DIALOG_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Очистить выбранные участки?").assertIsDisplayed()
+        composeRule.onNodeWithText(CLEAR_COVERAGE_CONFIRM_LABEL).assertIsDisplayed()
+
+        // Until "Очистить" is chosen, the selection is untouched.
+        assertFalse(confirmed)
+        assertFalse(dismissed)
+
+        composeRule.onNodeWithText(CLEAR_COVERAGE_CONFIRM_LABEL).performClick()
+        composeRule.runOnIdle { assertTrue(confirmed) }
+        assertFalse(dismissed)
+    }
+
+    @Test
+    fun decliningTheClearConfirmationChangesNothing() {
+        var confirmed = false
+        var dismissed = false
+        composeRule.setContent {
+            Bee_searchTheme {
+                ClearCoverageSelectionDialog(
+                    onConfirm = { confirmed = true },
+                    onDismiss = { dismissed = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Отмена").performClick()
+
+        composeRule.runOnIdle { assertTrue(dismissed) }
+        assertFalse(confirmed)
+    }
+
+    @Test
+    fun unsavedChangesDialogOffersSaveDiscardAndStay() {
+        var saved = false
+        var discarded = false
+        var stayed = false
+        composeRule.setContent {
+            Bee_searchTheme {
+                CoverageUnsavedChangesDialog(
+                    onSave = { saved = true },
+                    onDiscard = { discarded = true },
+                    onStay = { stayed = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(UNSAVED_COVERAGE_CHANGES_DIALOG_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Сохранить изменения участка?").assertIsDisplayed()
+        composeRule.onNodeWithText(SAVE_COVERAGE_CHANGES_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithText(DISCARD_COVERAGE_CHANGES_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithText(STAY_IN_COVERAGE_SELECTION_LABEL).assertIsDisplayed()
+
+        // Every outcome is named; the dialog never asks an ambiguous yes/no question.
+        composeRule.onNodeWithText("Да").assertDoesNotExist()
+        composeRule.onNodeWithText("Нет").assertDoesNotExist()
+
+        composeRule.onNodeWithText(SAVE_COVERAGE_CHANGES_LABEL).performClick()
+        composeRule.runOnIdle { assertTrue(saved) }
+
+        composeRule.onNodeWithText(DISCARD_COVERAGE_CHANGES_LABEL).performClick()
+        composeRule.runOnIdle { assertTrue(discarded) }
+
+        composeRule.onNodeWithText(STAY_IN_COVERAGE_SELECTION_LABEL).performClick()
+        composeRule.runOnIdle { assertTrue(stayed) }
+    }
+
+    @Test
     fun offlinePackagePanelExplainsMissingMapAndOffersNextAction() {
         composeRule.setContent {
             Bee_searchTheme {
@@ -78,35 +263,6 @@ class MapCoverageSelectionUiTest {
     }
 
     @Test
-    fun devExportIsAvailableForOneSelectedRectangle() {
-        var copied = false
-        val selected = coverageBoundsSummary(
-            MapGeoBounds(north = 56.4, east = 42.8, south = 56.1, west = 42.2),
-        )
-        composeRule.setContent {
-            Bee_searchTheme {
-                MapCoverageSelectionControls(
-                    fragmentCount = 1,
-                    viewportSummary = selected,
-                    selectedSummary = selected,
-                    showDevBoundsExport = true,
-                    canAddFragment = true,
-                    onAddFragment = {},
-                    onUndo = {},
-                    onShowAll = {},
-                    onClear = {},
-                    onDone = {},
-                    onCopySelectedBounds = { copied = true },
-                )
-            }
-        }
-
-        composeRule.onNodeWithText("Копировать bbox").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(COPY_SELECTED_COVERAGE_DESCRIPTION).performClick()
-        assertTrue(copied)
-    }
-
-    @Test
     fun importPanelExplainsManifestThenPmtilesOrder() {
         composeRule.setContent {
             Bee_searchTheme {
@@ -125,5 +281,19 @@ class MapCoverageSelectionUiTest {
         composeRule.onNodeWithText(
             "Импорт: сначала manifest, затем соответствующий PMTiles.",
         ).assertIsDisplayed()
+    }
+
+    @Composable
+    private fun EditorControls(fragmentCount: Int = 1) {
+        MapCoverageSelectionControls(
+            fragmentCount = fragmentCount,
+            viewportSummary = null,
+            canAddFragment = true,
+            onAddFragment = {},
+            onUndo = {},
+            onShowAll = {},
+            onClear = {},
+            onDone = {},
+        )
     }
 }

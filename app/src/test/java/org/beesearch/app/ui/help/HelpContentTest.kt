@@ -1,5 +1,14 @@
 package org.beesearch.app.ui.help
 
+import org.beesearch.app.ui.map.ADD_COVERAGE_FRAGMENT_LABEL
+import org.beesearch.app.ui.map.CLEAR_COVERAGE_LABEL
+import org.beesearch.app.ui.map.COPY_SELECTED_COVERAGE_LABEL
+import org.beesearch.app.ui.map.DISCARD_COVERAGE_CHANGES_LABEL
+import org.beesearch.app.ui.map.DONE_COVERAGE_SELECTION_LABEL
+import org.beesearch.app.ui.map.SAVE_COVERAGE_CHANGES_LABEL
+import org.beesearch.app.ui.map.SHOW_ALL_COVERAGE_LABEL
+import org.beesearch.app.ui.map.STAY_IN_COVERAGE_SELECTION_LABEL
+import org.beesearch.app.ui.map.UNDO_COVERAGE_FRAGMENT_LABEL
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,6 +31,8 @@ class HelpContentTest {
         "Азимут",
         "Экспорт и очистка данных",
         "Карты",
+        "Создание участка офлайн-карты",
+        "Загрузка офлайн-карты",
     )
 
     private fun sectionText(title: String): String {
@@ -152,19 +163,123 @@ class HelpContentTest {
     fun mapFactsAreStated() {
         val text = sectionText("Карты")
         assertTrue(text, text.contains("требует подключения к сети"))
-        assertTrue(text, text.contains("экране офлайн-карт"))
-        assertTrue(text, text.contains("PMTiles"))
-        assertTrue(text, text.contains("выбирается на карте"))
-        assertTrue(text, text.contains("переключать"))
+        assertTrue(text, text.contains("работает без сети"))
+        assertTrue(text, text.contains("переключается"))
+        // The overview points at the two detailed sections instead of repeating their steps.
+        assertTrue(text, text.contains("сначала выбирается участок"))
+    }
+
+    @Test
+    fun participantSectionExplainsSelectionVocabulary() {
+        val text = sectionText("Создание участка офлайн-карты")
+        assertTrue(text, text.contains("прямоугольная область"))
+        assertTrue(text, text.contains("Оранжевая рамка"))
+        assertTrue(text, text.contains("синим прямоугольником"))
+        assertTrue(text, text.contains("Участков может быть несколько"))
+        assertTrue(text, text.contains("«Офлайн-карты»"))
+        assertTrue(text, text.contains("«Выбрать участок»"))
+        assertTrue(text, text.contains("«Изменить участок»"))
+    }
+
+    @Test
+    fun participantSectionNamesExactlyTheActionsTheEditorShows() {
+        val text = sectionText("Создание участка офлайн-карты")
+        listOf(
+            ADD_COVERAGE_FRAGMENT_LABEL,
+            UNDO_COVERAGE_FRAGMENT_LABEL,
+            SHOW_ALL_COVERAGE_LABEL,
+            CLEAR_COVERAGE_LABEL,
+            DONE_COVERAGE_SELECTION_LABEL,
+            COPY_SELECTED_COVERAGE_LABEL,
+        ).forEach { label ->
+            assertTrue("help must name the editor action «$label»", text.contains("«$label»"))
+        }
+    }
+
+    @Test
+    fun retiredEditorActionNamesAreNotPresentedAsCurrent() {
+        val text = allHelpText()
+        // The editor used to end with a plain "Выйти", and the undo/clear actions used to be called
+        // "Отмена" and "Сброс". None of those names may be offered as a current action again.
+        assertFalse(text, text.contains("«Выйти»"))
+        assertFalse(text, text.contains("«Отмена»"))
+        assertFalse(text, text.contains("«Сброс»"))
+    }
+
+    @Test
+    fun doneSavesAndLeavesTheEditor() {
+        val text = sectionText("Создание участка офлайн-карты")
+        assertTrue(
+            text,
+            text.contains("«$DONE_COVERAGE_SELECTION_LABEL» сохраняет выбранные участки и завершает редактирование"),
+        )
+    }
+
+    @Test
+    fun unsavedChangesDecisionIsExplainedWithoutYesNo() {
+        val text = sectionText("Создание участка офлайн-карты")
+        listOf(
+            SAVE_COVERAGE_CHANGES_LABEL,
+            DISCARD_COVERAGE_CHANGES_LABEL,
+            STAY_IN_COVERAGE_SELECTION_LABEL,
+        ).forEach { label ->
+            assertTrue("help must name the choice «$label»", text.contains("«$label»"))
+        }
+        assertTrue(text, text.contains("Назад"))
+        assertTrue(text, text.contains("Если изменений нет"))
+        // The confirmation offers named outcomes, never an ambiguous yes/no pair.
+        assertFalse(text, text.contains("«Да»"))
+        assertFalse(text, text.contains("«Нет»"))
+    }
+
+    @Test
+    fun clearingIsDescribedAsConfirmedAndDraftScoped() {
+        val text = sectionText("Создание участка офлайн-карты")
+        assertTrue(text, text.contains("спрашивает подтверждение"))
+        assertTrue(text, text.contains("изменения существуют только на экране"))
+    }
+
+    @Test
+    fun mapLoadingSectionNamesTheTwoFilesOfThePair() {
+        val text = sectionText("Загрузка офлайн-карты")
+        // The user has to pick these two files, so their names are operational guidance rather
+        // than an implementation detail; the offline-map screen shows the same names.
+        assertTrue(text, text.contains("*.pmtiles.manifest.json"))
+        assertTrue(text, text.contains("*.pmtiles"))
+        assertTrue(text, text.contains("Нужны оба файла"))
+        assertTrue(text, text.contains("имя файла карты должно точно совпадать"))
+    }
+
+    @Test
+    fun mapLoadingSectionDescribesTheRealImportWorkflow() {
+        val text = sectionText("Загрузка офлайн-карты")
+        assertTrue(text, text.contains("«Офлайн-карты»"))
+        assertTrue(text, text.contains("«Импортировать карту»"))
+        assertTrue(text, text.contains("«Заменить карту»"))
+        assertTrue(text, text.contains("сначала выберите файл описания карты, затем — файл самой карты"))
+        assertTrue(text, text.contains("импортирована и активирована"))
+        assertTrue(text, text.contains("«Онлайн карта»"))
+        assertTrue(text, text.contains("«Векторная карта»"))
+    }
+
+    @Test
+    fun incompleteCoverageRefusalIsExplained() {
+        val text = sectionText("Загрузка офлайн-карты")
+        assertTrue(text, text.contains("неполном покрытии"))
+        assertTrue(text, text.contains("полностью включает выбранные участки"))
+        // A failed attempt must not be described as losing the installed map.
+        assertTrue(text, text.contains("не удаляется"))
     }
 
     @Test
     fun noInternalTerminologyOrArchiveInternals() {
         val text = allHelpText()
         assertFalse(text, Regex("D0\\d\\d").containsMatchIn(text))
-        assertFalse(text, text.contains(".json"))
-        assertFalse(text, text.contains("manifest"))
         assertFalse(text, text.contains("Room"))
+        assertFalse(text, text.contains("SHA"))
+        assertFalse(text, text.contains("Planetiler"))
+        assertFalse(text, text.contains("schemaVersion"))
+        assertFalse(text, text.contains("PMTiles v3"))
     }
 
     @Test

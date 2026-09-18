@@ -106,8 +106,9 @@ sprite dependency.
 ## Local D063/D065 map-package build
 
 The pre-server package workflow starts with the normal production
-`MapCoverageSelection` in Bee Search DEV. Add exactly one visible rectangle.
-The debug build then offers `Копировать bbox`; it copies the saved
+`MapCoverageSelection` in Bee Search. Add exactly one visible rectangle.
+The map editor then offers `Копировать bbox`, available in every build type and
+shown while exactly one rectangle is selected; it copies the saved
 rectangle in the argument order expected by the builder:
 
 ```text

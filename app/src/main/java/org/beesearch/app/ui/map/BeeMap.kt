@@ -55,7 +55,6 @@ import org.beesearch.app.MapGpsMarker
 import org.beesearch.app.MapTarget
 import org.beesearch.app.beeSearchFieldMapProfile
 import org.beesearch.app.beeSearchActivePmtilesMapProfile
-import org.beesearch.app.BuildConfig
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.model.ObservationPointSummary
 import org.beesearch.app.visibleMapMeasurement
@@ -108,6 +107,7 @@ internal fun BeeMap(
     var coverageViewportBounds by remember { mutableStateOf<MapGeoBounds?>(null) }
     var packageAvailability by remember { mutableStateOf<MapPackageAvailability>(MapPackageAvailability.Missing) }
     var clearSelectionConfirmationVisible by remember { mutableStateOf(false) }
+    var unsavedCoverageChangesVisible by remember { mutableStateOf(false) }
     var developerBasemap by remember { mutableStateOf(DeveloperBasemap.ONLINE) }
     var mapCameraRevision by remember { mutableStateOf(0) }
     var coverageControlsHeightPx by remember { mutableStateOf(0) }
@@ -191,10 +191,57 @@ internal fun BeeMap(
     }
     val activeMapPackage = (packageAvailability as? MapPackageAvailability.Ready)?.activePackage
     val activeVectorProfile = activeMapPackage?.let(::beeSearchActivePmtilesMapProfile)
-    BackHandler(enabled = mode == BeeMapMode.FIELD && coverageSelectionActive) {
+    // The editor has no unsaved work the moment it opens: the draft starts as the persisted
+    // selection. Only a draft operation (add / undo last / clear all) makes it dirty.
+    val coverageSelectionDirty = coverageSelectionMode &&
+        isCoverageSelectionDirty(persisted = persistedCoverage, working = workingCoverage)
+
+    /**
+     * Leaves the editor. [restoreDraft] puts the persisted selection back into the draft, which is
+     * how "leave without saving" discards the session without ever having written anything: the
+     * store is only written by [saveWorkingCoverage].
+     */
+    fun leaveCoverageSelection(restoreDraft: Boolean) {
+        if (restoreDraft) workingCoverage = persistedCoverage
+        unsavedCoverageChangesVisible = false
+        clearSelectionConfirmationVisible = false
+        map?.restoreNormalCameraPadding(normalCameraPadding)
         coverageSelectionMode = false
         editingTerritoryId = null
-        workingCoverage = emptyList()
+    }
+
+    /** The single committed exit: persist the draft, then leave the editor. */
+    fun saveWorkingCoverage() {
+        val id = editingTerritoryId
+        if (id == null) {
+            leaveCoverageSelection(restoreDraft = false)
+            return
+        }
+        val selectedCoverage = workingCoverage
+        coroutineScope.launch {
+            try {
+                coverageStore.replace(id, selectedCoverage)
+                if (id == latestTerritoryId) persistedCoverage = selectedCoverage
+                leaveCoverageSelection(restoreDraft = false)
+            } catch (_: Exception) {
+                // Persistence failed: stay in the editor with the draft intact so nothing is lost.
+                Toast.makeText(
+                    appContext,
+                    "Не удалось сохранить участок",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+
+    // Back never discards silently. With unsaved changes it asks the user to choose an outcome;
+    // without them it closes the editor directly.
+    BackHandler(enabled = mode == BeeMapMode.FIELD && coverageSelectionActive) {
+        if (coverageSelectionDirty) {
+            unsavedCoverageChangesVisible = true
+        } else {
+            leaveCoverageSelection(restoreDraft = true)
+        }
     }
 
     LaunchedEffect(coverageSelectionMode, map) {
@@ -455,7 +502,6 @@ internal fun BeeMap(
                 fragmentCount = coverageFragments.size,
                 viewportSummary = coverageViewportSummary,
                 selectedSummary = selectedCoverageSummary,
-                showDevBoundsExport = BuildConfig.DEBUG,
                 title = "Участок",
                 canAddFragment = map != null,
                 onAddFragment = {
@@ -487,27 +533,7 @@ internal fun BeeMap(
                     }
                 },
                 onClear = { clearSelectionConfirmationVisible = true },
-                onDone = {
-                    val id = editingTerritoryId
-                    if (id != null) {
-                        val selectedCoverage = workingCoverage
-                        coroutineScope.launch {
-                            try {
-                                coverageStore.replace(id, selectedCoverage)
-                                if (id == latestTerritoryId) persistedCoverage = selectedCoverage
-                                map?.restoreNormalCameraPadding(normalCameraPadding)
-                                coverageSelectionMode = false
-                                editingTerritoryId = null
-                            } catch (_: Exception) {
-                                Toast.makeText(
-                                    appContext,
-                                    "Не удалось сохранить участок",
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        }
-                    }
-                },
+                onDone = { saveWorkingCoverage() },
                 onCopySelectedBounds = {
                     workingCoverage.singleOrNull()?.let { selected ->
                         val text = formatMapPackageBuilderBounds(selected.bounds)
@@ -515,11 +541,6 @@ internal fun BeeMap(
                         clipboard.setPrimaryClip(ClipData.newPlainText("Bee Search map bbox", text))
                         Toast.makeText(appContext, "Bbox скопирован", Toast.LENGTH_SHORT).show()
                     }
-                },
-                onCancel = {
-                    coverageSelectionMode = false
-                    editingTerritoryId = null
-                    workingCoverage = emptyList()
                 },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -552,6 +573,14 @@ internal fun BeeMap(
                     clearSelectionConfirmationVisible = false
                 },
                 onDismiss = { clearSelectionConfirmationVisible = false },
+            )
+        }
+
+        if (unsavedCoverageChangesVisible) {
+            CoverageUnsavedChangesDialog(
+                onSave = { saveWorkingCoverage() },
+                onDiscard = { leaveCoverageSelection(restoreDraft = true) },
+                onStay = { unsavedCoverageChangesVisible = false },
             )
         }
 

@@ -99,6 +99,20 @@ internal fun undoLastCoverageFragment(
 internal fun clearCoverageFragments(): List<MapCoverageFragment> = emptyList()
 
 /**
+ * A coverage-editing session is dirty only while its working draft differs from the last
+ * persisted selection.
+ *
+ * Opening the editor is not a change: the draft starts as a copy of the persisted selection, so an
+ * untouched editor is not dirty and may be left without any confirmation. Every draft operation
+ * (add, undo last, clear all) is a pure function of the previous list and never touches the
+ * persisted selection, which is what makes "leave without saving" a plain restore.
+ */
+internal fun isCoverageSelectionDirty(
+    persisted: List<MapCoverageFragment>,
+    working: List<MapCoverageFragment>,
+): Boolean = working != persisted
+
+/**
  * Bounds used only to frame the camera for review. The selected fragments stay unchanged.
  */
 internal fun coverageBoundsForShowAll(

@@ -6,6 +6,47 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Offline-map coverage editor UX and in-app help (D078, 2026-09-18)
+
+The coverage editor no longer offers a plain exit. `Готово` is the only way out
+and it saves the selected areas and closes the editor, so a finished selection
+can no longer be thrown away by an ordinary dismissal. Opening the editor is not
+a change: the draft starts as the persisted selection, and dirty state appears
+only after `Добавить участок`, `Отменить последний` or `Очистить всё`. System
+Back with unsaved changes shows `Сохранить изменения участка?` with the named
+choices `Сохранить`, `Выйти без сохранения` and `Остаться`; with no unsaved
+changes Back closes the editor directly. `Отмена` and `Сброс` became
+`Отменить последний` and `Очистить всё`, the clear confirmation is
+`Очистить выбранные участки?`, and clearing stays draft-scoped until `Готово`,
+so leaving without saving restores the previous persisted selection.
+`Копировать bbox` is no longer gated on `BuildConfig.DEBUG` and is available in
+every build type while exactly one area is selected.
+
+The two actions that need long labels moved out of the old three-button row:
+`Отменить последний` takes a full-width row and `Обзор`/`Очистить всё` share the
+next one, which keeps every label readable at `font_scale=1.7`.
+
+In-app help gained `Создание участка офлайн-карты` and `Загрузка офлайн-карты`.
+Their action names are asserted against the same constants the editor renders, so
+a rename cannot leave the help describing a button that no longer exists.
+
+Verification: `:app:testDebugUnitTest` (all classes green; 14 coverage-selection
+and 23 help-content tests), `:app:compileDebugAndroidTestKotlin`,
+`:app:assembleBeta`, 15 instrumented UI tests (`MapCoverageSelectionUiTest`,
+`HelpScreenTest`) and 11 existing map instrumentation tests (`MainMapScreenTest`,
+`MapCenterTargetTest`, `MapViewLifecycleControllerTest`) passed on the Samsung
+SM-S938B at `font_scale=1.7` through `tools/run-preserving-device-tests.ps1`.
+Device scenario checks ran against the real screen: create then `Готово` persists
+and survives reopening; Back + `Выйти без сохранения` keeps the previous
+selection; Back + `Сохранить` commits the change; declining the clear
+confirmation loses nothing; clear then Back + discard leaves the saved selection
+untouched. The DEV coverage DataStore file was byte-identical before and after
+(md5 `41bc475150c6e97fb3edf12101a13449`, 427 bytes).
+
+Not covered automatically: the `BeeMap` wiring itself. The Back confirmation and
+the `Готово` commit path are verified by device checks plus unit tests of the
+draft semantics, not by an automated integration test.
+
 ## Navigation shell milestone (D077, 2026-09-17)
 
 The main map is now the common creation entry. Its red center point is the
