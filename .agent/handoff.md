@@ -38,6 +38,15 @@ fully dark body plus a mark-colored elliptical ring, because no segment can
 honestly carry that color. `contentDescription` carries the meaning for
 accessibility, e.g. `Жёлтая метка, грудь`. No per-combination asset exists.
 
+The chromatic mark colours were brightened after field review reported that the
+first palette went blind in sunlight: `RED C62828`, `BLUE 1565C0` and
+`GREEN 2E7D32` had a relative luminance of only 0.13-0.16, which is close to the
+dark body colour, so the filled segment stopped separating from the rest of the
+silhouette (contrast against the body was only 2.7-3.1). They are now
+`RED FF3B30`, `BLUE 0A84FF` and `GREEN 4CAF50`, which raises the contrast against
+the dark body to 4.3-5.7 while keeping every pair of colours distinguishable.
+`WHITE` and `YELLOW` are unchanged.
+
 The mark is sized and proportioned from an explicit visual review. Its slot is
 tall and narrow (width ~0.36 of its height), the abdomen is the dominant mass,
 and the graphic spans the full height of a Bee card, so the mark is the largest

@@ -67,12 +67,19 @@ internal fun beeMarkSegmentColors(
 /**
  * Mark colours stay semantically WHITE, YELLOW, BLUE, RED and GREEN. WHITE is
  * not darkened to gain visibility; the icon relies on its outline instead.
+ *
+ * The chromatic colours are deliberately bright and fully saturated so a mark
+ * stays identifiable in direct sunlight. A dark tone does not merely look dull
+ * outdoors: its luminance approaches the dark body colour, so the filled
+ * segment stops separating from the rest of the bee. Every colour here keeps a
+ * luminance of at least 0.22 and a contrast ratio of at least 4.0 against
+ * [BeeMarkOutline].
  */
 internal fun markColorValue(markColor: String): Color = when (markColor) {
     "WHITE" -> Color.White
     "YELLOW" -> Color(0xFFFFD54F)
-    "BLUE" -> Color(0xFF1565C0)
-    "RED" -> Color(0xFFC62828)
-    "GREEN" -> Color(0xFF2E7D32)
+    "BLUE" -> Color(0xFF0A84FF)
+    "RED" -> Color(0xFFFF3B30)
+    "GREEN" -> Color(0xFF4CAF50)
     else -> Color.Gray
 }
