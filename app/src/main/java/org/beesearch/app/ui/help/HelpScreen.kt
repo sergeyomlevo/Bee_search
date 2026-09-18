@@ -20,6 +20,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -30,9 +31,14 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
 
 @Composable
-internal fun HelpScreen(onBack: () -> Unit) {
+internal fun HelpScreen(
+    exchangeStorage: BeeSearchExchangeStorage,
+    onBack: () -> Unit,
+) {
+    val sections = remember(exchangeStorage) { helpSections(exchangeStorage) }
     BackHandler(onBack = onBack)
     Scaffold(
         topBar = {
@@ -60,7 +66,7 @@ internal fun HelpScreen(onBack: () -> Unit) {
                     style = MaterialTheme.typography.headlineSmall,
                 )
             }
-            itemsIndexed(detailedHelpSections) { index, section ->
+            itemsIndexed(sections) { index, section ->
                 HelpSectionCard(section = section, index = index)
             }
         }

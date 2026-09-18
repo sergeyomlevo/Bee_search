@@ -1,5 +1,6 @@
 package org.beesearch.app.ui.help
 
+import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
 import org.beesearch.app.ui.map.ADD_COVERAGE_FRAGMENT_LABEL
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_LABEL
 import org.beesearch.app.ui.map.COPY_SELECTED_COVERAGE_LABEL
@@ -13,6 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * Content invariants of the in-app help.
@@ -33,20 +35,28 @@ class HelpContentTest {
         "Карты",
         "Создание участка офлайн-карты",
         "Загрузка офлайн-карты",
+        EXCHANGE_HELP_TITLE,
     )
 
+    private fun exchangeStorage(variant: String = "Beta") = BeeSearchExchangeStorage(
+        publicRoot = File("Download"),
+        variantName = variant,
+    )
+
+    private fun sections() = helpSections(exchangeStorage())
+
     private fun sectionText(title: String): String {
-        val section = detailedHelpSections.single { it.title == title }
+        val section = sections().single { it.title == title }
         return (listOf(section.title) + section.paragraphs).joinToString("\n")
     }
 
     private fun allHelpText(): String =
-        (quickStartHelp + detailedHelpSections.flatMap { listOf(it.title) + it.paragraphs })
+        (quickStartHelp + sections().flatMap { listOf(it.title) + it.paragraphs })
             .joinToString("\n")
 
     @Test
     fun sectionTitlesAreTheTopicOnly() {
-        assertEquals(expectedTitles, detailedHelpSections.map { it.title })
+        assertEquals(expectedTitles, sections().map { it.title })
         expectedTitles.forEach { title ->
             assertFalse(title, title.contains("Развернуть"))
             assertFalse(title, title.contains("Свернуть"))
@@ -269,6 +279,35 @@ class HelpContentTest {
         assertTrue(text, text.contains("полностью включает выбранные участки"))
         // A failed attempt must not be described as losing the installed map.
         assertTrue(text, text.contains("не удаляется"))
+    }
+
+    @Test
+    fun exchangeSectionNamesTheFolderOfTheRunningVariant() {
+        val text = sectionText(EXCHANGE_HELP_TITLE)
+        assertTrue(text, text.contains("Download/BeeSearch/Beta/Exchange"))
+        assertTrue(text, text.contains("Areas"))
+        assertTrue(text, text.contains("OfflineMaps"))
+        assertTrue(text, text.contains("Data"))
+        assertTrue(text, text.contains("папка обмена"))
+        assertTrue(text, text.contains("не внутреннее хранилище приложения"))
+        // Deleting an exchange file must be described as harmless for imported data.
+        assertTrue(text, text.contains("не повредит уже импортированную карту"))
+    }
+
+    @Test
+    fun exchangeSectionIsVariantSpecific() {
+        val beta = exchangeHelpSection(exchangeStorage("Beta")).paragraphs.joinToString("\n")
+        val stable = exchangeHelpSection(exchangeStorage("Stable")).paragraphs.joinToString("\n")
+        val dev = exchangeHelpSection(exchangeStorage("Dev")).paragraphs.joinToString("\n")
+
+        assertTrue(beta, beta.contains("Download/BeeSearch/Beta/Exchange"))
+        assertTrue(stable, stable.contains("Download/BeeSearch/Stable/Exchange"))
+        assertTrue(dev, dev.contains("Download/BeeSearch/Dev/Exchange"))
+
+        // A variant must never advertise another variant's folder as its own.
+        assertFalse(beta, beta.contains("BeeSearch/Stable/") || beta.contains("BeeSearch/Dev/"))
+        assertFalse(stable, stable.contains("BeeSearch/Beta/") || stable.contains("BeeSearch/Dev/"))
+        assertFalse(dev, dev.contains("BeeSearch/Beta/") || dev.contains("BeeSearch/Stable/"))
     }
 
     @Test

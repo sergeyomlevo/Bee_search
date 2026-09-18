@@ -5,6 +5,7 @@ import android.content.Context
 import org.beesearch.app.data.backup.BackupDocumentExporter
 import org.beesearch.app.data.backup.BackupService
 import org.beesearch.app.data.backup.SafBackupDocumentExporter
+import org.beesearch.app.data.exchange.beeSearchExchangeStorage
 import org.beesearch.app.data.heading.AndroidHeadingProvider
 import org.beesearch.app.data.location.AndroidLocationProvider
 import org.beesearch.app.data.local.room.BeeSearchDatabase
@@ -63,6 +64,7 @@ internal class AppContainer(context: Context) {
         settingsRepository = settingsRepository,
         pointCreator = observationRepository,
     )
+    val exchangeStorage = beeSearchExchangeStorage()
     val locationProvider = AndroidLocationProvider(context)
     val headingProvider = AndroidHeadingProvider(context, clock)
 }

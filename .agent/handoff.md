@@ -6,6 +6,55 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Bee Search file exchange directory (D080, 2026-09-18)
+
+User-facing file exchange now has one predictable place per build variant:
+`Download/BeeSearch/<Stable|Beta|Dev>/Exchange/` with `Areas`, `OfflineMaps` and
+`Data`. The variant comes from the generated `BuildConfig.EXCHANGE_VARIANT`, set per
+build type, so no code inspects the package name. `BeeSearchExchangeStorage` is the
+single contract that owns the variant root, the three folders, the picker start
+location and directory materialisation; UI, import and export never build paths
+themselves. Folders are created idempotently on first use — nothing is deleted,
+renamed or duplicated.
+
+The exchange directory is a user-facing transfer contract, not canonical app
+storage. Room, DataStore, cache, the installed PMTiles copy and map-package runtime
+state stay app-owned; import still copies into app-owned storage, so deleting an
+exchange file cannot damage an imported map.
+
+Scoped storage does not allow an app to create `BeeSearch` in the root of shared
+storage and Bee Search asks for no broad filesystem permission, so the physical root
+is the public `Download` collection. Measured on the target device (API 36,
+targetSdk 37): top-level `mkdirs()` is denied, `Download/BeeSearch/...` and
+`Documents/BeeSearch/...` are creatable and writable, files created by another writer
+are **not** readable by the app (EACCES, and `list()` is empty), and MediaStore
+insert with a nested `RELATIVE_PATH` also works. Because foreign files cannot be read
+directly, map import keeps using the system picker and only steers its start location
+via `DocumentsContract.EXTRA_INITIAL_URI`.
+
+Map import (`OfflineMapManagementScreen`) and data export (`DataRoute`) both point
+their pickers at the variant's `OfflineMaps`/`Data` folder and display the exact path
+as text. Map-package contract, importer semantics and backup format are unchanged.
+In-app help gained the `Где находятся файлы Bee Search` section, generated from the
+running variant so it always shows the real path.
+
+Verification: full debug unit suite green (116 tests, including 9 exchange-contract
+tests) plus `BeeSearchExchangeStorageDeviceTest`, `HelpScreenTest`, `DataScreenTest`
+and `MapCoverageSelectionUiTest` (26 instrumented tests). On the SM-S938B at
+`font_scale=1.7`: the Dev tree was created, the OfflineMaps picker opened inside
+`Dev > Exchange > OfflineMaps`, a map pair copied there was listed and selectable, the
+export picker opened inside `Dev > Exchange > Data` with `bee-search-backup.zip`, and
+the offline vector map kept rendering after the source pair was moved out of
+`Download`. The Dev coverage DataStore file stayed byte-identical
+(md5 `41bc475150c6e97fb3edf12101a13449`).
+
+Known, unrelated defect found while checking the export: on this DEV device the
+backup export fails with `IllegalArgumentException: No enum constant
+org.beesearch.app.domain.model.MarkPosition.THORAX` from
+`RoomConverters.stringToMarkPosition` while reading Bee rows. That vocabulary belongs
+to the bee-marking branch; it is a cross-branch DEV database incompatibility, not
+caused by the exchange directory, and it is not fixed here.
+
 ## Offline-map coverage editor UX and in-app help (D079, 2026-09-18)
 
 The coverage editor no longer offers a plain exit. `Готово` is the only way out

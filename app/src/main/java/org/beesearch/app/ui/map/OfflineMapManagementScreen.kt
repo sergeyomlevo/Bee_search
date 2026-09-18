@@ -3,7 +3,6 @@ package org.beesearch.app.ui.map
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -31,6 +30,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import kotlinx.coroutines.launch
+import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
+import org.beesearch.app.data.exchange.ExchangeFolder
+import org.beesearch.app.data.exchange.OpenExchangeDocument
 import org.beesearch.app.domain.model.Territory
 
 /**
@@ -56,6 +58,7 @@ internal fun OfflineMapManagementScreen(
     territory: Territory?,
     mapCoverageStore: MapCoverageStore,
     mapPackageStore: MapPackageStore,
+    exchangeStorage: BeeSearchExchangeStorage,
     onBack: () -> Unit,
     onEditCoverageOnMap: () -> Unit,
     modifier: Modifier = Modifier,
@@ -63,6 +66,10 @@ internal fun OfflineMapManagementScreen(
     val territoryId = territory?.id
     val scope = rememberCoroutineScope()
     val contentResolver = LocalContext.current.contentResolver
+    // Pickers start inside the exchange folder so the user does not have to hunt for map files.
+    val exchangeOfflineMapsUri = remember(exchangeStorage) {
+        exchangeStorage.initialDocumentUri(ExchangeFolder.OFFLINE_MAPS)
+    }
 
     var coverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
     var availability by remember {
@@ -75,6 +82,10 @@ internal fun OfflineMapManagementScreen(
     // Steps of the current import session.
     var pendingManifestUri by remember { mutableStateOf<Uri?>(null) }
     var selectedManifest by remember { mutableStateOf<MapPackageManifest?>(null) }
+
+    LaunchedEffect(exchangeStorage) {
+        exchangeStorage.ensure()
+    }
 
     LaunchedEffect(territoryId) {
         if (territoryId == null) return@LaunchedEffect
@@ -129,7 +140,7 @@ internal fun OfflineMapManagementScreen(
     }
 
     val pmtilesPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
+        contract = OpenExchangeDocument(exchangeOfflineMapsUri),
     ) { pmtilesUri ->
         if (pmtilesUri == null) return@rememberLauncherForActivityResult
         val manifest = selectedManifest
@@ -177,7 +188,7 @@ internal fun OfflineMapManagementScreen(
     }
 
     val manifestPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
+        contract = OpenExchangeDocument(exchangeOfflineMapsUri),
     ) { manifestUri ->
         if (manifestUri == null) return@rememberLauncherForActivityResult
         val displayName = readDisplayName(manifestUri)
@@ -291,6 +302,10 @@ internal fun OfflineMapManagementScreen(
                                 "1. *.pmtiles.manifest.json — файл описания карты;\n" +
                                 "2. *.pmtiles — файл самой карты.",
                             style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            "Папка обмена: ${exchangeStorage.userVisiblePath(ExchangeFolder.OFFLINE_MAPS)}",
+                            style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 }

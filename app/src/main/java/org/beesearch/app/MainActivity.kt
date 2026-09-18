@@ -145,6 +145,12 @@ private fun BeeSearchApp(
         )
     }
 
+    // Materialise the user-facing exchange tree once per process so the folder exists and is
+    // predictable before the user goes looking for it. Idempotent: existing folders are reused.
+    LaunchedEffect(application) {
+        application.container.exchangeStorage.ensure()
+    }
+
     Bee_searchTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -168,7 +174,10 @@ private fun BeeSearchApp(
                         onOpenHelp = viewModel::openHelp,
                         onOpenData = viewModel::openData,
                     )
-                    AppRoute.Help -> HelpScreen(onBack = viewModel::openSettings)
+                    AppRoute.Help -> HelpScreen(
+                        exchangeStorage = application.container.exchangeStorage,
+                        onBack = viewModel::openSettings,
+                    )
                     AppRoute.Data -> DataRoute(
                         application = application,
                         onBack = viewModel::openSettings,
@@ -203,6 +212,7 @@ private fun BeeSearchApp(
                         territory = currentTerritory,
                         mapCoverageStore = application.container.mapCoverageStore,
                         mapPackageStore = application.container.mapPackageStore,
+                        exchangeStorage = application.container.exchangeStorage,
                         onBack = viewModel::returnToStartup,
                         onEditCoverageOnMap = viewModel::openMapWithCoverageEdit,
                     )

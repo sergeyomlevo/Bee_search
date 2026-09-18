@@ -1,9 +1,13 @@
 package org.beesearch.app.ui.help
 
+import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
+
 internal data class HelpSection(
     val title: String,
     val paragraphs: List<String>,
 )
+
+internal const val EXCHANGE_HELP_TITLE = "Где находятся файлы Bee Search"
 
 internal val quickStartHelp = listOf(
     "Выберите или создайте территорию и укажите наблюдателя.",
@@ -105,5 +109,31 @@ internal val detailedHelpSections = listOf(
             "Карта подходит, только если её область полностью включает выбранные участки. Если выбрать участок за пределами области карты, загрузка будет отклонена с сообщением о неполном покрытии: тогда либо выбирают участок внутри области карты, либо готовят карту для текущего участка.",
             "Другие обычные причины отказа: выбран не тот файл (например, файл карты вместо описания или файл из другой пары), файл карты повреждён или не поддерживается, файл не удалось прочитать. Уже установленная карта при неудачной попытке не удаляется и продолжает работать.",
         ),
+    ),
+)
+
+/** Help for the running build: the exchange section names the folder this variant actually uses. */
+internal fun helpSections(exchangeStorage: BeeSearchExchangeStorage): List<HelpSection> =
+    detailedHelpSections + exchangeHelpSection(exchangeStorage)
+
+internal fun exchangeHelpSection(exchangeStorage: BeeSearchExchangeStorage): HelpSection = HelpSection(
+    title = EXCHANGE_HELP_TITLE,
+    paragraphs = listOf(
+        "Bee Search обменивается файлами через отдельную папку в общем хранилище устройства. " +
+            "У каждой сборки приложения своя папка: Stable, Beta и Dev не смешивают файлы. " +
+            "Эта сборка использует папку:",
+        exchangeStorage.userVisiblePath(),
+        "Внутри папки обмена:",
+        "Areas — участки офлайн-карты;",
+        "OfflineMaps — готовые офлайн-карты: два файла одной пары;",
+        "Data — экспортированные данные Bee Search.",
+        "Это папка обмена, а не внутреннее хранилище приложения. Участки, точки наблюдения, " +
+            "настройки и установленная карта хранятся внутри приложения, поэтому удаление или " +
+            "перемещение файла из папки обмена не повредит уже импортированную карту и не удалит данные.",
+        "Папку участков пока использует только подготовка карт: файлы участков появятся в ней " +
+            "в одной из следующих версий, а сейчас участки хранятся внутри приложения.",
+        "Свои файлы в папку обмена можно положить заранее. При импорте карты приложение " +
+            "открывает проводник в папке OfflineMaps; если проводник открылся в другом месте, " +
+            "вернитесь к пути, указанному выше.",
     ),
 )
