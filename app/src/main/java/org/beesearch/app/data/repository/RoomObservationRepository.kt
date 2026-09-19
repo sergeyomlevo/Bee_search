@@ -2,6 +2,7 @@ package org.beesearch.app.data.repository
 
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import org.beesearch.app.data.local.room.BeeDao
 import org.beesearch.app.data.local.room.BeeEntity
@@ -10,6 +11,10 @@ import org.beesearch.app.data.local.room.FlightCycleDao
 import org.beesearch.app.data.local.room.FlightCycleEntity
 import org.beesearch.app.data.local.room.ObservationPointDao
 import org.beesearch.app.data.local.room.ObservationPointEntity
+import org.beesearch.app.data.local.room.ObservationPointAttachmentDao
+import org.beesearch.app.data.local.room.ObservationPointAttachmentEntity
+import org.beesearch.app.data.local.room.ObservationPointWeatherDao
+import org.beesearch.app.data.local.room.ObservationPointWeatherEntity
 import org.beesearch.app.data.local.room.ObserverDao
 import org.beesearch.app.data.local.room.TerritoryDao
 import org.beesearch.app.data.local.room.toDomain
@@ -43,6 +48,10 @@ import org.beesearch.app.domain.model.ObservationPointNotCompletedException
 import org.beesearch.app.domain.model.StartedBeeFlight
 import org.beesearch.app.domain.model.OpenFlightCycleExistsException
 import org.beesearch.app.domain.model.OpenFlightCycleNotFoundException
+import org.beesearch.app.domain.model.ObservationPointAttachment
+import org.beesearch.app.domain.model.ObservationPointWeather
+import org.beesearch.app.domain.model.PendingWeatherRequest
+import org.beesearch.app.domain.model.WeatherStatus
 import org.beesearch.app.domain.repository.ObservationRepository
 import java.time.Clock
 import java.time.ZoneId
@@ -55,9 +64,33 @@ internal class RoomObservationRepository(
     private val observerDao: ObserverDao,
     private val beeDao: BeeDao,
     private val cycleDao: FlightCycleDao,
+    private val attachmentDao: ObservationPointAttachmentDao,
+    private val weatherDao: ObservationPointWeatherDao,
     private val clock: Clock,
     private val observationZoneIdProvider: () -> ZoneId = { ZoneId.systemDefault() },
 ) : ObservationRepository {
+    constructor(
+        database: BeeSearchDatabase,
+        territoryDao: TerritoryDao,
+        pointDao: ObservationPointDao,
+        observerDao: ObserverDao,
+        beeDao: BeeDao,
+        cycleDao: FlightCycleDao,
+        clock: Clock,
+        observationZoneIdProvider: () -> ZoneId = { ZoneId.systemDefault() },
+    ) : this(
+        database = database,
+        territoryDao = territoryDao,
+        pointDao = pointDao,
+        observerDao = observerDao,
+        beeDao = beeDao,
+        cycleDao = cycleDao,
+        attachmentDao = database.observationPointAttachmentDao(),
+        weatherDao = database.observationPointWeatherDao(),
+        clock = clock,
+        observationZoneIdProvider = observationZoneIdProvider,
+    )
+
     override fun observeObservationPointSummaries(
         territoryId: UUID,
         observationYear: Int?,
@@ -99,8 +132,72 @@ internal class RoomObservationRepository(
                         flightCycles = cyclesByBee[bee.id].orEmpty().map(FlightCycleEntity::toDomain),
                     )
                 },
+                weather = weatherDao.getByPointId(pointId)?.toDomain(),
+                attachments = attachmentDao.getForPoint(pointId).map(ObservationPointAttachmentEntity::toDomain),
             )
         }
+
+    override fun observeObservationPointProperties(pointId: UUID): Flow<ObservationPointDetail?> =
+        combine(
+            pointDao.observeById(pointId),
+            attachmentDao.observeForPoint(pointId),
+            weatherDao.observeByPointId(pointId),
+        ) { point, _, _ ->
+            if (point == null) null else getObservationPointDetail(pointId)
+        }
+
+    override suspend fun updateObservationPointDescription(pointId: UUID, description: String?): ObservationPoint =
+        database.withTransaction {
+            val normalized = description?.takeUnless { it.isEmpty() }
+            if (pointDao.updateDescription(pointId, normalized) != 1) throw EntityNotFoundException("ObservationPoint")
+            pointDao.getById(pointId)!!.toDomain()
+        }
+
+    override suspend fun listObservationPointAttachments(pointId: UUID): List<ObservationPointAttachment> =
+        attachmentDao.getForPoint(pointId).map(ObservationPointAttachmentEntity::toDomain)
+
+    override suspend fun listAllObservationPointAttachments(): List<ObservationPointAttachment> =
+        attachmentDao.getAll().map(ObservationPointAttachmentEntity::toDomain)
+
+    override suspend fun insertObservationPointAttachment(attachment: ObservationPointAttachment) {
+        require(!attachment.relativePath.startsWith("/") && !Regex("^[A-Za-z]:[\\\\/]").containsMatchIn(attachment.relativePath))
+        require(attachment.byteSize >= 0L && attachment.sha256.matches(Regex("[0-9a-f]{64}")))
+        attachmentDao.insert(ObservationPointAttachmentEntity(
+            attachment.id, attachment.observationPointId, attachment.type, attachment.relativePath,
+            attachment.originalFileName, attachment.mimeType, attachment.byteSize, attachment.sha256, attachment.createdAt,
+        ))
+    }
+
+    override suspend fun deleteObservationPointAttachment(attachmentId: UUID): ObservationPointAttachment? = database.withTransaction {
+        val existing = attachmentDao.getById(attachmentId) ?: return@withTransaction null
+        attachmentDao.deleteById(attachmentId)
+        existing.toDomain()
+    }
+
+    override suspend fun getObservationPointWeather(pointId: UUID): ObservationPointWeather? =
+        weatherDao.getByPointId(pointId)?.toDomain()
+
+    override suspend fun getPendingWeatherRequests(): List<PendingWeatherRequest> =
+        weatherDao.getPending().mapNotNull { weather ->
+            pointDao.getById(weather.observationPointId)?.let { point ->
+                PendingWeatherRequest(point.id, point.latitude, point.longitude, point.createdAt)
+            }
+        }
+
+    override suspend fun storeLoadedWeather(pointId: UUID, weather: ObservationPointWeather): Boolean {
+        require(weather.observationPointId == pointId && weather.status == WeatherStatus.LOADED)
+        val temperature = requireNotNull(weather.temperatureC)
+        val speed = requireNotNull(weather.windSpeedMps)
+        val direction = requireNotNull(weather.windDirectionDeg)
+        require(temperature.isFinite() && speed.isFinite() && speed >= 0.0 && direction.isFinite() && direction >= 0.0 && direction < 360.0)
+        val sampleAt = requireNotNull(weather.sampleAt)
+        val fetchedAt = requireNotNull(weather.fetchedAt)
+        val source = requireNotNull(weather.source).takeIf { it.isNotBlank() } ?: error("weather source is required")
+        return weatherDao.storeLoaded(pointId, WeatherStatus.LOADED, temperature, speed, direction, sampleAt, fetchedAt, source) == 1
+    }
+
+    override suspend fun markWeatherUnavailable(pointId: UUID): Boolean = weatherDao.markUnavailable(pointId) == 1
+    override suspend fun resetWeatherPending(pointId: UUID): Boolean = weatherDao.resetPending(pointId) == 1
 
     override fun observeActivePoint(): Flow<ObservationPoint?> = pointDao.observeActive()
         .map { point -> point?.toDomain() }
@@ -140,6 +237,8 @@ internal class RoomObservationRepository(
             }
 
             cycleDao.deleteForObservationPoint(pointId)
+            attachmentDao.deleteForPoint(pointId)
+            weatherDao.deleteForPoint(pointId)
             beeDao.deleteForObservationPoint(pointId)
             if (pointDao.deleteCompletedById(pointId) != 1) {
                 throw EntityNotFoundException("ObservationPoint")
@@ -152,6 +251,8 @@ internal class RoomObservationRepository(
             val counts = observationDataCounts()
             cycleDao.deleteAll()
             beeDao.deleteAll()
+            attachmentDao.deleteAll()
+            weatherDao.deleteAll()
             pointDao.deleteAll()
             counts
         }
@@ -216,8 +317,10 @@ internal class RoomObservationRepository(
             createdAt = createdAt,
             initialGroupReleaseAt = null,
             completedAt = null,
+            description = null,
         )
         pointDao.insert(entity)
+        weatherDao.insert(ObservationPointWeatherEntity(entity.id, WeatherStatus.PENDING, null, null, null, null, null, null))
         return entity
     }
 

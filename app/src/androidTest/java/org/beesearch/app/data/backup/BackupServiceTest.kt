@@ -14,15 +14,19 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.beesearch.app.data.local.room.*
+import org.beesearch.app.data.media.ObservationAttachmentFileStore
 import org.beesearch.app.domain.backup.*
+import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.MarkPosition
+import org.beesearch.app.domain.model.WeatherStatus
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.ByteArrayInputStream
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
@@ -84,17 +88,68 @@ class BackupServiceTest {
         assertEquals("v1|56.2,42.8,56.1,42.7", prefs[stringPreferencesKey("map_coverage_${ids.territory1}")])
         assertEquals("target.pmtiles", prefs[stringPreferencesKey("map_package_active_${ids.territory1}")])
         val names = zipEntries(archive).keys
-        assertFalse(names.any { it.contains("attachment") })
+        assertFalse(names.any { it.startsWith(BackupContractV2.ATTACHMENT_PREFIX) })
         assertFalse(zipEntries(archive).values.any { String(it).contains("source.pmtiles") || String(it).contains("/private/source/path") })
     }
 
-    @Test fun manifestContainsAllSevenRequiredCollections() = runBlocking {
+    @Test fun v2RoundTripPreservesPropertiesWeatherAndPhotoBytes() = runBlocking {
+        seed(source)
+        val point = source.backupDao().observationPoints().single { it.code == "P2" }
+        val attachmentId = UUID.randomUUID()
+        val sourceFiles = ObservationAttachmentFileStore(temp("source-files"), temp("source-staging"))
+        val payload = "tiny-photo".toByteArray()
+        val stored = sourceFiles.importPhoto(point.id, attachmentId) { ByteArrayInputStream(payload) }
+        source.backupDao().insertObservationPointAttachments(listOf(ObservationPointAttachmentEntity(attachmentId, point.id, AttachmentType.PHOTO, stored.relativePath, "bee.jpg", "image/jpeg", stored.byteSize, stored.sha256, NOW)))
+        source.backupDao().insertObservationPointWeather(listOf(ObservationPointWeatherEntity(point.id, WeatherStatus.LOADED, 18.4, 2.1, 247.0, NOW, NOW.plusSeconds(10), "Open-Meteo")))
+        val targetFiles = ObservationAttachmentFileStore(temp("target-files"), temp("target-staging"))
+        service(source, sourceStore, sourceFiles).export(archive)
+        service(target, targetStore, targetFiles).restore(archive)
+        val restoredPoint = target.backupDao().observationPoints().single { it.code == "P2" }
+        assertEquals("description", restoredPoint.description)
+        assertEquals(payload.toList(), targetFiles.resolve(stored.relativePath).readBytes().toList())
+        assertEquals(1, target.backupDao().observationPointAttachments().size)
+        assertEquals(
+            WeatherStatus.LOADED,
+            target.backupDao().observationPointWeather().single { it.observationPointId == point.id }.status,
+        )
+    }
+
+    @Test fun v1RestoreCreatesPendingWeatherAndNoProperties() = runBlocking {
+        seed(source)
+        service(source, sourceStore).export(archive)
+        val v1 = convertV2ToV1(zipEntries(archive))
+        service(target, targetStore).restore(v1)
+        assertTrue(target.backupDao().observationPoints().all { it.description == null })
+        assertEquals(2, target.backupDao().observationPointWeather().size)
+        assertTrue(target.backupDao().observationPointWeather().all { it.status == WeatherStatus.PENDING })
+        assertTrue(target.backupDao().observationPointAttachments().isEmpty())
+    }
+
+    @Test fun attachmentBytesAndOwnersAreValidatedBeforeRestore() = runBlocking {
+        seed(source)
+        val point = source.backupDao().observationPoints().single { it.code == "P2" }
+        val attachmentId = UUID.randomUUID()
+        val files = ObservationAttachmentFileStore(temp("files"), temp("staging"))
+        val stored = files.importPhoto(point.id, attachmentId) { ByteArrayInputStream(byteArrayOf(1, 2, 3)) }
+        source.backupDao().insertObservationPointAttachments(listOf(ObservationPointAttachmentEntity(attachmentId, point.id, AttachmentType.PHOTO, stored.relativePath, null, "image/jpeg", stored.byteSize, stored.sha256, NOW)))
+        service(source, sourceStore, files).export(archive)
+        val base = zipEntries(archive)
+        val archivePath = "${BackupContractV2.ATTACHMENT_PREFIX}${point.id}/$attachmentId"
+        assertFailure<MissingBackupCollection>(mutate(base) { it.remove(archivePath) })
+        assertFailure<BackupIntegrityMismatch>(mutate(base) { it[archivePath] = byteArrayOf(9, 9, 9) })
+        val metadata = String(base.getValue(BackupContractV2.collections.getValue("observation-point-attachments")))
+            .replace(point.id.toString(), UUID.randomUUID().toString())
+        assertFailure<BrokenBackupForeignKey>(replaceCollection(base, "observation-point-attachments", metadata))
+        assertFailure<MalformedBackup>(mutate(base) { it["attachments/../escape"] = byteArrayOf(1) })
+    }
+
+    @Test fun manifestContainsAllV2RequiredCollections() = runBlocking {
         seed(source); service(source, sourceStore).export(archive)
         val manifest = String(zipEntries(archive).getValue("manifest.json"))
-        BackupContractV1.collections.forEach { (name, path) ->
+        BackupContractV2.collections.forEach { (name, path) ->
             assertTrue(manifest.contains("\"name\":\"$name\"")); assertTrue(manifest.contains("\"path\":\"$path\""))
         }
-        assertEquals(7, "\"collectionSchemaVersion\":1".toRegex().findAll(manifest).count())
+        assertEquals(9, "\"collectionSchemaVersion\":1".toRegex().findAll(manifest).count())
     }
 
     @Test fun integrityFailuresAreExplicit() = runBlocking {
@@ -120,7 +175,7 @@ class BackupServiceTest {
             "bees" to "observationPointId",
             "flight-cycles" to "beeId",
         ).forEach { (collection, key) ->
-            val path = BackupContractV1.collections.getValue(collection); val text = String(base.getValue(path))
+            val path = BackupContractV2.collections.getValue(collection); val text = String(base.getValue(path))
             assertFailure<BrokenBackupForeignKey>(replaceCollection(base, collection, text.replaceFirst(field(text.lineSequence().first(), key), UUID.randomUUID().toString())))
         }
         assertEquals(0, target.backupDao().total())
@@ -128,8 +183,8 @@ class BackupServiceTest {
 
     @Test fun formatEvolutionFailuresAreExplicit() = runBlocking {
         seed(source); service(source, sourceStore).export(archive); val base = zipEntries(archive)
-        assertFailure<UnsupportedBackupFormat>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"backupFormatVersion\":1", "\"backupFormatVersion\":2").toByteArray() })
-        assertFailure<UnsupportedArchiveSchema>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"archiveSchemaVersion\":1", "\"archiveSchemaVersion\":2").toByteArray() })
+        assertFailure<UnsupportedBackupFormat>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"backupFormatVersion\":2", "\"backupFormatVersion\":3").toByteArray() })
+        assertFailure<UnsupportedArchiveSchema>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"archiveSchemaVersion\":2", "\"archiveSchemaVersion\":3").toByteArray() })
         assertFailure<MissingBackupCollection>(mutate(base) { it.remove("research/bees.json") })
         assertFailure<UnknownRequiredBackupCollection>(mutate(base) {
             val text = String(it.getValue("manifest.json")); val descriptor = "{\"name\":\"future\",\"path\":\"future.json\",\"collectionSchemaVersion\":1,\"required\":true,\"recordCount\":0,\"byteLength\":0,\"sha256\":\"${"0".repeat(64)}\"}"
@@ -217,13 +272,33 @@ class BackupServiceTest {
     private fun database() = Room.inMemoryDatabaseBuilder(context, BeeSearchDatabase::class.java).allowMainThreadQueries().build()
     private fun dataStore(file: File) = PreferenceDataStoreFactory.create(scope = scope, produceFile = { file })
     private fun temp(suffix: String) = File(context.cacheDir, "${UUID.randomUUID()}-$suffix")
-    private fun service(db: BeeSearchDatabase, store: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>) = BackupService(db, store, Clock.fixed(NOW, ZoneOffset.UTC), "test")
+    private fun service(db: BeeSearchDatabase, store: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>, attachmentStore: ObservationAttachmentFileStore? = null) = BackupService(db, store, Clock.fixed(NOW, ZoneOffset.UTC), "test", attachmentStore = attachmentStore)
     private fun write(entries: Map<String, ByteArray>): File { ZipOutputStream(archive.outputStream()).use { z -> entries.forEach { (n,b) -> z.putNextEntry(ZipEntry(n)); z.write(b); z.closeEntry() } }; return archive }
     private fun mutate(base: Map<String, ByteArray>, block: (MutableMap<String, ByteArray>) -> Unit): File { val copy = LinkedHashMap(base); block(copy); return write(copy) }
+    private fun convertV2ToV1(base: Map<String, ByteArray>): File {
+        val copy = LinkedHashMap<String, ByteArray>()
+        BackupContractV1.collections.values.forEach { path -> copy[path] = base.getValue(path) }
+        val pointPath = BackupContractV1.collections.getValue("observation-points")
+        copy[pointPath] = String(copy.getValue(pointPath)).replace(Regex(",\\\"description\\\":(?:\\\"[^\\\"]*\\\"|null)"), "").toByteArray()
+        val descriptors = BackupContractV1.collections.entries.joinToString(",", "[", "]") { (name, path) ->
+            val bytes = copy.getValue(path)
+            val count = String(bytes).lineSequence().count(String::isNotBlank)
+            val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+            "{\"name\":\"$name\",\"path\":\"$path\",\"collectionSchemaVersion\":1," +
+                "\"required\":true,\"recordCount\":$count,\"byteLength\":${bytes.size},\"sha256\":\"$hash\"}"
+        }
+        val manifest = String(base.getValue("manifest.json"))
+        val v1Manifest = manifest.substringBefore("\"collections\":")
+            .replace("\"backupFormatVersion\":2", "\"backupFormatVersion\":1")
+            .replace("\"archiveSchemaVersion\":2", "\"archiveSchemaVersion\":1")
+            .replace("\"roomSchemaVersion\":7", "\"roomSchemaVersion\":6") + "\"collections\":" + descriptors + "}"
+        copy["manifest.json"] = v1Manifest.toByteArray()
+        return write(copy)
+    }
     private inline fun <reified T : Throwable> assertFailure(file: File) { assertThrows(T::class.java) { service(target, targetStore).validate(file) } }
     private fun zipEntries(file: File): LinkedHashMap<String, ByteArray> { val out = linkedMapOf<String, ByteArray>(); ZipInputStream(file.inputStream()).use { z -> while (true) { val e=z.nextEntry?:break; out[e.name]=z.readBytes() } }; return out }
     private fun replaceCollection(base: Map<String, ByteArray>, name: String, text: String): File {
-        val copy = LinkedHashMap(base); val bytes = text.toByteArray(); val path = BackupContractV1.collections.getValue(name); copy[path] = bytes
+        val copy = LinkedHashMap(base); val bytes = text.toByteArray(); val path = BackupContractV2.collections.getValue(name); copy[path] = bytes
         val manifest = String(copy.getValue("manifest.json")); val start = manifest.indexOf("{\"name\":\"$name\"")
         check(start >= 0); val end = manifest.indexOf('}', start) + 1; val old = manifest.substring(start, end)
         val count = text.lineSequence().count(String::isNotBlank); val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
@@ -237,7 +312,7 @@ class BackupServiceTest {
         val t1=UUID.randomUUID(); val t2=UUID.randomUUID(); val o1=UUID.randomUUID(); val o2=UUID.randomUUID(); val p1=UUID.randomUUID(); val p2=UUID.randomUUID(); val b1=UUID.randomUUID(); val b2=UUID.randomUUID()
         val d=db.backupDao(); d.insertTerritories(listOf(TerritoryEntity(t1,"T1","One","R","D",NOW,NOW),TerritoryEntity(t2,"T2","Two","R","D",NOW,NOW)))
         d.insertObservers(listOf(ObserverEntity(o1,"O1","Ivanov","Ivan",null,null,NOW,NOW),ObserverEntity(o2,"O2","Petrov","Petr","P", "contact",NOW,NOW)))
-        d.insertObservationPoints(listOf(ObservationPointEntity(p1,t1,o1,2026,1,BeePresenceResult.NO_BEES_FOUND,null,56.1,42.7,null,null,null,NOW,null,NOW.plusSeconds(10)), ObservationPointEntity(p2,t2,o2,2026,1,BeePresenceResult.BEES_FOUND,"P2",56.2,42.8,56.19,42.79,4.5,NOW,NOW.plusSeconds(20),null)))
+        d.insertObservationPoints(listOf(ObservationPointEntity(p1,t1,o1,2026,1,BeePresenceResult.NO_BEES_FOUND,null,56.1,42.7,null,null,null,NOW,null,NOW.plusSeconds(10)), ObservationPointEntity(p2,t2,o2,2026,1,BeePresenceResult.BEES_FOUND,"P2",56.2,42.8,56.19,42.79,4.5,NOW,NOW.plusSeconds(20),null,"description")))
         d.insertBees(listOf(BeeEntity(b1,p2,"WHITE",MarkPosition.NONE,NOW),BeeEntity(b2,p2,"BLUE",MarkPosition.LEFT_WING,NOW)))
         d.insertFlightCycles(listOf(FlightCycleEntity(UUID.randomUUID(),b1,1,NOW.plusSeconds(20),NOW.plusSeconds(80),null,false,true,false,NOW.plusSeconds(20),NOW.plusSeconds(80)), FlightCycleEntity(UUID.randomUUID(),b1,2,NOW.plusSeconds(90),null,0.0,true,false,false,NOW.plusSeconds(90),NOW.plusSeconds(90)), FlightCycleEntity(UUID.randomUUID(),b2,1,NOW.plusSeconds(20),NOW.plusSeconds(70),247.5,true,true,false,NOW.plusSeconds(20),NOW.plusSeconds(70))))
         return Ids(t1,t2,o1,o2)

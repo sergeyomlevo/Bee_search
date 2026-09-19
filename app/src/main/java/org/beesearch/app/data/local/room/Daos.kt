@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 import org.beesearch.app.domain.model.BeePresenceResult
 import java.time.Instant
 import java.util.UUID
+import org.beesearch.app.domain.model.AttachmentType
+import org.beesearch.app.domain.model.WeatherStatus
 
 internal data class CompletedObservationPointRow(
     @ColumnInfo(name = "id") val id: UUID,
@@ -44,6 +46,8 @@ internal abstract class BackupDao {
     @Query("SELECT * FROM observation_points ORDER BY id") abstract suspend fun observationPoints(): List<ObservationPointEntity>
     @Query("SELECT * FROM bees ORDER BY id") abstract suspend fun bees(): List<BeeEntity>
     @Query("SELECT * FROM flight_cycles ORDER BY id") abstract suspend fun flightCycles(): List<FlightCycleEntity>
+    @Query("SELECT * FROM observation_point_attachments ORDER BY id") abstract suspend fun observationPointAttachments(): List<ObservationPointAttachmentEntity>
+    @Query("SELECT * FROM observation_point_weather ORDER BY observation_point_id") abstract suspend fun observationPointWeather(): List<ObservationPointWeatherEntity>
     @Query("SELECT COUNT(*) FROM territories") abstract suspend fun territoryCount(): Int
     @Query("SELECT COUNT(*) FROM observers") abstract suspend fun observerCount(): Int
     @Query("SELECT COUNT(*) FROM observation_points") abstract suspend fun observationPointCount(): Int
@@ -54,6 +58,8 @@ internal abstract class BackupDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertObservationPoints(value: List<ObservationPointEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertBees(value: List<BeeEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertFlightCycles(value: List<FlightCycleEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertObservationPointAttachments(value: List<ObservationPointAttachmentEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertObservationPointWeather(value: List<ObservationPointWeatherEntity>)
 }
 
 @Dao
@@ -105,6 +111,12 @@ internal interface ObservationPointDao {
 
     @Query("SELECT * FROM observation_points WHERE id = :id")
     suspend fun getById(id: UUID): ObservationPointEntity?
+
+    @Query("SELECT * FROM observation_points WHERE id = :id")
+    fun observeById(id: UUID): Flow<ObservationPointEntity?>
+
+    @Query("UPDATE observation_points SET description = :description WHERE id = :id")
+    suspend fun updateDescription(id: UUID, description: String?): Int
 
     @Query(
         """
@@ -217,6 +229,50 @@ internal interface ObservationPointDao {
         result: BeePresenceResult,
         completedAt: Instant,
     ): Int
+}
+
+@Dao
+internal interface ObservationPointAttachmentDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(attachment: ObservationPointAttachmentEntity)
+    @Query("SELECT * FROM observation_point_attachments WHERE observation_point_id = :pointId ORDER BY created_at, id")
+    suspend fun getForPoint(pointId: UUID): List<ObservationPointAttachmentEntity>
+    @Query("SELECT * FROM observation_point_attachments ORDER BY created_at, id")
+    suspend fun getAll(): List<ObservationPointAttachmentEntity>
+
+    @Query("SELECT * FROM observation_point_attachments WHERE observation_point_id = :pointId ORDER BY created_at, id")
+    fun observeForPoint(pointId: UUID): Flow<List<ObservationPointAttachmentEntity>>
+    @Query("SELECT * FROM observation_point_attachments WHERE id = :id")
+    suspend fun getById(id: UUID): ObservationPointAttachmentEntity?
+    @Query("DELETE FROM observation_point_attachments WHERE id = :id")
+    suspend fun deleteById(id: UUID): Int
+    @Query("DELETE FROM observation_point_attachments WHERE observation_point_id = :pointId")
+    suspend fun deleteForPoint(pointId: UUID): Int
+    @Query("DELETE FROM observation_point_attachments")
+    suspend fun deleteAll(): Int
+}
+
+@Dao
+internal interface ObservationPointWeatherDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(weather: ObservationPointWeatherEntity)
+    @Query("SELECT * FROM observation_point_weather WHERE observation_point_id = :pointId")
+    suspend fun getByPointId(pointId: UUID): ObservationPointWeatherEntity?
+
+    @Query("SELECT * FROM observation_point_weather WHERE observation_point_id = :pointId")
+    fun observeByPointId(pointId: UUID): Flow<ObservationPointWeatherEntity?>
+    @Query("SELECT * FROM observation_point_weather WHERE status = 'PENDING'")
+    suspend fun getPending(): List<ObservationPointWeatherEntity>
+    @Query("UPDATE observation_point_weather SET status = :status, temperature_c = :temperatureC, wind_speed_mps = :windSpeedMps, wind_direction_deg = :windDirectionDeg, sample_at = :sampleAt, fetched_at = :fetchedAt, source = :source WHERE observation_point_id = :pointId AND status != 'LOADED'")
+    suspend fun storeLoaded(pointId: UUID, status: WeatherStatus, temperatureC: Double, windSpeedMps: Double, windDirectionDeg: Double, sampleAt: Instant, fetchedAt: Instant, source: String): Int
+    @Query("UPDATE observation_point_weather SET status = 'UNAVAILABLE' WHERE observation_point_id = :pointId AND status != 'LOADED'")
+    suspend fun markUnavailable(pointId: UUID): Int
+    @Query("UPDATE observation_point_weather SET status = 'PENDING' WHERE observation_point_id = :pointId AND status != 'LOADED'")
+    suspend fun resetPending(pointId: UUID): Int
+    @Query("DELETE FROM observation_point_weather WHERE observation_point_id = :pointId")
+    suspend fun deleteForPoint(pointId: UUID): Int
+    @Query("DELETE FROM observation_point_weather")
+    suspend fun deleteAll(): Int
 }
 
 @Dao

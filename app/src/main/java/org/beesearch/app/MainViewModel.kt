@@ -63,12 +63,15 @@ sealed interface AppRoute {
     data object Objects : AppRoute
     data object Points : AppRoute
     data class PointDetail(val pointId: UUID) : AppRoute
+    data class PointProperties(val pointId: UUID, val returnTo: PointPropertiesReturn) : AppRoute
     data object TerritoryManagement : AppRoute
     data object OfflineMapManagement : AppRoute
     data object CurrentTerritory : AppRoute
     data object PrepareObservationPoint : AppRoute
     data class ResumeObservation(val point: ObservationPoint) : AppRoute
 }
+
+enum class PointPropertiesReturn { OBSERVATION, DETAIL }
 
 data class BeePreparationUiState(
     val pointId: UUID? = null,
@@ -213,6 +216,25 @@ internal class MainViewModel(
 
     fun openPointDetail(pointId: UUID) {
         manualRoute.value = AppRoute.PointDetail(pointId)
+        clearFeedback()
+    }
+
+    fun openHistoricalPointProperties(pointId: UUID) {
+        manualRoute.value = AppRoute.PointProperties(pointId, PointPropertiesReturn.DETAIL)
+        clearFeedback()
+    }
+
+    fun openActivePointProperties(pointId: UUID) {
+        manualRoute.value = AppRoute.PointProperties(pointId, PointPropertiesReturn.OBSERVATION)
+        clearFeedback()
+    }
+
+    fun closePointProperties(route: AppRoute.PointProperties) {
+        manualRoute.value = when (route.returnTo) {
+            PointPropertiesReturn.DETAIL -> AppRoute.PointDetail(route.pointId)
+            PointPropertiesReturn.OBSERVATION -> activePoint.value?.let(AppRoute::ResumeObservation)
+                ?: AppRoute.CurrentTerritory
+        }
         clearFeedback()
     }
 

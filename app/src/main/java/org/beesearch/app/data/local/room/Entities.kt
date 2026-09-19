@@ -7,6 +7,8 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.BeePresenceResult
+import org.beesearch.app.domain.model.AttachmentType
+import org.beesearch.app.domain.model.WeatherStatus
 import java.time.Instant
 import java.util.UUID
 
@@ -82,6 +84,47 @@ internal data class ObservationPointEntity(
     @ColumnInfo(name = "created_at") val createdAt: Instant,
     @ColumnInfo(name = "initial_group_release_at") val initialGroupReleaseAt: Instant?,
     @ColumnInfo(name = "completed_at") val completedAt: Instant?,
+    val description: String? = null,
+)
+
+@Entity(
+    tableName = "observation_point_attachments",
+    foreignKeys = [ForeignKey(
+        entity = ObservationPointEntity::class,
+        parentColumns = ["id"], childColumns = ["observation_point_id"],
+        onDelete = ForeignKey.RESTRICT, onUpdate = ForeignKey.NO_ACTION,
+    )],
+    indices = [Index(value = ["observation_point_id"])],
+)
+internal data class ObservationPointAttachmentEntity(
+    @PrimaryKey val id: UUID,
+    @ColumnInfo(name = "observation_point_id") val observationPointId: UUID,
+    @ColumnInfo(name = "attachment_type") val type: AttachmentType,
+    @ColumnInfo(name = "relative_path") val relativePath: String,
+    @ColumnInfo(name = "original_file_name") val originalFileName: String?,
+    @ColumnInfo(name = "mime_type") val mimeType: String?,
+    @ColumnInfo(name = "byte_size") val byteSize: Long,
+    val sha256: String,
+    @ColumnInfo(name = "created_at") val createdAt: Instant,
+)
+
+@Entity(
+    tableName = "observation_point_weather",
+    foreignKeys = [ForeignKey(
+        entity = ObservationPointEntity::class,
+        parentColumns = ["id"], childColumns = ["observation_point_id"],
+        onDelete = ForeignKey.RESTRICT, onUpdate = ForeignKey.NO_ACTION,
+    )],
+)
+internal data class ObservationPointWeatherEntity(
+    @PrimaryKey @ColumnInfo(name = "observation_point_id") val observationPointId: UUID,
+    val status: WeatherStatus,
+    @ColumnInfo(name = "temperature_c") val temperatureC: Double?,
+    @ColumnInfo(name = "wind_speed_mps") val windSpeedMps: Double?,
+    @ColumnInfo(name = "wind_direction_deg") val windDirectionDeg: Double?,
+    @ColumnInfo(name = "sample_at") val sampleAt: Instant?,
+    @ColumnInfo(name = "fetched_at") val fetchedAt: Instant?,
+    val source: String?,
 )
 
 @Entity(

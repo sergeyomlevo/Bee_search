@@ -108,6 +108,37 @@ class BeeSearchMigrationTest {
     }
 
     @Test
+    fun migrationFromSixToSevenPreservesPointAndInitializesProperties() {
+        val territoryId = UUID.randomUUID().toString()
+        val observerId = UUID.randomUUID().toString()
+        val pointId = UUID.randomUUID().toString()
+        val timestamp = Instant.parse("2026-09-12T10:15:00Z").toEpochMilli()
+        migrationHelper.createDatabase(DATABASE_NAME + "-v7", 6).apply {
+            execSQL("INSERT INTO territories (id, code, name, region, district, created_at, updated_at) VALUES (?, 'T', 'Territory', 'R', 'D', ?, ?)", arrayOf<Any>(territoryId, timestamp, timestamp))
+            execSQL("INSERT INTO observers (id, code, last_name, first_name, middle_name, contact, created_at, updated_at) VALUES (?, 'O', 'Last', 'First', NULL, NULL, ?, ?)", arrayOf<Any>(observerId, timestamp, timestamp))
+            execSQL("INSERT INTO observation_points (id, territory_id, observer_id, observation_year, point_number, bee_presence_result, code, latitude, longitude, gps_latitude, gps_longitude, gps_accuracy_m, created_at, initial_group_release_at, completed_at) VALUES (?, ?, ?, 2026, 4, 'NO_BEES_FOUND', 'P4', 56.1, 42.7, NULL, NULL, NULL, ?, NULL, ?)", arrayOf<Any?>(pointId, territoryId, observerId, timestamp, timestamp))
+            close()
+        }
+        val migrated = migrationHelper.runMigrationsAndValidate(DATABASE_NAME + "-v7", 7, true, MIGRATION_6_7)
+        migrated.query("SELECT observation_year, point_number, bee_presence_result, code, latitude, longitude, description FROM observation_points WHERE id = ?", arrayOf(pointId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(2026, cursor.getInt(0))
+            assertEquals(4, cursor.getInt(1))
+            assertEquals("NO_BEES_FOUND", cursor.getString(2))
+            assertEquals("P4", cursor.getString(3))
+            assertEquals(56.1, cursor.getDouble(4), 0.0)
+            assertEquals(42.7, cursor.getDouble(5), 0.0)
+            assertTrue(cursor.isNull(6))
+        }
+        migrated.query("SELECT status, temperature_c, wind_speed_mps, wind_direction_deg, sample_at, fetched_at, source FROM observation_point_weather WHERE observation_point_id = ?", arrayOf(pointId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("PENDING", cursor.getString(0))
+            for (index in 1..6) assertTrue(cursor.isNull(index))
+        }
+        migrated.close()
+    }
+
+    @Test
     fun migrationFromTwoToThreeBackfillsCaptureConsumptionAndPreservesCycles() {
         val databaseName = "$DATABASE_NAME-2-3"
         val territoryId = UUID.randomUUID().toString()

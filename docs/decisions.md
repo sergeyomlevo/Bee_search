@@ -1835,6 +1835,42 @@ analysis не меняются.
 
 ---
 
+# D078 — ObservationPoint properties v1 и воспроизводимый weather snapshot
+
+**Статус:** ACCEPTED
+
+ObservationPoint properties v1 включает plain-text `description`, 0..N app-owned
+фотографий и один автоматический weather snapshot: `temperatureC`,
+`windSpeedMps`, `windDirectionDeg`. Давление, влажность, облачность, осадки,
+порывы, прогноз, charts и погодная аналитика не входят.
+
+Weather snapshot относится к подтверждённым координатам и persisted `created_at`
+ObservationPoint. Для hourly ответа выбирается ближайший sample; при равном
+расстоянии — более ранний. Фактическое время sample и время загрузки сохраняются
+отдельно. Создание точки никогда не зависит от сети: `PENDING` запрос выполняется
+WorkManager с network constraint и может быть исторически догружен позднее.
+`LOADED` не перезаписывается обычным retry; permanent/malformed result становится
+`UNAVAILABLE`, а явный retry возвращает его в `PENDING`.
+
+Текущий adapter — Open-Meteo Free/Open-Access для некоммерческого исследовательского/
+личного Bee Search. Используемые weather data распространяются по CC BY 4.0 и
+показываются с кликабельной атрибуцией `Данные погоды: Open-Meteo`. Если приложение
+перейдёт к коммерческому использованию, provider и API plan пересматриваются до
+такого использования. Domain `WeatherProvider` остаётся provider-neutral и не
+закрепляет предположение о вечной бесплатности Open-Meteo.
+
+Photo metadata хранится в Room, bytes — в app-owned storage с относительной ссылкой,
+размером и SHA-256. Импорт всегда создаёт собственную копию. Удаление attachment или
+ObservationPoint согласованно удаляет metadata и bytes. Complete logical backup v2
+включает properties, weather metadata и photo bytes; backup v1 остаётся читаемым и
+восстанавливает старые точки с `description = null`, без attachments и с `PENDING`
+weather без fake values.
+
+Во внешний provider отправляются только координаты и временной диапазон. Observer,
+Territory, UUID, Bee, description и photos не отправляются.
+
+---
+
 # Закрытые архитектурные вопросы
 
 - O001 — формат offline vector Map Package закрыт решением D063: PMTiles;

@@ -6,19 +6,21 @@ import org.beesearch.app.domain.model.ObserverRequiredException
 import org.beesearch.app.domain.model.TerritoryRequiredException
 import org.beesearch.app.domain.repository.ObservationPointPreparationCreator
 import org.beesearch.app.domain.repository.SettingsRepository
+import org.beesearch.app.domain.weather.WeatherSyncScheduler
 
 class CreateObservationPoint(
     private val settingsRepository: SettingsRepository,
     private val pointCreator: ObservationPointPreparationCreator,
+    private val weatherSyncScheduler: WeatherSyncScheduler = WeatherSyncScheduler { },
 ) {
     suspend fun create(point: NewObservationPoint): ObservationPoint {
         requireCurrentSelection(point)
-        return pointCreator.createObservationPoint(point)
+        return pointCreator.createObservationPoint(point).also { weatherSyncScheduler.enqueue() }
     }
 
     suspend fun createWithNoBeesFound(point: NewObservationPoint): ObservationPoint {
         requireCurrentSelection(point)
-        return pointCreator.createObservationPointWithNoBeesFound(point)
+        return pointCreator.createObservationPointWithNoBeesFound(point).also { weatherSyncScheduler.enqueue() }
     }
 
     private suspend fun requireCurrentSelection(point: NewObservationPoint) {

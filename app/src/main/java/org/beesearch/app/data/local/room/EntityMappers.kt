@@ -5,6 +5,8 @@ import org.beesearch.app.domain.model.FlightCycle
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.domain.model.ObservationPointAttachment
+import org.beesearch.app.domain.model.ObservationPointWeather
 
 internal fun TerritoryEntity.toDomain(): Territory = Territory(
     id = id,
@@ -43,6 +45,15 @@ internal fun ObservationPointEntity.toDomain(): ObservationPoint = ObservationPo
     createdAt = createdAt,
     initialGroupReleaseAt = initialGroupReleaseAt,
     completedAt = completedAt,
+    description = description,
+)
+
+internal fun ObservationPointAttachmentEntity.toDomain() = ObservationPointAttachment(
+    id, observationPointId, type, relativePath, originalFileName, mimeType, byteSize, sha256, createdAt,
+)
+
+internal fun ObservationPointWeatherEntity.toDomain() = ObservationPointWeather(
+    observationPointId, status, temperatureC, windSpeedMps, windDirectionDeg, sampleAt, fetchedAt, source,
 )
 
 internal fun BeeEntity.toDomain(): Bee = Bee(

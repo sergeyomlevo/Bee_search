@@ -13,8 +13,10 @@ import androidx.room.TypeConverters
         ObservationPointEntity::class,
         BeeEntity::class,
         FlightCycleEntity::class,
+        ObservationPointAttachmentEntity::class,
+        ObservationPointWeatherEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -24,6 +26,8 @@ internal abstract class BeeSearchDatabase : RoomDatabase() {
     abstract fun observationPointDao(): ObservationPointDao
     abstract fun beeDao(): BeeDao
     abstract fun flightCycleDao(): FlightCycleDao
+    abstract fun observationPointAttachmentDao(): ObservationPointAttachmentDao
+    abstract fun observationPointWeatherDao(): ObservationPointWeatherDao
     abstract fun backupDao(): BackupDao
 
     companion object {
@@ -40,6 +44,7 @@ internal abstract class BeeSearchDatabase : RoomDatabase() {
                 MIGRATION_3_4,
                 MIGRATION_4_5,
                 MIGRATION_5_6,
+                MIGRATION_6_7,
             )
             .build()
     }

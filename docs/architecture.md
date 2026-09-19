@@ -1658,6 +1658,27 @@ DataStore settings и map packages не входят в эту транзакц�
 отдельной offline presentation feature; MainActivity остаётся только app host и
 маршрутизатором существующего route mechanism.
 
+ObservationPoint properties v1 использует Room schema v7. `description` остаётся
+полем ObservationPoint; attachment metadata и one-to-one weather snapshot имеют
+отдельные таблицы. Photo bytes копируются в
+`files/observation-attachments/<pointId>/<attachmentId>` и никогда не зависят от
+долговечности исходного content URI. Selective/full deletion сначала безопасно
+перемещает файлы в staging, затем удаляет metadata транзакцией и завершает удаление;
+при ошибке транзакции files возвращаются.
+
+UI зависит от provider-neutral `WeatherProvider`. WorkManager с network constraint
+обрабатывает только persisted `PENDING` requests; координаты и время берутся из
+ObservationPoint, поэтому delayed retry не подменяет условия погодой reconnect.
+Open-Meteo adapter использует hourly `temperature_2m`, `wind_speed_10m` в `ms` и
+`wind_direction_10m`; ближайший sample выбирается к `created_at`, при tie — более
+ранний. Forecast endpoint применяется для поддерживаемого recent диапазона, archive
+endpoint — для более старых точек. UI/domain не знают endpoint DTO.
+
+Во внешний weather request передаются только latitude, longitude и требуемая дата/
+время. Observer, Territory, UUID точки, Bee, description и photos не отправляются.
+Open-Meteo является текущим non-commercial adapter, но domain boundary не содержит
+предположения о бесплатности или неизменности provider.
+
 Не следует полагаться только на один телефон как единственное долговременное хранилище исследовательских данных.
 
 ---

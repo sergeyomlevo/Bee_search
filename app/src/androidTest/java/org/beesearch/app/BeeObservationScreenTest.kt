@@ -74,6 +74,7 @@ class BeeObservationScreenTest {
     @Test
     fun emptyObservationShowsDerivedMarkChoicesAndStartsSelectedMark() {
         var selected: Pair<String, MarkPosition>? = null
+        var propertiesOpened = false
         composeRule.setContent {
             Bee_searchTheme {
                 BeeObservationScreen(
@@ -86,11 +87,14 @@ class BeeObservationScreenTest {
                     onStartFirstFlight = { color, position -> selected = color to position },
                     onStartNextFlight = {},
                     onComplete = {},
+                    onOpenPointProperties = { propertiesOpened = true },
                 )
             }
         }
 
         assertEquals(15, BeeMarkCatalog.supportedCombinations.size)
+        composeRule.onNodeWithTag("open-active-point-properties").performClick()
+        composeRule.runOnIdle { assertTrue(propertiesOpened) }
         composeRule.onNodeWithTag("available-mark-WHITE-NONE").assertIsDisplayed()
         composeRule.onNodeWithTag("available-mark-action-WHITE-NONE")
             .assertIsEnabled()

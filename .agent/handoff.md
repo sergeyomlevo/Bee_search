@@ -6,6 +6,44 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## ObservationPoint properties v1 milestone (D078, 2026-09-19)
+
+ObservationPoint now has editable plain-text `description`, 0..N app-owned
+photo attachments, and one persisted weather snapshot. Room schema v7 adds the
+nullable description column plus `observation_point_attachments` and
+`observation_point_weather`; migration 6 -> 7 preserves existing research data,
+creates no fake weather values, and initializes each existing point as pending.
+
+The separate `Свойства точки` screen is reachable from both the active
+observation and historical detail. Photos can be captured with the system
+camera or selected with Photo Picker, are copied under
+`files/observation-attachments/<pointId>/<attachmentId>`, and are cleaned up
+with their metadata on attachment/point deletion. Complete logical backup v2
+includes description, weather metadata and validated photo bytes; v1 restore
+remains supported. Ordinary app-owned photos also remain eligible for Android
+cloud backup/device transfer under the existing rules, subject to Android's
+platform quota.
+
+The provider-neutral `WeatherProvider` currently uses Open-Meteo for the
+non-commercial app. WorkManager retries with a network constraint and always
+uses the point's persisted coordinates and creation time. Hourly selection is
+nearest to that time, with the earlier sample winning ties and a maximum
+one-hour distance. Data up to 92 days old uses the forecast endpoint; older
+data uses the historical archive. UI shows only temperature, wind speed in
+m/s, direction in degrees plus a derived compass label, and the required
+clickable Open-Meteo attribution.
+
+Full unit tests, debug/androidTest compilation, lint and debug assemblies pass.
+On Samsung SM-S938B at `font_scale=1.7`, the preserving runner passed 64 focused
+migration/Room/backup/properties/Points/Observation tests while retaining the
+DEV package and offline map. Manual navigation opened real point 12 through
+Objects -> Points -> Table -> detail -> properties and showed the pending
+offline weather state plus attribution. A compatibility mapping for legacy DEV
+tokens `THORAX`/`ABDOMEN` was added after that real point exposed the strict
+enum-converter crash. A live Open-Meteo-loaded state and a real camera/photo
+round trip were not independently completed on the device; automated provider,
+file-store and UI tests cover those paths.
+
 ## Navigation shell milestone (D077, 2026-09-17)
 
 The main map is now the common creation entry. Its red center point is the

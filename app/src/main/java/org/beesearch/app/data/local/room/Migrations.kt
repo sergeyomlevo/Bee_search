@@ -276,6 +276,43 @@ internal val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+internal val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE observation_points ADD COLUMN description TEXT")
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS observation_point_attachments (
+                id TEXT NOT NULL,
+                observation_point_id TEXT NOT NULL,
+                attachment_type TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                original_file_name TEXT,
+                mime_type TEXT,
+                byte_size INTEGER NOT NULL,
+                sha256 TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                PRIMARY KEY(id),
+                FOREIGN KEY(observation_point_id) REFERENCES observation_points(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_observation_point_attachments_observation_point_id ON observation_point_attachments(observation_point_id)")
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS observation_point_weather (
+                observation_point_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                temperature_c REAL,
+                wind_speed_mps REAL,
+                wind_direction_deg REAL,
+                sample_at INTEGER,
+                fetched_at INTEGER,
+                source TEXT,
+                PRIMARY KEY(observation_point_id),
+                FOREIGN KEY(observation_point_id) REFERENCES observation_points(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+        """.trimIndent())
+        db.execSQL("INSERT INTO observation_point_weather (observation_point_id, status) SELECT id, 'PENDING' FROM observation_points")
+    }
+}
+
 private data class LegacyObservationPoint(
     val id: String,
     val territoryId: String,

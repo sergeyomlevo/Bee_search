@@ -156,7 +156,7 @@ internal class DataViewModel(
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T = DataViewModel(
                     backupExporter = application.container.backupDocumentExporter,
-                    observationData = application.container.observationRepository,
+                    observationData = application.container.observationDataMaintenance,
                 ) as T
             }
     }

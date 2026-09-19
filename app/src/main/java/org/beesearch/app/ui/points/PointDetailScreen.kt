@@ -36,25 +36,37 @@ import java.util.UUID
 import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.ObservationPointDetail
 import org.beesearch.app.domain.repository.ObservationRepository
+import org.beesearch.app.data.media.ObservationAttachmentFileStore
+import org.beesearch.app.ui.properties.AttachmentRow
+import org.beesearch.app.ui.properties.WeatherBlock
 
 @Composable
 internal fun PointDetailRoute(
     pointId: UUID,
     repository: ObservationRepository,
+    fileStore: ObservationAttachmentFileStore,
     onBack: () -> Unit,
+    onOpenProperties: () -> Unit,
 ) {
     val detailViewModel: PointDetailViewModel = viewModel(
         key = "point-detail-$pointId",
         factory = PointDetailViewModel.factory(repository, pointId),
     )
     val state by detailViewModel.uiState.collectAsStateWithLifecycle()
-    PointDetailScreen(state = state, onBack = onBack)
+    PointDetailScreen(
+        state = state,
+        fileStore = fileStore,
+        onBack = onBack,
+        onOpenProperties = onOpenProperties,
+    )
 }
 
 @Composable
 internal fun PointDetailScreen(
     state: PointDetailUiState,
+    fileStore: ObservationAttachmentFileStore? = null,
     onBack: () -> Unit,
+    onOpenProperties: () -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
     Scaffold(
@@ -62,6 +74,12 @@ internal fun PointDetailScreen(
             TopAppBar(
                 title = { Text("Просмотр точки") },
                 navigationIcon = { TextButton(onClick = onBack) { Text("Назад") } },
+                actions = {
+                    TextButton(
+                        onClick = onOpenProperties,
+                        modifier = Modifier.testTag("open-point-properties"),
+                    ) { Text("Свойства") }
+                },
             )
         },
     ) { padding ->
@@ -74,6 +92,7 @@ internal fun PointDetailScreen(
             }
             state.detail != null -> PointDetailContent(
                 detail = state.detail,
+                fileStore = fileStore,
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
         }
@@ -83,6 +102,7 @@ internal fun PointDetailScreen(
 @Composable
 private fun PointDetailContent(
     detail: ObservationPointDetail,
+    fileStore: ObservationAttachmentFileStore?,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -100,6 +120,21 @@ private fun PointDetailContent(
             }
             DetailLine("Наблюдатель", "${detail.observer.displayName} (${detail.observer.code})")
             DetailLine("Результат", pointResultLabel(detail.point.beePresenceResult))
+        }
+        detail.point.description?.takeIf { it.isNotBlank() }?.let { description ->
+            item {
+                Text("Описание", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp))
+                Text(description)
+            }
+        }
+        if (detail.attachments.isNotEmpty() && fileStore != null) {
+            item { Text("Фотографии", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp)) }
+            items(detail.attachments, key = { "attachment-${it.id}" }) { attachment ->
+                AttachmentRow(attachment, fileStore)
+            }
+        }
+        detail.weather?.let { weather ->
+            item { WeatherBlock(weather) }
         }
         item { Text("Пчёлы", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp)) }
         if (detail.beeHistories.isEmpty()) {

@@ -13,6 +13,10 @@ import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.CompletedObservationPointSummary
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.domain.model.AttachmentType
+import org.beesearch.app.domain.model.ObservationPointAttachment
+import org.beesearch.app.domain.model.ObservationPointWeather
+import org.beesearch.app.domain.model.PendingWeatherRequest
 import org.beesearch.app.domain.model.ObservationPointSummary
 import org.beesearch.app.domain.model.ObservationPointDetail
 import java.util.UUID
@@ -67,7 +71,13 @@ interface ObservationDataMaintenance {
     suspend fun clearObservationData(): ObservationDataCounts
 }
 
-interface ObservationRepository : ObservationPointPreparationCreator, ObservationDataMaintenance {
+interface WeatherBackfillStore {
+    suspend fun getPendingWeatherRequests(): List<PendingWeatherRequest>
+    suspend fun storeLoadedWeather(pointId: UUID, weather: ObservationPointWeather): Boolean
+    suspend fun markWeatherUnavailable(pointId: UUID): Boolean
+}
+
+interface ObservationRepository : ObservationPointPreparationCreator, ObservationDataMaintenance, WeatherBackfillStore {
     fun observeObservationPointSummaries(
         territoryId: UUID,
         observationYear: Int? = null,
@@ -90,4 +100,13 @@ interface ObservationRepository : ObservationPointPreparationCreator, Observatio
     suspend fun undoLastBeeAction(beeId: UUID): BeeUndoAction
     suspend fun completeObservationPoint(pointId: UUID): ObservationPoint
     suspend fun recordNoBeesFound(pointId: UUID): ObservationPoint
+
+    fun observeObservationPointProperties(pointId: UUID): Flow<ObservationPointDetail?>
+    suspend fun updateObservationPointDescription(pointId: UUID, description: String?): ObservationPoint
+    suspend fun listObservationPointAttachments(pointId: UUID): List<ObservationPointAttachment>
+    suspend fun listAllObservationPointAttachments(): List<ObservationPointAttachment>
+    suspend fun insertObservationPointAttachment(attachment: ObservationPointAttachment)
+    suspend fun deleteObservationPointAttachment(attachmentId: UUID): ObservationPointAttachment?
+    suspend fun getObservationPointWeather(pointId: UUID): ObservationPointWeather?
+    suspend fun resetWeatherPending(pointId: UUID): Boolean
 }

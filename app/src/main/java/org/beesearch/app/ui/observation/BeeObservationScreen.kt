@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -86,6 +88,7 @@ internal fun BeeObservationScreen(
     onCaptureFlightAzimuth: (UUID, Double, () -> Unit) -> Unit =
         { cycleId, value, onSuccess -> onSetFlightAzimuth(cycleId, value, onSuccess) },
     onComplete: () -> Unit,
+    onOpenPointProperties: () -> Unit = {},
     nowProvider: () -> Instant = { Instant.now() },
     @Suppress("UNUSED_PARAMETER") undoTimeoutMillis: Long = FEEDBACK_AUTO_DISMISS_MILLIS,
 ) {
@@ -252,6 +255,12 @@ internal fun BeeObservationScreen(
                                     .defaultMinSize(minHeight = 48.dp),
                                 contentAlignment = Alignment.CenterStart,
                             ) { ObservationHeaderTitle() }
+                            TextButton(
+                                onClick = onOpenPointProperties,
+                                modifier = Modifier
+                                    .semantics { contentDescription = "Свойства точки" }
+                                    .testTag("open-active-point-properties"),
+                            ) { Text("ⓘ") }
                             TextButton(
                                 onClick = { showCompletionConfirmation = true },
                                 enabled = !isCompleting &&

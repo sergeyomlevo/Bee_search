@@ -71,6 +71,7 @@ class PointsScreenTest {
 
     @Test
     fun detailShowsMultipleBeesCyclesOpenStateAndOnlyPersistedAzimuth() {
+        var propertiesOpened = false
         val firstBee = bee("WHITE", MarkPosition.NONE)
         val secondBee = bee("BLUE", MarkPosition.RIGHT_WING)
         val firstDeparture = Instant.parse("2026-09-17T06:00:00Z")
@@ -98,6 +99,7 @@ class PointsScreenTest {
                 PointDetailScreen(
                     state = PointDetailUiState(detail = detail, isLoading = false),
                     onBack = {},
+                    onOpenProperties = { propertiesOpened = true },
                 )
             }
         }
@@ -109,6 +111,8 @@ class PointsScreenTest {
         composeRule.onNodeWithText("91°").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Синяя КП").assertExists()
         composeRule.onNodeWithText("—°").assertDoesNotExist()
+        composeRule.onNodeWithTag("open-point-properties").performClick()
+        composeRule.runOnIdle { assertEquals(true, propertiesOpened) }
     }
 
     @Test

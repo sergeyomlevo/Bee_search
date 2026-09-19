@@ -25,6 +25,8 @@ data class ObservationPointDetail(
     val territory: Territory,
     val observer: Observer,
     val beeHistories: List<BeeObservationHistory>,
+    val weather: ObservationPointWeather? = null,
+    val attachments: List<ObservationPointAttachment> = emptyList(),
 )
 
 data class BeeObservationHistory(

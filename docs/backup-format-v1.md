@@ -1,4 +1,4 @@
-# Logical backup format v1
+# Logical backup formats v1 and v2
 
 The Bee Search backup is a logical ZIP archive, not a SQLite file. Version 1
 uses `backupFormatVersion=1` and `archiveSchemaVersion=1` and has these fixed
@@ -31,6 +31,28 @@ archive and does not re-import Room data.
 The reader rejects duplicate or unsafe ZIP paths, unlisted entries, more than
 64 entries, a payload over 16 MiB, or total uncompressed payload over 64 MiB.
 Unknown required collections are rejected. Unknown optional collections may be
-ignored only after their declared path, length, and hash are valid. Future
-first-class collections and attachment bytes require an explicit archive schema
-evolution; v1 does not create speculative Room entities.
+ignored only after their declared path, length, and hash are valid.
+
+Version 2 is the current Complete backup contract. It retains the v1 research and
+portable-settings collections and adds `observation-point-weather`,
+`observation-point-attachments`, and photo entries under `attachments/`.
+ObservationPoint records also carry nullable `description`. Every attachment entry
+is tied to exactly one metadata row and validated by owner, deterministic relative
+path, byte size, and SHA-256; missing, extra, duplicate, unsafe, or mismatched files
+reject the archive before research data is written. Files are staged and validated,
+then activated before the single Room restore transaction; activation and database
+failures compensate activated files.
+
+The importer remains backward-compatible with v1. A v1 point restores with
+`description = null`, no attachments, and a `PENDING` weather row whose snapshot
+values are null. No historical weather value is invented.
+
+Both formats retain the bounded reader limits: at most 64 entries, 16 MiB per entry,
+and 64 MiB total uncompressed payload. Consequently each imported photo is limited
+to 16 MiB and a Complete backup containing all photos must fit the total limit.
+Offline PMTiles remain excluded.
+
+Android cloud backup/device transfer includes ordinary app-owned attachment files by
+default because only map packages and DEV bootstrap files are excluded by Bee Search
+rules. Android cloud backup has a platform quota and is not the canonical Complete
+backup; logical backup v2 is the explicit portable research archive.

@@ -53,6 +53,41 @@ data class ObservationPoint(
      */
     val initialGroupReleaseAt: Instant? = null,
     val completedAt: Instant?,
+    val description: String? = null,
+)
+
+enum class AttachmentType { PHOTO }
+
+data class ObservationPointAttachment(
+    val id: UUID,
+    val observationPointId: UUID,
+    val type: AttachmentType,
+    val relativePath: String,
+    val originalFileName: String?,
+    val mimeType: String?,
+    val byteSize: Long,
+    val sha256: String,
+    val createdAt: Instant,
+)
+
+enum class WeatherStatus { PENDING, LOADED, UNAVAILABLE }
+
+data class ObservationPointWeather(
+    val observationPointId: UUID,
+    val status: WeatherStatus,
+    val temperatureC: Double?,
+    val windSpeedMps: Double?,
+    val windDirectionDeg: Double?,
+    val sampleAt: Instant?,
+    val fetchedAt: Instant?,
+    val source: String?,
+)
+
+data class PendingWeatherRequest(
+    val observationPointId: UUID,
+    val latitude: Double,
+    val longitude: Double,
+    val observationTime: Instant,
 )
 
 enum class BeePresenceResult {

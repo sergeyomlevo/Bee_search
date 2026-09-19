@@ -126,12 +126,13 @@ internal class PointDetailViewModel(
 
     init {
         viewModelScope.launch {
-            val detail = repository.getObservationPointDetail(pointId)
-            mutableUiState.value = PointDetailUiState(
-                detail = detail,
-                isLoading = false,
-                notFound = detail == null,
-            )
+            repository.observeObservationPointProperties(pointId).collect { detail ->
+                mutableUiState.value = PointDetailUiState(
+                    detail = detail,
+                    isLoading = false,
+                    notFound = detail == null,
+                )
+            }
         }
     }
 

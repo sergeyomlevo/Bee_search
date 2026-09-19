@@ -49,6 +49,7 @@ import org.beesearch.app.ui.data.DataRoute
 import org.beesearch.app.ui.help.HelpScreen
 import org.beesearch.app.ui.points.PointDetailRoute
 import org.beesearch.app.ui.points.PointsRoute
+import org.beesearch.app.ui.properties.PointPropertiesRoute
 import org.beesearch.app.ui.objects.ObjectsScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import kotlinx.coroutines.delay
@@ -189,7 +190,18 @@ private fun BeeSearchApp(
                     is AppRoute.PointDetail -> PointDetailRoute(
                         pointId = currentRoute.pointId,
                         repository = application.container.observationRepository,
+                        fileStore = application.container.attachmentFileStore,
                         onBack = viewModel::openPoints,
+                        onOpenProperties = {
+                            viewModel.openHistoricalPointProperties(currentRoute.pointId)
+                        },
+                    )
+                    is AppRoute.PointProperties -> PointPropertiesRoute(
+                        pointId = currentRoute.pointId,
+                        repository = application.container.observationRepository,
+                        fileStore = application.container.attachmentFileStore,
+                        weatherScheduler = application.container.weatherSyncScheduler,
+                        onBack = { viewModel.closePointProperties(currentRoute) },
                     )
                     AppRoute.TerritoryManagement -> TerritoryManagementScreen(
                         territories = territories,
@@ -259,6 +271,9 @@ private fun BeeSearchApp(
                                 onCaptureFlightAzimuth = viewModel::captureFlightAzimuth,
                                 onComplete = {
                                     viewModel.completeObservationPoint(currentRoute.point.id)
+                                },
+                                onOpenPointProperties = {
+                                    viewModel.openActivePointProperties(currentRoute.point.id)
                                 },
                             )
                         }

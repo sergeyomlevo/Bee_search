@@ -433,7 +433,13 @@ gps_accuracy_m      Double?     optional
 created_at          Instant     required
 initial_group_release_at Instant? legacy, только восстановленные данные
 completed_at        Instant?    optional
+description         String?     optional plain text
 ```
+
+Schema v7 также хранит 0..N `ObservationPointAttachment` и ровно одну строку
+`ObservationPointWeather` на ObservationPoint. Attachment metadata находится в
+Room, а bytes — в app-owned file storage. Weather row может оставаться `PENDING`
+без искусственных числовых значений.
 
 ---
 
@@ -1541,6 +1547,34 @@ territory_id
 + point_number
 ```
 
+## ObservationPointAttachment
+
+```text
+id                   UNIQUE UUID
+observation_point_id MUST EXIST
+type                 PHOTO
+relative_path        app-owned relative path
+byte_size            >= 0
+sha256               lowercase SHA-256
+created_at           required
+```
+
+## ObservationPointWeather
+
+```text
+observation_point_id UNIQUE, MUST EXIST
+status               PENDING | LOADED | UNAVAILABLE
+temperature_c        numeric only when LOADED
+wind_speed_mps       numeric m/s, >= 0 only when LOADED
+wind_direction_deg   numeric [0, 360) only when LOADED
+sample_at            required when LOADED
+fetched_at           required when LOADED
+source               required when LOADED
+```
+
+Числовое направление ветра является primary data; сторона света вычисляется
+только presentation layer.
+
 ## Bee
 
 ```text
@@ -1635,6 +1669,21 @@ ObservationPoint, Bee и FlightCycle, потому что невозможно �
 `observer_code` DataStore больше не является целевой настройкой и игнорируется.
 Это не является общей политикой: после v5 будущие миграции по умолчанию должны
 быть non-destructive и сохранять реальные исследовательские данные.
+
+---
+
+# 69.1. Room schema v6/v7
+
+Schema v6 сохраняет Points Browser/read-side изменения предыдущей итерации.
+Schema v7 выполняет non-destructive migration 6 → 7: добавляет nullable
+`observation_points.description`, таблицы `observation_point_attachments` и
+`observation_point_weather`. Для каждой существующей точки создаётся weather row
+со статусом `PENDING` и всеми значениями snapshot `null`; фиктивная погода не
+подставляется. Existing UUID, Bee и FlightCycle сохраняются.
+
+Новая ObservationPoint создаётся вместе с `PENDING` weather row в одной Room
+transaction. Успешно загруженный `LOADED` snapshot не перезаписывается обычным
+повторным worker run.
 
 ---
 
