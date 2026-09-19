@@ -2,6 +2,7 @@
 
 package org.beesearch.app.ui.area
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -29,24 +30,41 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import java.io.File
 import kotlinx.coroutines.launch
+import org.beesearch.app.data.exchange.AreaExchangeFileName
 import org.beesearch.app.data.exchange.AreaExchangeMirror
+import org.beesearch.app.data.exchange.AreaMapCandidate
+import org.beesearch.app.data.exchange.AreaMapDiscovery
+import org.beesearch.app.data.exchange.AreaMapDiscoveryResult
 import org.beesearch.app.data.exchange.AreaSendResult
 import org.beesearch.app.data.exchange.AreaTransport
+import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
+import org.beesearch.app.data.exchange.ExchangeFolder
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.ui.map.AREA_MAP_READY_DESCRIPTION
+import org.beesearch.app.ui.map.AREA_MAP_READY_LABEL
 import org.beesearch.app.ui.map.CREATE_AREA_LABEL
 import org.beesearch.app.ui.map.DELETE_AREA_LABEL
 import org.beesearch.app.ui.map.DeleteAreaDialog
+import org.beesearch.app.ui.map.LOAD_AREA_MAP_DESCRIPTION
+import org.beesearch.app.ui.map.LOAD_AREA_MAP_LABEL
+import org.beesearch.app.ui.map.MAP_PACKAGE_COVERAGE_MISMATCH_MESSAGE
 import org.beesearch.app.ui.map.MapArea
 import org.beesearch.app.ui.map.MapAreaChangeResult
 import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapAreaStore
+import org.beesearch.app.ui.map.MapPackageAvailability
+import org.beesearch.app.ui.map.MapPackageImportResult
+import org.beesearch.app.ui.map.MapPackageStore
 import org.beesearch.app.ui.map.SEND_AREA_DESCRIPTION
 import org.beesearch.app.ui.map.SEND_AREA_LABEL
 import org.beesearch.app.ui.map.VIEW_AREA_ON_MAP_DESCRIPTION
 import org.beesearch.app.ui.map.VIEW_AREA_ON_MAP_LABEL
 import org.beesearch.app.ui.map.areaUnionKm2
+import org.beesearch.app.ui.map.coverageFragments
 import org.beesearch.app.ui.map.formatSquareKilometers
+import org.beesearch.app.ui.map.rememberMapPackageImportSession
 
 internal const val AREA_SCREEN_TAG = "area-screen"
 internal const val AREA_NOT_CREATED_TAG = "area-not-created"
@@ -58,6 +76,10 @@ internal const val AREA_TOTAL_AREA_TAG = "area-total-area"
 internal const val CREATE_AREA_TAG = "create-area"
 internal const val VIEW_AREA_ON_MAP_TAG = "view-area-on-map"
 internal const val SEND_AREA_TAG = "send-area"
+internal const val LOAD_AREA_MAP_TAG = "load-area-map"
+internal const val AREA_MAP_READY_TAG = "area-map-ready"
+internal const val AREA_MAP_MESSAGE_TAG = "area-map-message"
+internal const val AREA_MAP_CHOOSE_ANOTHER_ACTION_TAG = "area-map-choose-another-action"
 internal const val DELETE_AREA_TAG = "delete-area"
 internal const val CREATE_AREA_DESCRIPTION = "Создать ареал офлайн-карты"
 internal const val DELETE_AREA_DESCRIPTION = "Удалить ареал территории"
@@ -66,13 +88,19 @@ internal const val DELETE_AREA_DESCRIPTION = "Удалить ареал терр
 internal const val AREA_TOTAL_AREA_LABEL = "Общая площадь"
 internal const val AREA_SECTION_COUNT_LABEL = "Участков"
 
+/** Shown when a discovered package turns out not to cover the current Ареал. */
+internal const val AREA_MAP_COVERAGE_MISMATCH_AREA_MESSAGE =
+    "Карта найдена, но она не покрывает текущий ареал."
+internal const val CHOOSE_ANOTHER_MAP_ACTION_LABEL = "Выбрать другую карту"
+
 /**
  * The Ареал of the current Territory: one object, so this screen is a card rather than a list.
  *
- * The card answers three questions only - what the Ареал is, how to look at it on the map and how to
- * send its file. Editing участки is a separate step from the view mode, so a user who only wants to
- * look at the Ареал never lands in the editor. The name is set when the Ареал is created and is
- * treated as stable afterwards; there is deliberately no separate rename action.
+ * The card answers what the Ареал is, how to look at it on the map, how to send its file and how to
+ * get the offline map for it. Loading a map is an entry point into the one existing import flow:
+ * `Загрузить карту` first tries to recognise the package by its file name and otherwise opens the
+ * standard Android file picker. Nothing here validates or installs a package itself, and a recognised
+ * name never replaces the real manifest, integrity and coverage checks.
  */
 @Composable
 internal fun AreaRoute(
@@ -80,6 +108,9 @@ internal fun AreaRoute(
     areaStore: MapAreaStore,
     areaMirror: AreaExchangeMirror,
     areaTransport: AreaTransport,
+    mapPackageStore: MapPackageStore,
+    mapDiscovery: AreaMapDiscovery,
+    exchangeStorage: BeeSearchExchangeStorage,
     onCreate: () -> Unit,
     onViewOnMap: () -> Unit,
     onBack: () -> Unit,
@@ -90,8 +121,46 @@ internal fun AreaRoute(
     var deleteVisible by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var sending by remember { mutableStateOf(false) }
+    var discovering by remember { mutableStateOf(false) }
+    var mapAvailability by remember {
+        mutableStateOf<MapPackageAvailability>(MapPackageAvailability.Missing)
+    }
+    var foundCandidate by remember { mutableStateOf<AreaMapCandidate?>(null) }
+    var alternatives by remember { mutableStateOf(emptyList<AreaMapCandidate>()) }
+    var alternativesVisible by remember { mutableStateOf(false) }
+    var coverageMismatch by remember { mutableStateOf(false) }
     val territoryId = territory?.id
     val area = (read as? MapAreaReadResult.Present)?.area
+    val coverage = area?.coverageFragments().orEmpty()
+
+    // The offline-map import lives in this shared session: the Ареал screen only decides which pair to
+    // hand it, and the session ends in the same MapPackageStore.import as every other entry point.
+    val importSession = rememberMapPackageImportSession(
+        territoryId = territoryId,
+        desiredCoverage = coverage,
+        mapPackageStore = mapPackageStore,
+        exchangeStorage = exchangeStorage,
+    ) { result ->
+        when (result) {
+            is MapPackageImportResult.Activated -> {
+                mapAvailability = MapPackageAvailability.Ready(result.activePackage)
+                message = null
+                coverageMismatch = false
+            }
+
+            is MapPackageImportResult.Rejected -> {
+                coverageMismatch = result.message == MAP_PACKAGE_COVERAGE_MISMATCH_MESSAGE
+                message = if (coverageMismatch) {
+                    AREA_MAP_COVERAGE_MISMATCH_AREA_MESSAGE
+                } else {
+                    result.message
+                }
+                if (territoryId != null) {
+                    mapAvailability = mapPackageStore.loadActive(territoryId, coverage)
+                }
+            }
+        }
+    }
 
     LaunchedEffect(territoryId, areaStore, territory?.name) {
         val loaded = if (territoryId == null) {
@@ -110,11 +179,61 @@ internal fun AreaRoute(
         (loaded as? MapAreaReadResult.Present)?.let { areaMirror.sync(it.area) }
     }
 
+    LaunchedEffect(territoryId, mapPackageStore, coverage) {
+        if (territoryId == null) return@LaunchedEffect
+        mapAvailability = mapPackageStore.loadActive(territoryId, coverage)
+    }
+
+    /** Loads one discovered package through the shared import flow. */
+    fun loadCandidate(candidate: AreaMapCandidate) {
+        foundCandidate = null
+        alternativesVisible = false
+        val folder = exchangeStorage.directoryOf(ExchangeFolder.OFFLINE_MAPS).directory
+        importSession.importPair(
+            manifestUri = Uri.fromFile(File(folder, candidate.manifestFileName)),
+            pmtilesUri = Uri.fromFile(File(folder, candidate.pmtilesFileName)),
+        )
+    }
+
+    /**
+     * `Загрузить карту`: look for a package of this Ареал by its file name first.
+     *
+     * A found package is only offered, never imported by itself. Nothing found, an unclear pairing or
+     * a platform that will not let the app list the folder all lead to the standard file picker, which
+     * is an ordinary outcome rather than an error the user has to understand.
+     */
+    fun startMapLoading() {
+        val current = area ?: return
+        if (discovering) return
+        discovering = true
+        message = null
+        coverageMismatch = false
+        scope.launch {
+            val result = try {
+                mapDiscovery.discover(AreaExchangeFileName.externalAreaStem(current))
+            } catch (_: Exception) {
+                AreaMapDiscoveryResult.Unavailable("Не удалось проверить папку обмена")
+            }
+            discovering = false
+            when (val decision = areaMapLoadDecision(result)) {
+                is AreaMapLoadDecision.OfferFound -> {
+                    alternatives = decision.alternatives
+                    foundCandidate = decision.candidate
+                }
+
+                AreaMapLoadDecision.OpenPicker -> importSession.startFromPicker()
+            }
+        }
+    }
+
     AreaScreen(
         territoryCode = territory?.code,
         read = read,
         message = message,
         sending = sending,
+        discovering = discovering,
+        mapReady = mapAvailability is MapPackageAvailability.Ready,
+        coverageMismatch = coverageMismatch,
         onCreate = onCreate,
         onViewOnMap = onViewOnMap,
         onSend = {
@@ -129,6 +248,8 @@ internal fun AreaRoute(
                 }
             }
         },
+        onLoadMap = { startMapLoading() },
+        onChooseAnotherMap = { importSession.startFromPicker() },
         onDelete = { deleteVisible = true },
         onBack = onBack,
         modifier = modifier,
@@ -153,6 +274,45 @@ internal fun AreaRoute(
             onDismiss = { deleteVisible = false },
         )
     }
+
+    foundCandidate?.let { candidate ->
+        AreaMapFoundDialog(
+            areaName = area?.name.orEmpty(),
+            candidate = candidate,
+            hasAlternatives = alternatives.isNotEmpty(),
+            onLoad = { loadCandidate(candidate) },
+            onShowAlternatives = {
+                foundCandidate = null
+                alternativesVisible = true
+            },
+            onChooseAnother = {
+                foundCandidate = null
+                alternatives = emptyList()
+                importSession.startFromPicker()
+            },
+            onDismiss = {
+                foundCandidate = null
+                alternatives = emptyList()
+            },
+        )
+    }
+
+    if (alternativesVisible) {
+        AreaMapAlternativesDialog(
+            areaName = area?.name.orEmpty(),
+            alternatives = alternatives,
+            onPick = { loadCandidate(it) },
+            onChooseAnother = {
+                alternativesVisible = false
+                alternatives = emptyList()
+                importSession.startFromPicker()
+            },
+            onDismiss = {
+                alternativesVisible = false
+                alternatives = emptyList()
+            },
+        )
+    }
 }
 
 @Composable
@@ -161,9 +321,14 @@ internal fun AreaScreen(
     read: MapAreaReadResult,
     message: String?,
     sending: Boolean,
+    discovering: Boolean,
+    mapReady: Boolean,
+    coverageMismatch: Boolean,
     onCreate: () -> Unit,
     onViewOnMap: () -> Unit,
     onSend: () -> Unit,
+    onLoadMap: () -> Unit,
+    onChooseAnotherMap: () -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -194,11 +359,24 @@ internal fun AreaScreen(
             message?.let { detail ->
                 item {
                     Surface(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag(AREA_MAP_MESSAGE_TAG),
                         shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.errorContainer,
                     ) {
-                        Text(detail, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(detail, style = MaterialTheme.typography.bodyMedium)
+                            if (coverageMismatch) {
+                                // The map was found but cannot be used: offer the ordinary picker
+                                // instead. The Ареал itself is untouched either way.
+                                TextButton(
+                                    onClick = onChooseAnotherMap,
+                                    modifier = Modifier.testTag(AREA_MAP_CHOOSE_ANOTHER_ACTION_TAG),
+                                ) { Text(CHOOSE_ANOTHER_MAP_ACTION_LABEL) }
+                            }
+                        }
                     }
                 }
             }
@@ -212,8 +390,11 @@ internal fun AreaScreen(
                     is MapAreaReadResult.Present -> AreaCard(
                         area = read.area,
                         sending = sending,
+                        discovering = discovering,
+                        mapReady = mapReady,
                         onViewOnMap = onViewOnMap,
                         onSend = onSend,
+                        onLoadMap = onLoadMap,
                         onDelete = onDelete,
                     )
 
@@ -261,16 +442,19 @@ private fun AreaNotCreated(
 }
 
 /**
- * What the user needs to know about a saved Ареал: its name, how many участки it has and how large
- * it is. No UUID, no raw bounding boxes and no file details - those are implementation, and the file
- * itself is handled by «Отправить ареал».
+ * What the user needs to know about a saved Ареал: its name, how many участки it has, how large it is,
+ * and whether an offline map is ready for it. No UUID, no raw bounding boxes, no storage path, no
+ * manifest and no hashes - those are implementation, and the files are handled by the actions.
  */
 @Composable
 private fun AreaCard(
     area: MapArea,
     sending: Boolean,
+    discovering: Boolean,
+    mapReady: Boolean,
     onViewOnMap: () -> Unit,
     onSend: () -> Unit,
+    onLoadMap: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Surface(
@@ -307,6 +491,23 @@ private fun AreaCard(
                     .testTag(SEND_AREA_TAG)
                     .semantics { contentDescription = SEND_AREA_DESCRIPTION },
             ) { Text(if (sending) "Отправка…" else SEND_AREA_LABEL) }
+            Button(
+                onClick = onLoadMap,
+                enabled = !discovering,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(LOAD_AREA_MAP_TAG)
+                    .semantics { contentDescription = LOAD_AREA_MAP_DESCRIPTION },
+            ) { Text(if (discovering) "Поиск карты…" else LOAD_AREA_MAP_LABEL) }
+            if (mapReady) {
+                Text(
+                    text = AREA_MAP_READY_LABEL,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                        .testTag(AREA_MAP_READY_TAG)
+                        .semantics { contentDescription = AREA_MAP_READY_DESCRIPTION },
+                )
+            }
             TextButton(
                 onClick = onDelete,
                 modifier = Modifier

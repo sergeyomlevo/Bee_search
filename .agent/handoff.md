@@ -6,6 +6,75 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Automatic offline-map lookup for the Ареал (D084, 2026-09-19)
+
+`Objects → Ареал` gained `Загрузить карту`, and the offline map of an Ареал can now be found by
+its file name. The canonical model is untouched: the Ареал, its UUID, its участки, the Area file
+and the import pipeline are the same as before.
+
+The external naming contract now has one stem, taken from D083: `externalAreaStem(area)` in
+`AreaExchangeFileName` is `<sanitised name>--<8 hex of the UUID>`, the Area file is `<stem>.json`
+and a map package for that Ареал is `<stem>--map-v<N>.pmtiles` with `N >= 1`. `canonicalMapPackageFileName`
+builds that name and `matchMapPackageFileName` parses one file name against the exact expected stem:
+`CurrentArea(version)`, `OtherArea`, `Malformed` or `WrongExtension`. The version grammar is
+`[1-9][0-9]*`, so `v0`, `v01`, `v-1`, `v1.0` and names without a version are malformed; versions are
+compared as numbers (`v12` newer than `v2`), never by mtime, never by listing order. Matching requires
+the whole stem, so a similar name or another name with the same short id is not a candidate. Note the
+deliberate reading of one ambiguous requirement: a large purely numeric version such as `--map-v2026`
+**is** a valid version by that grammar; only a bare `--map-2026` without the `v` is malformed.
+
+`discoverAreaMapPackages` (pure, in `data/exchange/AreaMapDiscovery.kt`) pairs files into complete
+packages using the manifest's own `pmtilesFile` field - the existing D065 pairing rule, not a new
+manifest naming convention. An orphan map, an orphan manifest, a manifest of another version, a
+manifest of another Ареал and a broken description are not packages. Several versions produce a
+preferred candidate (highest numeric version) plus alternatives; an unclear pairing (two descriptions
+claiming one map) at the newest version produces `Ambiguous` and no silent choice; the result type
+keeps `None` and `Unavailable` (the platform refused to list the folder) apart. `AndroidAreaMapDiscovery`
+lists the real `Exchange/OfflineMaps` folder, and `AndroidAreaMapDiscoveryTest` covers the app-owned
+case on a temporary folder.
+
+`areaMapLoadDecision` turns that result into the next step: offer the found package, or open the
+standard picker for `None`, `Unavailable` and `Ambiguous`. `AreaRoute` shows the found package in a
+confirmation dialog with `Загрузить`, `Другие карты`/`Выбрать другую` and `Отмена`, and only on
+confirmation hands the pair to the import flow.
+
+There is still exactly one import flow. `rememberMapPackageImportSession` (`ui/map/MapPackageImportSession.kt`)
+now owns the two-step pickers, the friendly basename check and the `MapPackageStore.import` call, and
+both `OfflineMapManagementScreen` and the Ареал screen use it. The import is fed `file://` URIs for a
+discovered pair and SAF URIs for a picked one; staging reads through `ContentResolver`, so no second
+importer exists. A discovered name never bypasses validation: manifest structure, profile/style, size,
+SHA-256, PMTiles v3 header, zoom range and D065 coverage all still run, and a perfectly named package
+that does not cover the Ареал is rejected with `Карта найдена, но она не покрывает текущий ареал.`
+plus `Выбрать другую карту`. The card shows `Офлайн-карта загружена` when the existing availability
+state says so, and lists no package id, path or hash.
+
+The D065 coverage rejection message became the constant `MAP_PACKAGE_COVERAGE_MISMATCH_MESSAGE` so the
+screen can recognise exactly that outcome; the wording and the rule are unchanged.
+
+Verification: unit suite green (293 tests; new `AreaExternalStemTest` 9, `MapPackageFileNameTest` 15,
+`AreaMapPackageDiscoveryTest` 20, `AreaMapValidationInvariantTest` 10, `AreaMapLoadDecisionTest` 6) and
+the instrumented suite green on the SM-S938B (232 tests, including `AreaMapLoadingTest`).
+
+Device scenarios ran on the real DEV app at `font_scale=1.7`. With app-owned files in
+`Exchange/OfflineMaps` (copied as the app UID, which is what a future server download looks like)
+`Загрузить карту` found `DEV Territory--e6b55f2d--map-v1` on its own and offered it, while an
+`ДругойАреал--12345678--map-v5` pair in the same folder was not offered; nothing changed until
+`Загрузить`, and confirming switched the active package through the existing pipeline while the
+canonical Ареал, its участки and the source files stayed as they were. With v1, v2 and v12 present the
+dialog offered v12 and `Другие карты` listed v2 then v1; touching v1 so that it became the newest by
+mtime did not change the choice - the version is numeric, not time-based - and the active pointer was
+untouched until a confirmation. A package named for the Ареал but declaring coverage that does not
+contain it was rejected with `Карта найдена, но она не покрывает текущий ареал.` and `Выбрать другую
+карту`, with the previous active map and the Ареал unchanged. Files placed by adb in the same folder
+were invisible to the app (`ls` as the app UID: empty, and reading by exact path is `EACCES`), so
+`Загрузить карту` went straight to the standard picker opened inside `Exchange/OfflineMaps` without any
+storage permission being requested; selecting a `forest-map.pmtiles` pair by hand from there imported
+successfully, which is the point that the file name is a convenience and not a compatibility identity.
+Two manifests claiming one map produced the picker as well, with no silent choice. The DEV DataStore was
+restored byte-identically (md5 `5AA4B4D2BB02C3237A35F6FE36FE71B1`, 530 bytes) with its original active
+package pointer, the two packages the test imports created were removed, `Exchange/OfflineMaps` was left
+empty as it was found, and the user's own packages and backups in `Download/BeeSearch` were not touched.
+
 ## Area exchange file, Area view mode and transport-independent send (D083, 2026-09-19)
 
 A saved Ареал now has a portable file and a life outside the editor. The canonical value is

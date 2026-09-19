@@ -155,8 +155,21 @@ internal object AreaExchangeFileName {
 
     fun of(area: MapArea): String = of(id = area.id, name = area.name)
 
-    fun of(id: UUID, name: String): String =
-        sanitizedAreaName(name) + SEPARATOR + shortId(id) + EXTENSION
+    fun of(id: UUID, name: String): String = externalAreaStem(id = id, name = name) + EXTENSION
+
+    /**
+     * The shared external stem of an Ареал: `<sanitised-name>--<short-id>`, without an extension.
+     *
+     * This one stem connects the exported Ареал to everything built for it outside Bee Search: the
+     * Area JSON is `<stem>.json`, and a generated offline map package for that Ареал is
+     * `<stem>--map-v<N>.pmtiles`. Both names therefore start with the same human-readable name and
+     * carry the same short id, so a person sees which area a file belongs to while two Ареалы with
+     * the same name stay distinguishable.
+     */
+    fun externalAreaStem(area: MapArea): String = externalAreaStem(id = area.id, name = area.name)
+
+    fun externalAreaStem(id: UUID, name: String): String =
+        sanitizedAreaName(name) + SEPARATOR + shortId(id)
 
     /** First eight hex characters of the UUID: stable for a given Ареал, never random. */
     fun shortId(id: UUID): String = id.toString().replace("-", "").take(8)

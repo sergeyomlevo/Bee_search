@@ -4,6 +4,8 @@ import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
 import org.beesearch.app.ui.map.CREATE_AREA_LABEL
 import org.beesearch.app.ui.map.DELETE_AREA_LABEL
 import org.beesearch.app.ui.map.EDIT_AREA_SECTIONS_LABEL
+import org.beesearch.app.ui.map.LOAD_AREA_MAP_LABEL
+import org.beesearch.app.ui.map.OTHER_AREA_MAPS_LABEL
 import org.beesearch.app.ui.map.SEND_AREA_LABEL
 import org.beesearch.app.ui.map.VIEW_AREA_ON_MAP_LABEL
 import org.beesearch.app.ui.map.ADD_COVERAGE_FRAGMENT_LABEL
@@ -363,6 +365,31 @@ class HelpContentTest {
         assertTrue(text, text.contains("импортирована и активирована"))
         assertTrue(text, text.contains("«Онлайн карта»"))
         assertTrue(text, text.contains("«Векторная карта»"))
+    }
+
+    @Test
+    fun mapLoadingSectionExplainsAutomaticDiscoveryFromTheAreaScreen() {
+        val text = sectionText("Загрузка офлайн-карты")
+        // The user finds the new entry point, the file place, and what happens when nothing is found.
+        assertTrue(text, text.contains("«Объекты» → «Ареал»"))
+        assertTrue(text, text.contains("«$LOAD_AREA_MAP_LABEL»"))
+        assertTrue(text, text.contains("OfflineMaps"))
+        assertTrue(text, text.contains("определить карту этого ареала по имени файла"))
+        assertTrue(text, text.contains("«$OTHER_AREA_MAPS_LABEL»"))
+        assertTrue(text, text.contains("стандартный выбор файлов Android"))
+        assertTrue(text, text.contains("Это обычная ситуация, а не ошибка"))
+    }
+
+    @Test
+    fun mapLoadingSectionSaysAnExactNameStillGetsValidated() {
+        val text = sectionText("Загрузка офлайн-карты")
+        assertTrue(text, text.contains("Перед загрузкой карта всегда проверяется"))
+        assertTrue(text, text.contains("имя помогает только найти файл"))
+        assertTrue(text, text.contains("предыдущая установленная карта остаётся рабочей"))
+        // No implementation vocabulary for an ordinary user.
+        listOf("UUID", "regex", "Scoped Storage", "MediaStore", "coverageFragments", "SHA").forEach { term ->
+            assertFalse(term, text.contains(term))
+        }
     }
 
     @Test

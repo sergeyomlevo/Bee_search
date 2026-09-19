@@ -82,6 +82,20 @@ internal const val VIEW_AREA_ON_MAP_DESCRIPTION = "Посмотреть ареа
 internal const val SEND_AREA_DESCRIPTION = "Отправить файл ареала"
 internal const val EDIT_AREA_SECTIONS_IN_VIEW_DESCRIPTION = "Изменить участки просматриваемого ареала"
 
+/**
+ * Labels of the offline-map step of the Ареал workflow.
+ *
+ * The `Загрузить карту` action, its confirmation and the alternative-map actions are named here
+ * because the in-app help names them too, and a renamed button must not leave the help lying.
+ */
+internal const val LOAD_AREA_MAP_LABEL = "Загрузить карту"
+internal const val LOAD_AREA_MAP_CONFIRM_LABEL = "Загрузить"
+internal const val CHOOSE_ANOTHER_AREA_MAP_LABEL = "Выбрать другую"
+internal const val OTHER_AREA_MAPS_LABEL = "Другие карты"
+internal const val AREA_MAP_READY_LABEL = "Офлайн-карта загружена"
+internal const val LOAD_AREA_MAP_DESCRIPTION = "Загрузить офлайн-карту для ареала"
+internal const val AREA_MAP_READY_DESCRIPTION = "Для ареала загружена офлайн-карта"
+
 private val coverageFill = Color(0xFF1565C0).copy(alpha = 0.16f)
 private val coverageBorder = Color(0xFF0D47A1).copy(alpha = 0.9f)
 private val viewportFrame = Color(0xFFF57C00).copy(alpha = 0.95f)

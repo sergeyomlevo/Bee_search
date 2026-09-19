@@ -5,8 +5,10 @@ import android.content.Context
 import org.beesearch.app.data.backup.BackupDocumentExporter
 import org.beesearch.app.data.backup.BackupService
 import org.beesearch.app.data.backup.SafBackupDocumentExporter
+import org.beesearch.app.data.exchange.AndroidAreaMapDiscovery
 import org.beesearch.app.data.exchange.AndroidAreaShareTransport
 import org.beesearch.app.data.exchange.AreaExchangeMirror
+import org.beesearch.app.data.exchange.AreaMapDiscovery
 import org.beesearch.app.data.exchange.AreaTransport
 import org.beesearch.app.data.exchange.MirroringMapAreaStore
 import org.beesearch.app.data.exchange.beeSearchExchangeStorage
@@ -54,6 +56,14 @@ internal class AppContainer(context: Context) {
 
     /** Current transport of «Отправить ареал»: the Android share sheet. */
     val areaTransport: AreaTransport = AndroidAreaShareTransport(context, areaExchangeMirror)
+
+    /**
+     * Automatic lookup of an offline map package of the current Ареал in the exchange folder.
+     *
+     * It only recognises names; anything it finds still goes through `MapPackageStore.import`, so a
+     * discovered package is validated exactly like a manually picked one.
+     */
+    val areaMapDiscovery: AreaMapDiscovery = AndroidAreaMapDiscovery(exchangeStorage)
 
     val mapPackageStore = DataStoreMapPackageStore(
         contentResolver = context.contentResolver,

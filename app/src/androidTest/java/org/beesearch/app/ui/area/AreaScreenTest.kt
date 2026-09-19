@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import java.util.UUID
 import org.beesearch.app.ui.map.AreaNameDialog
+import org.beesearch.app.ui.map.AREA_MAP_READY_LABEL
 import org.beesearch.app.ui.map.CANCEL_LABEL
 import org.beesearch.app.ui.map.CREATE_AREA_LABEL
 import org.beesearch.app.ui.map.DELETE_AREA_LABEL
@@ -51,9 +52,14 @@ class AreaScreenTest {
         territoryCode: String? = "DEV-BENCH2",
         message: String? = null,
         sending: Boolean = false,
+        discovering: Boolean = false,
+        mapReady: Boolean = false,
+        coverageMismatch: Boolean = false,
         onCreate: () -> Unit = {},
         onViewOnMap: () -> Unit = {},
         onSend: () -> Unit = {},
+        onLoadMap: () -> Unit = {},
+        onChooseAnotherMap: () -> Unit = {},
         onDelete: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -63,9 +69,14 @@ class AreaScreenTest {
                     read = read,
                     message = message,
                     sending = sending,
+                    discovering = discovering,
+                    mapReady = mapReady,
+                    coverageMismatch = coverageMismatch,
                     onCreate = onCreate,
                     onViewOnMap = onViewOnMap,
                     onSend = onSend,
+                    onLoadMap = onLoadMap,
+                    onChooseAnotherMap = onChooseAnotherMap,
                     onDelete = onDelete,
                     onBack = {},
                 )
@@ -133,11 +144,12 @@ class AreaScreenTest {
     }
 
     @Test
-    fun theCardOffersViewingSendingAndDeletingOnly() {
+    fun theCardOffersViewingSendingLoadingAndDeleting() {
         show(MapAreaReadResult.Present(area))
 
         composeRule.onNodeWithTag(VIEW_AREA_ON_MAP_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(SEND_AREA_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(LOAD_AREA_MAP_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(DELETE_AREA_TAG).assertIsDisplayed()
         // Renaming was retired: the name is set once when the Ареал is created.
         composeRule.onNodeWithText("Переименовать").assertDoesNotExist()
@@ -145,6 +157,29 @@ class AreaScreenTest {
         // Raw coordinates, the technical id and file details are not user-facing.
         composeRule.onNodeWithText(area.id.toString()).assertDoesNotExist()
         composeRule.onNodeWithText("56.0").assertDoesNotExist()
+    }
+
+    @Test
+    fun theLoadingActionIsOfferedOnlyForAnExistingArea() {
+        var loaded = false
+        show(MapAreaReadResult.Present(area), onLoadMap = { loaded = true })
+
+        composeRule.onNodeWithTag(LOAD_AREA_MAP_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(LOAD_AREA_MAP_TAG).performClick()
+
+        composeRule.runOnIdle { assertTrue(loaded) }
+    }
+
+    @Test
+    fun aLoadedMapIsReportedOnTheCardWithoutTechnicalDetails() {
+        show(MapAreaReadResult.Present(area), mapReady = true)
+
+        composeRule.onNodeWithTag(AREA_MAP_READY_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText(AREA_MAP_READY_LABEL).assertIsDisplayed()
+        // The status names no package, path, hash or identifier.
+        listOf("package-", ".pmtiles", "sha", "packageId").forEach { technical ->
+            composeRule.onNodeWithText(technical, substring = true).assertDoesNotExist()
+        }
     }
 
     @Test

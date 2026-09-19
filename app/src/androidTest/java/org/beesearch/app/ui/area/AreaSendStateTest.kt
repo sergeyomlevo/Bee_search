@@ -1,5 +1,6 @@
 package org.beesearch.app.ui.area
 
+import android.net.Uri
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -10,6 +11,8 @@ import java.nio.file.Files
 import java.time.Instant
 import java.util.UUID
 import org.beesearch.app.data.exchange.AreaExchangeMirror
+import org.beesearch.app.data.exchange.AreaMapDiscovery
+import org.beesearch.app.data.exchange.AreaMapDiscoveryResult
 import org.beesearch.app.data.exchange.AreaSendResult
 import org.beesearch.app.data.exchange.AreaTransport
 import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
@@ -18,7 +21,11 @@ import org.beesearch.app.ui.map.MapArea
 import org.beesearch.app.ui.map.MapAreaChangeResult
 import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapAreaStore
+import org.beesearch.app.ui.map.MapCoverageFragment
 import org.beesearch.app.ui.map.MapGeoBounds
+import org.beesearch.app.ui.map.MapPackageAvailability
+import org.beesearch.app.ui.map.MapPackageImportResult
+import org.beesearch.app.ui.map.MapPackageStore
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -73,7 +80,8 @@ class AreaSendStateTest {
     }
 
     private fun show(transport: AreaTransport, store: RecordingAreaStore) {
-        val mirror = AreaExchangeMirror(BeeSearchExchangeStorage(root, "Test"))
+        val storage = BeeSearchExchangeStorage(root, "Test")
+        val mirror = AreaExchangeMirror(storage)
         composeRule.setContent {
             Bee_searchTheme {
                 AreaRoute(
@@ -81,12 +89,37 @@ class AreaSendStateTest {
                     areaStore = store,
                     areaMirror = mirror,
                     areaTransport = transport,
+                    mapPackageStore = NoMapPackageStore,
+                    mapDiscovery = NoAreaMapDiscovery,
+                    exchangeStorage = storage,
                     onCreate = {},
                     onViewOnMap = {},
                     onBack = {},
                 )
             }
         }
+    }
+
+    /** The send tests care about the Ареал: no map package is available and none is looked for. */
+    private object NoMapPackageStore : MapPackageStore {
+        override suspend fun loadActive(
+            territoryId: UUID,
+            desiredCoverage: List<MapCoverageFragment>,
+        ): MapPackageAvailability = MapPackageAvailability.Missing
+
+        override suspend fun import(
+            territoryId: UUID,
+            desiredCoverage: List<MapCoverageFragment>,
+            manifestUri: Uri,
+            pmtilesUri: Uri,
+        ): MapPackageImportResult = MapPackageImportResult.Rejected("тест не импортирует карту")
+
+        override suspend fun clear(territoryId: UUID) = Unit
+    }
+
+    private object NoAreaMapDiscovery : AreaMapDiscovery {
+        override suspend fun discover(expectedAreaStem: String): AreaMapDiscoveryResult =
+            AreaMapDiscoveryResult.None
     }
 
     @Test
