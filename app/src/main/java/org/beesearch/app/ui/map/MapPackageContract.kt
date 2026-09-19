@@ -191,7 +191,7 @@ internal object MapPackageValidator {
     ): ValidatedMapPackage {
         BeeSearchMapPackageCompatibility.validate(manifest)
         if (desiredCoverage.isEmpty()) {
-            throw MapPackageValidationException("Сначала выберите участок для офлайн-карты")
+            throw MapPackageValidationException("Сначала создайте ареал для офлайн-карты")
         }
         if (pmtilesFile.name != manifest.pmtilesFile || !pmtilesFile.isFile) {
             throw MapPackageValidationException("Выбранный PMTiles файл не соответствует описанию карты")

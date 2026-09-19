@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.beesearch.app.ui.map.ADD_COVERAGE_FRAGMENT_LABEL
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_CONFIRM_LABEL
+import org.beesearch.app.ui.map.CREATE_AREA_LABEL
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_DIALOG_TAG
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_LABEL
 import org.beesearch.app.ui.map.COPY_SELECTED_COVERAGE_DESCRIPTION
@@ -259,7 +260,7 @@ class MapCoverageSelectionUiTest {
 
         composeRule.onNodeWithTag(OFFLINE_MAP_PACKAGE_PANEL_TAG).assertIsDisplayed()
         composeRule.onNodeWithText("Офлайн-карта не подготовлена").assertIsDisplayed()
-        composeRule.onNodeWithText("Выбрать участок").assertIsDisplayed()
+        composeRule.onNodeWithText(CREATE_AREA_LABEL).assertIsDisplayed()
     }
 
     @Test

@@ -61,6 +61,7 @@ sealed interface AppRoute {
     data object Help : AppRoute
     data object Data : AppRoute
     data object Objects : AppRoute
+    data object Area : AppRoute
     data object Points : AppRoute
     data class PointDetail(val pointId: UUID) : AppRoute
     data object TerritoryManagement : AppRoute
@@ -208,6 +209,11 @@ internal class MainViewModel(
 
     fun openPoints() {
         manualRoute.value = AppRoute.Points
+        clearFeedback()
+    }
+
+    fun openArea() {
+        manualRoute.value = AppRoute.Area
         clearFeedback()
     }
 

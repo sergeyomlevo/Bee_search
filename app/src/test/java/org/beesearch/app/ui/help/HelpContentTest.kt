@@ -1,6 +1,10 @@
 package org.beesearch.app.ui.help
 
 import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
+import org.beesearch.app.ui.map.CREATE_AREA_LABEL
+import org.beesearch.app.ui.map.DELETE_AREA_LABEL
+import org.beesearch.app.ui.map.EDIT_AREA_SECTIONS_LABEL
+import org.beesearch.app.ui.map.RENAME_AREA_LABEL
 import org.beesearch.app.ui.map.ADD_COVERAGE_FRAGMENT_LABEL
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_LABEL
 import org.beesearch.app.ui.map.COPY_SELECTED_COVERAGE_LABEL
@@ -33,6 +37,7 @@ class HelpContentTest {
         "Азимут",
         "Экспорт и очистка данных",
         "Карты",
+        AREA_HELP_TITLE,
         "Создание участка офлайн-карты",
         "Загрузка офлайн-карты",
         EXCHANGE_HELP_TITLE,
@@ -176,7 +181,35 @@ class HelpContentTest {
         assertTrue(text, text.contains("работает без сети"))
         assertTrue(text, text.contains("переключается"))
         // The overview points at the two detailed sections instead of repeating their steps.
-        assertTrue(text, text.contains("сначала выбирается участок"))
+        assertTrue(text, text.contains("создаётся ареал территории"))
+    }
+
+    @Test
+    fun areaSectionExplainsTheModelAndManagementPlace() {
+        val text = sectionText(AREA_HELP_TITLE)
+        assertTrue(text, text.contains("один ареал"))
+        assertTrue(text, text.contains("один прямоугольник"))
+        assertTrue(text, text.contains("«Объекты»"))
+        assertTrue(text, text.contains("название территории"))
+        assertTrue(text, text.contains("«Изменить участки»"))
+        assertTrue(text, text.contains("«$RENAME_AREA_LABEL»"))
+        assertTrue(text, text.contains("«$DELETE_AREA_LABEL»"))
+    }
+
+    @Test
+    fun helpExplainsExplicitAreaDeletionInsteadOfClearingTheEditor() {
+        val text = sectionText(AREA_HELP_TITLE) + sectionText("Создание участка офлайн-карты")
+        assertTrue(text, text.contains("пустой ареал не сохраняется"))
+        assertTrue(text, text.contains("только отдельным действием"))
+        assertTrue(text, text.contains("территория, точки наблюдения и установленная офлайн-карта остаются"))
+    }
+
+    @Test
+    fun helpExplainsFirstSaveNamingAndLaterRename() {
+        val text = sectionText("Создание участка офлайн-карты")
+        assertTrue(text, text.contains("предлагает название ареала"))
+        assertTrue(text, text.contains("дальше имя не спрашивается"))
+        assertTrue(text, text.contains("сохраняет и название, и свой идентификатор"))
     }
 
     @Test
@@ -187,8 +220,24 @@ class HelpContentTest {
         assertTrue(text, text.contains("синим прямоугольником"))
         assertTrue(text, text.contains("Участков может быть несколько"))
         assertTrue(text, text.contains("«Офлайн-карты»"))
-        assertTrue(text, text.contains("«Выбрать участок»"))
-        assertTrue(text, text.contains("«Изменить участок»"))
+        assertTrue(text, text.contains("«$CREATE_AREA_LABEL»"))
+        assertTrue(text, text.contains("«$EDIT_AREA_SECTIONS_LABEL»"))
+    }
+
+    @Test
+    fun helpNamesTheAreaLifecycleActionsTheScreensShow() {
+        val text = allHelpText()
+        listOf(
+            CREATE_AREA_LABEL,
+            EDIT_AREA_SECTIONS_LABEL,
+            RENAME_AREA_LABEL,
+            DELETE_AREA_LABEL,
+        ).forEach { label ->
+            assertTrue("help must name the Ареал action «$label»", text.contains("«$label»"))
+        }
+        // The retired coverage-only label must not survive as a current action name.
+        assertFalse(text, text.contains("«Выбрать участок»"))
+        assertFalse(text, text.contains("«Изменить участок»"))
     }
 
     @Test

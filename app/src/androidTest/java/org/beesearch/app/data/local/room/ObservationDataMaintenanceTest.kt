@@ -154,7 +154,7 @@ class ObservationDataMaintenanceTest {
             val activeMapKey = stringPreferencesKey("map_package_active_${territory.id}")
             settings.setCurrentTerritoryId(territory.id)
             settings.setCurrentObserverId(observer.id)
-            areaStore.saveBounds(territory.id, coverage.map { it.bounds }, null)
+            areaStore.create(territory.id, "Тестовый ареал", coverage.map { it.bounds })
             dataStore.edit { it[activeMapKey] = mapFile.absolutePath }
             mapFile.writeText("device-local map marker")
 

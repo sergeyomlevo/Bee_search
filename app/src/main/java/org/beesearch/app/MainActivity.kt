@@ -45,6 +45,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import org.beesearch.app.ui.map.CurrentTerritoryScreen
 import org.beesearch.app.ui.map.OfflineMapManagementScreen
+import org.beesearch.app.ui.area.AreaRoute
 import org.beesearch.app.ui.data.DataRoute
 import org.beesearch.app.ui.help.HelpScreen
 import org.beesearch.app.ui.points.PointDetailRoute
@@ -184,7 +185,14 @@ private fun BeeSearchApp(
                     )
                     AppRoute.Objects -> ObjectsScreen(
                         onBack = viewModel::openCurrentTerritory,
+                        onOpenArea = viewModel::openArea,
                         onOpenObservationPoints = viewModel::openPoints,
+                    )
+                    AppRoute.Area -> AreaRoute(
+                        territory = currentTerritory,
+                        areaStore = application.container.mapAreaStore,
+                        onBack = viewModel::openObjects,
+                        onEditSections = viewModel::openMapWithCoverageEdit,
                     )
                     AppRoute.Points -> PointsRoute(
                         territory = currentTerritory,

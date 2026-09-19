@@ -47,7 +47,7 @@ class SelectedLargeCoverageDeviceSetupTest {
             "Bee Search DEV has no current Territory"
         }
 
-        container.mapAreaStore.saveBounds(territoryId, coverage.map { it.bounds }, territory.name)
+        container.mapAreaStore.create(territoryId, territory.name, coverage.map { it.bounds })
 
         val stored = container.mapAreaStore.load(territoryId, territory.name) as MapAreaReadResult.Present
         assertEquals(coverage.map { it.bounds }, stored.area.bounds)

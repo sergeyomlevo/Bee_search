@@ -9,9 +9,9 @@ import org.beesearch.app.domain.model.EntityNotFoundException
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.model.TerritoryInUseException
 import org.beesearch.app.domain.repository.TerritoryRepository
+import org.beesearch.app.ui.map.MapAreaChangeResult
 import org.beesearch.app.ui.map.MapAreaCodec
 import org.beesearch.app.ui.map.MapAreaReadResult
-import org.beesearch.app.ui.map.MapAreaSaveResult
 import org.beesearch.app.ui.map.MapAreaStore
 import org.beesearch.app.ui.map.MapGeoBounds
 import org.junit.Assert.assertEquals
@@ -98,11 +98,22 @@ class TerritoryCoverageDeletionTest {
         override suspend fun load(territoryId: UUID, territoryName: String?): MapAreaReadResult =
             MapAreaCodec.decode(values[territoryId])
 
-        override suspend fun saveBounds(
+        override suspend fun create(
+            territoryId: UUID,
+            name: String,
+            bounds: List<MapGeoBounds>,
+        ): MapAreaChangeResult = throw UnsupportedOperationException()
+
+        override suspend fun updateBounds(
             territoryId: UUID,
             bounds: List<MapGeoBounds>,
-            territoryName: String?,
-        ): MapAreaSaveResult = throw UnsupportedOperationException()
+        ): MapAreaChangeResult = throw UnsupportedOperationException()
+
+        override suspend fun rename(territoryId: UUID, name: String): MapAreaChangeResult =
+            throw UnsupportedOperationException()
+
+        override suspend fun delete(territoryId: UUID): MapAreaChangeResult =
+            throw UnsupportedOperationException()
 
         override suspend fun clear(territoryId: UUID) {
             values.remove(territoryId)

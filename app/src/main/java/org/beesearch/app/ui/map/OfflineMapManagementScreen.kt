@@ -254,9 +254,9 @@ internal fun OfflineMapManagementScreen(
             Text("Территория: ${territory.code} · ${territory.name}", style = MaterialTheme.typography.titleMedium)
 
             if (coverage.isEmpty()) {
-                Text("Покрытие не выбрано. Выберите участок на карте.", style = MaterialTheme.typography.bodyMedium)
+                Text("Ареал не создан. Создайте ареал на карте.", style = MaterialTheme.typography.bodyMedium)
             } else {
-                Text("Выбранное покрытие", style = MaterialTheme.typography.titleSmall)
+                Text("Участки ареала", style = MaterialTheme.typography.titleSmall)
                 coverage.forEachIndexed { index, fragment ->
                     val b = fragment.bounds
                     Text(

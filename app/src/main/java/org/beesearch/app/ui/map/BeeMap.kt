@@ -110,6 +110,9 @@ internal fun BeeMap(
     var packageAvailability by remember { mutableStateOf<MapPackageAvailability>(MapPackageAvailability.Missing) }
     var clearSelectionConfirmationVisible by remember { mutableStateOf(false) }
     var unsavedCoverageChangesVisible by remember { mutableStateOf(false) }
+    var createAreaConfirmationVisible by remember { mutableStateOf(false) }
+    var areaNameInput by remember { mutableStateOf("") }
+    var areaNameBlank by remember { mutableStateOf(false) }
     var developerBasemap by remember { mutableStateOf(DeveloperBasemap.ONLINE) }
     var mapCameraRevision by remember { mutableStateOf(0) }
     var coverageControlsHeightPx by remember { mutableStateOf(0) }
@@ -205,33 +208,29 @@ internal fun BeeMap(
     /**
      * Leaves the editor. [restoreDraft] puts the persisted selection back into the draft, which is
      * how "leave without saving" discards the session without ever having written anything: the
-     * store is only written by [saveWorkingCoverage].
+     * store is only written by [commitCoverage] and the first-create confirmation.
      */
     fun leaveCoverageSelection(restoreDraft: Boolean) {
         if (restoreDraft) workingCoverage = persistedCoverage
         unsavedCoverageChangesVisible = false
         clearSelectionConfirmationVisible = false
+        createAreaConfirmationVisible = false
+        areaNameBlank = false
         map?.restoreNormalCameraPadding(normalCameraPadding)
         coverageSelectionMode = false
         editingTerritoryId = null
     }
 
-    /** The single committed exit: persist the draft, then leave the editor. */
-    fun saveWorkingCoverage() {
-        val id = editingTerritoryId
-        if (id == null) {
-            leaveCoverageSelection(restoreDraft = false)
-            return
-        }
-        val selectedCoverage = workingCoverage
+    /** Saves edited участки of an existing Ареал, keeping its UUID and name. */
+    fun saveAreaBounds(id: UUID, bounds: List<MapGeoBounds>) {
         coroutineScope.launch {
             val result = try {
-                areaStore.saveBounds(id, selectedCoverage.map { it.bounds }, territoryName)
+                areaStore.updateBounds(id, bounds)
             } catch (_: Exception) {
-                MapAreaSaveResult.Refused(CORRUPT_AREA_MESSAGE)
+                MapAreaChangeResult.Refused(CORRUPT_AREA_MESSAGE)
             }
             when (result) {
-                is MapAreaSaveResult.Saved -> {
+                is MapAreaChangeResult.Saved -> {
                     if (id == latestTerritoryId) {
                         persistedArea = MapAreaReadResult.Present(result.area)
                         persistedCoverage = result.area.coverageFragments()
@@ -239,19 +238,76 @@ internal fun BeeMap(
                     leaveCoverageSelection(restoreDraft = false)
                 }
 
-                // The territory has no Ареал yet, so the selection is stored as before.
-                MapAreaSaveResult.SavedLegacySelection -> {
+                // The stored value stays untouched: stay in the editor with the draft intact.
+                is MapAreaChangeResult.Refused ->
+                    Toast.makeText(appContext, result.reason, Toast.LENGTH_LONG).show()
+
+                MapAreaChangeResult.Deleted -> leaveCoverageSelection(restoreDraft = false)
+            }
+        }
+    }
+
+    /** The single committed exit for both «Готово» and Back → «Сохранить». */
+    fun commitCoverage() {
+        val id = editingTerritoryId
+        if (id == null) {
+            leaveCoverageSelection(restoreDraft = false)
+            return
+        }
+        when (val plan = planAreaCommit(persistedArea, workingCoverage, territoryName)) {
+            AreaCommitPlan.ExitWithoutCreating -> leaveCoverageSelection(restoreDraft = false)
+
+            is AreaCommitPlan.CreateWithName -> {
+                // First creation asks for the name; nothing is written until it is confirmed.
+                areaNameInput = plan.initialName
+                areaNameBlank = false
+                // The name question answers the unsaved-changes question it may have been reached
+                // from, so that question must not stay stacked behind it.
+                unsavedCoverageChangesVisible = false
+                createAreaConfirmationVisible = true
+            }
+
+            AreaCommitPlan.UpdateBounds -> saveAreaBounds(id, workingCoverage.map { it.bounds })
+
+            is AreaCommitPlan.Refused -> {
+                Toast.makeText(appContext, plan.message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /** Creates the Ареал after the first-save name dialog was confirmed. */
+    fun createAreaFromNameDialog() {
+        val name = normalizedAreaName(areaNameInput)
+        if (name == null) {
+            areaNameBlank = true
+            return
+        }
+        val id = editingTerritoryId ?: return
+        val draft = workingCoverage.map { it.bounds }
+        coroutineScope.launch {
+            val result = try {
+                areaStore.create(id, name, draft)
+            } catch (_: Exception) {
+                MapAreaChangeResult.Refused(CORRUPT_AREA_MESSAGE)
+            }
+            when (result) {
+                is MapAreaChangeResult.Saved -> {
+                    createAreaConfirmationVisible = false
+                    areaNameBlank = false
                     if (id == latestTerritoryId) {
-                        persistedArea = MapAreaReadResult.Absent
-                        persistedCoverage = selectedCoverage
+                        persistedArea = MapAreaReadResult.Present(result.area)
+                        persistedCoverage = result.area.coverageFragments()
                     }
                     leaveCoverageSelection(restoreDraft = false)
                 }
 
-                // The stored value stays untouched: stay in the editor with the draft intact.
-                is MapAreaSaveResult.Refused -> {
+                // Nothing is written, so the editor keeps the draft and stays open.
+                is MapAreaChangeResult.Refused -> {
+                    createAreaConfirmationVisible = false
                     Toast.makeText(appContext, result.reason, Toast.LENGTH_LONG).show()
                 }
+
+                MapAreaChangeResult.Deleted -> createAreaConfirmationVisible = false
             }
         }
     }
@@ -555,7 +611,7 @@ internal fun BeeMap(
                     }
                 },
                 onClear = { clearSelectionConfirmationVisible = true },
-                onDone = { saveWorkingCoverage() },
+                onDone = { commitCoverage() },
                 onCopySelectedBounds = {
                     workingCoverage.singleOrNull()?.let { selected ->
                         val text = formatMapPackageBuilderBounds(selected.bounds)
@@ -604,9 +660,26 @@ internal fun BeeMap(
 
         if (unsavedCoverageChangesVisible) {
             CoverageUnsavedChangesDialog(
-                onSave = { saveWorkingCoverage() },
+                onSave = { commitCoverage() },
                 onDiscard = { leaveCoverageSelection(restoreDraft = true) },
                 onStay = { unsavedCoverageChangesVisible = false },
+            )
+        }
+
+        if (createAreaConfirmationVisible) {
+            AreaNameDialog(
+                name = areaNameInput,
+                blankName = areaNameBlank,
+                onNameChange = {
+                    areaNameInput = it
+                    if (areaNameBlank) areaNameBlank = false
+                },
+                onConfirm = { createAreaFromNameDialog() },
+                // Cancelling keeps the draft and every stored value untouched.
+                onDismiss = {
+                    createAreaConfirmationVisible = false
+                    areaNameBlank = false
+                },
             )
         }
 

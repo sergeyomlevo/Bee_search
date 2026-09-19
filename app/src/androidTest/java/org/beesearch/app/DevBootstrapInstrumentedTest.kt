@@ -74,7 +74,7 @@ class DevBootstrapInstrumentedTest {
                 ),
             ),
         )
-        container.mapAreaStore.saveBounds(territory.id, coverage.map { it.bounds }, territory.name)
+        container.mapAreaStore.create(territory.id, territory.name, coverage.map { it.bounds })
         val import = container.mapPackageStore.import(
             territoryId = territory.id,
             desiredCoverage = coverage,

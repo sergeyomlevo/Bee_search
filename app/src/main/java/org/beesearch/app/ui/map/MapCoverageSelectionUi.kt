@@ -12,6 +12,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,11 +59,24 @@ internal const val COPY_SELECTED_COVERAGE_LABEL = "Копировать bbox"
 
 internal const val CLEAR_COVERAGE_DIALOG_TAG = "clear-coverage-dialog"
 internal const val UNSAVED_COVERAGE_CHANGES_DIALOG_TAG = "coverage-unsaved-changes-dialog"
+internal const val AREA_NAME_DIALOG_TAG = "area-name-dialog"
+internal const val AREA_NAME_FIELD_TAG = "area-name-field"
+internal const val AREA_NAME_ERROR_TAG = "area-name-error"
+internal const val DELETE_AREA_DIALOG_TAG = "delete-area-dialog"
 
 internal const val CLEAR_COVERAGE_CONFIRM_LABEL = "Очистить"
 internal const val SAVE_COVERAGE_CHANGES_LABEL = "Сохранить"
 internal const val DISCARD_COVERAGE_CHANGES_LABEL = "Выйти без сохранения"
 internal const val STAY_IN_COVERAGE_SELECTION_LABEL = "Остаться"
+
+/** Visible labels of the Ареал lifecycle, shared with the in-app help so they cannot drift. */
+internal const val AREA_NAME_DIALOG_TITLE = "Название ареала"
+internal const val CREATE_AREA_LABEL = "Создать ареал"
+internal const val EDIT_AREA_SECTIONS_LABEL = "Изменить участки"
+internal const val RENAME_AREA_LABEL = "Переименовать"
+internal const val DELETE_AREA_LABEL = "Удалить ареал"
+internal const val DELETE_AREA_CONFIRM_LABEL = "Удалить"
+internal const val CANCEL_LABEL = "Отмена"
 
 private val coverageFill = Color(0xFF1565C0).copy(alpha = 0.16f)
 private val coverageBorder = Color(0xFF0D47A1).copy(alpha = 0.9f)
@@ -103,7 +117,7 @@ internal fun OfflineMapPackagePanel(
             }
             if (!desiredCoverageConfigured) {
                 Text(
-                    "Сначала выберите участок, который должен работать без сети.",
+                    "Сначала создайте ареал, который должен работать без сети.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Button(
@@ -111,7 +125,7 @@ internal fun OfflineMapPackagePanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .semantics { contentDescription = SELECT_OFFLINE_COVERAGE_DESCRIPTION },
-                ) { Text("Выбрать участок") }
+                ) { Text(CREATE_AREA_LABEL) }
             } else {
                 Text(
                     "Импорт: сначала manifest, затем соответствующий PMTiles.",
@@ -129,7 +143,7 @@ internal fun OfflineMapPackagePanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .semantics { contentDescription = SELECT_OFFLINE_COVERAGE_DESCRIPTION },
-                ) { Text("Изменить участок") }
+                ) { Text(EDIT_AREA_SECTIONS_LABEL) }
             }
         }
     }
@@ -308,7 +322,83 @@ internal fun ClearCoverageSelectionDialog(
             Button(onClick = onConfirm) { Text(CLEAR_COVERAGE_CONFIRM_LABEL) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
+            TextButton(onClick = onDismiss) { Text(CANCEL_LABEL) }
+        },
+    )
+}
+
+/**
+ * Names the Ареал on first save, and renames it later. The same dialog serves both, so the two
+ * paths cannot drift apart.
+ *
+ * The field is prefilled, so the common case is a single tap. A blank name never closes the dialog
+ * and never creates or renames anything.
+ */
+@Composable
+internal fun AreaNameDialog(
+    name: String,
+    blankName: Boolean,
+    onNameChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(AREA_NAME_DIALOG_TAG),
+        title = { Text(AREA_NAME_DIALOG_TITLE) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = onNameChange,
+                    singleLine = true,
+                    isError = blankName,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(AREA_NAME_FIELD_TAG),
+                )
+                if (blankName) {
+                    Text(
+                        text = BLANK_AREA_NAME_MESSAGE,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag(AREA_NAME_ERROR_TAG),
+                    )
+                }
+            }
+        },
+        // Stacked full-width actions stay readable at font_scale 1.7.
+        confirmButton = {
+            Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) { Text(SAVE_COVERAGE_CHANGES_LABEL) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(CANCEL_LABEL) }
+        },
+    )
+}
+
+/**
+ * Confirmation for the only user-facing way to remove an Ареал.
+ *
+ * It states explicitly what is removed and what is kept, because an empty editor draft can no longer
+ * delete the Ареал.
+ */
+@Composable
+internal fun DeleteAreaDialog(
+    areaName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(DELETE_AREA_DIALOG_TAG),
+        title = { Text("Удалить ареал «$areaName»?") },
+        text = { Text("Будут удалены сохранённые участки этого ареала. Территория и точки наблюдения останутся.") },
+        confirmButton = {
+            Button(onClick = onConfirm) { Text(DELETE_AREA_CONFIRM_LABEL) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(CANCEL_LABEL) }
         },
     )
 }

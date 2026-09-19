@@ -6,6 +6,69 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Named Ареал Phase B: creation, rename, delete, empty protection (D082, 2026-09-19)
+
+Phase B gives the D081 model its user-facing lifecycle. An Ареал is now created, renamed
+and deleted only through explicit actions, and geometry editing can no longer turn an
+existing Ареал into no Ареал.
+
+First creation happens together with the name. When no Ареал exists and the user finishes
+with at least one участок, `Готово` opens the `Название ареала` dialog, prefilled from the
+trimmed `Territory.name` (otherwise `Ареал`). A blank name keeps the dialog open with
+`Введите название ареала` and writes nothing; `Отмена` creates nothing, keeps the draft and
+stays in the editor. `Готово` and Back → `Сохранить` share one commit path
+(`commitCoverage` plus the pure `planAreaCommit`), so both exits produce the same plan, the
+same name dialog and the same refusals; there is no second saving implementation.
+
+`Очистить всё` followed by `Готово` no longer deletes the Ареал: the commit is refused, the
+user sees `Ареал должен содержать хотя бы один участок.`, the stored value is untouched and
+the editor stays open with the empty draft. An absent Ареал with an empty draft just leaves
+the editor — no name dialog, and no empty value written. Deletion is the explicit
+`Удалить ареал` action on the new Ареал screen, behind a confirmation that names the Ареал
+and states that Territory and observation points remain. No new `v1` is written anywhere:
+`v1` is read/migration-only, and the two transitional `PHASE B` branches were removed from
+`DataStoreMapAreaStore`.
+
+`MapAreaStore` now exposes exactly `load`, `create(name, bounds)`, `updateBounds`, `rename`
+and `delete`, plus the unconditional `clear`/`snapshot`/`restore` used when a Territory
+itself is deleted. Decision and write happen inside a single DataStore `edit`, so a refusal
+provably leaves the stored value untouched. `create` refuses an existing, damaged or
+unmigrated value; `updateBounds`/`rename` refuse an absent Ареал or empty bounds; `delete`
+is idempotent when absent and refuses a damaged value. UI state never enters the store.
+
+The entry point is `Objects → Ареал`, not Settings. `AreaScreen` shows `Ареал не создан`
+with `Создать ареал`, or the card with the name, `Участков: N`, `Изменить участки`,
+`Переименовать` and `Удалить ареал`; a damaged or unmigrated value shows `Данные ареала
+повреждены` and offers no lifecycle action. Rename changes only the name — `areaId` and
+участки stay identical — and no file is updated, because the Ареал file format (Phase C)
+does not exist yet. Help gained the `Ареал` section, and the offline-map sections now say
+`создайте ареал`/`участок` instead of the retired `выберите участок` wording.
+
+Verification: `:app:testDebugUnitTest` green (165 tests; new `MapAreaCommitPlanTest` 11 and
+a rewritten `DataStoreMapAreaStoreTest` for the final API) and the instrumented suite green
+on the SM-S938B (203 tests, expected opt-in skips) through
+`tools/run-preserving-device-tests.ps1`. Device scenarios A–F ran on the real DEV app at
+`font_scale=1.7` against the real DataStore file: first creation with the prefilled
+territory name (blank name refused, file byte-identical), a third участок added to an
+existing Ареал with the same `areaId` and no name dialog, rename changing only `name` with
+identical bounds, `Очистить всё` + `Готово` refused with the Ареал intact, Back →
+`Сохранить` refused the same way, first creation reached through Back → `Сохранить`,
+`Отмена` in the delete confirmation changing nothing, and deletion after confirmation
+leaving Territory, Room files, the PMTiles package and the active pointer unchanged. The
+DEV DataStore was restored byte-identically afterwards
+(md5 `f7061adad65f60b6ad76e8b46b157d86`, 293 bytes).
+
+Two defects were found and fixed during that device pass: the name dialog reached from
+Back → `Сохранить` appeared on top of the still-open unsaved-changes dialog, and the
+refusal message was long enough that its Toast truncated the actionable half at
+`font_scale=1.7`, so the message is now one short sentence and the deletion hint lives in
+Help.
+
+Deliberately not implemented: Ареал JSON exchange, a managed Ареал file, Area
+import/export, union area, multi-section map generation, manifest recovery and
+manifest/PMTiles schema changes. No file belongs to an Ареал yet, so rename and delete
+cannot affect an installed Map Package.
+
 ## Named Ареал Phase A: model, codec v2 and migration (D081, 2026-09-18)
 
 Phase A of the Area model is implemented without any user-facing change. A Territory now
@@ -31,9 +94,10 @@ backup export explicitly while leaving it in DataStore; `backupFormatVersion`,
 existing `map-coverage` settings rows. `TerritoryCoverageDeletion` snapshots and restores
 the exact stored value, so even a damaged one survives a failed territory deletion.
 
-Transitional behaviour until Phase B owns first creation: a territory without an Ареал
-still stores an unnamed legacy selection, and an existing Ареал refuses to be saved with
-zero участки. Both are marked `PHASE B` in `DataStoreMapAreaStore`.
+Phase A left two transitional branches in `DataStoreMapAreaStore`; Phase B removed both. A
+territory without an Ареал no longer stores an unnamed legacy selection, and the
+zero-участки refusal now runs through the single commit path described in the Phase B
+section above.
 
 Map workflow compatibility is unchanged: `Area.bounds` are passed as `desiredCoverage` to
 the existing D065 containment check, the active package stays keyed by Territory and no
@@ -50,8 +114,9 @@ UUID stayed identical across further restarts. The DEV DataStore was backed up f
 Note: the DEV saved selection was already the empty legacy value before this work, so no user
 geometry was in the file; the cause of that earlier emptying is not established.
 
-Phase B is next: the first-`Готово` name dialog (prefilled from the Territory name), the
-`Objects → Ареал` card, rename and delete. Nothing else of the Area design is implemented yet.
+Phase B implemented the first-`Готово` name dialog, the `Objects → Ареал` screen, rename
+and delete; see the Phase B section above. Phase C — an Ареал file, its JSON exchange and
+Area import/export — is still unimplemented, and the next durable decision id is **D083**.
 
 ## Bee Search file exchange directory (D080, 2026-09-18)
 

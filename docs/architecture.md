@@ -714,9 +714,12 @@ readiness. Package считается Ready только после validation �
 У разных Territory может быть разный coverage; rectangles остаются map
 infrastructure и не становятся Room entities.
 Желаемое coverage хранится device-local в Preferences DataStore по ключу
-`Territory.id` в versioned формате `v1`; это не downloaded resources и не Room
-research data. Редактирование использует working copy и заменяет список только
-после Done, а смена Territory загружает только её собственные fragments.
+`Territory.id` в versioned формате: `v1` — прежний безымянный набор участков, `v2` —
+именованный Ареал (D081). Это не downloaded resources и не Room research data.
+Редактирование использует working copy и заменяет участки только после Done, а смена
+Territory загружает только её собственный Ареал. Создание Ареала, переименование,
+изменение участков и удаление идут через явные действия пользователя и один
+store-контракт, а UI-состояние редактора в хранилище не попадает (D082).
 При успешном удалении неиспользуемой Territory её coverage key очищается; если
 удаление заблокировано существующим ObservationPoint, coverage не изменяется.
 
