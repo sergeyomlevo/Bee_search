@@ -62,6 +62,7 @@ sealed interface AppRoute {
     data object Data : AppRoute
     data object Objects : AppRoute
     data object Area : AppRoute
+    data object AreaView : AppRoute
     data object Points : AppRoute
     data class PointDetail(val pointId: UUID) : AppRoute
     data object TerritoryManagement : AppRoute
@@ -111,6 +112,9 @@ internal class MainViewModel(
     private val _flightAzimuthInProgressIds = MutableStateFlow<Set<UUID>>(emptySet())
     private var locationJob: kotlinx.coroutines.Job? = null
     private var nextFeedbackId = 0L
+
+    /** Where the участки editor should return to once the Ареал workflow opened it. */
+    private var areaEditReturnRoute: AppRoute? = null
 
     val feedback: StateFlow<UiFeedback?> = _feedback.asStateFlow()
     val locationState: StateFlow<LocationUiState> = _locationState.asStateFlow()
@@ -214,6 +218,35 @@ internal class MainViewModel(
 
     fun openArea() {
         manualRoute.value = AppRoute.Area
+        clearFeedback()
+    }
+
+    /** The Ареал on a clean map: geometry without the editor. */
+    fun openAreaView() {
+        manualRoute.value = AppRoute.AreaView
+        clearFeedback()
+    }
+
+    /**
+     * Opens the участки editor for the Ареал workflow.
+     *
+     * The Ареал screen and the Ареал view are two different places a user can start editing from, so
+     * the origin is remembered and [completeAreaSectionsEditing] returns there. Other entry points to
+     * the same editor (the map's own coverage button, the offline-map screen) record no origin and
+     * keep the previous behaviour of staying on the map.
+     */
+    fun openAreaSectionsEditor(returnToView: Boolean) {
+        areaEditReturnRoute = if (returnToView) AppRoute.AreaView else AppRoute.Area
+        manualRoute.value = AppRoute.CurrentTerritory
+        _coverageEditNonce.value += 1
+        clearFeedback()
+    }
+
+    /** The editor session ended: go back to where the Ареал workflow started, if it did. */
+    fun completeAreaSectionsEditing() {
+        val origin = areaEditReturnRoute ?: return
+        areaEditReturnRoute = null
+        manualRoute.value = origin
         clearFeedback()
     }
 

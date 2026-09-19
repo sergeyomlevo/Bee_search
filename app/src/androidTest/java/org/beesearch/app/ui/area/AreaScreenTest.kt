@@ -1,6 +1,7 @@
 package org.beesearch.app.ui.area
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -12,20 +13,25 @@ import org.beesearch.app.ui.map.CREATE_AREA_LABEL
 import org.beesearch.app.ui.map.DELETE_AREA_LABEL
 import org.beesearch.app.ui.map.DELETE_AREA_CONFIRM_LABEL
 import org.beesearch.app.ui.map.DeleteAreaDialog
-import org.beesearch.app.ui.map.EDIT_AREA_SECTIONS_LABEL
 import org.beesearch.app.ui.map.MapArea
 import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapGeoBounds
-import org.beesearch.app.ui.map.RENAME_AREA_LABEL
+import org.beesearch.app.ui.map.SEND_AREA_LABEL
+import org.beesearch.app.ui.map.VIEW_AREA_ON_MAP_LABEL
+import org.beesearch.app.ui.map.areaUnionKm2
+import org.beesearch.app.ui.map.formatSquareKilometers
 import org.beesearch.app.ui.objects.ObjectsScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * The Ареал screen is a card for the one Ареал of the current Territory, plus the two dialogs that
- * guard renaming and deletion. A damaged value must never be presented as "not created".
+ * The Ареал screen is a card for the one Ареал of the current Territory: what it is, how to look at
+ * it on the map and how to send its file. Editing участки is a separate screen, and the name is set
+ * once, so the card must not offer renaming. A damaged value must never be presented as "not
+ * created".
  */
 class AreaScreenTest {
     @get:Rule
@@ -44,9 +50,10 @@ class AreaScreenTest {
         read: MapAreaReadResult,
         territoryCode: String? = "DEV-BENCH2",
         message: String? = null,
+        sending: Boolean = false,
         onCreate: () -> Unit = {},
-        onEditSections: () -> Unit = {},
-        onRename: () -> Unit = {},
+        onViewOnMap: () -> Unit = {},
+        onSend: () -> Unit = {},
         onDelete: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -55,9 +62,10 @@ class AreaScreenTest {
                     territoryCode = territoryCode,
                     read = read,
                     message = message,
+                    sending = sending,
                     onCreate = onCreate,
-                    onEditSections = onEditSections,
-                    onRename = onRename,
+                    onViewOnMap = onViewOnMap,
+                    onSend = onSend,
                     onDelete = onDelete,
                     onBack = {},
                 )
@@ -87,8 +95,19 @@ class AreaScreenTest {
 
         composeRule.onNodeWithTag(AREA_NOT_CREATED_TAG).assertIsDisplayed()
         composeRule.onNodeWithText("Ареал не создан").assertIsDisplayed()
-        composeRule.onNodeWithTag("create-area").performClick()
+        composeRule.onNodeWithTag(CREATE_AREA_TAG).performClick()
         composeRule.runOnIdle { assertTrue(created) }
+    }
+
+    @Test
+    fun anAbsentAreaOffersNothingToViewOrSend() {
+        show(MapAreaReadResult.Absent)
+
+        composeRule.onNodeWithTag(VIEW_AREA_ON_MAP_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(SEND_AREA_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(DELETE_AREA_TAG).assertDoesNotExist()
+        composeRule.onNodeWithText(VIEW_AREA_ON_MAP_LABEL).assertDoesNotExist()
+        composeRule.onNodeWithText(SEND_AREA_LABEL).assertDoesNotExist()
     }
 
     @Test
@@ -96,29 +115,63 @@ class AreaScreenTest {
         show(MapAreaReadResult.Absent, territoryCode = null)
 
         composeRule.onNodeWithText("Текущая территория не выбрана").assertIsDisplayed()
-        composeRule.onNodeWithTag("create-area").assertDoesNotExist()
+        composeRule.onNodeWithTag(CREATE_AREA_TAG).assertDoesNotExist()
     }
 
     @Test
-    fun anExistingAreaShowsItsNameAndSectionCount() {
+    fun anExistingAreaShowsItsNameSectionCountAndTotalArea() {
         show(MapAreaReadResult.Present(area))
 
         composeRule.onNodeWithTag(AREA_CARD_TAG).assertIsDisplayed()
-        composeRule.onNodeWithTag("area-name").assertIsDisplayed()
+        composeRule.onNodeWithTag(AREA_NAME_TAG).assertIsDisplayed()
         composeRule.onNodeWithText("Лух").assertIsDisplayed()
         composeRule.onNodeWithText("Участков: 2").assertIsDisplayed()
-        composeRule.onNodeWithText(EDIT_AREA_SECTIONS_LABEL).assertIsDisplayed()
-        composeRule.onNodeWithText(RENAME_AREA_LABEL).assertIsDisplayed()
-        composeRule.onNodeWithText(DELETE_AREA_LABEL).assertIsDisplayed()
+        // The same helper the editor uses for one участок, so the two screens cannot disagree.
+        val expectedArea = "$AREA_TOTAL_AREA_LABEL: ${formatSquareKilometers(areaUnionKm2(area.bounds))} км²"
+        composeRule.onNodeWithTag(AREA_TOTAL_AREA_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText(expectedArea).assertIsDisplayed()
     }
 
     @Test
-    fun editingSectionsOpensTheExistingMapEditor() {
-        var edited = false
-        show(MapAreaReadResult.Present(area), onEditSections = { edited = true })
+    fun theCardOffersViewingSendingAndDeletingOnly() {
+        show(MapAreaReadResult.Present(area))
 
-        composeRule.onNodeWithTag("edit-area-sections").performClick()
-        composeRule.runOnIdle { assertTrue(edited) }
+        composeRule.onNodeWithTag(VIEW_AREA_ON_MAP_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(SEND_AREA_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DELETE_AREA_TAG).assertIsDisplayed()
+        // Renaming was retired: the name is set once when the Ареал is created.
+        composeRule.onNodeWithText("Переименовать").assertDoesNotExist()
+        composeRule.onNodeWithTag("rename-area").assertDoesNotExist()
+        // Raw coordinates, the technical id and file details are not user-facing.
+        composeRule.onNodeWithText(area.id.toString()).assertDoesNotExist()
+        composeRule.onNodeWithText("56.0").assertDoesNotExist()
+    }
+
+    @Test
+    fun viewingOnTheMapOpensTheAreaView() {
+        var viewed = false
+        show(MapAreaReadResult.Present(area), onViewOnMap = { viewed = true })
+
+        composeRule.onNodeWithTag(VIEW_AREA_ON_MAP_TAG).performClick()
+
+        composeRule.runOnIdle { assertTrue(viewed) }
+    }
+
+    @Test
+    fun sendingTheAreaUsesTheSendAction() {
+        var sent = false
+        show(MapAreaReadResult.Present(area), onSend = { sent = true })
+
+        composeRule.onNodeWithTag(SEND_AREA_TAG).performClick()
+
+        composeRule.runOnIdle { assertTrue(sent) }
+    }
+
+    @Test
+    fun theSendActionIsDisabledWhileTheFileIsBeingPrepared() {
+        show(MapAreaReadResult.Present(area), sending = true)
+
+        composeRule.onNodeWithTag(SEND_AREA_TAG).assertIsNotEnabled()
     }
 
     @Test
@@ -128,9 +181,10 @@ class AreaScreenTest {
         composeRule.onNodeWithTag(AREA_CORRUPT_TAG).assertIsDisplayed()
         composeRule.onNodeWithText("Данные ареала повреждены").assertIsDisplayed()
         composeRule.onNodeWithTag(AREA_NOT_CREATED_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag("create-area").assertDoesNotExist()
-        composeRule.onNodeWithTag("rename-area").assertDoesNotExist()
-        composeRule.onNodeWithTag("delete-area").assertDoesNotExist()
+        composeRule.onNodeWithTag(CREATE_AREA_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(VIEW_AREA_ON_MAP_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(SEND_AREA_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(DELETE_AREA_TAG).assertDoesNotExist()
     }
 
     @Test
@@ -155,7 +209,7 @@ class AreaScreenTest {
         // Nothing happens until the destructive action is chosen explicitly.
         composeRule.onNodeWithText(DELETE_AREA_CONFIRM_LABEL).performClick()
         composeRule.runOnIdle { assertTrue(confirmed) }
-        assertTrue(!dismissed)
+        assertFalse(dismissed)
     }
 
     @Test
@@ -175,7 +229,7 @@ class AreaScreenTest {
         composeRule.onNodeWithText(CANCEL_LABEL).performClick()
 
         composeRule.runOnIdle { assertTrue(dismissed) }
-        assertTrue(!confirmed)
+        assertFalse(confirmed)
     }
 
     @Test
@@ -225,8 +279,8 @@ class AreaScreenTest {
 
     @Test
     fun anErrorMessageOnTheScreenIsVisible() {
-        show(MapAreaReadResult.Present(area), message = "Не удалось переименовать ареал")
+        show(MapAreaReadResult.Present(area), message = "Не удалось подготовить файл ареала")
 
-        composeRule.onNodeWithText("Не удалось переименовать ареал").assertIsDisplayed()
+        composeRule.onNodeWithText("Не удалось подготовить файл ареала").assertIsDisplayed()
     }
 }

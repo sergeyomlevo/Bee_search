@@ -46,6 +46,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import org.beesearch.app.ui.map.CurrentTerritoryScreen
 import org.beesearch.app.ui.map.OfflineMapManagementScreen
 import org.beesearch.app.ui.area.AreaRoute
+import org.beesearch.app.ui.area.AreaViewRoute
 import org.beesearch.app.ui.data.DataRoute
 import org.beesearch.app.ui.help.HelpScreen
 import org.beesearch.app.ui.points.PointDetailRoute
@@ -191,8 +192,21 @@ private fun BeeSearchApp(
                     AppRoute.Area -> AreaRoute(
                         territory = currentTerritory,
                         areaStore = application.container.mapAreaStore,
+                        areaMirror = application.container.areaExchangeMirror,
+                        areaTransport = application.container.areaTransport,
+                        onCreate = { viewModel.openAreaSectionsEditor(returnToView = false) },
+                        onViewOnMap = viewModel::openAreaView,
                         onBack = viewModel::openObjects,
-                        onEditSections = viewModel::openMapWithCoverageEdit,
+                    )
+                    AppRoute.AreaView -> AreaViewRoute(
+                        territory = currentTerritory,
+                        mapAreaStore = application.container.mapAreaStore,
+                        mapPackageStore = application.container.mapPackageStore,
+                        locationState = locationState,
+                        locationPermissionGranted = locationPermissionGranted,
+                        onRequestLocationPermission = requestLocationPermission,
+                        onEditSections = { viewModel.openAreaSectionsEditor(returnToView = true) },
+                        onBack = viewModel::openArea,
                     )
                     AppRoute.Points -> PointsRoute(
                         territory = currentTerritory,
@@ -240,6 +254,7 @@ private fun BeeSearchApp(
                         onOpenOfflineMaps = viewModel::openOfflineMaps,
                         onOpenTerritories = viewModel::openTerritoryManagement,
                         coverageEditNonce = coverageEditNonce,
+                        onCoverageEditFinished = viewModel::completeAreaSectionsEditing,
                     )
                     AppRoute.PrepareObservationPoint -> observationPointPreparationDraft?.let { draft ->
                         ObservationPointPreparationScreen(

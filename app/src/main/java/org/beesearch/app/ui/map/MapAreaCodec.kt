@@ -70,19 +70,6 @@ internal object MapAreaCodec {
     }
 
     /**
-     * Legacy encoding of участки without an Ареал.
-     *
-     * PHASE B: kept only so first creation can stay unchanged until the name dialog exists.
-     */
-    fun encodeLegacy(bounds: List<MapGeoBounds>): String = buildString {
-        append(LEGACY_VERSION)
-        bounds.forEach { bound ->
-            append('|').append(bound.north).append(',').append(bound.east)
-                .append(',').append(bound.south).append(',').append(bound.west)
-        }
-    }
-
-    /**
      * Reads a persisted value. A damaged value is reported as [MapAreaReadResult.Corrupt] and is
      * never reported as [MapAreaReadResult.Absent].
      */

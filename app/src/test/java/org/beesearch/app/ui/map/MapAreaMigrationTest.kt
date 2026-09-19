@@ -65,18 +65,17 @@ class MapAreaMigrationTest {
     }
 
     @Test
-    fun `a legacy value that was never migrated can be read and re-encoded unchanged`() {
-        val legacy = MapAreaCodec.encodeLegacy(legacyBounds)
+    fun `a legacy value that was never migrated is read as legacy`() {
+        val legacy = legacyCoverageValue(legacyBounds)
 
         val decoded = MapAreaCodec.decode(legacy)
 
         assertEquals(MapAreaReadResult.Legacy(legacyBounds), decoded)
-        assertEquals(legacy, MapAreaCodec.encodeLegacy((decoded as MapAreaReadResult.Legacy).bounds))
     }
 
     @Test
     fun `an empty legacy selection produces no area at all`() {
-        assertEquals(MapAreaReadResult.Absent, MapAreaCodec.decode(MapAreaCodec.encodeLegacy(emptyList())))
+        assertEquals(MapAreaReadResult.Absent, MapAreaCodec.decode(legacyCoverageValue(emptyList())))
     }
 
     @Test

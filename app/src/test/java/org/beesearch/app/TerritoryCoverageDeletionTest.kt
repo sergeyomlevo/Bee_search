@@ -14,6 +14,7 @@ import org.beesearch.app.ui.map.MapAreaCodec
 import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapAreaStore
 import org.beesearch.app.ui.map.MapGeoBounds
+import org.beesearch.app.ui.map.legacyCoverageValue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -23,8 +24,8 @@ import org.junit.Test
 class TerritoryCoverageDeletionTest {
     private val a = UUID.randomUUID()
     private val b = UUID.randomUUID()
-    private val valueA = MapAreaCodec.encodeLegacy(listOf(MapGeoBounds(10.0, 20.0, 0.0, 0.0)))
-    private val valueB = MapAreaCodec.encodeLegacy(listOf(MapGeoBounds(30.0, 40.0, 20.0, 20.0)))
+    private val valueA = legacyCoverageValue(listOf(MapGeoBounds(10.0, 20.0, 0.0, 0.0)))
+    private val valueB = legacyCoverageValue(listOf(MapGeoBounds(30.0, 40.0, 20.0, 20.0)))
 
     @Test fun `deleting unused territory removes only its area value`() = runBlocking {
         val territories = FakeTerritoryRepository(setOf(a, b))

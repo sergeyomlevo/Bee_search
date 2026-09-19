@@ -6,6 +6,85 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Area exchange file, Area view mode and transport-independent send (D083, 2026-09-19)
+
+A saved Ареал now has a portable file and a life outside the editor. The canonical value is
+unchanged: still the device-local `map_coverage_<territoryId>` `v2` entry. Everything added here is
+derived from it.
+
+`data/exchange/AreaExchangeFile.kt` holds the public contract: `AreaExchangeCodec` writes and reads
+Area JSON v1 (`formatVersion`, full `areaId`, non-blank `name`, 1..N `bounds` in stored order, exact
+coordinates, UTF-8, locale-independent numbers) and `AreaExchangeFileName` builds the deterministic
+human-readable name `Лух--7e82a310.json`. The file carries the whole Ареал and nothing device-local:
+no territory id, variant, storage path, active package, UI state, timestamps or derived area. A
+quoted version, an unknown field, a bad UUID, a blank name, an empty bound list or an out-of-range
+coordinate are all reported as `Invalid`, never as a repaired Ареал.
+
+`AreaExchangeMirror` owns one managed file in `<variant>/Exchange/Areas`: it writes it atomically
+(temp file plus a replacing move), skips a rewrite when the file is already current, refuses to touch
+a file carrying another `areaId`, and removes only its own file. `MirroringMapAreaStore` attaches the
+mirror to the store, so every canonical save refreshes the file and no screen can forget it. Order is
+enforced there: canonical first, mirror second, and a mirror failure never changes the canonical
+result. Reads never touch the file. The two places that need the file immediately - opening
+`Objects → Ареал` and sending - call `sync`, which also performs the lazy backfill for an Ареал saved
+by an earlier version.
+
+The user-visible surface changed as D083 describes. The Ареал card is now the name, `Участков: N`,
+`Общая площадь: …` and the actions `Посмотреть на карте`, `Отправить ареал`, `Удалить ареал`.
+`Переименовать` is gone from the interface (the store's `rename` still exists and still mirrors, but
+nothing in the app calls it - keep it or remove it deliberately, not accidentally), and
+`Копировать bbox` was removed from the editor panel, the help, the tests, `MapAreaCodec.encodeLegacy`
+and the `formatMapPackageBuilderBounds` helper, so manual coordinate handover is gone.
+
+`BeeMapMode.AREA_VIEW` is the third map mode, reached through the `AppRoute.AreaView` route: it draws
+all stored участки unchanged (no merging, no simplifying), frames the outer extent once, shows no
+editor panel and offers one small `Изменить участки` action. `mapAreaPresentation` (pure, in
+`MapCoverageSelection.kt`) decides what each mode draws, and `AreaViewControlsTest` plus
+`MapAreaPresentationTest` fix that separation. Editing started from the Ареал workflow records its
+origin in `MainViewModel.areaEditReturnRoute` and `completeAreaSectionsEditing` sends the user back to
+the card or the view; other entry points to the same editor keep the previous behaviour.
+
+`Отправить ареал` goes through `AreaTransport`. The current implementation,
+`AndroidAreaShareTransport`, writes a byte-identical cache copy of the Area JSON, exposes it with a
+`FileProvider` (`${applicationId}.fileprovider`, `res/xml/file_paths.xml` → cache `area-share/`) as a
+`content://` URI with a temporary read grant and the human-readable name, and opens the system
+chooser (`application/json`). No `file://`, no storage permission, no receiving-app-specific code, so
+the same action can later be a server upload without touching the Area JSON or the canonical model.
+
+The total area is derived: `areaUnionKm2` compresses the latitude and longitude edges into a grid,
+counts every covered cell once and measures a cell as `R² × Δλ × (sin φnorth − sin φsouth)` with
+`R = 6371.0088 km`. Overlaps count once, a nested участок adds nothing and the gaps between separate
+участки are excluded. `coverageBoundsSummary` now uses the same helper, so one участок cannot show
+two different areas in the editor and on the card.
+
+Verification: `:app:testDebugUnitTest` green (230 tests, of which the new `AreaExchangeCodecTest` 17,
+`AreaExchangeFileNameTest` 11, `AreaExchangeMirrorTest` 14, `MapAreaGeometryTest` 12 and
+`MapAreaPresentationTest` 7) and the instrumented suite green on the SM-S938B (219 tests, expected
+opt-in skips). The unit tests caught a real portability bug: replacing an existing file by renaming
+onto it silently failed on a filesystem that refuses the overwrite, which is why the mirror now moves
+with `REPLACE_EXISTING`.
+
+Device scenarios ran on the real DEV app at `font_scale=1.7`. A useful accident made the upgrade path
+real rather than simulated: the device already carried an Ареал saved by the previous build (two
+участки, `DEV Territory`, `e6b55f2d-…`) with **no** managed file, and opening `Objects → Ареал`
+created `DEV Territory--e6b55f2d.json` with both участки by itself. Adding a third участок kept the
+same `areaId` and the same file name and grew the JSON to three bounds; the card showed the name,
+`Участков: 3` and `Общая площадь: 4.8 км²` with no rename action; the view mode showed all участки
+with their overlap and framed them; the editor opened from the view mode without `Копировать bbox`
+and returned to the view after `Готово`; the share sheet appeared with the document named
+`DEV Territory--e6b55f2d.json` and Telegram, VK, Gmail and Drive among the targets; deleting the
+managed file by hand and pressing `Отправить ареал` restored it; the DataStore was byte-identical
+across sends; and deleting the Ареал removed the managed file while Room files, the PMTiles package
+and the territory pointer stayed untouched.
+
+Creation from scratch was then driven through the interface as well: with no Ареал, `Создать ареал`
+opened the editor, two участки were added, `Готово` asked for the name (prefilled from the Territory)
+and the save produced a new canonical `v2` Ареал (`12af9565-…`, two участки) together with
+`DEV Territory--12af9565.json` containing exactly the same two участки, which the card then showed as
+`Участков: 2`. The DEV DataStore was restored byte-identically
+(md5 `5AA4B4D2BB02C3237A35F6FE36FE71B1`, 530 bytes) and the exchange `Areas` folder was left empty, as
+it was found.
+
 ## Named Ареал Phase B: creation, rename, delete, empty protection (D082, 2026-09-19)
 
 Phase B gives the D081 model its user-facing lifecycle. An Ареал is now created, renamed
@@ -115,8 +194,8 @@ Note: the DEV saved selection was already the empty legacy value before this wor
 geometry was in the file; the cause of that earlier emptying is not established.
 
 Phase B implemented the first-`Готово` name dialog, the `Objects → Ареал` screen, rename
-and delete; see the Phase B section above. Phase C — an Ареал file, its JSON exchange and
-Area import/export — is still unimplemented, and the next durable decision id is **D083**.
+and delete; see the Phase B section above. Rename was removed from the interface in the
+next iteration (D083) and the store method is now unused by the app.
 
 ## Bee Search file exchange directory (D080, 2026-09-18)
 

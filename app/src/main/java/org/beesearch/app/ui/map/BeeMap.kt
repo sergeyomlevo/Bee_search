@@ -1,8 +1,5 @@
 package org.beesearch.app.ui.map
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -69,6 +66,15 @@ import org.maplibre.android.maps.Style
 internal enum class BeeMapMode {
     FIELD,
     POINT_BROWSER,
+
+    /**
+     * Read-only Ареал review: the saved участки on a clean map.
+     *
+     * It exists so that looking at the Ареал is not the same screen as editing it: no editor panel,
+     * no center target and no record controls, only the saved geometry, the normal map controls and
+     * one small action that switches to the editor.
+     */
+    AREA_VIEW,
 }
 
 @Composable
@@ -87,6 +93,12 @@ internal fun BeeMap(
     mode: BeeMapMode = BeeMapMode.FIELD,
     savedObservationPoints: List<ObservationPointSummary> = emptyList(),
     onSelectSavedObservationPoint: (UUID) -> Unit = {},
+    /** Leaves the Ареал view mode; the host decides which screen that means. */
+    onExitAreaView: () -> Unit = {},
+    /** Opens the участки editor from the Ареал view mode. */
+    onEditAreaSections: () -> Unit = {},
+    /** The участки editor session ended, however it ended, and the host may restore its route. */
+    onCoverageSessionEnded: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -117,6 +129,9 @@ internal fun BeeMap(
     var mapCameraRevision by remember { mutableStateOf(0) }
     var coverageControlsHeightPx by remember { mutableStateOf(0) }
     val coverageCameraEdgePaddingPx = with(LocalDensity.current) { 16.dp.roundToPx() }
+    // View mode has almost no chrome, so the framing only needs to clear the small action button.
+    val areaViewEdgePaddingPx = with(LocalDensity.current) { 32.dp.roundToPx() }
+    val areaViewBottomPaddingPx = with(LocalDensity.current) { 96.dp.roundToPx() }
     val normalCameraPadding = remember { normalMapCameraPadding() }
     val reading = (locationState as? LocationUiState.Available)?.reading
     val gpsPosition = reading?.let { MapTarget(it.latitude, it.longitude) }
@@ -183,18 +198,18 @@ internal fun BeeMap(
             coverageSelectionMode = true
         }
     }
-    val coverageFragments = when {
-        coverageSelectionMode -> workingCoverage
-        territoryId != null && coverageLoadedFor == territoryId && !coverageLoading -> persistedCoverage
-        else -> emptyList()
-    }
+    // Mode decides what the Ареал looks like here: the editor works on the draft and marks the next
+    // viewport, the view mode shows exactly the stored участки, the field map draws nothing.
+    val areaPresentation = mapAreaPresentation(
+        mode = mode,
+        editorOpen = coverageSelectionMode,
+        working = workingCoverage,
+        persisted = persistedCoverage,
+        persistedLoaded = territoryId != null && coverageLoadedFor == territoryId && !coverageLoading,
+    )
+    val coverageFragments = areaPresentation.fragments
     val coverageViewportSummary = if (coverageSelectionMode) {
         coverageViewportBounds?.let(::coverageBoundsSummary)
-    } else {
-        null
-    }
-    val selectedCoverageSummary = if (coverageSelectionMode && workingCoverage.size == 1) {
-        coverageBoundsSummary(workingCoverage.single().bounds)
     } else {
         null
     }
@@ -219,6 +234,8 @@ internal fun BeeMap(
         map?.restoreNormalCameraPadding(normalCameraPadding)
         coverageSelectionMode = false
         editingTerritoryId = null
+        // The host may have opened this editor from the Ареал workflow; it decides where to return.
+        onCoverageSessionEnded()
     }
 
     /** Saves edited участки of an existing Ареал, keeping its UUID and name. */
@@ -322,6 +339,9 @@ internal fun BeeMap(
         }
     }
 
+    // Viewing is not a dead end: Back returns to the screen the user came from.
+    BackHandler(enabled = mode == BeeMapMode.AREA_VIEW, onBack = onExitAreaView)
+
     LaunchedEffect(coverageSelectionMode, map) {
         coverageViewportBounds = if (coverageSelectionMode) {
             map?.projection?.visibleRegion?.latLngBounds?.let(MapGeoBounds::fromMapLibre)
@@ -416,6 +436,26 @@ internal fun BeeMap(
             }
         }
 
+        // Entering the Ареал view frames the whole saved Ареал once. The outer extent is camera
+        // framing only: the участки themselves are drawn unchanged, including any overlap.
+        LaunchedEffect(mode, map, coverageFragments, areaPresentation.frameWholeArea) {
+            if (!areaPresentation.frameWholeArea || coverageFragments.isEmpty()) {
+                return@LaunchedEffect
+            }
+            val mapInstance = map ?: return@LaunchedEffect
+            unionBounds(coverageFragments.map(MapCoverageFragment::bounds))?.let { bounds ->
+                mapInstance.moveCamera(
+                    CameraUpdateFactory.newLatLngBounds(
+                        bounds.toLatLngBounds(),
+                        areaViewEdgePaddingPx,
+                        areaViewEdgePaddingPx,
+                        areaViewEdgePaddingPx,
+                        areaViewBottomPaddingPx,
+                    ),
+                )
+            }
+        }
+
         DisposableEffect(map, mapView, gpsPosition) {
             val mapInstance = map
             val currentMapView = mapView
@@ -462,14 +502,18 @@ internal fun BeeMap(
             }
         }
 
-        if (coverageSelectionActive) {
+        if (areaPresentation.drawFragments) {
+            // The same saved участки in both modes: viewing never re-derives, merges or simplifies
+            // the canonical geometry.
             MapCoverageFragmentsOverlay(
                 fragments = coverageFragments,
                 map = map,
                 cameraRevision = mapCameraRevision,
                 modifier = Modifier.fillMaxSize().zIndex(1f),
             )
-            MapCoverageViewportFrame(Modifier.fillMaxSize().zIndex(2f))
+            if (areaPresentation.showViewportFrame) {
+                MapCoverageViewportFrame(Modifier.fillMaxSize().zIndex(2f))
+            }
         }
 
         if (
@@ -500,7 +544,7 @@ internal fun BeeMap(
             MapCenterTarget(Modifier.align(Alignment.Center).zIndex(2f))
         }
 
-        if (mode == BeeMapMode.POINT_BROWSER) {
+        if (mode == BeeMapMode.POINT_BROWSER || mode == BeeMapMode.AREA_VIEW) {
             mapZoom?.let { zoom ->
                 MapZoomIndicator(
                     zoom = zoom,
@@ -579,7 +623,6 @@ internal fun BeeMap(
             MapCoverageSelectionControls(
                 fragmentCount = coverageFragments.size,
                 viewportSummary = coverageViewportSummary,
-                selectedSummary = selectedCoverageSummary,
                 title = "Участок",
                 canAddFragment = map != null,
                 onAddFragment = {
@@ -612,18 +655,18 @@ internal fun BeeMap(
                 },
                 onClear = { clearSelectionConfirmationVisible = true },
                 onDone = { commitCoverage() },
-                onCopySelectedBounds = {
-                    workingCoverage.singleOrNull()?.let { selected ->
-                        val text = formatMapPackageBuilderBounds(selected.bounds)
-                        val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("Bee Search map bbox", text))
-                        Toast.makeText(appContext, "Bbox скопирован", Toast.LENGTH_SHORT).show()
-                    }
-                },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(horizontal = 12.dp, vertical = 12.dp)
                     .onSizeChanged { coverageControlsHeightPx = it.height }
+                    .zIndex(3f),
+            )
+        } else if (mode == BeeMapMode.AREA_VIEW && territoryId != null) {
+            AreaViewControls(
+                onEditSections = onEditAreaSections,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp)
                     .zIndex(3f),
             )
         } else if (mode == BeeMapMode.FIELD && territoryId != null) {

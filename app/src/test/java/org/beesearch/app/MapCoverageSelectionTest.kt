@@ -8,7 +8,6 @@ import org.beesearch.app.ui.map.clearCoverageFragments
 import org.beesearch.app.ui.map.coverageBoundsSummary
 import org.beesearch.app.ui.map.coverageReviewCameraPadding
 import org.beesearch.app.ui.map.coverageBoundsForShowAll
-import org.beesearch.app.ui.map.formatMapPackageBuilderBounds
 import org.beesearch.app.ui.map.isCoverageSelectionDirty
 import org.beesearch.app.ui.map.normalMapCameraPadding
 import org.beesearch.app.ui.map.normalizeMapPackageBounds
@@ -133,10 +132,6 @@ class MapCoverageSelectionTest {
                 west = 42.2882890,
             ),
             normalized,
-        )
-        assertEquals(
-            "-West 42.2882890 -South 56.1530380 -East 42.7299151 -North 56.4446941",
-            formatMapPackageBuilderBounds(normalized),
         )
     }
 

@@ -164,13 +164,13 @@ class MapAreaCodecTest {
     }
 
     @Test
-    fun `legacy coordinates are preserved and re-encode identically`() {
+    fun `legacy coordinates are preserved without being rewritten`() {
         val legacy = "v1|57.111673,39.026918,56.562186,38.470994|56.92,38.91,56.81,38.72"
 
         val bounds = (MapAreaCodec.decode(legacy) as MapAreaReadResult.Legacy).bounds
 
+        // The app no longer writes v1, so reading it must not silently normalise the geometry either.
         assertEquals(listOf(northern, southern), bounds)
-        assertEquals(legacy, MapAreaCodec.encodeLegacy(bounds))
     }
 
     @Test

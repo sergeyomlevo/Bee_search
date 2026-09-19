@@ -38,7 +38,7 @@ internal const val CLEAR_COVERAGE_DESCRIPTION = "Очистить выбранн
 internal const val DONE_COVERAGE_SELECTION_DESCRIPTION = "Завершить выбор offline coverage"
 internal const val MAP_COVERAGE_SELECTION_CONTROLS_TAG = "map-coverage-selection-controls"
 internal const val CURRENT_COVERAGE_SUMMARY_TAG = "current-coverage-summary"
-internal const val COPY_SELECTED_COVERAGE_DESCRIPTION = "Копировать выбранный bbox для сборки карты"
+internal const val AREA_VIEW_CONTROLS_TAG = "area-view-controls"
 internal const val IMPORT_OFFLINE_MAP_DESCRIPTION = "Импортировать офлайн-карту"
 internal const val SELECT_OFFLINE_COVERAGE_DESCRIPTION = "Выбрать участок для офлайн-карты"
 internal const val OFFLINE_MAP_PACKAGE_PANEL_TAG = "offline-map-package-panel"
@@ -55,7 +55,6 @@ internal const val UNDO_COVERAGE_FRAGMENT_LABEL = "Отменить послед
 internal const val SHOW_ALL_COVERAGE_LABEL = "Обзор"
 internal const val CLEAR_COVERAGE_LABEL = "Очистить всё"
 internal const val DONE_COVERAGE_SELECTION_LABEL = "Готово"
-internal const val COPY_SELECTED_COVERAGE_LABEL = "Копировать bbox"
 
 internal const val CLEAR_COVERAGE_DIALOG_TAG = "clear-coverage-dialog"
 internal const val UNSAVED_COVERAGE_CHANGES_DIALOG_TAG = "coverage-unsaved-changes-dialog"
@@ -73,10 +72,15 @@ internal const val STAY_IN_COVERAGE_SELECTION_LABEL = "Остаться"
 internal const val AREA_NAME_DIALOG_TITLE = "Название ареала"
 internal const val CREATE_AREA_LABEL = "Создать ареал"
 internal const val EDIT_AREA_SECTIONS_LABEL = "Изменить участки"
-internal const val RENAME_AREA_LABEL = "Переименовать"
+internal const val VIEW_AREA_ON_MAP_LABEL = "Посмотреть на карте"
+internal const val SEND_AREA_LABEL = "Отправить ареал"
 internal const val DELETE_AREA_LABEL = "Удалить ареал"
 internal const val DELETE_AREA_CONFIRM_LABEL = "Удалить"
 internal const val CANCEL_LABEL = "Отмена"
+
+internal const val VIEW_AREA_ON_MAP_DESCRIPTION = "Посмотреть ареал на карте"
+internal const val SEND_AREA_DESCRIPTION = "Отправить файл ареала"
+internal const val EDIT_AREA_SECTIONS_IN_VIEW_DESCRIPTION = "Изменить участки просматриваемого ареала"
 
 private val coverageFill = Color(0xFF1565C0).copy(alpha = 0.16f)
 private val coverageBorder = Color(0xFF0D47A1).copy(alpha = 0.9f)
@@ -169,7 +173,6 @@ internal fun CoverageSelectionEntry(
 internal fun MapCoverageSelectionControls(
     fragmentCount: Int,
     viewportSummary: MapAreaBoundsSummary?,
-    selectedSummary: MapAreaBoundsSummary? = null,
     title: String = "Участок",
     canAddFragment: Boolean,
     onAddFragment: () -> Unit,
@@ -177,7 +180,6 @@ internal fun MapCoverageSelectionControls(
     onShowAll: () -> Unit,
     onClear: () -> Unit,
     onDone: () -> Unit,
-    onCopySelectedBounds: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -216,16 +218,6 @@ internal fun MapCoverageSelectionControls(
             }
             viewportSummary?.let { summary ->
                 CoverageViewportSummary(summary)
-            }
-            if (selectedSummary != null) {
-                TextButton(
-                    onClick = onCopySelectedBounds,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics { contentDescription = COPY_SELECTED_COVERAGE_DESCRIPTION },
-                ) {
-                    Text(COPY_SELECTED_COVERAGE_LABEL)
-                }
             }
             Button(
                 onClick = onAddFragment,
@@ -477,6 +469,35 @@ internal fun MapCoverageViewportFrame(
             color = viewportFrame,
             style = Stroke(width = 3.dp.toPx()),
         )
+    }
+}
+
+/**
+ * The whole interface of the Ареал view mode: one small action.
+ *
+ * Viewing is not editing, so the editor panel («Участок», «Текущий участок», «Добавить участок»,
+ * «Отменить последний», «Очистить всё», «Готово») must not appear here. Changing участки is a
+ * separate, deliberate step through [EDIT_AREA_SECTIONS_LABEL].
+ */
+@Composable
+internal fun AreaViewControls(
+    onEditSections: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.testTag(AREA_VIEW_CONTROLS_TAG),
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 3.dp,
+        shadowElevation = 2.dp,
+    ) {
+        TextButton(
+            onClick = onEditSections,
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .semantics { contentDescription = EDIT_AREA_SECTIONS_IN_VIEW_DESCRIPTION },
+        ) {
+            Text(EDIT_AREA_SECTIONS_LABEL)
+        }
     }
 }
 

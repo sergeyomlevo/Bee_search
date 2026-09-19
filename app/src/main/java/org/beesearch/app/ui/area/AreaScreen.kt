@@ -26,48 +26,75 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.beesearch.app.data.exchange.AreaExchangeMirror
+import org.beesearch.app.data.exchange.AreaSendResult
+import org.beesearch.app.data.exchange.AreaTransport
 import org.beesearch.app.domain.model.Territory
-import org.beesearch.app.ui.map.AreaNameDialog
 import org.beesearch.app.ui.map.CREATE_AREA_LABEL
 import org.beesearch.app.ui.map.DELETE_AREA_LABEL
 import org.beesearch.app.ui.map.DeleteAreaDialog
-import org.beesearch.app.ui.map.EDIT_AREA_SECTIONS_LABEL
 import org.beesearch.app.ui.map.MapArea
 import org.beesearch.app.ui.map.MapAreaChangeResult
 import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapAreaStore
-import org.beesearch.app.ui.map.RENAME_AREA_LABEL
-import org.beesearch.app.ui.map.normalizedAreaName
+import org.beesearch.app.ui.map.SEND_AREA_DESCRIPTION
+import org.beesearch.app.ui.map.SEND_AREA_LABEL
+import org.beesearch.app.ui.map.VIEW_AREA_ON_MAP_DESCRIPTION
+import org.beesearch.app.ui.map.VIEW_AREA_ON_MAP_LABEL
+import org.beesearch.app.ui.map.areaUnionKm2
+import org.beesearch.app.ui.map.formatSquareKilometers
 
 internal const val AREA_SCREEN_TAG = "area-screen"
 internal const val AREA_NOT_CREATED_TAG = "area-not-created"
 internal const val AREA_CARD_TAG = "area-card"
 internal const val AREA_CORRUPT_TAG = "area-corrupt"
+internal const val AREA_NAME_TAG = "area-name"
+internal const val AREA_SECTION_COUNT_TAG = "area-section-count"
+internal const val AREA_TOTAL_AREA_TAG = "area-total-area"
+internal const val CREATE_AREA_TAG = "create-area"
+internal const val VIEW_AREA_ON_MAP_TAG = "view-area-on-map"
+internal const val SEND_AREA_TAG = "send-area"
+internal const val DELETE_AREA_TAG = "delete-area"
 internal const val CREATE_AREA_DESCRIPTION = "Создать ареал офлайн-карты"
-internal const val EDIT_AREA_SECTIONS_DESCRIPTION = "Изменить участки ареала"
-internal const val RENAME_AREA_DESCRIPTION = "Переименовать ареал"
 internal const val DELETE_AREA_DESCRIPTION = "Удалить ареал территории"
 
-/** The Ареал of the current Territory: one object, so this screen is a card rather than a list. */
+/** Label of the derived total area. The value itself is never stored. */
+internal const val AREA_TOTAL_AREA_LABEL = "Общая площадь"
+internal const val AREA_SECTION_COUNT_LABEL = "Участков"
+
+/**
+ * The Ареал of the current Territory: one object, so this screen is a card rather than a list.
+ *
+ * The card answers three questions only - what the Ареал is, how to look at it on the map and how to
+ * send its file. Editing участки is a separate step from the view mode, so a user who only wants to
+ * look at the Ареал never lands in the editor. The name is set when the Ареал is created and is
+ * treated as stable afterwards; there is deliberately no separate rename action.
+ */
 @Composable
 internal fun AreaRoute(
     territory: Territory?,
     areaStore: MapAreaStore,
+    areaMirror: AreaExchangeMirror,
+    areaTransport: AreaTransport,
+    onCreate: () -> Unit,
+    onViewOnMap: () -> Unit,
     onBack: () -> Unit,
-    onEditSections: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     var read by remember { mutableStateOf<MapAreaReadResult>(MapAreaReadResult.Absent) }
-    var renameVisible by remember { mutableStateOf(false) }
     var deleteVisible by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    var sending by remember { mutableStateOf(false) }
     val territoryId = territory?.id
+    val area = (read as? MapAreaReadResult.Present)?.area
 
     LaunchedEffect(territoryId, areaStore, territory?.name) {
-        read = if (territoryId == null) {
+        val loaded = if (territoryId == null) {
             MapAreaReadResult.Absent
         } else {
             try {
@@ -76,59 +103,47 @@ internal fun AreaRoute(
                 MapAreaReadResult.Corrupt("не удалось прочитать ареал")
             }
         }
+        read = loaded
+        // Lazy backfill: an Ареал that was saved before this iteration, or whose public file the user
+        // deleted, gets its managed Area file back the next time this screen is opened. The canonical
+        // Ареал is only read here, and a failure to write the file changes nothing.
+        (loaded as? MapAreaReadResult.Present)?.let { areaMirror.sync(it.area) }
     }
 
     AreaScreen(
         territoryCode = territory?.code,
         read = read,
         message = message,
-        onCreate = onEditSections,
-        onEditSections = onEditSections,
-        onRename = { renameVisible = true },
+        sending = sending,
+        onCreate = onCreate,
+        onViewOnMap = onViewOnMap,
+        onSend = {
+            val current = area
+            if (current != null && !sending) {
+                sending = true
+                scope.launch {
+                    val result = areaTransport.send(current)
+                    sending = false
+                    // A failed send never touches the Ареал; the user only needs to know.
+                    if (result is AreaSendResult.Failed) message = result.message
+                }
+            }
+        },
         onDelete = { deleteVisible = true },
         onBack = onBack,
         modifier = modifier,
     )
 
-    val prepared = read as? MapAreaReadResult.Present
     val currentId = territoryId
-    if (renameVisible && prepared != null && currentId != null) {
-        var name by remember(prepared.area.id, prepared.area.name) { mutableStateOf(prepared.area.name) }
-        var blank by remember(prepared.area.id) { mutableStateOf(false) }
-        AreaNameDialog(
-            name = name,
-            blankName = blank,
-            onNameChange = {
-                name = it
-                if (blank) blank = false
-            },
-            onConfirm = {
-                val normalized = normalizedAreaName(name)
-                if (normalized == null) {
-                    blank = true
-                    return@AreaNameDialog
-                }
-                renameVisible = false
-                scope.launch {
-                    when (val result = areaStore.rename(currentId, normalized)) {
-                        is MapAreaChangeResult.Saved -> read = MapAreaReadResult.Present(result.area)
-                        is MapAreaChangeResult.Refused -> message = result.reason
-                        MapAreaChangeResult.Deleted -> read = MapAreaReadResult.Absent
-                    }
-                }
-            },
-            onDismiss = { renameVisible = false },
-        )
-    }
-
-    if (deleteVisible && prepared != null && currentId != null) {
+    if (deleteVisible && area != null && currentId != null) {
         DeleteAreaDialog(
-            areaName = prepared.area.name,
+            areaName = area.name,
             onConfirm = {
                 deleteVisible = false
                 scope.launch {
                     when (val result = areaStore.delete(currentId)) {
-                        // The Ареал is gone; Territory, observations and the map package stay.
+                        // The Ареал is gone; Territory, observations and the map package stay. The
+                        // managed Area file is removed by the store that owns the exchange mirror.
                         MapAreaChangeResult.Deleted -> read = MapAreaReadResult.Absent
                         is MapAreaChangeResult.Refused -> message = result.reason
                         is MapAreaChangeResult.Saved -> read = MapAreaReadResult.Present(result.area)
@@ -145,9 +160,10 @@ internal fun AreaScreen(
     territoryCode: String?,
     read: MapAreaReadResult,
     message: String?,
+    sending: Boolean,
     onCreate: () -> Unit,
-    onEditSections: () -> Unit,
-    onRename: () -> Unit,
+    onViewOnMap: () -> Unit,
+    onSend: () -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -195,13 +211,14 @@ internal fun AreaScreen(
 
                     is MapAreaReadResult.Present -> AreaCard(
                         area = read.area,
-                        onEditSections = onEditSections,
-                        onRename = onRename,
+                        sending = sending,
+                        onViewOnMap = onViewOnMap,
+                        onSend = onSend,
                         onDelete = onDelete,
                     )
 
                     // A damaged value is never presented as "not created", and it is never
-                    // created over, renamed or deleted from here.
+                    // created over or deleted from here.
                     is MapAreaReadResult.Corrupt -> AreaCorrupt()
                     is MapAreaReadResult.Legacy -> AreaCorrupt()
                 }
@@ -235,18 +252,25 @@ private fun AreaNotCreated(
                     onClick = onCreate,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("create-area"),
+                        .testTag(CREATE_AREA_TAG)
+                        .semantics { contentDescription = CREATE_AREA_DESCRIPTION },
                 ) { Text(CREATE_AREA_LABEL) }
             }
         }
     }
 }
 
+/**
+ * What the user needs to know about a saved Ареал: its name, how many участки it has and how large
+ * it is. No UUID, no raw bounding boxes and no file details - those are implementation, and the file
+ * itself is handled by «Отправить ареал».
+ */
 @Composable
 private fun AreaCard(
     area: MapArea,
-    onEditSections: () -> Unit,
-    onRename: () -> Unit,
+    sending: Boolean,
+    onViewOnMap: () -> Unit,
+    onSend: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Surface(
@@ -255,30 +279,40 @@ private fun AreaCard(
         tonalElevation = 1.dp,
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Название:", style = MaterialTheme.typography.labelMedium)
-            Text(area.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("area-name"))
+            Text(area.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag(AREA_NAME_TAG))
             Text(
-                text = "Участков: ${area.bounds.size}",
+                text = "$AREA_SECTION_COUNT_LABEL: ${area.bounds.size}",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.testTag("area-section-count"),
+                modifier = Modifier.testTag(AREA_SECTION_COUNT_TAG),
+            )
+            Text(
+                // Overlapping участки are counted once and the gaps between them are not counted at
+                // all, so this is the area of the Ареал itself rather than of its outer rectangle.
+                text = "$AREA_TOTAL_AREA_LABEL: ${formatSquareKilometers(areaUnionKm2(area.bounds))} км²",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.testTag(AREA_TOTAL_AREA_TAG),
             )
             Button(
-                onClick = onEditSections,
+                onClick = onViewOnMap,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("edit-area-sections"),
-            ) { Text(EDIT_AREA_SECTIONS_LABEL) }
-            TextButton(
-                onClick = onRename,
+                    .testTag(VIEW_AREA_ON_MAP_TAG)
+                    .semantics { contentDescription = VIEW_AREA_ON_MAP_DESCRIPTION },
+            ) { Text(VIEW_AREA_ON_MAP_LABEL) }
+            Button(
+                onClick = onSend,
+                enabled = !sending,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("rename-area"),
-            ) { Text(RENAME_AREA_LABEL) }
+                    .testTag(SEND_AREA_TAG)
+                    .semantics { contentDescription = SEND_AREA_DESCRIPTION },
+            ) { Text(if (sending) "Отправка…" else SEND_AREA_LABEL) }
             TextButton(
                 onClick = onDelete,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("delete-area"),
+                    .testTag(DELETE_AREA_TAG)
+                    .semantics { contentDescription = DELETE_AREA_DESCRIPTION },
             ) { Text(DELETE_AREA_LABEL) }
         }
     }

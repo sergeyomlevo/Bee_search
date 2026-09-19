@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Paths the FileProvider may serve. Only the app cache subdirectory that holds the shareable copy
+    of the current Area file is listed: the exchange folder in shared storage stays a plain folder
+    the user owns, and nothing else in app storage becomes reachable through a content URI.
+-->
+<paths>
+    <cache-path
+        name="area_share"
+        path="area-share/" />
+</paths>

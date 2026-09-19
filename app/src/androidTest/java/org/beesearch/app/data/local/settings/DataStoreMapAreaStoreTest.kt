@@ -56,7 +56,19 @@ class DataStoreMapAreaStoreTest {
     private fun keyOf(territoryId: UUID) = stringPreferencesKey("map_coverage_$territoryId")
 
     private suspend fun seedLegacy(territoryId: UUID, bounds: List<MapGeoBounds>) {
-        dataStore.edit { it[keyOf(territoryId)] = MapAreaCodec.encodeLegacy(bounds) }
+        dataStore.edit { it[keyOf(territoryId)] = legacyCoverageValue(bounds) }
+    }
+
+    /**
+     * The legacy `v1` coverage encoding, spelled out here because the app only reads it now: this
+     * test needs to seed exactly the value an older version of Bee Search would have left behind.
+     */
+    private fun legacyCoverageValue(bounds: List<MapGeoBounds>): String = buildString {
+        append(MapAreaCodec.LEGACY_VERSION)
+        bounds.forEach { bound ->
+            append('|').append(bound.north).append(',').append(bound.east)
+                .append(',').append(bound.south).append(',').append(bound.west)
+        }
     }
 
     private fun saved(result: MapAreaChangeResult) = (result as MapAreaChangeResult.Saved).area

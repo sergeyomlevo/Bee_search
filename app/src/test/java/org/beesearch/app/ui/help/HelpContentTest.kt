@@ -4,10 +4,10 @@ import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
 import org.beesearch.app.ui.map.CREATE_AREA_LABEL
 import org.beesearch.app.ui.map.DELETE_AREA_LABEL
 import org.beesearch.app.ui.map.EDIT_AREA_SECTIONS_LABEL
-import org.beesearch.app.ui.map.RENAME_AREA_LABEL
+import org.beesearch.app.ui.map.SEND_AREA_LABEL
+import org.beesearch.app.ui.map.VIEW_AREA_ON_MAP_LABEL
 import org.beesearch.app.ui.map.ADD_COVERAGE_FRAGMENT_LABEL
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_LABEL
-import org.beesearch.app.ui.map.COPY_SELECTED_COVERAGE_LABEL
 import org.beesearch.app.ui.map.DISCARD_COVERAGE_CHANGES_LABEL
 import org.beesearch.app.ui.map.DONE_COVERAGE_SELECTION_LABEL
 import org.beesearch.app.ui.map.SAVE_COVERAGE_CHANGES_LABEL
@@ -38,6 +38,8 @@ class HelpContentTest {
         "Экспорт и очистка данных",
         "Карты",
         AREA_HELP_TITLE,
+        AREA_VIEW_HELP_TITLE,
+        SEND_AREA_HELP_TITLE,
         "Создание участка офлайн-карты",
         "Загрузка офлайн-карты",
         EXCHANGE_HELP_TITLE,
@@ -191,9 +193,46 @@ class HelpContentTest {
         assertTrue(text, text.contains("один прямоугольник"))
         assertTrue(text, text.contains("«Объекты»"))
         assertTrue(text, text.contains("название территории"))
-        assertTrue(text, text.contains("«Изменить участки»"))
-        assertTrue(text, text.contains("«$RENAME_AREA_LABEL»"))
+        assertTrue(text, text.contains("«$VIEW_AREA_ON_MAP_LABEL»"))
+        assertTrue(text, text.contains("«$SEND_AREA_LABEL»"))
         assertTrue(text, text.contains("«$DELETE_AREA_LABEL»"))
+    }
+
+    @Test
+    fun areaSectionExplainsTheAutomaticallyCreatedAreaFile() {
+        val text = sectionText(AREA_HELP_TITLE) + sectionText("Создание участка офлайн-карты")
+        // The user must not be told to copy coordinates by hand: the app owns the file.
+        assertTrue(text, text.contains("сам создаёт файл всего ареала"))
+        assertTrue(text, text.contains("все участки ареала"))
+        assertTrue(text, text.contains("Копировать координаты вручную не требуется"))
+        assertTrue(text, text.contains("обновляет файл всего ареала"))
+    }
+
+    @Test
+    fun areaSectionExplainsHowTheTotalAreaIsCounted() {
+        val text = sectionText(AREA_HELP_TITLE)
+        assertTrue(text, text.contains("Общая площадь"))
+        // Overlap once, gaps not at all - the two cases a user could otherwise misread.
+        assertTrue(text, text.contains("перекрытие двух участков учитывается один раз"))
+        assertTrue(text, text.contains("промежутки между отдельными участками в площадь не входят"))
+    }
+
+    @Test
+    fun areaViewSectionSeparatesLookingFromEditing() {
+        val text = sectionText(AREA_VIEW_HELP_TITLE)
+        assertTrue(text, text.contains("«$VIEW_AREA_ON_MAP_LABEL»"))
+        assertTrue(text, text.contains("все его участки"))
+        assertTrue(text, text.contains("Панели редактирования на этом экране нет"))
+        assertTrue(text, text.contains("«$EDIT_AREA_SECTIONS_LABEL»"))
+    }
+
+    @Test
+    fun sendSectionExplainsTheSystemMenuAndThePreparedFile() {
+        val text = sectionText(SEND_AREA_HELP_TITLE)
+        assertTrue(text, text.contains("«$SEND_AREA_LABEL»"))
+        assertTrue(text, text.contains("меню Android"))
+        assertTrue(text, text.contains("сам готовит файл ареала"))
+        assertTrue(text, text.contains("искать файл в «Загрузках» вручную не нужно"))
     }
 
     @Test
@@ -205,11 +244,13 @@ class HelpContentTest {
     }
 
     @Test
-    fun helpExplainsFirstSaveNamingAndLaterRename() {
+    fun helpExplainsFirstSaveNamingWithoutOfferingRename() {
         val text = sectionText("Создание участка офлайн-карты")
         assertTrue(text, text.contains("предлагает название ареала"))
         assertTrue(text, text.contains("дальше имя не спрашивается"))
         assertTrue(text, text.contains("сохраняет и название, и свой идентификатор"))
+        // The name is set once and the card has no rename action any more, so help must not offer one.
+        assertFalse(allHelpText(), allHelpText().contains("«Переименовать»"))
     }
 
     @Test
@@ -229,8 +270,9 @@ class HelpContentTest {
         val text = allHelpText()
         listOf(
             CREATE_AREA_LABEL,
+            VIEW_AREA_ON_MAP_LABEL,
+            SEND_AREA_LABEL,
             EDIT_AREA_SECTIONS_LABEL,
-            RENAME_AREA_LABEL,
             DELETE_AREA_LABEL,
         ).forEach { label ->
             assertTrue("help must name the Ареал action «$label»", text.contains("«$label»"))
@@ -249,10 +291,12 @@ class HelpContentTest {
             SHOW_ALL_COVERAGE_LABEL,
             CLEAR_COVERAGE_LABEL,
             DONE_COVERAGE_SELECTION_LABEL,
-            COPY_SELECTED_COVERAGE_LABEL,
         ).forEach { label ->
             assertTrue("help must name the editor action «$label»", text.contains("«$label»"))
         }
+        // Copying a bbox by hand was retired with the Area file: it must not be offered again.
+        assertFalse(text, text.contains("Копировать bbox"))
+        assertFalse(text, text.contains("bbox"))
     }
 
     @Test

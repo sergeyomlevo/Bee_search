@@ -14,8 +14,6 @@ import org.beesearch.app.ui.map.CLEAR_COVERAGE_CONFIRM_LABEL
 import org.beesearch.app.ui.map.CREATE_AREA_LABEL
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_DIALOG_TAG
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_LABEL
-import org.beesearch.app.ui.map.COPY_SELECTED_COVERAGE_DESCRIPTION
-import org.beesearch.app.ui.map.COPY_SELECTED_COVERAGE_LABEL
 import org.beesearch.app.ui.map.CURRENT_COVERAGE_SUMMARY_TAG
 import org.beesearch.app.ui.map.ClearCoverageSelectionDialog
 import org.beesearch.app.ui.map.CoverageUnsavedChangesDialog
@@ -110,45 +108,17 @@ class MapCoverageSelectionUiTest {
     }
 
     @Test
-    fun bboxExportIsAvailableForOneSelectedRectangle() {
-        var copied = false
+    fun theEditorOffersNoManualCoordinateCopy() {
         val selected = coverageBoundsSummary(
             MapGeoBounds(north = 56.4, east = 42.8, south = 56.1, west = 42.2),
         )
         composeRule.setContent {
             Bee_searchTheme {
+                // «Копировать bbox» was retired together with the Area file: the app owns the file,
+                // so neither one rectangle nor several may bring a copying action back.
                 MapCoverageSelectionControls(
                     fragmentCount = 1,
                     viewportSummary = selected,
-                    selectedSummary = selected,
-                    canAddFragment = true,
-                    onAddFragment = {},
-                    onUndo = {},
-                    onShowAll = {},
-                    onClear = {},
-                    onDone = {},
-                    onCopySelectedBounds = { copied = true },
-                )
-            }
-        }
-
-        composeRule.onNodeWithText(COPY_SELECTED_COVERAGE_LABEL).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(COPY_SELECTED_COVERAGE_DESCRIPTION).performClick()
-        assertTrue(copied)
-    }
-
-    @Test
-    fun bboxExportIsHiddenWhileSeveralRectanglesAreSelected() {
-        val selected = coverageBoundsSummary(
-            MapGeoBounds(north = 56.4, east = 42.8, south = 56.1, west = 42.2),
-        )
-        composeRule.setContent {
-            Bee_searchTheme {
-                // A builder bbox describes exactly one rectangle, so the action stays scoped to one.
-                MapCoverageSelectionControls(
-                    fragmentCount = 2,
-                    viewportSummary = selected,
-                    selectedSummary = null,
                     canAddFragment = true,
                     onAddFragment = {},
                     onUndo = {},
@@ -159,7 +129,9 @@ class MapCoverageSelectionUiTest {
             }
         }
 
-        composeRule.onNodeWithText(COPY_SELECTED_COVERAGE_LABEL).assertDoesNotExist()
+        composeRule.onNodeWithText("Копировать bbox").assertDoesNotExist()
+        composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithText(DONE_COVERAGE_SELECTION_LABEL).assertIsDisplayed()
     }
 
     @Test

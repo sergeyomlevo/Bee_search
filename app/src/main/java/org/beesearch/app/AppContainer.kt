@@ -5,6 +5,10 @@ import android.content.Context
 import org.beesearch.app.data.backup.BackupDocumentExporter
 import org.beesearch.app.data.backup.BackupService
 import org.beesearch.app.data.backup.SafBackupDocumentExporter
+import org.beesearch.app.data.exchange.AndroidAreaShareTransport
+import org.beesearch.app.data.exchange.AreaExchangeMirror
+import org.beesearch.app.data.exchange.AreaTransport
+import org.beesearch.app.data.exchange.MirroringMapAreaStore
 import org.beesearch.app.data.exchange.beeSearchExchangeStorage
 import org.beesearch.app.data.heading.AndroidHeadingProvider
 import org.beesearch.app.data.location.AndroidLocationProvider
@@ -21,6 +25,7 @@ import org.beesearch.app.domain.repository.ObserverRepository
 import org.beesearch.app.domain.repository.SettingsRepository
 import org.beesearch.app.domain.repository.TerritoryRepository
 import org.beesearch.app.domain.usecase.CreateObservationPoint
+import org.beesearch.app.ui.map.MapAreaStore
 import java.time.Clock
 
 class BeeSearchApplication : Application() {
@@ -32,7 +37,24 @@ internal class AppContainer(context: Context) {
     private val database = BeeSearchDatabase.create(context)
 
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(context.settingsDataStore)
-    val mapAreaStore = DataStoreMapAreaStore(context.settingsDataStore)
+
+    /**
+     * The Ареал of the current Territory.
+     *
+     * The canonical value stays the DataStore `v2` entry; the exchange mirror is attached here, in
+     * one place, so every save also refreshes the user-facing Area file in `Exchange/Areas` and no
+     * screen can forget it. A mirror failure never changes the canonical result.
+     */
+    val exchangeStorage = beeSearchExchangeStorage()
+    val areaExchangeMirror = AreaExchangeMirror(exchangeStorage)
+    val mapAreaStore: MapAreaStore = MirroringMapAreaStore(
+        delegate = DataStoreMapAreaStore(context.settingsDataStore),
+        mirror = areaExchangeMirror,
+    )
+
+    /** Current transport of «Отправить ареал»: the Android share sheet. */
+    val areaTransport: AreaTransport = AndroidAreaShareTransport(context, areaExchangeMirror)
+
     val mapPackageStore = DataStoreMapPackageStore(
         contentResolver = context.contentResolver,
         filesDir = context.filesDir,
@@ -64,7 +86,6 @@ internal class AppContainer(context: Context) {
         settingsRepository = settingsRepository,
         pointCreator = observationRepository,
     )
-    val exchangeStorage = beeSearchExchangeStorage()
     val locationProvider = AndroidLocationProvider(context)
     val headingProvider = AndroidHeadingProvider(context, clock)
 }

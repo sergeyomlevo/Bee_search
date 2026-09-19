@@ -58,6 +58,8 @@ internal fun CurrentTerritoryScreen(
     onOpenOfflineMaps: () -> Unit = {},
     onOpenTerritories: () -> Unit,
     coverageEditNonce: Int = 0,
+    /** Called when the участки editor session ends, so the Ареал workflow can restore its screen. */
+    onCoverageEditFinished: () -> Unit = {},
 ) {
     MapFirstScaffold(
         onOpenObjects = onOpenObjects,
@@ -76,6 +78,7 @@ internal fun CurrentTerritoryScreen(
                     onCoverageTerritoryMissing = onOpenSettings,
                     onOpenOfflineMaps = onOpenOfflineMaps,
                     coverageEditNonce = coverageEditNonce,
+                    onCoverageSessionEnded = onCoverageEditFinished,
                     modifier = Modifier.fillMaxSize().testTag(MAIN_MAP_VIEWPORT_TAG),
                 )
             if (observationPointDraft != null) {
