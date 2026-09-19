@@ -673,9 +673,11 @@ text. The header deliberately says only `Наблюдение`, leaving the prim
 `Завершить` action fully visible at large font scale. When a successful
 `Улетела` moves a Bee into the flight group, the list scrolls only if its
 reordered card is not fully visible, leaving its azimuth action immediately
-available. Feedback is rendered below that stable header, never in its narrow
-title slot or as an overlay over cards: ordinary transient success and
-persistent error use the full width and push the list below them.
+available. A real problem is rendered below that stable header, never in its
+narrow title slot or as an overlay over cards, so the full-width message cannot
+cover a card. Routine successes announce nothing at all (see D085): the card
+already shows the new state, and a message above the list would push the next
+card out from under the finger.
 
 ACCEPTED D066 adds a local persisted correction to only the Bee card whose
 latest FlightCycle has a safely reversible last action. It is derived from the

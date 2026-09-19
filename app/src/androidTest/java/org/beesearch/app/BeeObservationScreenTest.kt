@@ -1206,9 +1206,8 @@ class BeeObservationScreenTest {
     }
 
     @Test
-    fun longTransientFeedbackIsFullyVisibleBelowTheHeaderWithoutCoveringCards() {
+    fun routineSuccessFeedbackIsNotShownAndNeverMovesTheBeeCards() {
         val feedback = mutableStateOf<UiFeedback?>(null)
-        val message = "Вылет сохранён. Зафиксируйте азимут, пока пчела в полёте."
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             val deviceDensity = LocalDensity.current
@@ -1239,41 +1238,85 @@ class BeeObservationScreenTest {
         val firstCardTopBefore = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
             .fetchSemanticsNode().boundsInRoot.top
 
+        // A routine success such as «Вылет сохранён» or «Прилёт сохранён»: the card already shows the
+        // new state, so nothing is announced and nothing may move under the finger.
         composeRule.runOnIdle {
-            feedback.value = autoFeedback(1, message)
+            feedback.value = autoFeedback(1, "Вылет сохранён")
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+
+        composeRule.onNodeWithText("Вылет сохранён").assertDoesNotExist()
+        composeRule.onNodeWithTag("observation-transient-banner").assertDoesNotExist()
+        val firstCardTopWithFeedback = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
+            .fetchSemanticsNode().boundsInRoot.top
+        assertEquals(
+            "Появление success-feedback не должно сдвигать карточки",
+            firstCardTopBefore,
+            firstCardTopWithFeedback,
+            0.5f,
+        )
+
+        composeRule.mainClock.advanceTimeBy(FEEDBACK_AUTO_DISMISS_MILLIS + 1)
+        composeRule.mainClock.advanceTimeByFrame()
+        val firstCardTopAfterRemoval = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
+            .fetchSemanticsNode().boundsInRoot.top
+        assertEquals(
+            "Исчезновение feedback не должно сдвигать список",
+            firstCardTopBefore,
+            firstCardTopAfterRemoval,
+            0.5f,
+        )
+        composeRule.onNodeWithTag("complete-field-observation")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+    }
+
+    @Test
+    fun aRealProblemIsStillAnnouncedBelowTheHeaderWithoutCoveringCards() {
+        val feedback = mutableStateOf<UiFeedback?>(null)
+        val message = "Не удалось сохранить азимут. Повторите действие после восстановления доступа к данным."
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            val deviceDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(deviceDensity.density, fontScale = 1.7f),
+            ) {
+                Bee_searchTheme {
+                    BeeObservationScreen(
+                        point = point(),
+                        bees = listOf(flyingBee),
+                        flightCycles = listOf(cycle(flyingBee, 1, releaseTime, null)),
+                        beeEventInProgressIds = emptySet(),
+                        feedback = feedback.value,
+                        onDismissFeedback = { id ->
+                            if (feedback.value?.id == id) feedback.value = null
+                        },
+                        isCompleting = false,
+                        onRegisterReturn = {},
+                        onStartNextFlight = {},
+                        onComplete = {},
+                        nowProvider = { now },
+                    )
+                }
+            }
+        }
+
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle {
+            feedback.value = UiFeedback(1, message, FeedbackDisplayMode.PERSISTENT)
         }
         composeRule.mainClock.advanceTimeByFrame()
 
         composeRule.onNodeWithText(message).assertIsDisplayed()
         val headerBounds = composeRule.onNodeWithTag("observation-header")
             .fetchSemanticsNode().boundsInRoot
-        val bannerBounds = composeRule.onNodeWithTag("observation-transient-banner")
+        val bannerBounds = composeRule.onNodeWithTag("observation-persistent-feedback")
             .fetchSemanticsNode().boundsInRoot
-        composeRule.onNodeWithTag("complete-field-observation")
-            .assertIsDisplayed()
-            .assertIsEnabled()
-        val firstCardTopWithFeedback = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
+        val firstCardTop = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
             .fetchSemanticsNode().boundsInRoot.top
 
-        assertTrue("Feedback должен начинаться ниже стабильного header", bannerBounds.top >= headerBounds.bottom)
-        assertTrue("Feedback не должен перекрывать первую карточку", bannerBounds.bottom <= firstCardTopWithFeedback)
-        assertTrue("Feedback может сдвинуть, но не перекрыть список", firstCardTopWithFeedback > firstCardTopBefore)
-
-        composeRule.onNodeWithTag("complete-field-observation").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("cancel-field-observation-completion").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(FEEDBACK_AUTO_DISMISS_MILLIS + 1)
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("observation-transient-banner").assertDoesNotExist()
-        val firstCardTopAfterDismiss = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
-            .fetchSemanticsNode().boundsInRoot.top
-        assertEquals(
-            "Исчезновение feedback не должно сдвигать список",
-            firstCardTopBefore,
-            firstCardTopAfterDismiss,
-            0.5f,
-        )
+        assertTrue("Ошибка должна показываться ниже стабильного header", bannerBounds.top >= headerBounds.bottom)
+        assertTrue("Ошибка не должна перекрывать первую карточку", bannerBounds.bottom <= firstCardTop)
     }
 
     @Test
@@ -1391,10 +1434,13 @@ class BeeObservationScreenTest {
     }
 
     @Test
-    fun localUndoBelongsToTheBeeCardAndDoesNotReplaceOrdinaryFeedback() {
+    fun localUndoBelongsToTheBeeCardAndDoesNotReplaceARealProblemMessage() {
         val flyingCycle = cycle(flyingBee, 1, releaseTime, null, azimuthDeg = 269.0)
         val atPointCycle = cycle(atPointBee, 1, releaseTime, returnTime)
-        val feedback = mutableStateOf<UiFeedback?>(autoFeedback(1, "Вылет сохранён"))
+        val errorMessage = "Не удалось сохранить азимут"
+        val feedback = mutableStateOf<UiFeedback?>(
+            UiFeedback(1, errorMessage, FeedbackDisplayMode.PERSISTENT),
+        )
         var undoneBeeId: UUID? = null
         composeRule.setContent {
             Bee_searchTheme {
@@ -1415,13 +1461,15 @@ class BeeObservationScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Вылет сохранён").assertIsDisplayed()
+        composeRule.onNodeWithText(errorMessage).assertIsDisplayed()
+        // A routine success carries no message at all, so it cannot replace the visible problem.
+        composeRule.onNodeWithText("Вылет сохранён").assertDoesNotExist()
         composeRule.onNodeWithTag("bee-undo-${flyingBee.id}")
             .assertIsDisplayed()
             .assertHeightIsAtLeast(48.dp)
             .performClick()
         composeRule.runOnIdle { assertEquals(flyingBee.id, undoneBeeId) }
-        composeRule.onNodeWithText("Вылет сохранён").assertIsDisplayed()
+        composeRule.onNodeWithText(errorMessage).assertIsDisplayed()
         composeRule.onNodeWithTag("azimuth-undo-banner").assertDoesNotExist()
     }
 

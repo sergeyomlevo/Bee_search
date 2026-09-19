@@ -525,22 +525,22 @@ internal class MainViewModel(
             return
         }
         launchBeeMutation(fallback = "Не удалось сохранить первый вылет") {
+            // No success confirmation: the bee card itself shows the new flight immediately, and a
+            // transient banner above the list would move the next card under the finger.
             observationRepository.startFirstFlight(pointId, markColor, markPosition)
-            showSuccessFeedback("Вылет сохранён")
         }
     }
 
     fun registerBeeReturn(beeId: UUID) {
         launchBeeEvent(beeId, fallback = "Не удалось сохранить возвращение пчелы") {
+            // The card switches to the at-point state by itself; a confirmation would only shift it.
             observationRepository.registerBeeReturn(beeId)
-            showSuccessFeedback("Прилёт сохранён")
         }
     }
 
     fun startNextFlight(beeId: UUID) {
         launchBeeEvent(beeId, fallback = "Не удалось сохранить вылет пчелы") {
             observationRepository.startNextFlight(beeId)
-            showSuccessFeedback("Вылет сохранён")
         }
     }
 

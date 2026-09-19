@@ -227,11 +227,12 @@ internal fun BeeObservationScreen(
         )
     }
 
+    // Only a real problem is announced here. A routine successful action - a departure, a return, a
+    // recorded azimuth - is already visible on the card it belongs to, so a transient message would
+    // duplicate the interface and, because it sits above the list, push the next card out from under
+    // the finger that is working through the bees.
     val persistentFeedback = feedback?.takeIf {
         it.displayMode == FeedbackDisplayMode.PERSISTENT
-    }
-    val ordinaryTransientFeedback = feedback?.takeIf {
-        it.displayMode == FeedbackDisplayMode.AUTO_DISMISS
     }
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -260,15 +261,11 @@ internal fun BeeObservationScreen(
                                 modifier = Modifier.testTag("complete-field-observation"),
                             ) { Text(if (isCompleting) "Завершаем" else "Завершить") }
                         }
-                        when {
-                            persistentFeedback != null -> FeedbackBanner(
-                                feedback = persistentFeedback,
+                        persistentFeedback?.let { banner ->
+                            FeedbackBanner(
+                                feedback = banner,
                                 onDismiss = onDismissFeedback,
                                 modifier = Modifier.testTag("observation-persistent-feedback"),
-                            )
-                            ordinaryTransientFeedback != null -> ObservationTransientFeedbackBanner(
-                                feedback = ordinaryTransientFeedback,
-                                onDismiss = onDismissFeedback,
                             )
                         }
                     }
@@ -378,37 +375,3 @@ private data class BeeViewportTarget(
     val expectedState: BeeFieldState,
     val expectedLatestCycleId: UUID? = null,
 )
-
-@Composable
-private fun ObservationTransientFeedbackBanner(
-    feedback: UiFeedback,
-    onDismiss: (Long) -> Unit,
-    autoDismissMillis: Long = FEEDBACK_AUTO_DISMISS_MILLIS,
-) {
-    LaunchedEffect(feedback.id, autoDismissMillis) {
-        delay(autoDismissMillis)
-        onDismiss(feedback.id)
-    }
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 48.dp)
-            .padding(start = 8.dp, end = 8.dp, bottom = 6.dp)
-            .testTag("observation-transient-banner"),
-        color = MaterialTheme.colorScheme.inverseSurface,
-        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Text(
-                text = feedback.message,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.testTag("observation-transient-text"),
-            )
-        }
-    }
-}
