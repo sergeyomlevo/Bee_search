@@ -57,7 +57,9 @@ internal fun CurrentTerritoryScreen(
     onOpenSettings: () -> Unit,
     onOpenOfflineMaps: () -> Unit = {},
     onOpenTerritories: () -> Unit,
-    coverageEditNonce: Int = 0,
+    /** Pending request to open the участки editor; a plain return to the map never produces one. */
+    areaEditorRequest: Int = AreaEditorRequest.NO_REQUEST,
+    onAreaEditorRequestHandled: () -> Unit = {},
     /** Called when the участки editor session ends, so the Ареал workflow can restore its screen. */
     onCoverageEditFinished: () -> Unit = {},
 ) {
@@ -77,7 +79,8 @@ internal fun CurrentTerritoryScreen(
                     onRequestCreateRecord = onRequestCreateRecord,
                     onCoverageTerritoryMissing = onOpenSettings,
                     onOpenOfflineMaps = onOpenOfflineMaps,
-                    coverageEditNonce = coverageEditNonce,
+                    areaEditorRequest = areaEditorRequest,
+                    onAreaEditorRequestHandled = onAreaEditorRequestHandled,
                     onCoverageSessionEnded = onCoverageEditFinished,
                     modifier = Modifier.fillMaxSize().testTag(MAIN_MAP_VIEWPORT_TAG),
                 )

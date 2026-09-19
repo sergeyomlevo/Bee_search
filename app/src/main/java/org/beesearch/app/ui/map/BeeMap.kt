@@ -89,7 +89,17 @@ internal fun BeeMap(
     onRequestCreateRecord: (Double, Double) -> Unit,
     onCoverageTerritoryMissing: () -> Unit = {},
     onOpenOfflineMaps: () -> Unit = {},
-    coverageEditNonce: Int = 0,
+    /**
+     * The pending request to open the участки editor; [AreaEditorRequest.NO_REQUEST] means nothing is
+     * pending.
+     *
+     * Only an explicit user action produces a request. It is consumed through
+     * [onAreaEditorRequestHandled] as soon as the editor opens, so a later visit to the map cannot
+     * replay an older request and open the editor on its own.
+     */
+    areaEditorRequest: Int = AreaEditorRequest.NO_REQUEST,
+    /** Reports that the pending request was handled, so it cannot be replayed. */
+    onAreaEditorRequestHandled: () -> Unit = {},
     mode: BeeMapMode = BeeMapMode.FIELD,
     savedObservationPoints: List<ObservationPointSummary> = emptyList(),
     onSelectSavedObservationPoint: (UUID) -> Unit = {},
@@ -184,19 +194,24 @@ internal fun BeeMap(
             }
         }
     }
-    // External request (Settings → Офлайн-карты → «Изменить участок») opens the
-    // spatial coverage-selection mode for the current territory.
-    LaunchedEffect(coverageEditNonce, territoryId, coverageLoadedFor, coverageLoading) {
+    // An explicit user request (the Ареал screen, the Ареал view, or Settings → Офлайн-карты →
+    // «Изменить участки») opens the участки editor once. The request is consumed here, because
+    // returning to the map is not a request: without that, every later visit would reload the Ареал,
+    // see the old request again and open the editor by itself.
+    LaunchedEffect(areaEditorRequest, territoryId, coverageLoadedFor, coverageLoading) {
         if (
-            coverageEditNonce > 0 &&
-            territoryId != null &&
-            !coverageLoading &&
-            coverageLoadedFor == territoryId
+            !shouldOpenAreaEditor(
+                requestToken = areaEditorRequest,
+                territoryId = territoryId,
+                areaLoaded = !coverageLoading && coverageLoadedFor == territoryId,
+            )
         ) {
-            editingTerritoryId = territoryId
-            workingCoverage = persistedCoverage
-            coverageSelectionMode = true
+            return@LaunchedEffect
         }
+        editingTerritoryId = territoryId
+        workingCoverage = persistedCoverage
+        coverageSelectionMode = true
+        onAreaEditorRequestHandled()
     }
     // Mode decides what the Ареал looks like here: the editor works on the draft and marks the next
     // viewport, the view mode shows exactly the stored участки, the field map draws nothing.

@@ -53,6 +53,7 @@ import org.beesearch.app.domain.repository.TerritoryRepository
 import org.beesearch.app.domain.usecase.CreateObservationPoint
 import org.beesearch.app.domain.usecase.StartupDestination
 import org.beesearch.app.domain.usecase.StartupRouter
+import org.beesearch.app.ui.map.AreaEditorRequest
 import java.util.UUID
 
 sealed interface AppRoute {
@@ -101,7 +102,14 @@ internal class MainViewModel(
     private val territoryCoverageDeletion: TerritoryCoverageDeletion,
 ) : ViewModel() {
     private val manualRoute = MutableStateFlow<AppRoute?>(null)
-    private val _coverageEditNonce = MutableStateFlow(0)
+
+    /**
+     * The pending request to open the участки editor.
+     *
+     * It is a one-shot command: the map that handles it consumes it, so a later return to the map
+     * cannot replay an old request and open the editor without a user action.
+     */
+    private val areaEditorRequest = AreaEditorRequest()
     private val _feedback = MutableStateFlow<UiFeedback?>(null)
     private val _locationState = MutableStateFlow<LocationUiState>(LocationUiState.PermissionRequired)
     private val _observationPointDraft = MutableStateFlow<ObservationPointCreationDraft?>(null)
@@ -127,7 +135,7 @@ internal class MainViewModel(
     val beeEventInProgressIds: StateFlow<Set<UUID>> = _beeEventInProgressIds.asStateFlow()
     val flightAzimuthInProgressIds: StateFlow<Set<UUID>> =
         _flightAzimuthInProgressIds.asStateFlow()
-    val coverageEditNonce: StateFlow<Int> = _coverageEditNonce.asStateFlow()
+    val areaEditorRequestToken: StateFlow<Int> = areaEditorRequest.token
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -234,11 +242,13 @@ internal class MainViewModel(
      * the origin is remembered and [completeAreaSectionsEditing] returns there. Other entry points to
      * the same editor (the map's own coverage button, the offline-map screen) record no origin and
      * keep the previous behaviour of staying on the map.
+     *
+     * This is the only kind of call that may open the editor: ordinary navigation never requests it.
      */
     fun openAreaSectionsEditor(returnToView: Boolean) {
         areaEditReturnRoute = if (returnToView) AppRoute.AreaView else AppRoute.Area
         manualRoute.value = AppRoute.CurrentTerritory
-        _coverageEditNonce.value += 1
+        areaEditorRequest.request()
         clearFeedback()
     }
 
@@ -248,6 +258,16 @@ internal class MainViewModel(
         areaEditReturnRoute = null
         manualRoute.value = origin
         clearFeedback()
+    }
+
+    /**
+     * The map opened the editor for the pending request, so the request is finished.
+     *
+     * Without this the request would stay pending and every later entry to the map would treat it as a
+     * fresh command and reopen the editor on its own.
+     */
+    fun consumeAreaEditorRequest() {
+        areaEditorRequest.consume()
     }
 
     fun openPointDetail(pointId: UUID) {
@@ -267,7 +287,7 @@ internal class MainViewModel(
 
     fun openMapWithCoverageEdit() {
         manualRoute.value = AppRoute.CurrentTerritory
-        _coverageEditNonce.value += 1
+        areaEditorRequest.request()
         clearFeedback()
     }
 

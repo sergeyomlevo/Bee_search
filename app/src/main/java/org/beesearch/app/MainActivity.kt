@@ -116,7 +116,7 @@ private fun BeeSearchApp(
     val currentTerritory by viewModel.currentTerritory.collectAsStateWithLifecycle()
     val currentObserver by viewModel.currentObserver.collectAsStateWithLifecycle()
     val feedback by viewModel.feedback.collectAsStateWithLifecycle()
-    val coverageEditNonce by viewModel.coverageEditNonce.collectAsStateWithLifecycle()
+    val areaEditorRequestToken by viewModel.areaEditorRequestToken.collectAsStateWithLifecycle()
     val locationState by viewModel.locationState.collectAsStateWithLifecycle()
     val observationPointDraft by viewModel.observationPointDraft.collectAsStateWithLifecycle()
     val observationPointPreparationDraft by viewModel.observationPointPreparationDraft.collectAsStateWithLifecycle()
@@ -256,7 +256,8 @@ private fun BeeSearchApp(
                         onOpenSettings = viewModel::openSettings,
                         onOpenOfflineMaps = viewModel::openOfflineMaps,
                         onOpenTerritories = viewModel::openTerritoryManagement,
-                        coverageEditNonce = coverageEditNonce,
+                        areaEditorRequest = areaEditorRequestToken,
+                        onAreaEditorRequestHandled = viewModel::consumeAreaEditorRequest,
                         onCoverageEditFinished = viewModel::completeAreaSectionsEditing,
                     )
                     AppRoute.PrepareObservationPoint -> observationPointPreparationDraft?.let { draft ->

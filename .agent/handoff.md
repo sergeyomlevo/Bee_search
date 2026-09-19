@@ -6,6 +6,40 @@ repository state take precedence.
 
 For any UI work, read `.agent/ui-policy.md` before implementation.
 
+## Ареал участки editor no longer opens by itself (regression fix, 2026-09-19)
+
+The участки editor (`Участок`, `Текущий участок`, `Добавить участок`, `Отменить последний`,
+`Очистить всё`, `Готово`) appeared on the ordinary map after an unrelated navigation round-trip:
+`карта → Объекты → назад`, `карта → Ареал → назад → назад`, and a cancelled or completed
+`ObservationPoint` workflow all reopened it without a user action.
+
+Cause. Opening the editor was carried by `MainViewModel.coverageEditNonce`, a counter that was only
+ever incremented and never finished, while `BeeMap` opened the editor whenever the value was `> 0`.
+The effect also keys on the loaded Ареал, so every re-entry to the map screen reloaded the Ареал,
+saw the old value again and treated a past command as a fresh one. Nothing in the map screen was
+stale: the *request* was.
+
+Fix. The request became an explicit one-shot command, `AreaEditorRequest` in
+`ui/map/AreaEditorSession.kt` (`request()` / `consume()` / `isPending`), owned by the view model and
+consumed by the map through `onAreaEditorRequestHandled` as soon as the editor opens. The map asks
+`shouldOpenAreaEditor(requestToken, territoryId, areaLoaded)`, which is true only for a pending
+request over a loaded Ареал, so a plain return to the map can never open the editor. `BeeMap`'s
+`coverageEditNonce` parameter was renamed to `areaEditorRequest` with the new meaning; the map mode
+itself and the `origin` return semantics of D083 are unchanged, and no persisted Area data, codec,
+UUID, file name or D084 discovery behaviour was touched.
+
+Regression tests. `AreaEditorSessionTest` (unit, 7 tests) pins the state contract: nothing is
+pending before a user action, a handled request is never replayed, a new explicit action opens the
+editor again, and neither a fresh nor a handled request satisfies the map condition.
+`AreaEditorEntryUiTest` (instrumented, 3 tests) drives the real `BeeMap`: a plain visit shows no
+panel, an explicit request shows it exactly once and finishes the request, and after `Готово` four
+successive map instances still show no panel. Verified on the SM-S938B as well: after a finished
+edit session, `map → Objects → map` (repeated), `map → Ареал → назад → назад`, a cancelled and a
+completed `ObservationPoint` workflow, and the full `Ареал → Посмотреть на карте → Изменить участки
+→ Готово` chain all left the normal map without the panel, while `Изменить участки` still opened it.
+The temporary observation point used for that check was removed with the app's own selective
+deletion and the DEV DataStore stayed byte-identical.
+
 ## Automatic offline-map lookup for the Ареал (D084, 2026-09-19)
 
 `Objects → Ареал` gained `Загрузить карту`, and the offline map of an Ареал can now be found by
