@@ -5,17 +5,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+// One-shot navigation intent.
+//
+// A request to open the Area editor must be consumed after it is handled.
+// Do not model this as a persistent Boolean/counter: persistent commands can
+// replay when the map screen is recreated and reopen the editor unexpectedly.
+//
+// Persistent state describes what is currently true.
+// AreaEditorRequest describes a user action that must happen once.
+//
+// See AGENTS.md, "One-shot UI/navigation actions", and the regression guard in AreaEditorEntryUiTest.
 /**
- * The one-shot request that opens the участки editor of the Ареал.
+ * Carries the pending intent to open the участки editor of the Ареал.
  *
- * Opening the editor is a *command*, not a place the map can be in: the editor may appear only after
- * the user asked for it (`Создать ареал`, `Изменить участки`, or the offline-map screen's
- * `Изменить участки`). The map therefore has to distinguish "the user just asked for the editor" from
- * "the map is being shown again", and that distinction is exactly the lifetime of this request.
- *
- * A request is consumed by the map that handles it. Keeping a request pending after it was handled is
- * what made the editor reappear on its own: every return to the map reloads the Ареал, and a stale
- * request then looked like a fresh command.
+ * The map has to distinguish "the user just asked for the editor" from "the map is being shown
+ * again", and that distinction is exactly the lifetime of this request: only explicit user actions
+ * (`Создать ареал`, `Изменить участки`, or the offline-map screen's `Изменить участки`) produce it,
+ * and the map that handles it consumes it.
  *
  * The request is deliberately *not* a second map mode: the mode itself stays where the map owns it
  * (the editor session inside the map screen), and this object only carries the pending user intent.

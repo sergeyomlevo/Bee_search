@@ -96,6 +96,8 @@ class AreaEditorEntryUiTest {
         assertEditorPanelShown()
     }
 
+    // Regression guard:
+    // a consumed editor request must never resurrect after map recreation.
     @Test
     fun aFinishedEditorSessionNeverReopensOnALaterVisit() {
         showMap()

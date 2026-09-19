@@ -45,8 +45,9 @@ class AreaEditorSessionTest {
 
         assertFalse(request.isPending)
         assertEquals(AreaEditorRequest.NO_REQUEST, request.token.value)
-        // This is the regression: the Ареал is reloaded on every visit, and a stale request used to
-        // open the editor again on a plain return to the map.
+        // Regression guard: a consumed editor request must never resurrect after map recreation.
+        // The Ареал is reloaded on every visit, and a stale request used to open the editor again on a
+        // plain return to the map.
         assertFalse(shouldOpenAreaEditor(request.token.value, territoryId, areaLoaded = true))
     }
 
