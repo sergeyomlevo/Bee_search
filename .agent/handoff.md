@@ -356,6 +356,79 @@ Not covered automatically: the `BeeMap` wiring itself. The Back confirmation and
 the `Готово` commit path are verified by device checks plus unit tests of the
 draft semantics, not by an automated integration test.
 
+## Bee marking on thorax/abdomen milestone (D078, worktree `bee-marking-abdomen`)
+
+A Bee is now identified by one of ten marks: 5 catalog colors × `THORAX` /
+`ABDOMEN`. Wing variants are retired from the active product: `КП`, `КЛ`,
+`правое крыло` and `левое крыло` appear nowhere in the running UI. D017 is
+SUPERSEDED by D078, and D055's quoted capacity is now 10.
+
+Confirmed field semantics drive the compatibility mapping. Real field data
+recorded on 2026-09-17 persisted `NONE` for a thorax mark and `RIGHT_WING` for a
+mark that was physically on the abdomen, so both tokens are read through
+`MarkPosition.fromPersistedToken`: `NONE` -> `THORAX`, `RIGHT_WING` -> `ABDOMEN`.
+`LEFT_WING` has no confirmed meaning, is not reinterpreted, is never offered for a
+new Bee, and does not consume one of the ten marks; it survives only as an
+internal legacy compatibility value for old and test records.
+
+Persistence stayed backward compatible without a schema migration. `mark_position`
+remains TEXT, Room stays at version 6 and no schema JSON changed, and the backup
+format stays at `backupFormatVersion = 1`. Duplicate-mark protection matches on
+`MarkPosition.persistedTokens`, so a legacy `NONE` row still occupies the
+`THORAX` slot and a legacy `RIGHT_WING` row still occupies the `ABDOMEN` slot.
+
+The former circular color swatch and the `КП` / `КЛ` text labels are replaced by
+`ui/observation/BeeMarkIcon.kt`, a parametric Compose Canvas drawing: head (small
+circle), thorax (noticeably larger circle) and abdomen (vertical oval). The mark
+color is painted on the thorax for `THORAX` and on the abdomen for `ABDOMEN`; other
+segments stay dark, so position and color are read from the same glance and no
+visible position label exists. WHITE keeps its semantics and gains visibility from
+an explicit dark outline instead of being greyed. A legacy `LEFT_WING` row draws a
+fully dark body plus a mark-colored elliptical ring, because no segment can
+honestly carry that color. `contentDescription` carries the meaning for
+accessibility, e.g. `Жёлтая метка, грудь`. No per-combination asset exists.
+
+The chromatic mark colours were brightened after field review reported that the
+first palette went blind in sunlight: `RED C62828`, `BLUE 1565C0` and
+`GREEN 2E7D32` had a relative luminance of only 0.13-0.16, which is close to the
+dark body colour, so the filled segment stopped separating from the rest of the
+silhouette (contrast against the body was only 2.7-3.1). They are now
+`RED FF3B30`, `BLUE 0A84FF` and `GREEN 4CAF50`, which raises the contrast against
+the dark body to 4.3-5.7 while keeping every pair of colours distinguishable.
+`WHITE` and `YELLOW` are unchanged.
+
+The mark is sized and proportioned from an explicit visual review. Its slot is
+tall and narrow (width ~0.36 of its height), the abdomen is the dominant mass,
+and the graphic spans the full height of a Bee card, so the mark is the largest
+element of the card while the state row and the action row sit beside it. On
+Samsung SM-S938B at `font_scale=1.7` the drawn mark measures about 95dp tall in a
+104dp card, against a reviewed reference silhouette whose width/height ratio is
+0.363 (implementation: 0.357). A consequence of spanning both rows is that a Bee
+card is slightly shorter than before, so more cards fit the field viewport.
+
+The icon is used in the observation screen's `Выбор` (AVAILABLE), `В полёте`
+(IN_FLIGHT) and `На точке` (AT_POINT) cards, and in the Points Browser detail Bee
+history, which no longer shows a mark text label.
+
+Verification: `compileDebugKotlin`, `compileDebugUnitTestKotlin`,
+`compileDebugAndroidTestKotlin` and `assembleDebug` pass; the JVM unit suite
+passes; the full `connectedDebugAndroidTest` run on Samsung SM-S938B finished 171
+tests with 12 expected opt-in skips and 0 failures. On that device at the system
+`font_scale=1.7`, the untouched DEV database was read through the new code: the
+rows persisted as `RIGHT_WING` render with a colored abdomen and the rows
+persisted as `NONE` render with a colored thorax, while the single legacy
+`LEFT_WING` row renders as an uninterpreted legacy mark. `org.beesearch.app.dev`
+and its database/WAL bytes were unchanged by the runs, and the field package
+`org.beesearch.app` was never targeted.
+
+Known out-of-scope consequence: `tools/analysis-evidence-explorer/evidence.py`
+still validates `markPosition` against the closed old triple
+(`NONE`/`RIGHT_WING`/`LEFT_WING`), so it rejects an archive produced by this
+version with "invalid bee mark position". The Explorer was deliberately not
+modified in this iteration. Extending that accepted set (and mapping the legacy
+tokens for its duplicate-mark key) is a required, purely additive follow-up
+before new backups are fed to the Explorer.
+
 ## Navigation shell milestone (D077, 2026-09-17)
 
 The main map is now the common creation entry. Its red center point is the

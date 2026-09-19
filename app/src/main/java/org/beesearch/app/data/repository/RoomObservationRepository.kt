@@ -233,7 +233,10 @@ internal class RoomObservationRepository(
         if (beeDao.countForPoint(pointId) >= BeeMarkCatalog.MAX_BEES_PER_OBSERVATION_POINT) {
             throw BeeLimitReachedException()
         }
-        if (beeDao.countByMark(pointId, markColor, markPosition) != 0) {
+        // Matching on every persisted token of the position keeps duplicate-mark
+        // protection correct for rows written before the thorax/abdomen marking
+        // system, where the same real position was stored under a legacy token.
+        if (beeDao.countByMark(pointId, markColor, markPosition.persistedTokens) != 0) {
             throw DuplicateBeeMarkException()
         }
 

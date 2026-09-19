@@ -33,9 +33,9 @@ import java.time.Duration
 import java.time.Instant
 import java.util.Locale
 import java.util.UUID
-import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.ObservationPointDetail
 import org.beesearch.app.domain.repository.ObservationRepository
+import org.beesearch.app.ui.observation.BeeMarkIcon
 
 @Composable
 internal fun PointDetailRoute(
@@ -85,7 +85,10 @@ private fun PointDetailContent(
     detail: ObservationPointDetail,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(
+        modifier = modifier.padding(horizontal = 16.dp).testTag("point-detail-list"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         item {
             Text("Основное", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
             DetailLine("Территория", "${detail.territory.code} — ${detail.territory.name}")
@@ -108,9 +111,10 @@ private fun PointDetailContent(
             items(detail.beeHistories, key = { it.bee.id }) { history ->
                 Card(Modifier.fillMaxWidth().testTag("detail-bee-${history.bee.id}")) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            BeeMarkCatalog.displayName(history.bee.markColor, history.bee.markPosition),
-                            style = MaterialTheme.typography.titleMedium,
+                        BeeMarkIcon(
+                            markColor = history.bee.markColor,
+                            markPosition = history.bee.markPosition,
+                            height = PointDetailBeeMarkHeight,
                         )
                         Text("Циклов: ${history.flightCycles.size}")
                         history.flightCycles.forEach { cycle ->
@@ -144,6 +148,9 @@ private fun DetailLine(label: String, value: String) {
         Text(value, modifier = Modifier.weight(1f))
     }
 }
+
+/** Sized to stay readily identifiable inside a Point history card. */
+private val PointDetailBeeMarkHeight = 72.dp
 
 internal fun formatCompletedFlightDuration(departure: Instant, returned: Instant): String {
     val seconds = Duration.between(departure, returned).seconds.coerceAtLeast(0)

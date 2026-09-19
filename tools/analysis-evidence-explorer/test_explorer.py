@@ -369,6 +369,100 @@ class ExplorerTest(unittest.TestCase):
                     with self.assertRaises(explorer.BackupError):
                         explorer.build_evidence(archive)
 
+    def test_both_mark_position_vocabularies_are_accepted(self) -> None:
+        """The wing vocabulary and the thorax/abdomen vocabulary denote the same
+        physical positions, so an archive written by either application version
+        is readable."""
+        for token in ("THORAX", "NONE", "ABDOMEN", "RIGHT_WING", "LEFT_WING"):
+            with self.subTest(token=token):
+                with tempfile.TemporaryDirectory() as directory:
+                    archive = Path(directory) / "mark.zip"
+                    rows = base_rows()
+                    rows["bees"][0]["markPosition"] = token
+                    write_backup(archive, rows=rows)
+                    result = explorer.build_evidence(archive)
+                    self.assertEqual(result["counts"]["bees"], 1)
+                    # The emitted token mirrors the archive. Canonicalisation is
+                    # used for validation and identity; it deliberately does not
+                    # rewrite the source record, so an archive written by the
+                    # previous application version serialises exactly as before.
+                    self.assertEqual(
+                        result["observationPoints"][0]["bees"][0]["markPosition"], token
+                    )
+
+    def test_renamed_mark_tokens_are_one_canonical_position(self) -> None:
+        """NONE and THORAX, and RIGHT_WING and ABDOMEN, are each one physical
+        position. An archive that holds both spellings for one color on one
+        ObservationPoint must therefore fail as a duplicate mark rather than be
+        accepted as two different positions."""
+        pairs = (
+            ("NONE", "THORAX"),
+            ("THORAX", "NONE"),
+            ("RIGHT_WING", "ABDOMEN"),
+            ("ABDOMEN", "RIGHT_WING"),
+        )
+        for first, second in pairs:
+            with self.subTest(pair=(first, second)):
+                with tempfile.TemporaryDirectory() as directory:
+                    archive = Path(directory) / "same-position.zip"
+                    rows = base_rows()
+                    rows["bees"][0]["markPosition"] = first
+                    rows["bees"].append({
+                        "id": uid(8), "observationPointId": uid(3), "markColor": "red",
+                        "markPosition": second, "createdAt": 3,
+                    })
+                    write_backup(archive, rows=rows)
+                    with self.assertRaises(explorer.BackupError) as raised:
+                        explorer.build_evidence(archive)
+                    # The archive must fail *because the two spellings are one
+                    # position*, not because a token is unknown. Without the
+                    # canonical key this archive would be accepted as two marks.
+                    self.assertIn("duplicate bee mark", str(raised.exception))
+
+    def test_legacy_left_wing_stays_a_separate_position(self) -> None:
+        """LEFT_WING has no confirmed physical meaning, so it must not collapse
+        into THORAX and must not block a real thorax mark of the same color."""
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "legacy-and-thorax.zip"
+            rows = base_rows()
+            rows["bees"][0]["markPosition"] = "LEFT_WING"
+            rows["bees"].append({
+                "id": uid(8), "observationPointId": uid(3), "markColor": "red",
+                "markPosition": "THORAX", "createdAt": 3,
+            })
+            write_backup(archive, rows=rows)
+            result = explorer.build_evidence(archive)
+            self.assertEqual(
+                [bee["markPosition"] for bee in result["observationPoints"][0]["bees"]],
+                ["LEFT_WING", "THORAX"],
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "legacy-duplicate.zip"
+            rows = base_rows()
+            rows["bees"][0]["markPosition"] = "LEFT_WING"
+            rows["bees"].append({
+                "id": uid(8), "observationPointId": uid(3), "markColor": "red",
+                "markPosition": "LEFT_WING", "createdAt": 3,
+            })
+            write_backup(archive, rows=rows)
+            with self.assertRaises(explorer.BackupError) as raised:
+                explorer.build_evidence(archive)
+            # Two identical legacy tokens are still one duplicate position.
+            self.assertIn("duplicate bee mark", str(raised.exception))
+
+    def test_unknown_mark_position_fails_closed(self) -> None:
+        cases = ("UNKNOWN", "thorax", "none", "", " LEFT_WING", "RIGHT WING", None, 5, True)
+        for value in cases:
+            with self.subTest(value=value):
+                with tempfile.TemporaryDirectory() as directory:
+                    archive = Path(directory) / "unknown-mark.zip"
+                    rows = base_rows()
+                    rows["bees"][0]["markPosition"] = value
+                    write_backup(archive, rows=rows)
+                    with self.assertRaises(explorer.BackupError):
+                        explorer.build_evidence(archive)
+
     def test_unsupported_versions_fail_closed(self) -> None:
         cases = (
             ({"backupFormatVersion": 2}, None),

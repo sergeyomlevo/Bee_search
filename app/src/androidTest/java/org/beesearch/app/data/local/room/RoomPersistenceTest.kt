@@ -40,6 +40,7 @@ import org.beesearch.app.domain.usecase.StartupRouter
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -233,7 +234,7 @@ class RoomPersistenceTest {
         val started = observationRepository.startFirstFlight(
             pointId = point.id,
             markColor = "WHITE",
-            markPosition = MarkPosition.NONE,
+            markPosition = MarkPosition.THORAX,
         )
 
         assertEquals(BeePresenceResult.BEES_FOUND, observationRepository.observeActivePoint().first()?.beePresenceResult)
@@ -263,7 +264,7 @@ class RoomPersistenceTest {
                 observationRepository.startFirstFlight(
                     pointId = point.id,
                     markColor = "WHITE",
-                    markPosition = MarkPosition.NONE,
+                    markPosition = MarkPosition.THORAX,
                 )
             }
         }
@@ -287,7 +288,7 @@ class RoomPersistenceTest {
     fun firstAndAdditionalBeeKeepBeesFoundResult() = runBlocking {
         val point = createPoint()
 
-        observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.NONE)
+        observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.THORAX)
         assertEquals(
             BeePresenceResult.BEES_FOUND,
             observationRepository.observeActivePoint().first()?.beePresenceResult,
@@ -307,7 +308,7 @@ class RoomPersistenceTest {
         val bee = observationRepository.startFirstFlight(
             point.id,
             "GREEN",
-            MarkPosition.RIGHT_WING,
+            MarkPosition.ABDOMEN,
         ).bee
 
         observationRepository.undoLastBeeAction(bee.id)
@@ -325,7 +326,7 @@ class RoomPersistenceTest {
 
         assertThrows(NoBeesFoundAlreadyRecordedException::class.java) {
             runBlocking {
-                observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.NONE)
+                observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.THORAX)
             }
         }
         Unit
@@ -431,7 +432,7 @@ class RoomPersistenceTest {
     @Test
     fun noBeesResultCannotReplaceFoundBees() = runBlocking {
         val point = createPoint()
-        val bee = observationRepository.addBee(point.id, "RED", MarkPosition.NONE)
+        val bee = observationRepository.addBee(point.id, "RED", MarkPosition.THORAX)
 
         assertThrows(BeesAlreadyFoundException::class.java) {
             runBlocking { observationRepository.recordNoBeesFound(point.id) }
@@ -457,12 +458,12 @@ class RoomPersistenceTest {
     @Test
     fun individualFirstDeparturesHaveOwnTimestampsAndOneOpenCycleIsEnforced() = runBlocking {
         val point = createPoint()
-        val first = observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.NONE)
+        val first = observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.THORAX)
         clock.advanceSeconds(7)
         val second = observationRepository.startFirstFlight(
             point.id,
             "BLUE",
-            MarkPosition.RIGHT_WING,
+            MarkPosition.ABDOMEN,
         )
         val firstBee = first.bee
         val secondBee = second.bee
@@ -502,7 +503,7 @@ class RoomPersistenceTest {
     @Test
     fun repeatedReturnCannotCreateOrRewriteAnotherEvent() = runBlocking {
         val point = createPoint()
-        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.THORAX)
         observationRepository.startInitialGroupRelease(point.id)
         clock.advanceSeconds(30)
         val returned = observationRepository.registerBeeReturn(bee.id)
@@ -520,7 +521,7 @@ class RoomPersistenceTest {
     @Test
     fun activeReleasedPointRestoresAsObservationWorkflow() = runBlocking {
         val point = createPoint()
-        observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        observationRepository.addBee(point.id, "WHITE", MarkPosition.THORAX)
         observationRepository.startInitialGroupRelease(point.id)
 
         val restoredPoint = observationRepository.observeActivePoint().first()
@@ -544,8 +545,8 @@ class RoomPersistenceTest {
     @Test
     fun completionPreservesMixedOpenAndClosedFlightCycles() = runBlocking {
         val point = createPoint()
-        val flyingBeeA = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
-        val atPointBee = observationRepository.addBee(point.id, "BLUE", MarkPosition.RIGHT_WING)
+        val flyingBeeA = observationRepository.addBee(point.id, "WHITE", MarkPosition.THORAX)
+        val atPointBee = observationRepository.addBee(point.id, "BLUE", MarkPosition.ABDOMEN)
         val flyingBeeC = observationRepository.addBee(point.id, "RED", MarkPosition.LEFT_WING)
         observationRepository.startInitialGroupRelease(point.id)
         clock.advanceSeconds(75)
@@ -567,7 +568,7 @@ class RoomPersistenceTest {
     @Test
     fun shortFirstIndividualCycleUsesNormalEligibilityAndCanContinue() = runBlocking {
         val point = createPoint()
-        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.THORAX)
         val firstCycle = observationRepository.startInitialGroupRelease(point.id).single()
 
         clock.advanceSeconds(20)
@@ -606,7 +607,7 @@ class RoomPersistenceTest {
             id = UUID.randomUUID(),
             observationPointId = UUID.randomUUID(),
             markColor = "BLUE",
-            markPosition = MarkPosition.NONE,
+            markPosition = MarkPosition.THORAX,
             createdAt = clock.instant(),
         )
         assertThrows(Exception::class.java) {
@@ -622,12 +623,12 @@ class RoomPersistenceTest {
         MarkPosition.entries.forEach { position ->
             observationRepository.addBee(point.id, "WHITE", position)
         }
-        observationRepository.addBee(point.id, "BLUE", MarkPosition.RIGHT_WING)
+        observationRepository.addBee(point.id, "BLUE", MarkPosition.ABDOMEN)
 
         val restored = observationRepository.observeBees(point.id).first()
         assertEquals(4, restored.size)
         assertEquals(MarkPosition.entries.toSet(), restored.filter { it.markColor == "WHITE" }.map { it.markPosition }.toSet())
-        assertEquals(2, restored.count { it.markPosition == MarkPosition.RIGHT_WING })
+        assertEquals(2, restored.count { it.markPosition == MarkPosition.ABDOMEN })
     }
 
     @Test
@@ -644,11 +645,11 @@ class RoomPersistenceTest {
     @Test
     fun cancellingOneFirstDeparturePreservesOtherBeeAndFreesOneSlot() = runBlocking {
         val point = createPoint()
-        val removed = observationRepository.startFirstFlight(point.id, "GREEN", MarkPosition.NONE).bee
+        val removed = observationRepository.startFirstFlight(point.id, "GREEN", MarkPosition.THORAX).bee
         val retained = observationRepository.startFirstFlight(
             point.id,
             "YELLOW",
-            MarkPosition.RIGHT_WING,
+            MarkPosition.ABDOMEN,
         ).bee
 
         observationRepository.undoLastBeeAction(removed.id)
@@ -664,34 +665,103 @@ class RoomPersistenceTest {
     fun repositoryLimitsRealBeesToTenAndCancellationFreesTheSlot() = runBlocking {
         val point = createPoint()
 
-        val started = BeeMarkCatalog.supportedCombinations.take(10).map { mark ->
+        // The ten marks are now exactly the ten-Bee capacity, so the limit is
+        // reached once every mark is used and an eleventh Bee can only be a
+        // repeat of an existing mark.
+        val started = BeeMarkCatalog.supportedCombinations.map { mark ->
             observationRepository.startFirstFlight(point.id, mark.markColor, mark.markPosition)
         }
-        val eleventh = BeeMarkCatalog.supportedCombinations[10]
+        assertEquals(BeeMarkCatalog.MAX_BEES_PER_OBSERVATION_POINT, started.size)
+        val repeated = BeeMarkCatalog.supportedCombinations.first()
         assertThrows(org.beesearch.app.domain.model.BeeLimitReachedException::class.java) {
             runBlocking {
                 observationRepository.startFirstFlight(
                     point.id,
-                    eleventh.markColor,
-                    eleventh.markPosition,
+                    repeated.markColor,
+                    repeated.markPosition,
                 )
             }
         }
 
-        observationRepository.undoLastBeeAction(started.last().bee.id)
+        observationRepository.undoLastBeeAction(started.first().bee.id)
         val replacement = observationRepository.startFirstFlight(
             point.id,
-            eleventh.markColor,
-            eleventh.markPosition,
+            repeated.markColor,
+            repeated.markPosition,
         )
         assertEquals(10, observationRepository.observeBees(point.id).first().size)
-        assertEquals(eleventh.markColor, replacement.bee.markColor)
+        assertEquals(repeated.markColor, replacement.bee.markColor)
+        assertEquals(repeated.markPosition, replacement.bee.markPosition)
+    }
+
+    /**
+     * Regression for the confirmed meaning of real field data: a Bee persisted as
+     * `RIGHT_WING` must be read as an abdomen mark, keep its place, and still
+     * block a duplicate of the same color and position.
+     */
+    @Test
+    fun legacyPersistedRightWingIsReadAsAbdomenAndStillBlocksDuplicates() = runBlocking {
+        val point = createPoint()
+        val legacyBeeId = UUID.randomUUID()
+        val now = clock.instant()
+        // Written directly, exactly like a row created before the thorax/abdomen
+        // marking system existed.
+        database.beeDao().insert(
+            BeeEntity(
+                id = legacyBeeId,
+                observationPointId = point.id,
+                markColor = "YELLOW",
+                markPosition = MarkPosition.ABDOMEN,
+                createdAt = now,
+            ),
+        )
+        database.openHelper.writableDatabase.execSQL(
+            "UPDATE bees SET mark_position = 'RIGHT_WING' WHERE id = '$legacyBeeId'",
+        )
+
+        val restored = observationRepository.observeBees(point.id).first().single()
+        assertEquals(MarkPosition.ABDOMEN, restored.markPosition)
+        assertEquals("YELLOW", restored.markColor)
+        assertEquals(legacyBeeId, restored.id)
+
+        assertThrows(DuplicateBeeMarkException::class.java) {
+            runBlocking { observationRepository.startFirstFlight(point.id, "YELLOW", MarkPosition.ABDOMEN) }
+        }
+        // The occupied legacy row leaves only the thorax mark of that color.
+        assertNotNull(observationRepository.startFirstFlight(point.id, "YELLOW", MarkPosition.THORAX))
+    }
+
+    /** A legacy `LEFT_WING` row stays readable and keeps its own place. */
+    @Test
+    fun legacyPersistedLeftWingIsReadableAndDoesNotClaimARealPosition() = runBlocking {
+        val point = createPoint()
+        val legacyBeeId = UUID.randomUUID()
+        val now = clock.instant()
+        database.beeDao().insert(
+            BeeEntity(
+                id = legacyBeeId,
+                observationPointId = point.id,
+                markColor = "BLUE",
+                markPosition = MarkPosition.LEFT_WING,
+                createdAt = now,
+            ),
+        )
+        database.openHelper.writableDatabase.execSQL(
+            "UPDATE bees SET mark_position = 'LEFT_WING' WHERE id = '$legacyBeeId'",
+        )
+
+        val restored = observationRepository.observeBees(point.id).first().single()
+        assertEquals(MarkPosition.LEFT_WING, restored.markPosition)
+        assertFalse(MarkPosition.LEFT_WING.isOfferedForNewBee)
+        // Both real marks of that color are still free.
+        assertNotNull(observationRepository.addBee(point.id, "BLUE", MarkPosition.THORAX))
+        assertNotNull(observationRepository.addBee(point.id, "BLUE", MarkPosition.ABDOMEN))
     }
 
     @Test
     fun azimuthAllowsZeroRejects360AndCanBeRemoved() = runBlocking {
         val point = createPoint()
-        val bee = observationRepository.addBee(point.id, "YELLOW", MarkPosition.NONE)
+        val bee = observationRepository.addBee(point.id, "YELLOW", MarkPosition.THORAX)
         val cycle = observationRepository.startInitialGroupRelease(point.id).single()
 
         val manuallySet = observationRepository.setFlightAzimuth(cycle.id, 0.0)
@@ -709,7 +779,7 @@ class RoomPersistenceTest {
     @Test
     fun fieldCaptureIsSingleUseUndoKeepsItConsumedAndNextCycleResetsIt() = runBlocking {
         val point = createPoint()
-        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.THORAX)
         val firstCycle = observationRepository.startInitialGroupRelease(point.id).single()
 
         assertNull(firstCycle.azimuthDeg)
@@ -741,7 +811,7 @@ class RoomPersistenceTest {
     @Test
     fun fieldCaptureRejectsClosedCycle() = runBlocking {
         val point = createPoint()
-        val bee = observationRepository.addBee(point.id, "BLUE", MarkPosition.NONE)
+        val bee = observationRepository.addBee(point.id, "BLUE", MarkPosition.THORAX)
         val cycle = observationRepository.startInitialGroupRelease(point.id).single()
         clock.advanceSeconds(30)
         val closed = observationRepository.registerBeeReturn(bee.id)
@@ -756,7 +826,7 @@ class RoomPersistenceTest {
     @Test
     fun technicalCaptureFailureLeavesAzimuthAndConsumptionUnchanged() = runBlocking {
         val point = createPoint()
-        observationRepository.addBee(point.id, "GREEN", MarkPosition.NONE)
+        observationRepository.addBee(point.id, "GREEN", MarkPosition.THORAX)
         val cycle = observationRepository.startInitialGroupRelease(point.id).single()
         database.openHelper.writableDatabase.execSQL(
             """
@@ -780,8 +850,8 @@ class RoomPersistenceTest {
     @Test
     fun azimuthIsEditableScopedToCycleAndRestoredWithoutChangingFlightWorkflow() = runBlocking {
         val point = createPoint()
-        val measuredBee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
-        val otherBee = observationRepository.addBee(point.id, "BLUE", MarkPosition.RIGHT_WING)
+        val measuredBee = observationRepository.addBee(point.id, "WHITE", MarkPosition.THORAX)
+        val otherBee = observationRepository.addBee(point.id, "BLUE", MarkPosition.ABDOMEN)
         val initialCycles = observationRepository.startInitialGroupRelease(point.id)
         val measuredFirstCycle = initialCycles.single { it.beeId == measuredBee.id }
         val otherFirstCycle = initialCycles.single { it.beeId == otherBee.id }
@@ -826,7 +896,7 @@ class RoomPersistenceTest {
     @Test
     fun undoLastBeeActionRestoresArrivalToTheOriginalDepartureTime() = runBlocking {
         val point = createPoint()
-        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.NONE)
+        val bee = observationRepository.addBee(point.id, "WHITE", MarkPosition.THORAX)
         val firstCycle = observationRepository.startInitialGroupRelease(point.id).single()
         val departure = firstCycle.departureTime
 
@@ -844,7 +914,7 @@ class RoomPersistenceTest {
     @Test
     fun undoLastBeeActionDeletesOnlyLatestRepeatFlightAndReusesSequenceNumber() = runBlocking {
         val point = createPoint()
-        val bee = observationRepository.addBee(point.id, "BLUE", MarkPosition.NONE)
+        val bee = observationRepository.addBee(point.id, "BLUE", MarkPosition.THORAX)
         val firstCycle = observationRepository.startInitialGroupRelease(point.id).single()
         clock.advanceSeconds(120)
         val returned = observationRepository.registerBeeReturn(bee.id)
@@ -865,8 +935,8 @@ class RoomPersistenceTest {
     @Test
     fun undoLastBeeActionUnwindsAzimuthBeforeTheLatestRepeatFlightWithoutTouchingOtherBee() = runBlocking {
         val point = createPoint()
-        val correctedBee = observationRepository.addBee(point.id, "RED", MarkPosition.NONE)
-        val otherBee = observationRepository.addBee(point.id, "GREEN", MarkPosition.RIGHT_WING)
+        val correctedBee = observationRepository.addBee(point.id, "RED", MarkPosition.THORAX)
+        val otherBee = observationRepository.addBee(point.id, "GREEN", MarkPosition.ABDOMEN)
         val initialCycles = observationRepository.startInitialGroupRelease(point.id)
         val correctedFirst = initialCycles.single { it.beeId == correctedBee.id }
         val otherInitial = initialCycles.single { it.beeId == otherBee.id }
@@ -892,7 +962,7 @@ class RoomPersistenceTest {
     @Test
     fun firstDepartureUndoRemovesBeeAndCycleAndReleasesItsMark() = runBlocking {
         val point = createPoint()
-        val started = observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.NONE)
+        val started = observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.THORAX)
         assertEquals(
             BeeUndoAction.FIRST_DEPARTURE,
             observationRepository.undoLastBeeAction(started.bee.id),
@@ -902,7 +972,7 @@ class RoomPersistenceTest {
         assertTrue(observationRepository.observeFlightCyclesForPoint(point.id).first().isEmpty())
         assertNull(observationRepository.observeActivePoint().first()?.beePresenceResult)
 
-        val retried = observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.NONE)
+        val retried = observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.THORAX)
         assertEquals(1, retried.flightCycle.sequenceNumber)
         assertFalse(retried.flightCycle.isInitialGroupLaunch)
         assertTrue(retried.flightCycle.isFirstDepartureCancellationEligible)

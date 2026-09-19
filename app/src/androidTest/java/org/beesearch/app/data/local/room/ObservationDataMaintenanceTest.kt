@@ -85,7 +85,7 @@ class ObservationDataMaintenanceTest {
                 longitude = 42.7,
             ),
         )
-        observationRepository.addBee(point.id, "Красная", MarkPosition.RIGHT_WING)
+        observationRepository.addBee(point.id, "Красная", MarkPosition.ABDOMEN)
         observationRepository.addBee(point.id, "Синяя", MarkPosition.LEFT_WING)
         observationRepository.startInitialGroupRelease(point.id)
 
@@ -126,7 +126,7 @@ class ObservationDataMaintenanceTest {
         val deletedBee = observationRepository.addBee(
             deletedPoint.id,
             "Красная",
-            MarkPosition.RIGHT_WING,
+            MarkPosition.ABDOMEN,
         )
         val deletedCycle = observationRepository.startInitialGroupRelease(deletedPoint.id).single()
         observationRepository.completeObservationPoint(deletedPoint.id)
@@ -202,7 +202,7 @@ class ObservationDataMaintenanceTest {
         val activePoint = observationRepository.createObservationPoint(
             NewObservationPoint(territory.id, observer.id, latitude = 56.3, longitude = 42.8),
         )
-        val activeBee = observationRepository.addBee(activePoint.id, "Красная", MarkPosition.NONE)
+        val activeBee = observationRepository.addBee(activePoint.id, "Красная", MarkPosition.THORAX)
         val before = database.backupDao().let { dao ->
             Triple(dao.observationPoints(), dao.bees(), dao.flightCycles())
         }
@@ -230,7 +230,7 @@ class ObservationDataMaintenanceTest {
         val point = observationRepository.createObservationPoint(
             NewObservationPoint(territory.id, observer.id, latitude = 56.2, longitude = 42.7),
         )
-        val bee = observationRepository.addBee(point.id, "Красная", MarkPosition.RIGHT_WING)
+        val bee = observationRepository.addBee(point.id, "Красная", MarkPosition.ABDOMEN)
         val cycle = observationRepository.startInitialGroupRelease(point.id).single()
         observationRepository.completeObservationPoint(point.id)
         database.openHelper.writableDatabase.execSQL(

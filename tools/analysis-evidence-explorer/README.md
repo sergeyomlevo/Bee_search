@@ -70,6 +70,35 @@ domain validator. Explorer validation is deliberately not guaranteed to
 duplicate the complete production restore validation set; Explorer acceptance
 must not be treated as proof that production restore would accept the archive.
 
+## Mark position compatibility
+
+Bee marks were renamed from a wing vocabulary to a thorax/abdomen vocabulary.
+Both vocabularies denote the same physical positions, so an archive written by
+either application version is readable. The stored token is canonicalised before
+any semantic use:
+
+| Stored token | Canonical position |
+|---|---|
+| `THORAX` | `THORAX` |
+| `NONE` | `THORAX` |
+| `ABDOMEN` | `ABDOMEN` |
+| `RIGHT_WING` | `ABDOMEN` |
+| `LEFT_WING` | `LEFT_WING` |
+
+Any other value fails closed, including a differently cased spelling. The
+duplicate-mark invariant is evaluated on the canonical position, so an archive
+that holds both spellings of one position for one color on a single
+ObservationPoint is rejected as a duplicate instead of passing as two different
+marks. `LEFT_WING` carries no confirmed physical meaning, so it stays a separate
+legacy value: it is never renamed to `THORAX` or `ABDOMEN`, and it does not block
+a real thorax mark of the same color.
+
+Canonicalisation is used for validation and identity only. The `markPosition`
+emitted in `evidence.json`, `bees.csv` and `evidence.md` still mirrors the token
+stored in the archive, so a result built from an archive written by the previous
+application version is byte-identical to before and no version identifier or
+canonical field had to change.
+
 ## Determinism and versions
 
 Canonical serialization is UTF-8 without BOM, compact JSON with sorted object
