@@ -1752,6 +1752,13 @@ Schema v7 выполняет non-destructive migration 6 → 7: добавляе
 transaction. Успешно загруженный `LOADED` snapshot не перезаписывается обычным
 повторным worker run.
 
+Creation draft не является Room entity. Его description остаётся transient, а
+фото до создания точки находятся в app-owned
+`files/observation-attachments-staging/<draftSessionId>/`. При создании UUID точки
+уже известен: файлы активируются в deterministic final paths, а ObservationPoint,
+weather row и attachment metadata записываются одной Room transaction. Отмена
+удаляет draft directory. Это не требует schema version выше 7.
+
 ---
 
 # 70. Что намеренно не хранится

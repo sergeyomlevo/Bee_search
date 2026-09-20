@@ -274,9 +274,9 @@ internal fun WeatherBlock(
     )
 }
 
-private fun ContentResolver.displayName(uri: Uri): String? = query(uri, arrayOf("_display_name"), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+internal fun ContentResolver.displayName(uri: Uri): String? = query(uri, arrayOf("_display_name"), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
 
-private fun decodePhotoThumbnail(file: File): android.graphics.Bitmap? {
+internal fun decodePhotoThumbnail(file: File): android.graphics.Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.absolutePath, bounds)
     var sampleSize = 1

@@ -1680,6 +1680,14 @@ ObservationPoint properties v1 использует Room schema v7. `description
 перемещает файлы в staging, затем удаляет metadata транзакцией и завершает удаление;
 при ошибке транзакции files возвращаются.
 
+До создания ObservationPoint photo draft хранится отдельно в
+`files/observation-attachments-staging/<draftSessionId>/<attachmentId>`. Picker и
+camera bytes валидируются и копируются туда без Room row. При подтверждении draft
+files перемещаются в final point directory, после чего ObservationPoint, weather и
+attachment metadata фиксируются одной Room transaction; при ошибке transaction
+files возвращаются в draft. Cancel удаляет session directory. Exchange/Areas и
+map-package storage в этом lifecycle не участвуют.
+
 UI зависит от provider-neutral `WeatherProvider`. WorkManager с network constraint
 обрабатывает только persisted `PENDING` requests; координаты и время берутся из
 ObservationPoint, поэтому delayed retry не подменяет условия погодой reconnect.
@@ -1699,9 +1707,8 @@ Open-Meteo является текущим non-commercial adapter, но domain b
 
 # 65. Работа с файлами
 
-Фото, аудио и другие вложения пока не входят в текущую модель MVP.
-
-Если они появятся позже, бинарные файлы не следует хранить непосредственно в основных Room-таблицах.
+Фотографии ObservationPoint входят в текущую модель; аудио и другие типы вложений
+пока не входят. Бинарные файлы не хранятся непосредственно в Room-таблицах.
 
 Предпочтительно:
 

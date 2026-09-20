@@ -275,6 +275,10 @@ private fun BeeSearchApp(
                     AppRoute.PrepareObservationPoint -> observationPointPreparationDraft?.let { draft ->
                         ObservationPointPreparationScreen(
                             draft = draft,
+                            fileStore = application.container.attachmentFileStore,
+                            onDescriptionChanged = viewModel::updateObservationPointDraftDescription,
+                            onImportPhoto = viewModel::stageObservationPointDraftPhoto,
+                            onDeletePhoto = viewModel::removeObservationPointDraftPhoto,
                             onConfirmPoint = viewModel::confirmObservationPointPreparation,
                             onRecordNoBeesFound = viewModel::recordNoBeesFoundFromPreparation,
                             onAbort = viewModel::abortObservationPointPreparation,

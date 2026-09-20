@@ -2358,6 +2358,14 @@ ObservationPoint согласованно удаляет metadata и bytes. Comp
 восстанавливает старые точки с `description = null`, без attachments и с `PENDING`
 weather без fake values.
 
+На transient-экране подготовки description и photos являются draft-свойствами:
+отдельного сохранения description нет, а photo bytes до создания находятся в
+app-owned `observation-attachments-staging/<draftSessionId>`. `Добавить` и
+подтверждённое `Пчёлы отсутствуют` сохраняют свойства вместе с новой точкой;
+Cancel удаляет draft без Room records. Постоянные bytes остаются только в
+`observation-attachments/<pointId>/<attachmentId>`. Room schema остаётся v7,
+backup contract — v2.
+
 Во внешний provider отправляются только координаты и временной диапазон. Observer,
 Territory, UUID, Bee, description и photos не отправляются.
 

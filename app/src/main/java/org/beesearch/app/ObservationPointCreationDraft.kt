@@ -2,6 +2,7 @@ package org.beesearch.app
 
 import org.beesearch.app.domain.location.LocationReading
 import org.beesearch.app.domain.model.NewObservationPoint
+import org.beesearch.app.data.media.StagedObservationPointPhoto
 import java.util.UUID
 
 internal data class ObservationPointCreationDraft(
@@ -30,5 +31,9 @@ internal data class ObservationPointCreationDraft(
 
 internal data class ObservationPointPreparationDraft(
     val point: NewObservationPoint,
+    val draftSessionId: UUID = UUID.randomUUID(),
+    val description: String = "",
+    val photos: List<StagedObservationPointPhoto> = emptyList(),
+    val isPhotoSaving: Boolean = false,
     val isSaving: Boolean = false,
 )

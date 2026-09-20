@@ -192,4 +192,7 @@ data class NewObservationPoint(
     val gpsLatitude: Double? = null,
     val gpsLongitude: Double? = null,
     val gpsAccuracyM: Double? = null,
+    val id: UUID = UUID.randomUUID(),
+    val description: String? = null,
+    val attachments: List<ObservationPointAttachment> = emptyList(),
 )

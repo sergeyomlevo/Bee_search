@@ -6,6 +6,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.pressBackUnconditionally
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
+import org.beesearch.app.data.media.ObservationAttachmentFileStore
 import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.ui.observation.ObservationPointPreparationScreen
@@ -18,6 +21,10 @@ import java.util.UUID
 class ObservationPointPreparationScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
+    private val fileStore by lazy {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        ObservationAttachmentFileStore(context.filesDir, context.cacheDir)
+    }
 
     @Test
     fun explicitAbortDiscardsOnlyThePreparationDraftWithoutConfirmation() {
@@ -29,6 +36,10 @@ class ObservationPointPreparationScreenTest {
             Bee_searchTheme {
                 ObservationPointPreparationScreen(
                     draft = draft(),
+                    fileStore = fileStore,
+                    onDescriptionChanged = {},
+                    onImportPhoto = { _, _, _, _ -> },
+                    onDeletePhoto = {},
                     onConfirmPoint = { confirmRequests += 1 },
                     onRecordNoBeesFound = { noBeesRequests += 1 },
                     onAbort = { abortRequests += 1 },
@@ -58,6 +69,10 @@ class ObservationPointPreparationScreenTest {
             Bee_searchTheme {
                 ObservationPointPreparationScreen(
                     draft = draft(),
+                    fileStore = fileStore,
+                    onDescriptionChanged = {},
+                    onImportPhoto = { _, _, _, _ -> },
+                    onDeletePhoto = {},
                     onConfirmPoint = { confirmRequests += 1 },
                     onRecordNoBeesFound = { noBeesRequests += 1 },
                     onAbort = { abortRequests += 1 },
@@ -82,6 +97,10 @@ class ObservationPointPreparationScreenTest {
             Bee_searchTheme {
                 ObservationPointPreparationScreen(
                     draft = draft(),
+                    fileStore = fileStore,
+                    onDescriptionChanged = {},
+                    onImportPhoto = { _, _, _, _ -> },
+                    onDeletePhoto = {},
                     onConfirmPoint = {},
                     onRecordNoBeesFound = { noBeesRequests += 1 },
                     onAbort = {},
@@ -104,6 +123,10 @@ class ObservationPointPreparationScreenTest {
             Bee_searchTheme {
                 ObservationPointPreparationScreen(
                     draft = draft(),
+                    fileStore = fileStore,
+                    onDescriptionChanged = {},
+                    onImportPhoto = { _, _, _, _ -> },
+                    onDeletePhoto = {},
                     onConfirmPoint = { confirmRequests += 1 },
                     onRecordNoBeesFound = {},
                     onAbort = {},
@@ -125,6 +148,10 @@ class ObservationPointPreparationScreenTest {
             Bee_searchTheme {
                 ObservationPointPreparationScreen(
                     draft = draft(),
+                    fileStore = fileStore,
+                    onDescriptionChanged = {},
+                    onImportPhoto = { _, _, _, _ -> },
+                    onDeletePhoto = {},
                     onConfirmPoint = {},
                     onRecordNoBeesFound = {},
                     onAbort = {},
@@ -137,6 +164,31 @@ class ObservationPointPreparationScreenTest {
             composeRule.onNodeWithTag("mark-color-${color.value}").assertDoesNotExist()
         }
         composeRule.onNodeWithTag("record-no-bees-from-draft").assertIsDisplayed()
+    }
+
+    @Test
+    fun descriptionAndPhotosAreDraftPropertiesWithoutSeparateSave() {
+        var description = ""
+        composeRule.setContent {
+            Bee_searchTheme {
+                ObservationPointPreparationScreen(
+                    draft = draft().copy(description = description),
+                    fileStore = fileStore,
+                    onDescriptionChanged = { description = it },
+                    onImportPhoto = { _, _, _, _ -> },
+                    onDeletePhoto = {},
+                    onConfirmPoint = {},
+                    onRecordNoBeesFound = {},
+                    onAbort = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("observation-point-draft-description").assertIsDisplayed()
+        composeRule.onNodeWithText("Сохранить").assertDoesNotExist()
+        composeRule.onNodeWithText("Фотографии").assertDoesNotExist()
+        composeRule.onNodeWithText("Выбрать фото").assertIsDisplayed()
+        composeRule.onNodeWithTag("observation-point-draft-take-photo").assertIsDisplayed()
     }
 
     private fun draft() = ObservationPointPreparationDraft(

@@ -260,13 +260,14 @@ internal class RoomObservationRepository(
     override suspend fun createObservationPoint(
         point: NewObservationPoint,
     ): ObservationPoint = database.withTransaction {
-        createActivePoint(point).toDomain()
+        createActivePoint(point).also { insertCreationAttachments(point) }.toDomain()
     }
 
     override suspend fun createObservationPointWithNoBeesFound(
         point: NewObservationPoint,
     ): ObservationPoint = database.withTransaction {
         val createdPoint = createActivePoint(point)
+        insertCreationAttachments(point)
         val completedAt = clock.instant()
         if (
             pointDao.recordNoBeesAndComplete(
@@ -302,7 +303,7 @@ internal class RoomObservationRepository(
             observerId = point.observerId,
         )
         val entity = ObservationPointEntity(
-            id = UUID.randomUUID(),
+            id = point.id,
             territoryId = point.territoryId,
             observerId = point.observerId,
             observationYear = observationYear,
@@ -317,11 +318,35 @@ internal class RoomObservationRepository(
             createdAt = createdAt,
             initialGroupReleaseAt = null,
             completedAt = null,
-            description = null,
+            description = point.description?.trimEnd()?.ifBlank { null },
         )
         pointDao.insert(entity)
         weatherDao.insert(ObservationPointWeatherEntity(entity.id, WeatherStatus.PENDING, null, null, null, null, null, null))
         return entity
+    }
+
+    private suspend fun insertCreationAttachments(point: NewObservationPoint) {
+        point.attachments.forEach { attachment ->
+            require(attachment.observationPointId == point.id)
+            require(
+                attachment.relativePath ==
+                    org.beesearch.app.data.media.ObservationAttachmentFileStore.relativePath(point.id, attachment.id),
+            )
+            require(attachment.byteSize > 0L && attachment.sha256.matches(Regex("[0-9a-f]{64}")))
+            attachmentDao.insert(
+                ObservationPointAttachmentEntity(
+                    attachment.id,
+                    attachment.observationPointId,
+                    attachment.type,
+                    attachment.relativePath,
+                    attachment.originalFileName,
+                    attachment.mimeType,
+                    attachment.byteSize,
+                    attachment.sha256,
+                    attachment.createdAt,
+                ),
+            )
+        }
     }
 
     override suspend fun startFirstFlight(

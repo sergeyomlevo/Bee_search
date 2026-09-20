@@ -28,6 +28,8 @@ class ObservationPointPropertiesRoomTest {
     private lateinit var database: BeeSearchDatabase
     private lateinit var repository: RoomObservationRepository
     private lateinit var pointId: UUID
+    private lateinit var territoryId: UUID
+    private lateinit var observerId: UUID
 
     @Before
     fun setUp() = runBlocking {
@@ -36,12 +38,69 @@ class ObservationPointPropertiesRoomTest {
         val clock = Clock.fixed(Instant.parse("2026-09-12T10:15:00Z"), ZoneOffset.UTC)
         val territory = RoomTerritoryRepository(database.territoryDao(), clock).createTerritory("T", "Territory", "R", "D")
         val observer = RoomObserverRepository(database.observerDao(), clock).createObserver("O", "Last", "First", null, null)
+        territoryId = territory.id
+        observerId = observer.id
         repository = RoomObservationRepository(
             database, database.territoryDao(), database.observationPointDao(), database.observerDao(),
             database.beeDao(), database.flightCycleDao(), database.observationPointAttachmentDao(),
             database.observationPointWeatherDao(), clock, { ZoneOffset.UTC },
         )
         pointId = repository.createObservationPoint(NewObservationPoint(territory.id, observer.id, latitude = 56.1, longitude = 42.7)).id
+    }
+
+    @Test
+    fun creationPersistsDescriptionAndAttachmentsInTheSamePointTransaction() = runBlocking {
+        repository.recordNoBeesFound(pointId)
+        val newPointId = UUID.randomUUID()
+        val attachmentId = UUID.randomUUID()
+        val createdAttachment = attachment(
+            newPointId,
+            "observation-attachments/$newPointId/$attachmentId",
+            attachmentId,
+        )
+        val created = repository.createObservationPoint(
+            NewObservationPoint(
+                territoryId = territoryId,
+                observerId = observerId,
+                latitude = 56.2,
+                longitude = 42.8,
+                id = newPointId,
+                description = "Описание из создания",
+                attachments = listOf(createdAttachment),
+            ),
+        )
+
+        val detail = repository.getObservationPointDetail(created.id)!!
+        assertEquals("Описание из создания", detail.point.description)
+        assertEquals(listOf(createdAttachment), detail.attachments)
+    }
+
+    @Test
+    fun noBeesCreationPersistsTheSameDraftProperties() = runBlocking {
+        repository.recordNoBeesFound(pointId)
+        val newPointId = UUID.randomUUID()
+        val attachmentId = UUID.randomUUID()
+        val createdAttachment = attachment(
+            newPointId,
+            "observation-attachments/$newPointId/$attachmentId",
+            attachmentId,
+        )
+        val created = repository.createObservationPointWithNoBeesFound(
+            NewObservationPoint(
+                territoryId = territoryId,
+                observerId = observerId,
+                latitude = 56.2,
+                longitude = 42.8,
+                id = newPointId,
+                description = "Точка без пчёл",
+                attachments = listOf(createdAttachment),
+            ),
+        )
+
+        val detail = repository.getObservationPointDetail(created.id)!!
+        assertEquals(org.beesearch.app.domain.model.BeePresenceResult.NO_BEES_FOUND, detail.point.beePresenceResult)
+        assertEquals("Точка без пчёл", detail.point.description)
+        assertEquals(listOf(createdAttachment), detail.attachments)
     }
 
     @After fun tearDown() = database.close()
@@ -63,7 +122,10 @@ class ObservationPointPropertiesRoomTest {
         val second = attachment(pointId, "points/$pointId/2.jpg")
         repository.insertObservationPointAttachment(first)
         repository.insertObservationPointAttachment(second)
-        assertEquals(listOf(first, second), repository.listObservationPointAttachments(pointId))
+        assertEquals(
+            listOf(first, second).sortedWith(compareBy({ it.createdAt }, { it.id.toString() })),
+            repository.listObservationPointAttachments(pointId),
+        )
         assertEquals(first, repository.deleteObservationPointAttachment(first.id))
         assertEquals(listOf(second), repository.listObservationPointAttachments(pointId))
         assertFalse(database.observationPointAttachmentDao().getById(first.id) != null)
@@ -99,8 +161,8 @@ class ObservationPointPropertiesRoomTest {
         assertNull(database.observationPointWeatherDao().getByPointId(pointId))
     }
 
-    private fun attachment(pointId: UUID, path: String) = ObservationPointAttachment(
-        UUID.randomUUID(), pointId, AttachmentType.PHOTO, path, "photo.jpg", "image/jpeg", 12L,
+    private fun attachment(pointId: UUID, path: String, id: UUID = UUID.randomUUID()) = ObservationPointAttachment(
+        id, pointId, AttachmentType.PHOTO, path, "photo.jpg", "image/jpeg", 12L,
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", Instant.parse("2026-09-12T10:16:00Z"),
     )
 }

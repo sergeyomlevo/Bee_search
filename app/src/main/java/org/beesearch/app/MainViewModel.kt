@@ -55,6 +55,11 @@ import org.beesearch.app.domain.usecase.StartupDestination
 import org.beesearch.app.domain.usecase.StartupRouter
 import org.beesearch.app.ui.map.AreaEditorRequest
 import java.util.UUID
+import java.io.InputStream
+import java.time.Clock
+import java.time.Instant
+import org.beesearch.app.data.media.ObservationAttachmentFileStore
+import org.beesearch.app.data.media.StagedObservationPointPhoto
 
 sealed interface AppRoute {
     data object Loading : AppRoute
@@ -101,8 +106,10 @@ internal class MainViewModel(
     private val observerRepository: ObserverRepository,
     private val observationRepository: ObservationRepository,
     private val createObservationPoint: CreateObservationPoint,
+    private val attachmentFileStore: ObservationAttachmentFileStore,
     private val locationProvider: LocationProvider,
     private val territoryCoverageDeletion: TerritoryCoverageDeletion,
+    private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
     private val manualRoute = MutableStateFlow<AppRoute?>(null)
 
@@ -472,10 +479,74 @@ internal class MainViewModel(
 
     fun abortObservationPointPreparation() {
         val draft = _observationPointPreparationDraft.value ?: return
-        if (draft.isSaving) return
-        _observationPointPreparationDraft.value = null
-        manualRoute.value = null
-        clearFeedback()
+        if (draft.isSaving || draft.isPhotoSaving) return
+        _observationPointPreparationDraft.value = draft.copy(isSaving = true)
+        viewModelScope.launch {
+            if (attachmentFileStore.discardDraft(draft.draftSessionId)) {
+                _observationPointPreparationDraft.value = null
+                manualRoute.value = null
+                clearFeedback()
+            } else {
+                _observationPointPreparationDraft.value = draft
+                showPersistentFeedback("Не удалось удалить временные фотографии")
+            }
+        }
+    }
+
+    fun updateObservationPointDraftDescription(value: String) {
+        val draft = _observationPointPreparationDraft.value ?: return
+        if (draft.isSaving || draft.isPhotoSaving) return
+        _observationPointPreparationDraft.value = draft.copy(description = value)
+    }
+
+    fun stageObservationPointDraftPhoto(
+        source: () -> InputStream,
+        originalFileName: String?,
+        mimeType: String?,
+        onComplete: (() -> Unit)? = null,
+    ) {
+        val draft = _observationPointPreparationDraft.value ?: return
+        if (draft.isSaving || draft.isPhotoSaving) return
+        _observationPointPreparationDraft.value = draft.copy(isPhotoSaving = true)
+        viewModelScope.launch {
+            runCatching {
+                attachmentFileStore.stageDraftPhoto(
+                    draftSessionId = draft.draftSessionId,
+                    attachmentId = UUID.randomUUID(),
+                    originalFileName = originalFileName,
+                    mimeType = mimeType,
+                    createdAt = Instant.now(clock),
+                    source = source,
+                )
+            }.onSuccess { photo ->
+                _observationPointPreparationDraft.value =
+                    _observationPointPreparationDraft.value?.copy(
+                        photos = draft.photos + photo,
+                        isPhotoSaving = false,
+                    )
+            }.onFailure { error ->
+                _observationPointPreparationDraft.value = draft.copy(isPhotoSaving = false)
+                showPersistentFeedback(userMessageFor(error, "Не удалось добавить фотографию"))
+            }
+            onComplete?.invoke()
+        }
+    }
+
+    fun removeObservationPointDraftPhoto(photo: StagedObservationPointPhoto) {
+        val draft = _observationPointPreparationDraft.value ?: return
+        if (draft.isSaving || draft.isPhotoSaving || photo !in draft.photos) return
+        _observationPointPreparationDraft.value = draft.copy(isPhotoSaving = true)
+        viewModelScope.launch {
+            if (attachmentFileStore.deleteDraftPhoto(photo)) {
+                _observationPointPreparationDraft.value = draft.copy(
+                    photos = draft.photos - photo,
+                    isPhotoSaving = false,
+                )
+            } else {
+                _observationPointPreparationDraft.value = draft.copy(isPhotoSaving = false)
+                showPersistentFeedback("Не удалось удалить временную фотографию")
+            }
+        }
     }
 
     fun confirmObservationPointPreparation() {
@@ -502,21 +573,48 @@ internal class MainViewModel(
         operation: suspend (org.beesearch.app.domain.model.NewObservationPoint) -> Unit,
     ) {
         val draft = _observationPointPreparationDraft.value ?: return
-        if (draft.isSaving) return
+        if (draft.isSaving || draft.isPhotoSaving) return
         _observationPointPreparationDraft.value = draft.copy(isSaving = true)
         viewModelScope.launch {
+            var activation: org.beesearch.app.data.media.DraftAttachmentActivation? = null
             try {
-                operation(draft.point)
+                activation = attachmentFileStore.prepareDraftActivation(
+                    draftSessionId = draft.draftSessionId,
+                    observationPointId = draft.point.id,
+                    photos = draft.photos,
+                )
+                operation(
+                    draft.point.copy(
+                        description = draft.description.trimEnd().ifBlank { null },
+                        attachments = activation.attachments,
+                    ),
+                )
+                // Room now owns the attachment metadata. Final files must not be rolled back if
+                // removing an already-empty draft directory fails or this cleanup is cancelled.
+                val committedActivation = activation
+                activation = null
+                try {
+                    committedActivation.commit()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    // The database and final attachment files are already consistent. A leftover
+                    // empty draft directory is harmless and can be removed by a later cleanup.
+                }
                 _observationPointPreparationDraft.value = null
                 manualRoute.value = null
                 showSuccessFeedback(successMessage)
             } catch (error: CancellationException) {
+                runCatching { activation?.rollback() }
                 throw error
             } catch (error: ObservationPointAlreadyActiveException) {
+                runCatching { activation?.rollback() }
+                runCatching { attachmentFileStore.discardDraft(draft.draftSessionId) }
                 _observationPointPreparationDraft.value = null
                 manualRoute.value = activePoint.value?.let(AppRoute::ResumeObservation)
                 showPersistentFeedback(userMessageFor(error, fallbackMessage))
             } catch (error: Exception) {
+                runCatching { activation?.rollback() }
                 _observationPointPreparationDraft.value = draft
                 showPersistentFeedback(userMessageFor(error, fallbackMessage))
             }
@@ -793,6 +891,7 @@ internal class MainViewModel(
                         observerRepository = application.container.observerRepository,
                         observationRepository = application.container.observationRepository,
                         createObservationPoint = application.container.createObservationPoint,
+                        attachmentFileStore = application.container.attachmentFileStore,
                         locationProvider = application.container.locationProvider,
                         territoryCoverageDeletion = TerritoryCoverageDeletion(
                             territoryRepository = application.container.territoryRepository,

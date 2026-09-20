@@ -15,12 +15,14 @@ class CreateObservationPoint(
 ) {
     suspend fun create(point: NewObservationPoint): ObservationPoint {
         requireCurrentSelection(point)
-        return pointCreator.createObservationPoint(point).also { weatherSyncScheduler.enqueue() }
+        return pointCreator.createObservationPoint(point).also { runCatching { weatherSyncScheduler.enqueue() } }
     }
 
     suspend fun createWithNoBeesFound(point: NewObservationPoint): ObservationPoint {
         requireCurrentSelection(point)
-        return pointCreator.createObservationPointWithNoBeesFound(point).also { weatherSyncScheduler.enqueue() }
+        return pointCreator.createObservationPointWithNoBeesFound(point).also {
+            runCatching { weatherSyncScheduler.enqueue() }
+        }
     }
 
     private suspend fun requireCurrentSelection(point: NewObservationPoint) {
