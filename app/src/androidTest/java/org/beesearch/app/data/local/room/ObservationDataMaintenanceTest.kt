@@ -192,6 +192,56 @@ class ObservationDataMaintenanceTest {
         }
     }
 
+    /**
+     * The mass "delete all points" operation must not reach outside research data: Territory,
+     * Observer, portable settings, the Ареал and the installed offline map package all survive.
+     */
+    @Test
+    fun clearAllPointsPreservesTerritoryObserverSettingsAreaAndInstalledMap() = runBlocking {
+        val territory = territoryRepository.createTerritory("T01", "Территория", "Регион", "Район")
+        val observer = observerRepository.createObserver("O01", "Иванов", "Иван", null, null)
+        val point = observationRepository.createObservationPoint(
+            NewObservationPoint(territory.id, observer.id, latitude = 56.2, longitude = 42.7),
+        )
+        observationRepository.addBee(point.id, "Красная", MarkPosition.ABDOMEN)
+        observationRepository.startInitialGroupRelease(point.id)
+        observationRepository.completeObservationPoint(point.id)
+
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val preferenceFile = File(context.cacheDir, "clear-all-${UUID.randomUUID()}.preferences_pb")
+        val mapFile = File(context.cacheDir, "clear-all-map-${UUID.randomUUID()}.pmtiles")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val dataStore = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferenceFile })
+            val settings = DataStoreSettingsRepository(dataStore)
+            val areaStore = DataStoreMapAreaStore(dataStore)
+            val coverage = listOf(MapCoverageFragment(MapGeoBounds(57.0, 43.0, 56.0, 42.0)))
+            val activeMapKey = stringPreferencesKey("map_package_active_${territory.id}")
+            settings.setCurrentTerritoryId(territory.id)
+            settings.setCurrentObserverId(observer.id)
+            areaStore.create(territory.id, "Тестовый ареал", coverage.map { it.bounds })
+            dataStore.edit { it[activeMapKey] = mapFile.absolutePath }
+            mapFile.writeText("device-local map marker")
+
+            val deleted = observationRepository.clearObservationData()
+
+            assertEquals(ObservationDataCounts(1, 1, 1), deleted)
+            assertEquals(0, database.backupDao().observationPointCount())
+            assertEquals(1, database.backupDao().territoryCount())
+            assertEquals(1, database.backupDao().observerCount())
+            assertEquals(territory.id, settings.getSettings().currentTerritoryId)
+            assertEquals(observer.id, settings.getSettings().currentObserverId)
+            val storedArea = areaStore.load(territory.id, null) as MapAreaReadResult.Present
+            assertEquals(coverage.map { it.bounds }, storedArea.area.bounds)
+            assertEquals(mapFile.absolutePath, dataStore.data.first()[activeMapKey])
+            assertTrue(mapFile.exists())
+        } finally {
+            scope.cancel()
+            preferenceFile.delete()
+            mapFile.delete()
+        }
+    }
+
     @Test
     fun activePointIsNotListedAndCannotBeSelectivelyDeleted() = runBlocking {
         val territory = territoryRepository.createTerritory("T01", "Территория", "Регион", "Район")

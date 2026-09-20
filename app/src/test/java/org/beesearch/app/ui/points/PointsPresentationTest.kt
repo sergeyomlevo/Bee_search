@@ -9,6 +9,9 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PointsPresentationTest {
+    private val devTerritory = UUID.randomUUID()
+    private val otherTerritory = UUID.randomUUID()
+
     @Test
     fun defaultUsesLatestAvailableYearAndSpecificYearFiltersOnce() {
         val old = summary(2025, 1)
@@ -16,13 +19,15 @@ class PointsPresentationTest {
 
         val initial = buildPointsUiState(
             allPoints = listOf(newest, old),
-            requestedFilter = null,
+            selectedTerritoryId = devTerritory,
+            requestedYearFilter = null,
             viewMode = PointsViewMode.MAP,
             selectedPointId = null,
         )
         val oldYear = buildPointsUiState(
             allPoints = listOf(newest, old),
-            requestedFilter = PointsYearFilter.Year(2025),
+            selectedTerritoryId = devTerritory,
+            requestedYearFilter = PointsYearFilter.Year(2025),
             viewMode = PointsViewMode.TABLE,
             selectedPointId = old.id,
         )
@@ -37,12 +42,83 @@ class PointsPresentationTest {
     @Test
     fun allYearsAndViewSwitchKeepExactlyTheSamePointIds() {
         val points = listOf(summary(2026, 3), summary(2025, 2), summary(2024, 1))
-        val map = buildPointsUiState(points, PointsYearFilter.All, PointsViewMode.MAP, null)
-        val table = buildPointsUiState(points, PointsYearFilter.All, PointsViewMode.TABLE, null)
+        val map = buildPointsUiState(points, devTerritory, PointsYearFilter.All, PointsViewMode.MAP, null)
+        val table = buildPointsUiState(points, devTerritory, PointsYearFilter.All, PointsViewMode.TABLE, null)
 
         assertEquals(points.map { it.id }, map.points.map { it.id })
         assertEquals(map.points.map { it.id }, table.points.map { it.id })
         assertNull(table.selectedPoint)
+    }
+
+    /**
+     * The browser observes one Territory at a time, so every point in the state belongs to the
+     * Territory the user is viewing.
+     */
+    @Test
+    fun stateOnlyCarriesPointsOfTheViewedTerritory() {
+        val viewed = summary(2026, 1, territoryId = otherTerritory)
+
+        val state = buildPointsUiState(
+            allPoints = listOf(viewed),
+            selectedTerritoryId = otherTerritory,
+            requestedYearFilter = null,
+            viewMode = PointsViewMode.MAP,
+            selectedPointId = null,
+        )
+
+        assertEquals(otherTerritory, state.selectedTerritoryId)
+        assertEquals(listOf(viewed.id), state.points.map { it.id })
+        assertEquals(setOf(otherTerritory), state.points.map { it.territoryId }.toSet())
+    }
+
+    /**
+     * The viewing selection is the only thing the year filter depends on: it never produces points
+     * from another Territory, and it is not a settings value.
+     */
+    @Test
+    fun yearFilterAppliesOnlyWithinTheViewedTerritory() {
+        val otherYear = summary(2024, 9, territoryId = otherTerritory)
+
+        val state = buildPointsUiState(
+            allPoints = listOf(summary(2026, 1), summary(2025, 2), otherYear),
+            selectedTerritoryId = devTerritory,
+            requestedYearFilter = PointsYearFilter.Year(2025),
+            viewMode = PointsViewMode.TABLE,
+            selectedPointId = null,
+        )
+
+        assertEquals(listOf(2025), state.points.map { it.observationYear })
+        assertEquals(setOf(devTerritory), state.points.map { it.territoryId }.toSet())
+    }
+
+    @Test
+    fun yearMissingFromTheViewedTerritoryFallsBackToItsNewestYear() {
+        val state = buildPointsUiState(
+            allPoints = listOf(summary(2024, 1), summary(2023, 2)),
+            selectedTerritoryId = devTerritory,
+            requestedYearFilter = PointsYearFilter.Year(2026),
+            viewMode = PointsViewMode.MAP,
+            selectedPointId = null,
+        )
+
+        assertEquals(PointsYearFilter.Year(2024), state.yearFilter)
+        assertEquals(listOf(2024), state.points.map { it.observationYear })
+    }
+
+    @Test
+    fun emptyTerritoryProducesAnEmptyResultInsteadOfFailing() {
+        val state = buildPointsUiState(
+            allPoints = emptyList(),
+            selectedTerritoryId = devTerritory,
+            requestedYearFilter = PointsYearFilter.Year(2026),
+            viewMode = PointsViewMode.MAP,
+            selectedPointId = UUID.randomUUID(),
+        )
+
+        assertEquals(emptyList<UUID>(), state.points.map { it.id })
+        assertEquals(emptyList<Int>(), state.availableYears)
+        assertEquals(PointsYearFilter.All, state.yearFilter)
+        assertNull(state.selectedPoint)
     }
 
     @Test
@@ -61,9 +137,13 @@ class PointsPresentationTest {
         )
     }
 
-    private fun summary(year: Int, number: Int) = ObservationPointSummary(
+    private fun summary(
+        year: Int,
+        number: Int,
+        territoryId: UUID = devTerritory,
+    ) = ObservationPointSummary(
         id = UUID.randomUUID(),
-        territoryId = UUID.randomUUID(),
+        territoryId = territoryId,
         observationYear = year,
         pointNumber = number,
         code = null,

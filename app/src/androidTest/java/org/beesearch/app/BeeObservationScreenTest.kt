@@ -87,7 +87,7 @@ class BeeObservationScreenTest {
                     onStartFirstFlight = { color, position -> selected = color to position },
                     onStartNextFlight = {},
                     onComplete = {},
-                    onOpenPointProperties = { propertiesOpened = true },
+                    onOpenPointDetail = { propertiesOpened = true },
                 )
             }
         }

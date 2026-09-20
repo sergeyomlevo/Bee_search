@@ -2,63 +2,157 @@
 
 package org.beesearch.app.ui.points
 
+import android.content.ContentResolver
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.io.File
 import java.time.Duration
 import java.time.Instant
 import java.util.Locale
 import java.util.UUID
-import org.beesearch.app.domain.model.ObservationPointDetail
-import org.beesearch.app.domain.repository.ObservationRepository
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
-import org.beesearch.app.ui.properties.AttachmentRow
-import org.beesearch.app.ui.properties.WeatherBlock
+import org.beesearch.app.domain.model.ObservationPointAttachment
+import org.beesearch.app.domain.model.ObservationPointDetail
+import org.beesearch.app.domain.repository.ObservationDataMaintenance
+import org.beesearch.app.domain.repository.ObservationRepository
+import org.beesearch.app.domain.weather.WeatherSyncScheduler
 import org.beesearch.app.ui.observation.BeeMarkIcon
+import org.beesearch.app.ui.properties.PointDescriptionSection
+import org.beesearch.app.ui.properties.PointPhotoSection
+import org.beesearch.app.ui.properties.WeatherBlock
+import org.beesearch.app.ui.properties.displayName
 
+/**
+ * The single screen of one ObservationPoint: stored point data, description, photos, weather snapshot
+ * and the existing Bee/FlightCycle history. It replaces the former separate point-properties screen.
+ */
 @Composable
 internal fun PointDetailRoute(
     pointId: UUID,
     repository: ObservationRepository,
+    maintenance: ObservationDataMaintenance,
     fileStore: ObservationAttachmentFileStore,
+    weatherScheduler: WeatherSyncScheduler,
     onBack: () -> Unit,
-    onOpenProperties: () -> Unit,
+    onDeleted: () -> Unit,
 ) {
-    val detailViewModel: PointDetailViewModel = viewModel(
+    val viewModel: PointDetailViewModel = viewModel(
         key = "point-detail-$pointId",
-        factory = PointDetailViewModel.factory(repository, pointId),
+        factory = PointDetailViewModel.factory(
+            repository = repository,
+            maintenance = maintenance,
+            fileStore = fileStore,
+            weatherScheduler = weatherScheduler,
+            pointId = pointId,
+        ),
     )
-    val state by detailViewModel.uiState.collectAsStateWithLifecycle()
-    PointDetailScreen(
-        state = state,
-        fileStore = fileStore,
-        onBack = onBack,
-        onOpenProperties = onOpenProperties,
-    )
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val resolver = context.contentResolver
+    val snackbar = remember { SnackbarHostState() }
+    var deleteTarget by remember { mutableStateOf<ObservationPointAttachment?>(null) }
+    var confirmDeletePoint by rememberSaveable { mutableStateOf(false) }
+    var cameraPath by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val importUri = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            viewModel.importPhoto(
+                source = { resolver.openInputStream(uri) ?: error("Не удалось открыть фотографию") },
+                originalFileName = resolver.displayName(uri),
+                mimeType = resolver.getType(uri),
+            )
+        }
+    }
+    val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        val path = cameraPath ?: return@rememberLauncherForActivityResult
+        cameraPath = null
+        val file = File(path)
+        if (saved && file.exists()) {
+            viewModel.importPhoto(
+                source = { file.inputStream() },
+                originalFileName = file.name,
+                mimeType = "image/jpeg",
+                onComplete = { file.delete() },
+            )
+        } else {
+            file.delete()
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        PointDetailScreen(
+            state = state,
+            fileStore = fileStore,
+            onBack = onBack,
+            onStartDescriptionEditing = viewModel::startDescriptionEditing,
+            onDescriptionChanged = viewModel::onDescriptionChanged,
+            onCancelDescriptionEditing = viewModel::cancelDescriptionEditing,
+            onSaveDescription = viewModel::saveDescription,
+            onTakePhoto = {
+                val file = fileStore.cameraCaptureFile(UUID.randomUUID())
+                cameraPath = file.absolutePath
+                takePicture.launch(
+                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file),
+                )
+            },
+            onPickPhoto = {
+                importUri.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            onDeletePhoto = viewModel::deletePhoto,
+            onRetryWeather = viewModel::retryWeather,
+            onDeletePoint = { viewModel.deletePoint(onDeleted = onDeleted) },
+            onDismissMessage = viewModel::dismissMessage,
+        )
+        SnackbarHost(
+            hostState = snackbar,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
+        )
+    }
+
+    LaunchedEffect(state.message) {
+        state.message?.let { message ->
+            snackbar.showSnackbar(message)
+            viewModel.dismissMessage()
+        }
+    }
 }
 
 @Composable
@@ -66,108 +160,198 @@ internal fun PointDetailScreen(
     state: PointDetailUiState,
     fileStore: ObservationAttachmentFileStore? = null,
     onBack: () -> Unit,
-    onOpenProperties: () -> Unit = {},
+    onStartDescriptionEditing: () -> Unit = {},
+    onDescriptionChanged: (String) -> Unit = {},
+    onCancelDescriptionEditing: () -> Unit = {},
+    onSaveDescription: () -> Unit = {},
+    onTakePhoto: () -> Unit = {},
+    onPickPhoto: () -> Unit = {},
+    onDeletePhoto: (ObservationPointAttachment) -> Unit = {},
+    onRetryWeather: () -> Unit = {},
+    onDeletePoint: () -> Unit = {},
+    onDismissMessage: () -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Просмотр точки") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Назад") } },
-                actions = {
-                    TextButton(
-                        onClick = onOpenProperties,
-                        modifier = Modifier.testTag("open-point-properties"),
-                    ) { Text("Свойства") }
-                },
-            )
-        },
-    ) { padding ->
-        when {
-            state.isLoading -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+    var confirmDeletePoint by rememberSaveable { mutableStateOf(false) }
+    var deletePhotoTarget by remember { mutableStateOf<ObservationPointAttachment?>(null) }
+    val detail = state.detail
+    val deletable = detail?.point?.completedAt != null && !state.isDeletingPoint
+
+    Column(Modifier.fillMaxSize()) {
+        CompactScreenHeader(
+            title = detail?.let { "Точка №${it.point.pointNumber}" } ?: "Точка",
+            onBack = onBack,
+        ) {
+            if (deletable) {
+                HeaderMenuButton(
+                    items = listOf(
+                        HeaderMenuItem(
+                            label = "Удалить точку",
+                            testTag = "point-menu-delete",
+                            isDestructive = true,
+                            onClick = { confirmDeletePoint = true },
+                        ),
+                    ),
+                    menuDescription = "Действия с этой точкой",
+                    testTag = "point-menu",
+                )
             }
-            state.notFound -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Точка не найдена")
-            }
-            state.detail != null -> PointDetailContent(
-                detail = state.detail,
-                fileStore = fileStore,
-                modifier = Modifier.fillMaxSize().padding(padding),
-            )
         }
+        Box(Modifier.weight(1f)) {
+            when {
+                state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                detail == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Точка не найдена")
+                }
+                else -> PointDetailContent(
+                    detail = detail,
+                    state = state,
+                    fileStore = fileStore,
+                    onStartDescriptionEditing = onStartDescriptionEditing,
+                    onDescriptionChanged = onDescriptionChanged,
+                    onCancelDescriptionEditing = onCancelDescriptionEditing,
+                    onSaveDescription = onSaveDescription,
+                    onTakePhoto = onTakePhoto,
+                    onPickPhoto = onPickPhoto,
+                    onDeletePhoto = { attachment -> deletePhotoTarget = attachment },
+                    onRetryWeather = onRetryWeather,
+                )
+            }
+        }
+        state.message?.let { message ->
+            PointDetailMessageRow(message = message, onDismiss = onDismissMessage)
+        }
+    }
+
+    deletePhotoTarget?.let { attachment ->
+        AlertDialog(
+            onDismissRequest = { deletePhotoTarget = null },
+            title = { Text("Удалить фотографию?") },
+            text = { Text("Файл будет удалён из приложения.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { deletePhotoTarget = null; onDeletePhoto(attachment) },
+                    modifier = Modifier.testTag("confirm-delete-photo"),
+                ) { Text("Удалить") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { deletePhotoTarget = null },
+                    modifier = Modifier.testTag("cancel-delete-photo"),
+                ) { Text("Отмена") }
+            },
+        )
+    }
+
+    if (confirmDeletePoint) {
+        PointDeleteDialog(
+            detail = detail,
+            isDeleting = state.isDeletingPoint,
+            onConfirm = { confirmDeletePoint = false; onDeletePoint() },
+            onDismiss = { if (!state.isDeletingPoint) confirmDeletePoint = false },
+        )
     }
 }
 
 @Composable
 private fun PointDetailContent(
     detail: ObservationPointDetail,
+    state: PointDetailUiState,
     fileStore: ObservationAttachmentFileStore?,
-    modifier: Modifier = Modifier,
+    onStartDescriptionEditing: () -> Unit,
+    onDescriptionChanged: (String) -> Unit,
+    onCancelDescriptionEditing: () -> Unit,
+    onSaveDescription: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onPickPhoto: () -> Unit,
+    onDeletePhoto: (ObservationPointAttachment) -> Unit,
+    onRetryWeather: () -> Unit,
 ) {
     LazyColumn(
-        modifier = modifier.padding(horizontal = 16.dp).testTag("point-detail-list"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().testTag("point-detail-list"),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Text("Основное", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
-            DetailLine("Территория", "${detail.territory.code} — ${detail.territory.name}")
-            DetailLine("Точка", pointDisplayName(detail.point.pointNumber, detail.point.code))
-            DetailLine("Дата и время", formatPointDateTime(detail.point.createdAt))
-            DetailLine(
-                "Координаты",
-                String.format(Locale.ROOT, "%.6f, %.6f", detail.point.latitude, detail.point.longitude),
-            )
-            detail.point.gpsAccuracyM?.let { accuracy ->
-                DetailLine("Точность GPS", String.format(Locale.ROOT, "%.1f м", accuracy))
-            }
-            DetailLine("Наблюдатель", "${detail.observer.displayName} (${detail.observer.code})")
-            DetailLine("Результат", pointResultLabel(detail.point.beePresenceResult))
-        }
-        detail.point.description?.takeIf { it.isNotBlank() }?.let { description ->
-            item {
-                Text("Описание", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp))
-                Text(description)
+            PointSection("Основное") {
+                DetailField("Территория", "${detail.territory.code} — ${detail.territory.name}")
+                DetailField("Точка", pointDisplayName(detail.point.pointNumber, detail.point.code))
+                DetailField("Дата и время", formatPointDateTime(detail.point.createdAt))
+                DetailField(
+                    "Координаты",
+                    String.format(Locale.ROOT, "%.6f, %.6f", detail.point.latitude, detail.point.longitude),
+                )
+                detail.point.gpsAccuracyM?.let { accuracy ->
+                    DetailField("Точность GPS", String.format(Locale.ROOT, "%.1f м", accuracy))
+                }
+                DetailField("Наблюдатель", "${detail.observer.displayName} (${detail.observer.code})")
+                DetailField("Результат", pointResultLabel(detail.point.beePresenceResult))
             }
         }
-        if (detail.attachments.isNotEmpty() && fileStore != null) {
-            item { Text("Фотографии", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp)) }
-            items(detail.attachments, key = { "attachment-${it.id}" }) { attachment ->
-                AttachmentRow(attachment, fileStore)
+        item {
+            PointSection("Описание") {
+                PointDescriptionSection(
+                    detail = detail,
+                    descriptionDraft = state.descriptionDraft,
+                    isEditing = state.isDescriptionEditing,
+                    isSaving = state.isDescriptionSaving,
+                    onStartEditing = onStartDescriptionEditing,
+                    onDescriptionChanged = onDescriptionChanged,
+                    onCancelEditing = onCancelDescriptionEditing,
+                    onSaveDescription = onSaveDescription,
+                )
             }
         }
-        detail.weather?.let { weather ->
-            item { WeatherBlock(weather) }
+        item {
+            PointSection("Фото") {
+                PointPhotoSection(
+                    detail = detail,
+                    fileStore = fileStore,
+                    isPhotoSaving = state.isPhotoSaving,
+                    onTakePhoto = onTakePhoto,
+                    onPickPhoto = onPickPhoto,
+                    onDeletePhoto = onDeletePhoto,
+                )
+            }
         }
-        item { Text("Пчёлы", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp)) }
-        if (detail.beeHistories.isEmpty()) {
-            item { Text("Пчёл: 0", modifier = Modifier.padding(bottom = 16.dp)) }
-        } else {
-            items(detail.beeHistories, key = { it.bee.id }) { history ->
-                Card(Modifier.fillMaxWidth().testTag("detail-bee-${history.bee.id}")) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        BeeMarkIcon(
-                            markColor = history.bee.markColor,
-                            markPosition = history.bee.markPosition,
-                            height = PointDetailBeeMarkHeight,
-                        )
-                        Text("Циклов: ${history.flightCycles.size}")
-                        history.flightCycles.forEach { cycle ->
-                            HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                            Text("Цикл ${cycle.sequenceNumber}", fontWeight = FontWeight.Bold)
-                            DetailLine("Вылет", formatPointDateTime(cycle.departureTime))
-                            if (cycle.returnTime == null) {
-                                Text("Открыт", color = MaterialTheme.colorScheme.primary)
-                            } else {
-                                DetailLine("Прилёт", formatPointDateTime(cycle.returnTime))
-                                DetailLine(
-                                    "Длительность",
-                                    formatCompletedFlightDuration(cycle.departureTime, cycle.returnTime),
-                                )
-                            }
-                            cycle.azimuthDeg?.let { azimuth ->
-                                DetailLine("Азимут", String.format(Locale.ROOT, "%.0f°", azimuth))
-                            }
+        item {
+            PointSection("Погода") {
+                WeatherBlock(detail.weather, onRetryWeather)
+            }
+        }
+        item {
+            PointSection("Пчёлы") {
+                if (detail.beeHistories.isEmpty()) {
+                    Text("Пчёл: 0", modifier = Modifier.padding(bottom = 8.dp))
+                }
+            }
+        }
+        items(detail.beeHistories, key = { history -> "bee-${history.bee.id}" }) { history ->
+            Card(Modifier.fillMaxWidth().testTag("detail-bee-${history.bee.id}")) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    BeeMarkIcon(
+                        markColor = history.bee.markColor,
+                        markPosition = history.bee.markPosition,
+                        height = PointDetailBeeMarkHeight,
+                    )
+                    Text("Циклов: ${history.flightCycles.size}")
+                    history.flightCycles.forEach { cycle ->
+                        HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                        Text("Цикл ${cycle.sequenceNumber}", fontWeight = FontWeight.Bold)
+                        DetailField("Вылет", formatPointDateTime(cycle.departureTime))
+                        if (cycle.returnTime == null) {
+                            Text("Открыт", color = MaterialTheme.colorScheme.primary)
+                        } else {
+                            DetailField("Прилёт", formatPointDateTime(cycle.returnTime))
+                            DetailField(
+                                "Длительность",
+                                formatCompletedFlightDuration(cycle.departureTime, cycle.returnTime),
+                            )
+                        }
+                        cycle.azimuthDeg?.let { azimuth ->
+                            DetailField("Азимут", String.format(Locale.ROOT, "%.0f°", azimuth))
                         }
                     }
                 }
@@ -176,12 +360,90 @@ private fun PointDetailContent(
     }
 }
 
+/** Section with a heading; the heading is skipped when a section only shows its own empty state. */
 @Composable
-private fun DetailLine(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("$label:", fontWeight = FontWeight.SemiBold)
-        Text(value, modifier = Modifier.weight(1f))
+private fun PointSection(title: String, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        content()
     }
+}
+
+/**
+ * Vertical key/value field.
+ *
+ * The former layout put the label and the value in one row, which squeezed the value into a narrow
+ * right column at large system font scale. Stacking them keeps the value on the full width.
+ */
+@Composable
+private fun DetailField(label: String, value: String) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(text = value, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun PointDetailMessageRow(message: String, onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.weight(1f).testTag("point-detail-message"),
+        )
+        TextButton(onClick = onDismiss, modifier = Modifier.testTag("point-detail-message-dismiss")) {
+            Text("Закрыть")
+        }
+    }
+}
+
+/** Confirmation that names exactly the point being deleted. */
+@Composable
+private fun PointDeleteDialog(
+    detail: ObservationPointDetail?,
+    isDeleting: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(detail?.let { "Удалить Точка №${it.point.pointNumber}?" } ?: "Удалить точку?") },
+        text = {
+            Text(
+                buildString {
+                    detail?.let {
+                        append(formatPointDateTime(it.point.createdAt))
+                        append("\nТерритория: ${it.territory.code} — ${it.territory.name}")
+                        append("\n\n")
+                    }
+                    append("Точка будет удалена вместе со своими пчёлами, циклами полёта, ")
+                    append("описанием, фотографиями и погодой. Остальные точки сохранятся.")
+                },
+                modifier = Modifier.testTag("point-delete-confirm-scope"),
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !isDeleting,
+                modifier = Modifier.testTag("confirm-delete-point"),
+            ) { Text("Удалить точку") }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isDeleting,
+                modifier = Modifier.testTag("cancel-delete-point"),
+            ) { Text("Отмена") }
+        },
+    )
 }
 
 /** Sized to stay readily identifiable inside a Point history card. */

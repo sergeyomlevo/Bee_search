@@ -49,7 +49,6 @@ internal fun SettingsScreen(
     onBack: () -> Unit,
     onOpenOfflineMaps: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
-    onOpenData: () -> Unit = {},
     onSelectObserver: (UUID) -> Unit,
     onCreateObserver: (String, String, String, String, String) -> Unit,
     onUpdateObserver: (Observer) -> Unit = {},
@@ -115,12 +114,6 @@ internal fun SettingsScreen(
                     TextButton(onClick = onOpenOfflineMaps) { Text("Открыть") }
                 }
             }
-            SettingsDestination(
-                title = "Данные",
-                description = "Экспорт и очистка данных наблюдений.",
-                testTag = "settings-data",
-                onOpen = onOpenData,
-            )
             SettingsDestination(
                 title = "Помощь",
                 description = "Краткий старт и подробная работа с Bee Search.",

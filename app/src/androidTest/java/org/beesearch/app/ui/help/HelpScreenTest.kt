@@ -107,15 +107,30 @@ class HelpScreenTest {
     fun helpExposesDataAndMapSections() {
         composeRule.setContent { Bee_searchTheme { HelpScreen(exchangeStorage = exchangeStorage, onBack = {}) } }
 
-        val dataSectionIndex = sections().indexOfFirst { it.title == "Экспорт и очистка данных" }
+        val dataSectionIndex = sections().indexOfFirst { it.title == "Экспорт и удаление данных" }
         val mapSectionIndex = sections().indexOfFirst { it.title == "Карты" }
 
         composeRule.onNodeWithTag("help-screen")
             .performScrollToIndex(FIRST_SECTION_INDEX + dataSectionIndex)
-        composeRule.onNodeWithText("Экспорт и очистка данных").assertIsDisplayed()
+        composeRule.onNodeWithText("Экспорт и удаление данных").assertIsDisplayed()
         composeRule.onNodeWithTag("help-screen")
             .performScrollToIndex(FIRST_SECTION_INDEX + mapSectionIndex)
         composeRule.onNodeWithText("Карты").assertIsDisplayed()
+    }
+
+    @Test
+    fun helpExposesPointsAndPointScreenSections() {
+        composeRule.setContent { Bee_searchTheme { HelpScreen(exchangeStorage = exchangeStorage, onBack = {}) } }
+
+        val pointsIndex = sections().indexOfFirst { it.title == "Точки" }
+        val pointIndex = sections().indexOfFirst { it.title == "Точка наблюдения: просмотр" }
+        assertTrue("both point sections must exist", pointsIndex > 0 && pointIndex > pointsIndex)
+
+        composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX + pointsIndex)
+        composeRule.onNodeWithText("Точки").assertIsDisplayed()
+        composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX + pointIndex)
+        composeRule.onNodeWithText("Точка наблюдения: просмотр").assertIsDisplayed()
+        composeRule.onNodeWithText("Свойства точки").assertDoesNotExist()
     }
 
     @Test

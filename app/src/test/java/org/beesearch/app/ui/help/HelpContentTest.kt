@@ -37,7 +37,9 @@ class HelpContentTest {
         "Метки и первый вылет",
         "Возвраты и следующие циклы",
         "Азимут",
-        "Экспорт и очистка данных",
+        "Точки",
+        "Точка наблюдения: просмотр",
+        "Экспорт и удаление данных",
         "Карты",
         AREA_HELP_TITLE,
         AREA_VIEW_HELP_TITLE,
@@ -168,7 +170,7 @@ class HelpContentTest {
 
     @Test
     fun exportFactsAreStated() {
-        val text = sectionText("Экспорт и очистка данных")
+        val text = sectionText("Экспорт и удаление данных")
         assertTrue(text, text.contains("один файл"))
         assertTrue(text, text.contains("не удаляются"))
         assertTrue(text, text.contains("не отправляет"))
@@ -176,6 +178,27 @@ class HelpContentTest {
         assertTrue(text, text.contains("покрытие карты"))
         assertTrue(text, text.contains("Одну завершённую точку можно удалить выборочно"))
         assertTrue(text, text.contains("не удаляя остальные наблюдения"))
+    }
+
+    @Test
+    fun pointsAndPointScreensAreExplainedWithTheirOwnMenus() {
+        val points = sectionText("Точки")
+        assertTrue(points, points.contains("территория и год"))
+        assertTrue(points, points.contains("не меняет текущую территорию работы"))
+        assertTrue(points, points.contains("«Карта» / «Таблица»"))
+        assertTrue(points, points.contains("действия сразу над всеми точками"))
+
+        val point = sectionText("Точка наблюдения: просмотр")
+        assertTrue(point, point.contains("«Точка №16»"))
+        assertTrue(point, point.contains("описание"))
+        assertTrue(point, point.contains("фотографии"))
+        assertTrue(point, point.contains("погода"))
+        assertTrue(point, point.contains("циклами полёта"))
+        assertTrue(point, point.contains("Отдельного экрана свойств точки нет"))
+        assertTrue(point, point.contains("«Добавить описание»"))
+        assertTrue(point, point.contains("«Сделать фото»"))
+        assertTrue(point, point.contains("«Выбрать фото»"))
+        assertFalse(allHelpText(), allHelpText().contains("Свойства точки"))
     }
 
     @Test

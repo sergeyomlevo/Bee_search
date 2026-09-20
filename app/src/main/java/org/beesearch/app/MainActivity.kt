@@ -47,11 +47,9 @@ import org.beesearch.app.ui.map.CurrentTerritoryScreen
 import org.beesearch.app.ui.map.OfflineMapManagementScreen
 import org.beesearch.app.ui.area.AreaRoute
 import org.beesearch.app.ui.area.AreaViewRoute
-import org.beesearch.app.ui.data.DataRoute
 import org.beesearch.app.ui.help.HelpScreen
 import org.beesearch.app.ui.points.PointDetailRoute
 import org.beesearch.app.ui.points.PointsRoute
-import org.beesearch.app.ui.properties.PointPropertiesRoute
 import org.beesearch.app.ui.objects.ObjectsScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import kotlinx.coroutines.delay
@@ -175,14 +173,9 @@ private fun BeeSearchApp(
                         onDeleteTerritory = viewModel::deleteTerritory,
                         onOpenOfflineMaps = viewModel::openOfflineMaps,
                         onOpenHelp = viewModel::openHelp,
-                        onOpenData = viewModel::openData,
                     )
                     AppRoute.Help -> HelpScreen(
                         exchangeStorage = application.container.exchangeStorage,
-                        onBack = viewModel::openSettings,
-                    )
-                    AppRoute.Data -> DataRoute(
-                        application = application,
                         onBack = viewModel::openSettings,
                     )
                     AppRoute.Objects -> ObjectsScreen(
@@ -213,8 +206,12 @@ private fun BeeSearchApp(
                         onBack = viewModel::openArea,
                     )
                     AppRoute.Points -> PointsRoute(
-                        territory = currentTerritory,
+                        territories = territories,
+                        currentTerritoryId = settings.currentTerritoryId,
                         repository = application.container.observationRepository,
+                        observationDataMaintenance = application.container.observationDataMaintenance,
+                        backupExporter = application.container.backupDocumentExporter,
+                        exchangeStorage = application.container.exchangeStorage,
                         mapAreaStore = application.container.mapAreaStore,
                         mapPackageStore = application.container.mapPackageStore,
                         onBack = viewModel::openObjects,
@@ -224,18 +221,11 @@ private fun BeeSearchApp(
                     is AppRoute.PointDetail -> PointDetailRoute(
                         pointId = currentRoute.pointId,
                         repository = application.container.observationRepository,
-                        fileStore = application.container.attachmentFileStore,
-                        onBack = viewModel::openPoints,
-                        onOpenProperties = {
-                            viewModel.openHistoricalPointProperties(currentRoute.pointId)
-                        },
-                    )
-                    is AppRoute.PointProperties -> PointPropertiesRoute(
-                        pointId = currentRoute.pointId,
-                        repository = application.container.observationRepository,
+                        maintenance = application.container.observationDataMaintenance,
                         fileStore = application.container.attachmentFileStore,
                         weatherScheduler = application.container.weatherSyncScheduler,
-                        onBack = { viewModel.closePointProperties(currentRoute) },
+                        onBack = { viewModel.closePointDetail(currentRoute) },
+                        onDeleted = viewModel::openPoints,
                     )
                     AppRoute.TerritoryManagement -> TerritoryManagementScreen(
                         territories = territories,
@@ -313,8 +303,8 @@ private fun BeeSearchApp(
                                 onComplete = {
                                     viewModel.completeObservationPoint(currentRoute.point.id)
                                 },
-                                onOpenPointProperties = {
-                                    viewModel.openActivePointProperties(currentRoute.point.id)
+                                onOpenPointDetail = {
+                                    viewModel.openActivePointDetail(currentRoute.point.id)
                                 },
                             )
                         }

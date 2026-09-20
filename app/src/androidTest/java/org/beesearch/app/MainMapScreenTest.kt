@@ -264,7 +264,8 @@ class MainMapScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag("settings-data").assertIsDisplayed()
+        // Point management is no longer reachable from Settings; the Points screen owns it.
+        composeRule.onNodeWithTag("settings-data").assertDoesNotExist()
         composeRule.onNodeWithTag("settings-help").assertIsDisplayed()
         composeRule.onNodeWithText("Точки").assertDoesNotExist()
 

@@ -65,13 +65,15 @@ sealed interface AppRoute {
     data object Loading : AppRoute
     data object Settings : AppRoute
     data object Help : AppRoute
-    data object Data : AppRoute
     data object Objects : AppRoute
     data object Area : AppRoute
     data object AreaView : AppRoute
     data object Points : AppRoute
-    data class PointDetail(val pointId: UUID) : AppRoute
-    data class PointProperties(val pointId: UUID, val returnTo: PointPropertiesReturn) : AppRoute
+    data class PointDetail(
+        val pointId: UUID,
+        /** Where the screen was opened from, so Back returns there. */
+        val origin: PointDetailOrigin = PointDetailOrigin.POINTS,
+    ) : AppRoute
     data object TerritoryManagement : AppRoute
     data object OfflineMapManagement : AppRoute
     data object CurrentTerritory : AppRoute
@@ -79,7 +81,8 @@ sealed interface AppRoute {
     data class ResumeObservation(val point: ObservationPoint) : AppRoute
 }
 
-enum class PointPropertiesReturn { OBSERVATION, DETAIL }
+/** Origin of the single ObservationPoint screen. */
+enum class PointDetailOrigin { POINTS, OBSERVATION }
 
 data class BeePreparationUiState(
     val pointId: UUID? = null,
@@ -219,11 +222,6 @@ internal class MainViewModel(
         clearFeedback()
     }
 
-    fun openData() {
-        manualRoute.value = AppRoute.Data
-        clearFeedback()
-    }
-
     fun openObjects() {
         manualRoute.value = AppRoute.Objects
         clearFeedback()
@@ -280,25 +278,22 @@ internal class MainViewModel(
         areaEditorRequest.consume()
     }
 
+    /** Opens the point screen from the Points browser. */
     fun openPointDetail(pointId: UUID) {
-        manualRoute.value = AppRoute.PointDetail(pointId)
+        manualRoute.value = AppRoute.PointDetail(pointId, PointDetailOrigin.POINTS)
         clearFeedback()
     }
 
-    fun openHistoricalPointProperties(pointId: UUID) {
-        manualRoute.value = AppRoute.PointProperties(pointId, PointPropertiesReturn.DETAIL)
+    /** Opens the same point screen for the active observation; Back returns to the observation. */
+    fun openActivePointDetail(pointId: UUID) {
+        manualRoute.value = AppRoute.PointDetail(pointId, PointDetailOrigin.OBSERVATION)
         clearFeedback()
     }
 
-    fun openActivePointProperties(pointId: UUID) {
-        manualRoute.value = AppRoute.PointProperties(pointId, PointPropertiesReturn.OBSERVATION)
-        clearFeedback()
-    }
-
-    fun closePointProperties(route: AppRoute.PointProperties) {
-        manualRoute.value = when (route.returnTo) {
-            PointPropertiesReturn.DETAIL -> AppRoute.PointDetail(route.pointId)
-            PointPropertiesReturn.OBSERVATION -> activePoint.value?.let(AppRoute::ResumeObservation)
+    fun closePointDetail(route: AppRoute.PointDetail) {
+        manualRoute.value = when (route.origin) {
+            PointDetailOrigin.POINTS -> AppRoute.Points
+            PointDetailOrigin.OBSERVATION -> activePoint.value?.let(AppRoute::ResumeObservation)
                 ?: AppRoute.CurrentTerritory
         }
         clearFeedback()

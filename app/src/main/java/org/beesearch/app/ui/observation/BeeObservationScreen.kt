@@ -88,7 +88,7 @@ internal fun BeeObservationScreen(
     onCaptureFlightAzimuth: (UUID, Double, () -> Unit) -> Unit =
         { cycleId, value, onSuccess -> onSetFlightAzimuth(cycleId, value, onSuccess) },
     onComplete: () -> Unit,
-    onOpenPointProperties: () -> Unit = {},
+    onOpenPointDetail: () -> Unit = {},
     nowProvider: () -> Instant = { Instant.now() },
     @Suppress("UNUSED_PARAMETER") undoTimeoutMillis: Long = FEEDBACK_AUTO_DISMISS_MILLIS,
 ) {
@@ -257,9 +257,9 @@ internal fun BeeObservationScreen(
                                 contentAlignment = Alignment.CenterStart,
                             ) { ObservationHeaderTitle() }
                             TextButton(
-                                onClick = onOpenPointProperties,
+                                onClick = onOpenPointDetail,
                                 modifier = Modifier
-                                    .semantics { contentDescription = "Свойства точки" }
+                                    .semantics { contentDescription = "Точка: описание, фото и погода" }
                                     .testTag("open-active-point-properties"),
                             ) { Text("ⓘ") }
                             TextButton(

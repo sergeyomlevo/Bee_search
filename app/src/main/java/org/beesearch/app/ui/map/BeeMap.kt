@@ -101,8 +101,9 @@ internal fun BeeMap(
     /** Reports that the pending request was handled, so it cannot be replayed. */
     onAreaEditorRequestHandled: () -> Unit = {},
     mode: BeeMapMode = BeeMapMode.FIELD,
-    savedObservationPoints: List<ObservationPointSummary> = emptyList(),
-    onSelectSavedObservationPoint: (UUID) -> Unit = {},
+    /** Saved objects drawn in the browser mode. ObservationPoint is the only kind today. */
+    savedObjectMarkers: List<MapObjectMarker> = emptyList(),
+    onSelectSavedObject: (MapObjectMarker) -> Unit = {},
     /** Leaves the Ареал view mode; the host decides which screen that means. */
     onExitAreaView: () -> Unit = {},
     /** Opens the участки editor from the Ареал view mode. */
@@ -427,15 +428,15 @@ internal fun BeeMap(
             gpsScreenPosition = projectedMapPosition(map, mapView, gpsPosition)
         }
 
-        LaunchedEffect(map, mode, savedObservationPoints.map(ObservationPointSummary::id)) {
-            if (mode != BeeMapMode.POINT_BROWSER || savedObservationPoints.isEmpty()) {
+        LaunchedEffect(map, mode, savedObjectMarkers.map(MapObjectMarker::id)) {
+            if (mode != BeeMapMode.POINT_BROWSER || savedObjectMarkers.isEmpty()) {
                 return@LaunchedEffect
             }
             val mapInstance = map ?: return@LaunchedEffect
-            val north = savedObservationPoints.maxOf(ObservationPointSummary::latitude)
-            val east = savedObservationPoints.maxOf(ObservationPointSummary::longitude)
-            val south = savedObservationPoints.minOf(ObservationPointSummary::latitude)
-            val west = savedObservationPoints.minOf(ObservationPointSummary::longitude)
+            val north = savedObjectMarkers.maxOf(MapObjectMarker::latitude)
+            val east = savedObjectMarkers.maxOf(MapObjectMarker::longitude)
+            val south = savedObjectMarkers.minOf(MapObjectMarker::latitude)
+            val west = savedObjectMarkers.minOf(MapObjectMarker::longitude)
             if (north == south && east == west) {
                 mapInstance.moveCamera(
                     CameraUpdateFactory.newLatLngZoom(LatLng(north, east), 15.0),
@@ -743,12 +744,12 @@ internal fun BeeMap(
 
 
         if (mode == BeeMapMode.POINT_BROWSER) {
-            SavedObservationPointMarkersOverlay(
-                points = savedObservationPoints,
+            SavedObjectMarkersOverlay(
+                markers = savedObjectMarkers,
                 map = map,
                 mapView = mapView,
                 cameraRevision = mapCameraRevision,
-                onSelectPoint = onSelectSavedObservationPoint,
+                onSelectMarker = onSelectSavedObject,
                 modifier = Modifier.fillMaxSize().zIndex(2f),
             )
         }
