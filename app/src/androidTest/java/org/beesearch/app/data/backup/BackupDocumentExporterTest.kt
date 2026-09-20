@@ -56,7 +56,7 @@ class BackupDocumentExporterTest {
         val point = observationRepository.createObservationPoint(
             NewObservationPoint(territory.id, observer.id, latitude = 56.2, longitude = 42.7),
         )
-        observationRepository.addBee(point.id, "Красная", MarkPosition.RIGHT_WING)
+        observationRepository.addBee(point.id, "Красная", MarkPosition.ABDOMEN)
         observationRepository.startInitialGroupRelease(point.id)
         backupService = BackupService(database, EmptyPortableSettingsStore, clock, "test")
     }

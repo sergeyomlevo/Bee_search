@@ -24,15 +24,16 @@ internal class RoomConverters {
     @TypeConverter
     fun markPositionToString(value: MarkPosition): String = value.name
 
+    /**
+     * Reads the persisted token through the compatibility mapping so that rows
+     * written before the thorax/abdomen marking system stay readable:
+     * `NONE` becomes the thorax, `RIGHT_WING` becomes the abdomen, and
+     * `LEFT_WING` stays the legacy value it always was.
+     */
     @TypeConverter
-    fun stringToMarkPosition(value: String): MarkPosition = when (value) {
-        // Compatibility with DEV data written by the short-lived
-        // thorax/abdomen marking build. In the current model NONE is the
-        // thorax mark and RIGHT_WING carries the former abdomen meaning.
-        "THORAX" -> MarkPosition.NONE
-        "ABDOMEN" -> MarkPosition.RIGHT_WING
-        else -> MarkPosition.valueOf(value)
-    }
+    fun stringToMarkPosition(value: String): MarkPosition =
+        MarkPosition.fromPersistedToken(value)
+            ?: throw IllegalArgumentException("unknown mark position token: $value")
 
     @TypeConverter
     fun beePresenceResultToString(value: BeePresenceResult): String = value.name

@@ -5,6 +5,13 @@ import android.content.Context
 import org.beesearch.app.data.backup.BackupDocumentExporter
 import org.beesearch.app.data.backup.BackupService
 import org.beesearch.app.data.backup.SafBackupDocumentExporter
+import org.beesearch.app.data.exchange.AndroidAreaMapDiscovery
+import org.beesearch.app.data.exchange.AndroidAreaShareTransport
+import org.beesearch.app.data.exchange.AreaExchangeMirror
+import org.beesearch.app.data.exchange.AreaMapDiscovery
+import org.beesearch.app.data.exchange.AreaTransport
+import org.beesearch.app.data.exchange.MirroringMapAreaStore
+import org.beesearch.app.data.exchange.beeSearchExchangeStorage
 import org.beesearch.app.data.heading.AndroidHeadingProvider
 import org.beesearch.app.data.location.AndroidLocationProvider
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
@@ -12,7 +19,7 @@ import org.beesearch.app.data.media.FileAwareObservationDataMaintenance
 import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.local.settings.settingsDataStore
-import org.beesearch.app.data.local.settings.DataStoreMapCoverageStore
+import org.beesearch.app.data.local.settings.DataStoreMapAreaStore
 import org.beesearch.app.data.local.settings.DataStoreMapPackageStore
 import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomObserverRepository
@@ -25,6 +32,7 @@ import org.beesearch.app.domain.repository.SettingsRepository
 import org.beesearch.app.domain.repository.TerritoryRepository
 import org.beesearch.app.domain.usecase.CreateObservationPoint
 import org.beesearch.app.domain.weather.WeatherBackfillRunner
+import org.beesearch.app.ui.map.MapAreaStore
 import java.time.Clock
 
 class BeeSearchApplication : Application() {
@@ -43,7 +51,32 @@ internal class AppContainer(context: Context) {
     val weatherSyncScheduler = WorkManagerWeatherSyncScheduler(context)
 
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(context.settingsDataStore)
-    val mapCoverageStore = DataStoreMapCoverageStore(context.settingsDataStore)
+
+    /**
+     * The Ареал of the current Territory.
+     *
+     * The canonical value stays the DataStore `v2` entry; the exchange mirror is attached here, in
+     * one place, so every save also refreshes the user-facing Area file in `Exchange/Areas` and no
+     * screen can forget it. A mirror failure never changes the canonical result.
+     */
+    val exchangeStorage = beeSearchExchangeStorage()
+    val areaExchangeMirror = AreaExchangeMirror(exchangeStorage)
+    val mapAreaStore: MapAreaStore = MirroringMapAreaStore(
+        delegate = DataStoreMapAreaStore(context.settingsDataStore),
+        mirror = areaExchangeMirror,
+    )
+
+    /** Current transport of «Отправить ареал»: the Android share sheet. */
+    val areaTransport: AreaTransport = AndroidAreaShareTransport(context, areaExchangeMirror)
+
+    /**
+     * Automatic lookup of an offline map package of the current Ареал in the exchange folder.
+     *
+     * It only recognises names; anything it finds still goes through `MapPackageStore.import`, so a
+     * discovered package is validated exactly like a manually picked one.
+     */
+    val areaMapDiscovery: AreaMapDiscovery = AndroidAreaMapDiscovery(exchangeStorage)
+
     val mapPackageStore = DataStoreMapPackageStore(
         contentResolver = context.contentResolver,
         filesDir = context.filesDir,

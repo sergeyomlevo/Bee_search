@@ -504,7 +504,7 @@ private fun point(o: JsonObject) = ObservationPointEntity(o.uuid("id"), o.uuid("
 private fun pointV2(o: JsonObject) = ObservationPointEntity(o.uuid("id"), o.uuid("territoryId"), o.uuid("observerId"), o.int("observationYear"), o.int("pointNumber"), o.optionalEnum<BeePresenceResult>("beePresenceResult"), o.optionalString("code"), o.double("latitude"), o.double("longitude"), o.optionalDouble("gpsLatitude"), o.optionalDouble("gpsLongitude"), o.optionalDouble("gpsAccuracyM"), o.instant("createdAt"), o.optionalInstant("initialGroupReleaseAt"), o.optionalInstant("completedAt"), o.optionalString("description"))
 private fun weather(o: JsonObject) = ObservationPointWeatherEntity(o.uuid("observationPointId"), o.enum<WeatherStatus>("status"), o.optionalDouble("temperatureC"), o.optionalDouble("windSpeedMps"), o.optionalDouble("windDirectionDeg"), o.optionalInstant("sampleAt"), o.optionalInstant("fetchedAt"), o.optionalString("source"))
 private fun attachment(o: JsonObject) = ObservationPointAttachmentEntity(o.uuid("id"), o.uuid("observationPointId"), o.enum<AttachmentType>("type"), o.string("relativePath"), o.optionalString("originalFileName"), o.optionalString("mimeType"), o.long("byteSize"), o.string("sha256"), o.instant("createdAt"))
-private fun bee(o: JsonObject) = BeeEntity(o.uuid("id"), o.uuid("observationPointId"), o.string("markColor"), o.enum<MarkPosition>("markPosition"), o.instant("createdAt"))
+private fun bee(o: JsonObject) = BeeEntity(o.uuid("id"), o.uuid("observationPointId"), o.string("markColor"), o.markPosition("markPosition"), o.instant("createdAt"))
 private fun cycle(o: JsonObject) = FlightCycleEntity(o.uuid("id"), o.uuid("beeId"), o.int("sequenceNumber"), o.instant("departureTime"), o.optionalInstant("returnTime"), o.optionalDouble("azimuthDeg"), o.bool("azimuthCaptureConsumed"), o.bool("initialGroupLaunch"), o.bool("initialGroupLaunchCorrectionEligible"), o.instant("createdAt"), o.instant("updatedAt"))
 
 private fun objectFrom(bytes: ByteArray, label: String): JsonObject = try { JSON.parseToJsonElement(decode(bytes)).jsonObject } catch (e: Exception) { throw MalformedBackup("invalid JSON in $label", e) }
@@ -524,6 +524,16 @@ private fun JsonObject.instant(name: String) = try { Instant.ofEpochMilli(long(n
 private fun JsonObject.optionalInstant(name: String) = field(name).let { if (it is JsonNull) null else try { Instant.ofEpochMilli(it.jsonPrimitive.longOrNull ?: throw IllegalArgumentException()) } catch (e: Exception) { throw MalformedBackup("invalid $name", e) } }
 private inline fun <reified T : Enum<T>> JsonObject.enum(name: String) = try { enumValueOf<T>(string(name)) } catch (e: Exception) { throw BackupDomainInvariantViolation("invalid enum $name") }
 private inline fun <reified T : Enum<T>> JsonObject.optionalEnum(name: String) = optionalString(name)?.let { try { enumValueOf<T>(it) } catch (e: Exception) { throw BackupDomainInvariantViolation("invalid enum $name") } }
+
+/**
+ * Reads a mark position from a backup archive. The mapping is compatible with
+ * archives written before the thorax/abdomen marking system, so `NONE` is read
+ * as the thorax, `RIGHT_WING` as the abdomen, and `LEFT_WING` stays the legacy
+ * value. An unknown token is a rejected archive rather than a silent guess.
+ */
+private fun JsonObject.markPosition(name: String): MarkPosition =
+    MarkPosition.fromPersistedToken(string(name))
+        ?: throw BackupDomainInvariantViolation("invalid enum $name")
 private fun parseUuid(value: String, label: String) = try { UUID.fromString(value).also { require(it.toString() == value.lowercase()) } } catch (e: Exception) { throw MalformedBackup("invalid UUID $label", e) }
 
 private fun TerritoryEntity.json() = obj("id" to j(id), "code" to j(code), "name" to j(name), "region" to j(region), "district" to j(district), "createdAt" to j(createdAt), "updatedAt" to j(updatedAt))

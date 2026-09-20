@@ -63,12 +63,12 @@ class BeeObservationScreenTest {
     private val flyingBee = bee(
         id = UUID.fromString("00000000-0000-0000-0000-000000000201"),
         color = "WHITE",
-        position = MarkPosition.NONE,
+        position = MarkPosition.THORAX,
     )
     private val atPointBee = bee(
         id = UUID.fromString("00000000-0000-0000-0000-000000000202"),
         color = "BLUE",
-        position = MarkPosition.RIGHT_WING,
+        position = MarkPosition.ABDOMEN,
     )
 
     @Test
@@ -92,14 +92,14 @@ class BeeObservationScreenTest {
             }
         }
 
-        assertEquals(15, BeeMarkCatalog.supportedCombinations.size)
+        assertEquals(10, BeeMarkCatalog.supportedCombinations.size)
         composeRule.onNodeWithTag("open-active-point-properties").performClick()
         composeRule.runOnIdle { assertTrue(propertiesOpened) }
-        composeRule.onNodeWithTag("available-mark-WHITE-NONE").assertIsDisplayed()
-        composeRule.onNodeWithTag("available-mark-action-WHITE-NONE")
+        composeRule.onNodeWithTag("available-mark-WHITE-THORAX").assertIsDisplayed()
+        composeRule.onNodeWithTag("available-mark-action-WHITE-THORAX")
             .assertIsEnabled()
             .performClick()
-        composeRule.runOnIdle { assertEquals("WHITE" to MarkPosition.NONE, selected) }
+        composeRule.runOnIdle { assertEquals("WHITE" to MarkPosition.THORAX, selected) }
     }
 
     @Test
@@ -120,10 +120,10 @@ class BeeObservationScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag("available-mark-WHITE-NONE").assertDoesNotExist()
+        composeRule.onNodeWithTag("available-mark-WHITE-THORAX").assertDoesNotExist()
         val beeBounds = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
             .fetchSemanticsNode().boundsInRoot
-        val choiceBounds = composeRule.onNodeWithTag("available-mark-WHITE-RIGHT_WING")
+        val choiceBounds = composeRule.onNodeWithTag("available-mark-WHITE-ABDOMEN")
             .fetchSemanticsNode().boundsInRoot
         assertTrue(beeBounds.top < choiceBounds.top)
     }
@@ -148,13 +148,13 @@ class BeeObservationScreenTest {
 
         // The mark itself carries the position, exactly like on a Bee card;
         // the retired second text line must not come back.
-        composeRule.onNodeWithTag("bee-mark-WHITE-RIGHT_WING").assertExists()
-        composeRule.onNodeWithTag("bee-mark-WHITE-LEFT_WING").assertExists()
-        composeRule.onNodeWithTag("available-mark-position-WHITE-RIGHT_WING").assertDoesNotExist()
+        composeRule.onNodeWithTag("bee-mark-WHITE-ABDOMEN").assertExists()
+        composeRule.onNodeWithTag("bee-mark-WHITE-THORAX").assertExists()
+        composeRule.onNodeWithTag("available-mark-position-WHITE-ABDOMEN").assertDoesNotExist()
 
         val beeCardHeight = composeRule.onNodeWithTag("bee-card-${atPointBee.id}")
             .fetchSemanticsNode().boundsInRoot.height
-        val choiceCardHeight = composeRule.onNodeWithTag("available-mark-WHITE-RIGHT_WING")
+        val choiceCardHeight = composeRule.onNodeWithTag("available-mark-WHITE-ABDOMEN")
             .fetchSemanticsNode().boundsInRoot.height
         assertTrue(
             "Choice card must not be taller than a Bee card: " +
@@ -169,7 +169,7 @@ class BeeObservationScreenTest {
             bee(
                 UUID.fromString("00000000-0000-0000-0000-${(400 + index).toString().padStart(12, '0')}"),
                 listOf("WHITE", "YELLOW", "BLUE", "RED", "GREEN")[index % 5],
-                listOf(MarkPosition.NONE, MarkPosition.RIGHT_WING, MarkPosition.LEFT_WING)[index % 3],
+                MarkPosition.newBeePositions[index % 2],
             )
         }
         val bees = mutableStateOf(existingBees)
@@ -276,15 +276,29 @@ class BeeObservationScreenTest {
         composeRule.onNodeWithTag("record-no-bees-from-observation").assertDoesNotExist()
     }
 
+    /**
+     * The ten-Bee limit still guards the screen. Legacy `LEFT_WING` rows do not
+     * consume one of the ten real marks, so this Point can hold ten Bees while
+     * real marks are still unassigned; those choices must stay disabled.
+     */
     @Test
-    fun tenthRealBeeDisablesRemainingMarkChoices() {
-        val tenBees = BeeMarkCatalog.supportedCombinations.take(10).mapIndexed { index, mark ->
+    fun beeLimitDisablesRemainingMarkChoices() {
+        val colors = BeeMarkCatalog.colors.map { it.value }
+        val legacyBees = colors.mapIndexed { index, color ->
             bee(
-                id = UUID.fromString("00000000-0000-0000-0000-0000000003%02d".format(index)),
-                color = mark.markColor,
-                position = mark.markPosition,
+                id = UUID.fromString("00000000-0000-0000-0000-0000000005%02d".format(index)),
+                color = color,
+                position = MarkPosition.LEFT_WING,
             )
         }
+        val realBees = colors.mapIndexed { index, color ->
+            bee(
+                id = UUID.fromString("00000000-0000-0000-0000-0000000006%02d".format(index)),
+                color = color,
+                position = MarkPosition.THORAX,
+            )
+        }
+        val tenBees = legacyBees + realBees
 
         composeRule.setContent {
             Bee_searchTheme {
@@ -304,7 +318,9 @@ class BeeObservationScreenTest {
         val remaining = BeeMarkCatalog.availableCombinations(
             tenBees.map { BeeMarkCombination(it.markColor, it.markPosition) },
         )
+        assertEquals(10, tenBees.size)
         assertEquals(5, remaining.size)
+        assertTrue(remaining.all { it.markPosition == MarkPosition.ABDOMEN })
         remaining.forEach { mark ->
             val tag = "available-mark-action-${mark.markColor}-${mark.markPosition.name}"
             composeRule.onNodeWithTag("bee-observation-list").performScrollToNode(hasTestTag(tag))
@@ -337,8 +353,8 @@ class BeeObservationScreenTest {
         }
 
         composeRule.onNodeWithText("Белая").assertDoesNotExist()
-        composeRule.onNodeWithTag("bee-mark-WHITE-NONE").assertIsDisplayed()
-        composeRule.onNodeWithTag("bee-mark-BLUE-RIGHT_WING").assertIsDisplayed()
+        composeRule.onNodeWithTag("bee-mark-WHITE-THORAX").assertIsDisplayed()
+        composeRule.onNodeWithTag("bee-mark-BLUE-ABDOMEN").assertIsDisplayed()
         composeRule.onNodeWithText("В полёте").assertIsDisplayed()
         composeRule.onNodeWithText("На точке").assertIsDisplayed()
         composeRule.onNodeWithTag("bee-state-${flyingBee.id}").assertIsDisplayed()
@@ -555,12 +571,12 @@ class BeeObservationScreenTest {
         val longFlyingBee = bee(
             UUID.fromString("00000000-0000-0000-0000-000000000211"),
             "WHITE",
-            MarkPosition.NONE,
+            MarkPosition.THORAX,
         )
         val newerFlyingBee = bee(
             UUID.fromString("00000000-0000-0000-0000-000000000212"),
             "YELLOW",
-            MarkPosition.RIGHT_WING,
+            MarkPosition.ABDOMEN,
         )
         val longAtPointBee = bee(
             UUID.fromString("00000000-0000-0000-0000-000000000213"),
@@ -640,7 +656,7 @@ class BeeObservationScreenTest {
             bee(
                 UUID.fromString("00000000-0000-0000-0000-${(300 + index).toString().padStart(12, '0')}"),
                 listOf("WHITE", "YELLOW", "BLUE", "RED", "GREEN")[index % 5],
-                listOf(MarkPosition.NONE, MarkPosition.RIGHT_WING, MarkPosition.LEFT_WING)[index % 3],
+                MarkPosition.newBeePositions[index % 2],
             )
         }
         val departingBee = longListBees.last()
@@ -738,9 +754,9 @@ class BeeObservationScreenTest {
         val visibleBees = listOf(
             flyingBee,
             atPointBee,
-            bee(UUID.fromString("00000000-0000-0000-0000-000000000203"), "YELLOW", MarkPosition.NONE),
+            bee(UUID.fromString("00000000-0000-0000-0000-000000000203"), "YELLOW", MarkPosition.THORAX),
             bee(UUID.fromString("00000000-0000-0000-0000-000000000204"), "RED", MarkPosition.LEFT_WING),
-            bee(UUID.fromString("00000000-0000-0000-0000-000000000205"), "GREEN", MarkPosition.RIGHT_WING),
+            bee(UUID.fromString("00000000-0000-0000-0000-000000000205"), "GREEN", MarkPosition.ABDOMEN),
             bee(UUID.fromString("00000000-0000-0000-0000-000000000206"), "BLUE", MarkPosition.LEFT_WING),
         )
 
@@ -1194,9 +1210,8 @@ class BeeObservationScreenTest {
     }
 
     @Test
-    fun longTransientFeedbackIsFullyVisibleBelowTheHeaderWithoutCoveringCards() {
+    fun routineSuccessFeedbackIsNotShownAndNeverMovesTheBeeCards() {
         val feedback = mutableStateOf<UiFeedback?>(null)
-        val message = "Вылет сохранён. Зафиксируйте азимут, пока пчела в полёте."
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             val deviceDensity = LocalDensity.current
@@ -1227,41 +1242,85 @@ class BeeObservationScreenTest {
         val firstCardTopBefore = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
             .fetchSemanticsNode().boundsInRoot.top
 
+        // A routine success such as «Вылет сохранён» or «Прилёт сохранён»: the card already shows the
+        // new state, so nothing is announced and nothing may move under the finger.
         composeRule.runOnIdle {
-            feedback.value = autoFeedback(1, message)
+            feedback.value = autoFeedback(1, "Вылет сохранён")
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+
+        composeRule.onNodeWithText("Вылет сохранён").assertDoesNotExist()
+        composeRule.onNodeWithTag("observation-transient-banner").assertDoesNotExist()
+        val firstCardTopWithFeedback = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
+            .fetchSemanticsNode().boundsInRoot.top
+        assertEquals(
+            "Появление success-feedback не должно сдвигать карточки",
+            firstCardTopBefore,
+            firstCardTopWithFeedback,
+            0.5f,
+        )
+
+        composeRule.mainClock.advanceTimeBy(FEEDBACK_AUTO_DISMISS_MILLIS + 1)
+        composeRule.mainClock.advanceTimeByFrame()
+        val firstCardTopAfterRemoval = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
+            .fetchSemanticsNode().boundsInRoot.top
+        assertEquals(
+            "Исчезновение feedback не должно сдвигать список",
+            firstCardTopBefore,
+            firstCardTopAfterRemoval,
+            0.5f,
+        )
+        composeRule.onNodeWithTag("complete-field-observation")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+    }
+
+    @Test
+    fun aRealProblemIsStillAnnouncedBelowTheHeaderWithoutCoveringCards() {
+        val feedback = mutableStateOf<UiFeedback?>(null)
+        val message = "Не удалось сохранить азимут. Повторите действие после восстановления доступа к данным."
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            val deviceDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(deviceDensity.density, fontScale = 1.7f),
+            ) {
+                Bee_searchTheme {
+                    BeeObservationScreen(
+                        point = point(),
+                        bees = listOf(flyingBee),
+                        flightCycles = listOf(cycle(flyingBee, 1, releaseTime, null)),
+                        beeEventInProgressIds = emptySet(),
+                        feedback = feedback.value,
+                        onDismissFeedback = { id ->
+                            if (feedback.value?.id == id) feedback.value = null
+                        },
+                        isCompleting = false,
+                        onRegisterReturn = {},
+                        onStartNextFlight = {},
+                        onComplete = {},
+                        nowProvider = { now },
+                    )
+                }
+            }
+        }
+
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle {
+            feedback.value = UiFeedback(1, message, FeedbackDisplayMode.PERSISTENT)
         }
         composeRule.mainClock.advanceTimeByFrame()
 
         composeRule.onNodeWithText(message).assertIsDisplayed()
         val headerBounds = composeRule.onNodeWithTag("observation-header")
             .fetchSemanticsNode().boundsInRoot
-        val bannerBounds = composeRule.onNodeWithTag("observation-transient-banner")
+        val bannerBounds = composeRule.onNodeWithTag("observation-persistent-feedback")
             .fetchSemanticsNode().boundsInRoot
-        composeRule.onNodeWithTag("complete-field-observation")
-            .assertIsDisplayed()
-            .assertIsEnabled()
-        val firstCardTopWithFeedback = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
+        val firstCardTop = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
             .fetchSemanticsNode().boundsInRoot.top
 
-        assertTrue("Feedback должен начинаться ниже стабильного header", bannerBounds.top >= headerBounds.bottom)
-        assertTrue("Feedback не должен перекрывать первую карточку", bannerBounds.bottom <= firstCardTopWithFeedback)
-        assertTrue("Feedback может сдвинуть, но не перекрыть список", firstCardTopWithFeedback > firstCardTopBefore)
-
-        composeRule.onNodeWithTag("complete-field-observation").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("cancel-field-observation-completion").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(FEEDBACK_AUTO_DISMISS_MILLIS + 1)
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("observation-transient-banner").assertDoesNotExist()
-        val firstCardTopAfterDismiss = composeRule.onNodeWithTag("bee-card-${flyingBee.id}")
-            .fetchSemanticsNode().boundsInRoot.top
-        assertEquals(
-            "Исчезновение feedback не должно сдвигать список",
-            firstCardTopBefore,
-            firstCardTopAfterDismiss,
-            0.5f,
-        )
+        assertTrue("Ошибка должна показываться ниже стабильного header", bannerBounds.top >= headerBounds.bottom)
+        assertTrue("Ошибка не должна перекрывать первую карточку", bannerBounds.bottom <= firstCardTop)
     }
 
     @Test
@@ -1379,10 +1438,13 @@ class BeeObservationScreenTest {
     }
 
     @Test
-    fun localUndoBelongsToTheBeeCardAndDoesNotReplaceOrdinaryFeedback() {
+    fun localUndoBelongsToTheBeeCardAndDoesNotReplaceARealProblemMessage() {
         val flyingCycle = cycle(flyingBee, 1, releaseTime, null, azimuthDeg = 269.0)
         val atPointCycle = cycle(atPointBee, 1, releaseTime, returnTime)
-        val feedback = mutableStateOf<UiFeedback?>(autoFeedback(1, "Вылет сохранён"))
+        val errorMessage = "Не удалось сохранить азимут"
+        val feedback = mutableStateOf<UiFeedback?>(
+            UiFeedback(1, errorMessage, FeedbackDisplayMode.PERSISTENT),
+        )
         var undoneBeeId: UUID? = null
         composeRule.setContent {
             Bee_searchTheme {
@@ -1403,13 +1465,15 @@ class BeeObservationScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Вылет сохранён").assertIsDisplayed()
+        composeRule.onNodeWithText(errorMessage).assertIsDisplayed()
+        // A routine success carries no message at all, so it cannot replace the visible problem.
+        composeRule.onNodeWithText("Вылет сохранён").assertDoesNotExist()
         composeRule.onNodeWithTag("bee-undo-${flyingBee.id}")
             .assertIsDisplayed()
             .assertHeightIsAtLeast(48.dp)
             .performClick()
         composeRule.runOnIdle { assertEquals(flyingBee.id, undoneBeeId) }
-        composeRule.onNodeWithText("Вылет сохранён").assertIsDisplayed()
+        composeRule.onNodeWithText(errorMessage).assertIsDisplayed()
         composeRule.onNodeWithTag("azimuth-undo-banner").assertDoesNotExist()
     }
 

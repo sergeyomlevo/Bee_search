@@ -9,8 +9,8 @@ class RoomConvertersTest {
 
     @Test
     fun readsThoraxAndAbdomenTokensWrittenByCompatibleDevBuilds() {
-        assertEquals(MarkPosition.NONE, converters.stringToMarkPosition("THORAX"))
-        assertEquals(MarkPosition.RIGHT_WING, converters.stringToMarkPosition("ABDOMEN"))
+        assertEquals(MarkPosition.THORAX, converters.stringToMarkPosition("THORAX"))
+        assertEquals(MarkPosition.ABDOMEN, converters.stringToMarkPosition("ABDOMEN"))
     }
 
     @Test

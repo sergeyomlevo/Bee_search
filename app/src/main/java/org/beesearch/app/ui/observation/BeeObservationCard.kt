@@ -12,11 +12,8 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.Button
@@ -40,10 +37,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.beesearch.app.domain.heading.HeadingAccuracy
 import org.beesearch.app.domain.heading.HeadingState
-import org.beesearch.app.domain.model.BeeMarkCatalog
 import org.beesearch.app.domain.model.BeeMarkCombination
 import org.beesearch.app.domain.model.FlightCycle
-import org.beesearch.app.domain.model.MarkPosition
 import java.time.Instant
 import org.beesearch.app.BeeFieldState
 import org.beesearch.app.BeeLastReversibleAction
@@ -122,131 +117,137 @@ internal fun BeeObservationCard(
         colors = cardColors,
         border = BorderStroke(2.dp, cardBorderColor),
     ) {
-        Column(
+        Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+            // The mark spans the whole card height, so the mark graphic is as
+            // large as the card allows while both working rows stay beside it.
+            BeeMarkIcon(
+                markColor = card.bee.markColor,
+                markPosition = card.bee.markPosition,
+            )
+            Column(
+                modifier = Modifier.weight(1f).padding(start = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                ObservationBeeMark(
-                    markColor = card.bee.markColor,
-                    markPosition = card.bee.markPosition,
-                )
-                Text(
-                    stateText,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 10.dp)
-                        .testTag("bee-state-${card.bee.id}"),
-                )
-                Text(
-                    stateStartedAt?.let { formatElapsedTime(it, now) } ?: "--:--",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .testTag("bee-timer-${card.bee.id}"),
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.width(BeeAzimuthSlotWidth), contentAlignment = Alignment.CenterStart) {
-                    if (state == BeeFieldState.IN_FLIGHT || latestCycle?.azimuthDeg != null) {
-                        Box(
-                            modifier = Modifier
-                                .defaultMinSize(minWidth = 72.dp, minHeight = 48.dp)
-                                .clickable(
-                                    enabled = captureEnabled,
-                                    role = Role.Button,
-                                    onClick = {
-                                        if (openCycle != null && liveHeading != null) {
-                                            onCaptureAzimuth(openCycle, liveHeading.trueHeadingDeg)
-                                        }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stateText,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("bee-state-${card.bee.id}"),
+                    )
+                    Text(
+                        stateStartedAt?.let { formatElapsedTime(it, now) } ?: "--:--",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .testTag("bee-timer-${card.bee.id}"),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.width(BeeAzimuthSlotWidth), contentAlignment = Alignment.CenterStart) {
+                        if (state == BeeFieldState.IN_FLIGHT || latestCycle?.azimuthDeg != null) {
+                            Box(
+                                modifier = Modifier
+                                    .defaultMinSize(minWidth = 72.dp, minHeight = 48.dp)
+                                    .clickable(
+                                        enabled = captureEnabled,
+                                        role = Role.Button,
+                                        onClick = {
+                                            if (openCycle != null && liveHeading != null) {
+                                                onCaptureAzimuth(openCycle, liveHeading.trueHeadingDeg)
+                                            }
+                                        },
+                                    )
+                                    .padding(horizontal = 6.dp)
+                                    .testTag("bee-azimuth-${card.bee.id}"),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = when {
+                                        isAzimuthInProgress -> "…°"
+                                        latestCycle?.azimuthDeg != null -> formatAzimuthDegrees(latestCycle.azimuthDeg)
+                                        openCycle == null -> "—°"
+                                        latestCycle?.azimuthCaptureConsumed == true -> "—°"
+                                        liveHeading != null && liveHeading.accuracy == HeadingAccuracy.UNRELIABLE -> "! —"
+                                        liveHeading != null && liveHeading.accuracy == HeadingAccuracy.LOW ->
+                                            "! ${liveHeading.trueHeadingDeg}°"
+                                        liveHeading != null -> "${liveHeading.trueHeadingDeg}°"
+                                        headingState is HeadingState.Initializing -> "…°"
+                                        else -> "нет"
+                                    },
+                                    color = when {
+                                        latestCycle?.azimuthDeg != null -> MaterialTheme.colorScheme.onSurface
+                                        liveHeading?.accuracy == HeadingAccuracy.LOW ||
+                                            liveHeading?.accuracy == HeadingAccuracy.UNRELIABLE ->
+                                            MaterialTheme.colorScheme.error
+                                        captureEnabled -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.onSurface
+                                    },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    modifier = Modifier.semantics {
+                                        contentDescription = headingContentDescription(
+                                            persistedAzimuth = latestCycle?.azimuthDeg,
+                                            headingState = headingState,
+                                            isInFlight = openCycle != null,
+                                            captureConsumed = latestCycle?.azimuthCaptureConsumed == true,
+                                        )
                                     },
                                 )
-                                .padding(horizontal = 6.dp)
-                                .testTag("bee-azimuth-${card.bee.id}"),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = when {
-                                    isAzimuthInProgress -> "…°"
-                                    latestCycle?.azimuthDeg != null -> formatAzimuthDegrees(latestCycle.azimuthDeg)
-                                    openCycle == null -> "—°"
-                                    latestCycle?.azimuthCaptureConsumed == true -> "—°"
-                                    liveHeading != null && liveHeading.accuracy == HeadingAccuracy.UNRELIABLE -> "! —"
-                                    liveHeading != null && liveHeading.accuracy == HeadingAccuracy.LOW ->
-                                        "! ${liveHeading.trueHeadingDeg}°"
-                                    liveHeading != null -> "${liveHeading.trueHeadingDeg}°"
-                                    headingState is HeadingState.Initializing -> "…°"
-                                    else -> "нет"
-                                },
-                                color = when {
-                                    latestCycle?.azimuthDeg != null -> MaterialTheme.colorScheme.onSurface
-                                    liveHeading?.accuracy == HeadingAccuracy.LOW ||
-                                        liveHeading?.accuracy == HeadingAccuracy.UNRELIABLE ->
-                                        MaterialTheme.colorScheme.error
-                                    captureEnabled -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurface
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                modifier = Modifier.semantics {
-                                    contentDescription = headingContentDescription(
-                                        persistedAzimuth = latestCycle?.azimuthDeg,
-                                        headingState = headingState,
-                                        isInFlight = openCycle != null,
-                                        captureConsumed = latestCycle?.azimuthCaptureConsumed == true,
-                                    )
-                                },
+                            }
+                        }
+                    }
+                    // The flexible middle slot centers Undo between the neighboring
+                    // azimuth and primary-action edges, including when either control is absent.
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        if (lastReversibleAction != null && undoDescription != null) {
+                            BeeUndoIconButton(
+                                description = undoDescription,
+                                enabled = !isEventInProgress && !isAzimuthInProgress,
+                                onClick = { onUndoLastAction(lastReversibleAction) },
+                                modifier = Modifier.testTag("bee-undo-${card.bee.id}"),
                             )
                         }
                     }
-                }
-                // The flexible middle slot centers Undo between the neighboring
-                // azimuth and primary-action edges, including when either control is absent.
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    if (lastReversibleAction != null && undoDescription != null) {
-                        BeeUndoIconButton(
-                            description = undoDescription,
+                    Box(Modifier.width(BeePrimaryActionWidth), contentAlignment = Alignment.CenterEnd) {
+                        Button(
+                            onClick = {
+                                when (state) {
+                                    BeeFieldState.IN_FLIGHT -> onRegisterReturn()
+                                    BeeFieldState.AT_POINT -> onStartNextFlight()
+                                }
+                            },
                             enabled = !isEventInProgress && !isAzimuthInProgress,
-                            onClick = { onUndoLastAction(lastReversibleAction) },
-                            modifier = Modifier.testTag("bee-undo-${card.bee.id}"),
-                        )
-                    }
-                }
-                Box(Modifier.width(BeePrimaryActionWidth), contentAlignment = Alignment.CenterEnd) {
-                    Button(
-                        onClick = {
-                            when (state) {
-                                BeeFieldState.IN_FLIGHT -> onRegisterReturn()
-                                BeeFieldState.AT_POINT -> onStartNextFlight()
-                            }
-                        },
-                        enabled = !isEventInProgress && !isAzimuthInProgress,
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .defaultMinSize(minWidth = 104.dp, minHeight = 48.dp)
-                            .testTag("bee-action-${card.bee.id}"),
-                    ) {
-                        Text(
-                            text = if (isEventInProgress) "Сохранение" else actionText,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minWidth = 104.dp, minHeight = 48.dp)
+                                .testTag("bee-action-${card.bee.id}"),
+                        ) {
+                            Text(
+                                text = if (isEventInProgress) "Сохранение" else actionText,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
             }
@@ -275,20 +276,20 @@ internal fun AvailableBeeMarkCard(
         ),
         border = BorderStroke(2.dp, if (darkTheme) ChoiceCardBorderDark else ChoiceCardBorder),
     ) {
-        Column(
+        Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Same first row as a Bee card: the mark carries its own position, and
-            // only the state word differs ("Выбор" instead of "На точке").
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+            // Same layout as a Bee card: the tall mark spans both rows, and only
+            // the state word differs ("Выбор" instead of "На точке").
+            BeeMarkIcon(
+                markColor = mark.markColor,
+                markPosition = mark.markPosition,
+            )
+            Column(
+                modifier = Modifier.weight(1f).padding(start = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                ObservationBeeMark(
-                    markColor = mark.markColor,
-                    markPosition = mark.markPosition,
-                )
                 Text(
                     text = "Выбор",
                     style = MaterialTheme.typography.titleMedium,
@@ -296,34 +297,33 @@ internal fun AvailableBeeMarkCard(
                     maxLines = 1,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 10.dp)
+                        .fillMaxWidth()
                         .testTag("available-mark-state-$key"),
                 )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.weight(1f))
-                Box(Modifier.width(BeePrimaryActionWidth), contentAlignment = Alignment.CenterEnd) {
-                    Button(
-                        onClick = onStartFirstFlight,
-                        enabled = enabled,
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .defaultMinSize(minWidth = 104.dp, minHeight = 48.dp)
-                            .testTag("available-mark-action-$key"),
-                    ) {
-                        Text(
-                            text = "УЛЕТЕЛА",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.weight(1f))
+                    Box(Modifier.width(BeePrimaryActionWidth), contentAlignment = Alignment.CenterEnd) {
+                        Button(
+                            onClick = onStartFirstFlight,
+                            enabled = enabled,
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minWidth = 104.dp, minHeight = 48.dp)
+                                .testTag("available-mark-action-$key"),
+                        ) {
+                            Text(
+                                text = "УЛЕТЕЛА",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
             }
@@ -375,40 +375,3 @@ private val ChoiceCardContentDark = Color(0xFFEDEDED)
 private val ChoiceCardBorderDark = Color(0xFF9C9C9C)
 private val BeeAzimuthSlotWidth = 72.dp
 private val BeePrimaryActionWidth = 156.dp
-
-@Composable
-private fun ObservationBeeMark(
-    markColor: String,
-    markPosition: MarkPosition,
-) {
-    val background = markColorValue(markColor)
-    val foreground = if (markColor == "WHITE" || markColor == "YELLOW") Color.Black else Color.White
-    val positionText = when (markPosition) {
-        MarkPosition.NONE -> null
-        MarkPosition.RIGHT_WING -> "КП"
-        MarkPosition.LEFT_WING -> "КЛ"
-    }
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .background(background, CircleShape)
-            .border(
-                BorderStroke(if (markColor == "WHITE") 2.dp else 1.dp, Color(0xFF2B211D)),
-                CircleShape,
-            )
-            .semantics {
-                contentDescription = BeeMarkCatalog.displayName(markColor, markPosition)
-            }
-            .testTag("bee-mark-$markColor-${markPosition.name}"),
-        contentAlignment = Alignment.Center,
-    ) {
-        positionText?.let {
-            Text(
-                text = it,
-                color = foreground,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-    }
-}

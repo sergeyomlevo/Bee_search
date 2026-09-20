@@ -9,6 +9,12 @@ import kotlin.math.sqrt
 import org.maplibre.android.geometry.LatLngBounds
 
 /**
+ * Mean Earth radius in kilometres. One constant for every area and distance calculation, so a
+ * single участок cannot show two slightly different areas in two places of the interface.
+ */
+internal const val EARTH_RADIUS_KM = 6_371.0088
+
+/**
  * Geographic bounds used only by the current map-screen coverage-selection prototype.
  * They are intentionally not a Territory or Room model.
  */
@@ -83,12 +89,6 @@ internal fun normalizeMapPackageBounds(bounds: MapGeoBounds): MapGeoBounds = Map
     west = bounds.west.outwardCoordinate(RoundingMode.FLOOR),
 )
 
-internal fun formatMapPackageBuilderBounds(bounds: MapGeoBounds): String {
-    fun coordinate(value: Double): String = "%.7f".format(java.util.Locale.ROOT, value)
-    return "-West ${coordinate(bounds.west)} -South ${coordinate(bounds.south)} " +
-        "-East ${coordinate(bounds.east)} -North ${coordinate(bounds.north)}"
-}
-
 private fun Double.outwardCoordinate(roundingMode: RoundingMode): Double =
     BigDecimal.valueOf(this).setScale(7, roundingMode).toDouble()
 
@@ -99,17 +99,143 @@ internal fun undoLastCoverageFragment(
 internal fun clearCoverageFragments(): List<MapCoverageFragment> = emptyList()
 
 /**
- * Bounds used only to frame the camera for review. The selected fragments stay unchanged.
+ * A coverage-editing session is dirty only while its working draft differs from the last
+ * persisted selection.
+ *
+ * Opening the editor is not a change: the draft starts as a copy of the persisted selection, so an
+ * untouched editor is not dirty and may be left without any confirmation. Every draft operation
+ * (add, undo last, clear all) is a pure function of the previous list and never touches the
+ * persisted selection, which is what makes "leave without saving" a plain restore.
+ */
+internal fun isCoverageSelectionDirty(
+    persisted: List<MapCoverageFragment>,
+    working: List<MapCoverageFragment>,
+): Boolean = working != persisted
+
+/**
+ * Bounds used only to frame the camera. The fragments themselves stay unchanged.
  */
 internal fun coverageBoundsForShowAll(
     fragments: List<MapCoverageFragment>,
-): MapGeoBounds? {
-    if (fragments.isEmpty()) return null
+): MapGeoBounds? = unionBounds(fragments.map(MapCoverageFragment::bounds))
+
+/**
+ * Outer extent of участки: the smallest rectangle containing all of them.
+ *
+ * This is camera framing only. It is never persisted and never replaces the участки themselves, so
+ * an Ареал with a gap between two участки keeps showing both of them.
+ */
+internal fun unionBounds(bounds: List<MapGeoBounds>): MapGeoBounds? {
+    if (bounds.isEmpty()) return null
     return MapGeoBounds(
-        north = fragments.maxOf { it.bounds.north },
-        east = fragments.maxOf { it.bounds.east },
-        south = fragments.minOf { it.bounds.south },
-        west = fragments.minOf { it.bounds.west },
+        north = bounds.maxOf { it.north },
+        east = bounds.maxOf { it.east },
+        south = bounds.minOf { it.south },
+        west = bounds.minOf { it.west },
+    )
+}
+
+/**
+ * Area of the union of участки in square kilometres, computed without any GIS dependency.
+ *
+ * All latitude and longitude edges are compressed into a grid, every grid cell is either fully
+ * inside one of the участки or fully outside it, and a covered cell contributes exactly once. An
+ * overlap between two участки is therefore counted once, a участок nested inside another adds
+ * nothing, and the empty space between separate участки is not part of the area.
+ *
+ * A lat/lon cell is measured on the sphere:
+ *
+ * ```text
+ * A = R² × Δλ × (sin φnorth − sin φsouth)
+ * ```
+ *
+ * The result is derived data: it is never stored in DataStore and never written into the Area file.
+ */
+internal fun areaUnionKm2(bounds: List<MapGeoBounds>): Double {
+    if (bounds.isEmpty()) return 0.0
+    val latitudes = bounds.flatMap { listOf(it.south, it.north) }.distinct().sorted()
+    val longitudes = bounds.flatMap { listOf(it.west, it.east) }.distinct().sorted()
+    var total = 0.0
+    for (latitudeIndex in 0 until latitudes.size - 1) {
+        val south = latitudes[latitudeIndex]
+        val north = latitudes[latitudeIndex + 1]
+        if (north <= south) continue
+        val latitudeBandKm2 = EARTH_RADIUS_KM * EARTH_RADIUS_KM *
+            (sin(Math.toRadians(north)) - sin(Math.toRadians(south)))
+        for (longitudeIndex in 0 until longitudes.size - 1) {
+            val west = longitudes[longitudeIndex]
+            val east = longitudes[longitudeIndex + 1]
+            if (east <= west) continue
+            val covered = bounds.any { bound ->
+                bound.south <= south && bound.north >= north &&
+                    bound.west <= west && bound.east >= east
+            }
+            if (covered) total += latitudeBandKm2 * Math.toRadians(east - west)
+        }
+    }
+    return total
+}
+
+/** One decimal place, locale-independent: the precision the map screen already uses. */
+internal fun formatSquareKilometers(areaKm2: Double): String = "%.1f".format(java.util.Locale.ROOT, areaKm2)
+
+/** What the map shows for the Ареал of the current Territory. */
+internal data class MapAreaPresentation(
+    /** The участки the map draws, in stored order. */
+    val fragments: List<MapCoverageFragment>,
+
+    /** Whether [fragments] are drawn at all in this mode. */
+    val drawFragments: Boolean,
+
+    /** The editor's orange frame around the next visible участок: editor only. */
+    val showViewportFrame: Boolean,
+
+    /** Whether the участки editor is open. */
+    val editorOpen: Boolean,
+
+    /**
+     * Whether the camera should frame the whole Ареал. True in the view mode, where the user came to
+     * see the area rather than to pan around it.
+     */
+    val frameWholeArea: Boolean,
+)
+
+/**
+ * Mode decides what the Ареал looks like on the map.
+ *
+ * The editor works on the draft and marks the viewport it will add next; the view mode shows exactly
+ * the stored участки and frames them; the field map keeps them loaded but draws nothing, because the
+ * field workflow is about the current observation, not about the coverage outline.
+ */
+internal fun mapAreaPresentation(
+    mode: BeeMapMode,
+    editorOpen: Boolean,
+    working: List<MapCoverageFragment>,
+    persisted: List<MapCoverageFragment>,
+    persistedLoaded: Boolean,
+): MapAreaPresentation = when {
+    editorOpen -> MapAreaPresentation(
+        fragments = working,
+        drawFragments = true,
+        showViewportFrame = true,
+        editorOpen = true,
+        frameWholeArea = false,
+    )
+
+    mode == BeeMapMode.AREA_VIEW -> MapAreaPresentation(
+        fragments = persisted.takeIf { persistedLoaded }.orEmpty(),
+        drawFragments = persistedLoaded,
+        showViewportFrame = false,
+        editorOpen = false,
+        frameWholeArea = true,
+    )
+
+    else -> MapAreaPresentation(
+        fragments = persisted.takeIf { persistedLoaded }.orEmpty(),
+        drawFragments = false,
+        showViewportFrame = false,
+        editorOpen = false,
+        frameWholeArea = false,
     )
 }
 
@@ -144,7 +270,8 @@ internal fun coverageBoundsSummary(bounds: MapGeoBounds): MapAreaBoundsSummary {
         bounds = bounds,
         widthKm = widthKm,
         heightKm = heightKm,
-        areaKm2 = widthKm * heightKm,
+        // The same union helper the Ареал card uses, so one участок never shows two areas.
+        areaKm2 = areaUnionKm2(listOf(bounds)),
     )
 }
 
@@ -160,5 +287,5 @@ private fun haversineKm(
     val latitudeBRadians = Math.toRadians(latitudeB)
     val haversine = sin(latitudeDelta / 2.0).let { it * it } +
         cos(latitudeARadians) * cos(latitudeBRadians) * sin(longitudeDelta / 2.0).let { it * it }
-    return 6_371.0088 * 2.0 * asin(sqrt(haversine))
+    return EARTH_RADIUS_KM * 2.0 * asin(sqrt(haversine))
 }

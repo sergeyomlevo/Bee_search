@@ -53,6 +53,7 @@ import org.beesearch.app.domain.repository.TerritoryRepository
 import org.beesearch.app.domain.usecase.CreateObservationPoint
 import org.beesearch.app.domain.usecase.StartupDestination
 import org.beesearch.app.domain.usecase.StartupRouter
+import org.beesearch.app.ui.map.AreaEditorRequest
 import java.util.UUID
 
 sealed interface AppRoute {
@@ -61,6 +62,8 @@ sealed interface AppRoute {
     data object Help : AppRoute
     data object Data : AppRoute
     data object Objects : AppRoute
+    data object Area : AppRoute
+    data object AreaView : AppRoute
     data object Points : AppRoute
     data class PointDetail(val pointId: UUID) : AppRoute
     data class PointProperties(val pointId: UUID, val returnTo: PointPropertiesReturn) : AppRoute
@@ -102,7 +105,14 @@ internal class MainViewModel(
     private val territoryCoverageDeletion: TerritoryCoverageDeletion,
 ) : ViewModel() {
     private val manualRoute = MutableStateFlow<AppRoute?>(null)
-    private val _coverageEditNonce = MutableStateFlow(0)
+
+    /**
+     * The pending request to open the участки editor.
+     *
+     * It is a one-shot command: the map that handles it consumes it, so a later return to the map
+     * cannot replay an old request and open the editor without a user action.
+     */
+    private val areaEditorRequest = AreaEditorRequest()
     private val _feedback = MutableStateFlow<UiFeedback?>(null)
     private val _locationState = MutableStateFlow<LocationUiState>(LocationUiState.PermissionRequired)
     private val _observationPointDraft = MutableStateFlow<ObservationPointCreationDraft?>(null)
@@ -113,6 +123,9 @@ internal class MainViewModel(
     private val _flightAzimuthInProgressIds = MutableStateFlow<Set<UUID>>(emptySet())
     private var locationJob: kotlinx.coroutines.Job? = null
     private var nextFeedbackId = 0L
+
+    /** Where the участки editor should return to once the Ареал workflow opened it. */
+    private var areaEditReturnRoute: AppRoute? = null
 
     val feedback: StateFlow<UiFeedback?> = _feedback.asStateFlow()
     val locationState: StateFlow<LocationUiState> = _locationState.asStateFlow()
@@ -125,7 +138,7 @@ internal class MainViewModel(
     val beeEventInProgressIds: StateFlow<Set<UUID>> = _beeEventInProgressIds.asStateFlow()
     val flightAzimuthInProgressIds: StateFlow<Set<UUID>> =
         _flightAzimuthInProgressIds.asStateFlow()
-    val coverageEditNonce: StateFlow<Int> = _coverageEditNonce.asStateFlow()
+    val areaEditorRequestToken: StateFlow<Int> = areaEditorRequest.token
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -214,6 +227,52 @@ internal class MainViewModel(
         clearFeedback()
     }
 
+    fun openArea() {
+        manualRoute.value = AppRoute.Area
+        clearFeedback()
+    }
+
+    /** The Ареал on a clean map: geometry without the editor. */
+    fun openAreaView() {
+        manualRoute.value = AppRoute.AreaView
+        clearFeedback()
+    }
+
+    /**
+     * Opens the участки editor for the Ареал workflow.
+     *
+     * The Ареал screen and the Ареал view are two different places a user can start editing from, so
+     * the origin is remembered and [completeAreaSectionsEditing] returns there. Other entry points to
+     * the same editor (the map's own coverage button, the offline-map screen) record no origin and
+     * keep the previous behaviour of staying on the map.
+     *
+     * This is the only kind of call that may open the editor: ordinary navigation never requests it.
+     */
+    fun openAreaSectionsEditor(returnToView: Boolean) {
+        areaEditReturnRoute = if (returnToView) AppRoute.AreaView else AppRoute.Area
+        manualRoute.value = AppRoute.CurrentTerritory
+        areaEditorRequest.request()
+        clearFeedback()
+    }
+
+    /** The editor session ended: go back to where the Ареал workflow started, if it did. */
+    fun completeAreaSectionsEditing() {
+        val origin = areaEditReturnRoute ?: return
+        areaEditReturnRoute = null
+        manualRoute.value = origin
+        clearFeedback()
+    }
+
+    /**
+     * The map opened the editor for the pending request, so the request is finished.
+     *
+     * Without this the request would stay pending and every later entry to the map would treat it as a
+     * fresh command and reopen the editor on its own.
+     */
+    fun consumeAreaEditorRequest() {
+        areaEditorRequest.consume()
+    }
+
     fun openPointDetail(pointId: UUID) {
         manualRoute.value = AppRoute.PointDetail(pointId)
         clearFeedback()
@@ -250,7 +309,7 @@ internal class MainViewModel(
 
     fun openMapWithCoverageEdit() {
         manualRoute.value = AppRoute.CurrentTerritory
-        _coverageEditNonce.value += 1
+        areaEditorRequest.request()
         clearFeedback()
     }
 
@@ -508,22 +567,22 @@ internal class MainViewModel(
             return
         }
         launchBeeMutation(fallback = "Не удалось сохранить первый вылет") {
+            // No success confirmation: the bee card itself shows the new flight immediately, and a
+            // transient banner above the list would move the next card under the finger.
             observationRepository.startFirstFlight(pointId, markColor, markPosition)
-            showSuccessFeedback("Вылет сохранён")
         }
     }
 
     fun registerBeeReturn(beeId: UUID) {
         launchBeeEvent(beeId, fallback = "Не удалось сохранить возвращение пчелы") {
+            // The card switches to the at-point state by itself; a confirmation would only shift it.
             observationRepository.registerBeeReturn(beeId)
-            showSuccessFeedback("Прилёт сохранён")
         }
     }
 
     fun startNextFlight(beeId: UUID) {
         launchBeeEvent(beeId, fallback = "Не удалось сохранить вылет пчелы") {
             observationRepository.startNextFlight(beeId)
-            showSuccessFeedback("Вылет сохранён")
         }
     }
 
@@ -737,7 +796,7 @@ internal class MainViewModel(
                         locationProvider = application.container.locationProvider,
                         territoryCoverageDeletion = TerritoryCoverageDeletion(
                             territoryRepository = application.container.territoryRepository,
-                            coverageStore = application.container.mapCoverageStore,
+                            areaStore = application.container.mapAreaStore,
                         ),
                     ) as T
                 }

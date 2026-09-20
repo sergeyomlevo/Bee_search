@@ -1,9 +1,5 @@
 package org.beesearch.app.ui.map
 
-import android.net.Uri
-import android.provider.OpenableColumns
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -24,13 +20,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import java.util.Locale
-import kotlinx.coroutines.launch
+import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
+import org.beesearch.app.data.exchange.ExchangeFolder
 import org.beesearch.app.domain.model.Territory
 
 /**
@@ -47,172 +42,70 @@ import org.beesearch.app.domain.model.Territory
  *  3) a PMTiles whose name does not match the manifest is rejected with a
  *     readable "another file" message before any size/SHA/D065 validation.
  *
- * D063/D065 contracts, MapPackageStore semantics and the active-package
- * lifecycle are not modified: only the picker UX is improved.
+ * The pickers, the two-step selection and the import call live in
+ * `rememberMapPackageImportSession`, which the Ареал screen uses as well, so
+ * there is exactly one import flow in the application. D063/D065 contracts,
+ * MapPackageStore semantics and the active-package lifecycle are unchanged.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun OfflineMapManagementScreen(
     territory: Territory?,
-    mapCoverageStore: MapCoverageStore,
+    mapAreaStore: MapAreaStore,
     mapPackageStore: MapPackageStore,
+    exchangeStorage: BeeSearchExchangeStorage,
     onBack: () -> Unit,
     onEditCoverageOnMap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val territoryId = territory?.id
-    val scope = rememberCoroutineScope()
-    val contentResolver = LocalContext.current.contentResolver
 
     var coverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
     var availability by remember {
         mutableStateOf<MapPackageAvailability>(MapPackageAvailability.Missing)
     }
     var checking by remember { mutableStateOf(false) }
-    var importing by remember { mutableStateOf(false) }
-    var lastAttemptSucceeded by remember { mutableStateOf<Boolean?>(null) }
-    var lastAttemptMessage by remember { mutableStateOf<String?>(null) }
-    // Steps of the current import session.
-    var pendingManifestUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedManifest by remember { mutableStateOf<MapPackageManifest?>(null) }
+    // The pickers, the two-step selection and the import call live in the shared session, so this
+    // screen and the Ареал screen cannot drift into two different import flows.
+    val importSession = rememberMapPackageImportSession(
+        territoryId = territoryId,
+        desiredCoverage = coverage,
+        mapPackageStore = mapPackageStore,
+        exchangeStorage = exchangeStorage,
+    ) { result ->
+        when (result) {
+            is MapPackageImportResult.Activated ->
+                availability = MapPackageAvailability.Ready(result.activePackage)
 
-    LaunchedEffect(territoryId) {
-        if (territoryId == null) return@LaunchedEffect
-        val loadedCoverage = try {
-            mapCoverageStore.load(territoryId)
-        } catch (_: Exception) {
-            emptyList()
+            // State A is recomputed from the pointer; the failure belongs to B.
+            is MapPackageImportResult.Rejected ->
+                if (territoryId != null) availability = mapPackageStore.loadActive(territoryId, coverage)
         }
+    }
+
+    LaunchedEffect(exchangeStorage) {
+        exchangeStorage.ensure()
+    }
+
+    LaunchedEffect(territoryId, mapAreaStore, territory?.name) {
+        if (territoryId == null) return@LaunchedEffect
+        // Reading also migrates a readable legacy selection into a named Ареал.
+        val loadedArea = try {
+            mapAreaStore.load(territoryId, territory.name)
+        } catch (_: Exception) {
+            MapAreaReadResult.Corrupt(CORRUPT_AREA_MESSAGE)
+        }
+        val loadedCoverage = (loadedArea as? MapAreaReadResult.Present)?.area?.coverageFragments().orEmpty()
         coverage = loadedCoverage
         checking = true
         availability = mapPackageStore.loadActive(territoryId, loadedCoverage)
         checking = false
     }
 
-    fun setImportAttempt(succeeded: Boolean, message: String) {
-        lastAttemptSucceeded = succeeded
-        lastAttemptMessage = message
-    }
-
-    fun readDisplayName(uri: Uri): String? = try {
-        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (index >= 0) cursor.getString(index) else null
-            } else null
-        }
-    } catch (_: Exception) {
-        null
-    }
-
-    fun readFirstBytes(uri: Uri, max: Int): ByteArray? = try {
-        contentResolver.openInputStream(uri)?.use { input ->
-            val buffer = ByteArray(max)
-            var total = 0
-            while (total < max) {
-                val read = input.read(buffer, total, max - total)
-                if (read < 0) break
-                total += read
-            }
-            buffer.copyOf(total)
-        }
-    } catch (_: Exception) {
-        null
-    }
-
-    fun readManifestText(uri: Uri): String? = try {
-        contentResolver.openInputStream(uri)?.use { input ->
-            input.bufferedReader().use { it.readText() }
-        }
-    } catch (_: Exception) {
-        null
-    }
-
-    val pmtilesPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { pmtilesUri ->
-        if (pmtilesUri == null) return@rememberLauncherForActivityResult
-        val manifest = selectedManifest
-        val manifestUri = pendingManifestUri
-        val currentTerritoryId = territoryId
-        if (manifest == null || manifestUri == null || currentTerritoryId == null) {
-            pendingManifestUri = null
-            selectedManifest = null
-            setImportAttempt(false, "Выберите сначала файл описания карты (*.pmtiles.manifest.json).")
-            return@rememberLauncherForActivityResult
-        }
-        // Friendly basename check BEFORE size/SHA/D065 validation.
-        val displayName = readDisplayName(pmtilesUri)
-        if (displayName != null && displayName != manifest.pmtilesFile) {
-            setImportAttempt(false, "Выбран другой файл карты. Ожидается: ${manifest.pmtilesFile}")
-            return@rememberLauncherForActivityResult
-        }
-        scope.launch {
-            importing = true
-            try {
-                when (
-                    val result = mapPackageStore.import(
-                        territoryId = currentTerritoryId,
-                        desiredCoverage = coverage,
-                        manifestUri = manifestUri,
-                        pmtilesUri = pmtilesUri,
-                    )
-                ) {
-                    is MapPackageImportResult.Activated -> {
-                        availability = MapPackageAvailability.Ready(result.activePackage)
-                        setImportAttempt(true, "Карта успешно импортирована и активирована")
-                    }
-                    is MapPackageImportResult.Rejected -> {
-                        // State A is recomputed from the pointer; the failure belongs to B.
-                        availability = mapPackageStore.loadActive(currentTerritoryId, coverage)
-                        setImportAttempt(false, result.message ?: "Не удалось импортировать карту")
-                    }
-                }
-            } finally {
-                importing = false
-            }
-            pendingManifestUri = null
-            selectedManifest = null
-        }
-    }
-
-    val manifestPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { manifestUri ->
-        if (manifestUri == null) return@rememberLauncherForActivityResult
-        val displayName = readDisplayName(manifestUri)
-        val looksLikePmtiles =
-            displayName?.endsWith(".pmtiles") == true ||
-                (readFirstBytes(manifestUri, 16)?.let { bytes ->
-                    bytes.size >= 7 && bytes.copyOf(7).decodeToString() == "PMTiles"
-                } == true)
-        if (looksLikePmtiles) {
-            pendingManifestUri = null
-            selectedManifest = null
-            setImportAttempt(false, "Сначала выберите файл описания карты: *.pmtiles.manifest.json")
-            return@rememberLauncherForActivityResult
-        }
-        val text = readManifestText(manifestUri)
-        val parsed = try {
-            text?.let(MapPackageManifestParser::parse)
-        } catch (_: Exception) {
-            null
-        }
-        if (parsed == null) {
-            pendingManifestUri = null
-            selectedManifest = null
-            setImportAttempt(
-                false,
-                "Выбранный файл не является описанием карты. " +
-                    "Выберите файл *.pmtiles.manifest.json из той же пары, что и файл карты.",
-            )
-            return@rememberLauncherForActivityResult
-        }
-        pendingManifestUri = manifestUri
-        selectedManifest = parsed
-        // Manifest is valid: state the expected file and open the second picker.
-        pmtilesPicker.launch(arrayOf("*/*"))
-    }
+    val importing = importSession.importing
+    val selectedManifest = importSession.acceptedManifest
+    val lastAttemptSucceeded = importSession.lastAttemptSucceeded
+    val lastAttemptMessage = importSession.lastAttemptMessage
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -242,9 +135,9 @@ internal fun OfflineMapManagementScreen(
             Text("Территория: ${territory.code} · ${territory.name}", style = MaterialTheme.typography.titleMedium)
 
             if (coverage.isEmpty()) {
-                Text("Покрытие не выбрано. Выберите участок на карте.", style = MaterialTheme.typography.bodyMedium)
+                Text("Ареал не создан. Создайте ареал на карте.", style = MaterialTheme.typography.bodyMedium)
             } else {
-                Text("Выбранное покрытие", style = MaterialTheme.typography.titleSmall)
+                Text("Участки ареала", style = MaterialTheme.typography.titleSmall)
                 coverage.forEachIndexed { index, fragment ->
                     val b = fragment.bounds
                     Text(
@@ -271,7 +164,7 @@ internal fun OfflineMapManagementScreen(
                         isImporting = importing,
                         message = null,
                         onSelectCoverage = { onEditCoverageOnMap() },
-                        onImport = { manifestPicker.launch(arrayOf("*/*")) },
+                        onImport = { importSession.startFromPicker() },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -292,6 +185,10 @@ internal fun OfflineMapManagementScreen(
                                 "2. *.pmtiles — файл самой карты.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                        Text(
+                            "Папка обмена: ${exchangeStorage.userVisiblePath(ExchangeFolder.OFFLINE_MAPS)}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
             } else {
@@ -311,7 +208,7 @@ internal fun OfflineMapManagementScreen(
                             style = MaterialTheme.typography.bodyLarge,
                         )
                         TextButton(
-                            onClick = { pmtilesPicker.launch(arrayOf("*/*")) },
+                            onClick = { importSession.choosePmtilesForAcceptedManifest() },
                             enabled = !importing,
                         ) { Text("Выбрать файл карты") }
                     }
@@ -340,7 +237,7 @@ internal fun OfflineMapManagementScreen(
                                 MaterialTheme.colorScheme.onErrorContainer
                             },
                         )
-                        if (!lastSucceeded && lastAttemptMessage == "Выбранный файл не является корректным manifest карты") {
+                        if (!lastSucceeded && lastAttemptMessage == MAP_PACKAGE_NOT_A_MANIFEST_MESSAGE) {
                             Text(
                                 "Проверьте, что на 1-м шаге выбран файл описания карты " +
                                     "(*.pmtiles.manifest.json), а на 2-м шаге — сам файл карты (*.pmtiles).",

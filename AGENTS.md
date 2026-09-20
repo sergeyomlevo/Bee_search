@@ -626,6 +626,44 @@ must state either:
 - `Decomposition performed: ...`
 - `Decomposition reviewed; kept cohesive because: ...`
 
+### One-shot UI/navigation actions
+
+A command that must happen exactly once — open an editor, enter a dedicated
+mode, show a one-time action — must not be modelled as a durable Boolean, a
+non-zero counter, or any other state that is read again automatically after a
+recreation or a navigation transition. Such state can replay: the screen is
+recreated or reloaded, sees the old value, and performs a command the user
+already used. This is a real defect class, not a style preference; the Ареал
+участки editor reopened on a plain return to the map because of exactly this.
+
+Distinguish:
+
+- **persistent state** — state that genuinely has to survive recreation and be
+  shown again (settings, saved data, the current selection);
+- **one-shot request/event** — an intent to perform an action once.
+
+A one-shot request has an explicit lifecycle:
+
+```text
+request → handle → consume
+```
+
+Returning to a screen without a new explicit user action must never replay an
+already handled command: the screen opens only for a *pending* request, and the
+component that handles it consumes it.
+
+Do not keep a parallel flag next to the real mode. The request carries the
+pending user intent; the mode stays owned by the component that owns the mode.
+
+For the Ареал участки editor the source of truth is `AreaEditorRequest` in
+`app/src/main/java/org/beesearch/app/ui/map/AreaEditorSession.kt`.
+
+Regression tests must preserve this scenario:
+
+```text
+open explicitly → finish the session → navigate away and back → nothing reopens
+```
+
 ---
 
 ## 15. Dependencies

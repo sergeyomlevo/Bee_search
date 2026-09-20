@@ -12,10 +12,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -36,10 +38,63 @@ internal const val CLEAR_COVERAGE_DESCRIPTION = "Очистить выбранн
 internal const val DONE_COVERAGE_SELECTION_DESCRIPTION = "Завершить выбор offline coverage"
 internal const val MAP_COVERAGE_SELECTION_CONTROLS_TAG = "map-coverage-selection-controls"
 internal const val CURRENT_COVERAGE_SUMMARY_TAG = "current-coverage-summary"
-internal const val COPY_SELECTED_COVERAGE_DESCRIPTION = "Копировать выбранный bbox для сборки карты"
+internal const val AREA_VIEW_CONTROLS_TAG = "area-view-controls"
 internal const val IMPORT_OFFLINE_MAP_DESCRIPTION = "Импортировать офлайн-карту"
 internal const val SELECT_OFFLINE_COVERAGE_DESCRIPTION = "Выбрать участок для офлайн-карты"
 internal const val OFFLINE_MAP_PACKAGE_PANEL_TAG = "offline-map-package-panel"
+
+/**
+ * Visible action labels of the coverage editor.
+ *
+ * They live here as constants because the in-app help must name exactly the actions the editor
+ * shows. A help section that paraphrases a button becomes wrong as soon as the button is renamed,
+ * so the help test asserts these very strings instead of a copy of them.
+ */
+internal const val ADD_COVERAGE_FRAGMENT_LABEL = "Добавить участок"
+internal const val UNDO_COVERAGE_FRAGMENT_LABEL = "Отменить последний"
+internal const val SHOW_ALL_COVERAGE_LABEL = "Обзор"
+internal const val CLEAR_COVERAGE_LABEL = "Очистить всё"
+internal const val DONE_COVERAGE_SELECTION_LABEL = "Готово"
+
+internal const val CLEAR_COVERAGE_DIALOG_TAG = "clear-coverage-dialog"
+internal const val UNSAVED_COVERAGE_CHANGES_DIALOG_TAG = "coverage-unsaved-changes-dialog"
+internal const val AREA_NAME_DIALOG_TAG = "area-name-dialog"
+internal const val AREA_NAME_FIELD_TAG = "area-name-field"
+internal const val AREA_NAME_ERROR_TAG = "area-name-error"
+internal const val DELETE_AREA_DIALOG_TAG = "delete-area-dialog"
+
+internal const val CLEAR_COVERAGE_CONFIRM_LABEL = "Очистить"
+internal const val SAVE_COVERAGE_CHANGES_LABEL = "Сохранить"
+internal const val DISCARD_COVERAGE_CHANGES_LABEL = "Выйти без сохранения"
+internal const val STAY_IN_COVERAGE_SELECTION_LABEL = "Остаться"
+
+/** Visible labels of the Ареал lifecycle, shared with the in-app help so they cannot drift. */
+internal const val AREA_NAME_DIALOG_TITLE = "Название ареала"
+internal const val CREATE_AREA_LABEL = "Создать ареал"
+internal const val EDIT_AREA_SECTIONS_LABEL = "Изменить участки"
+internal const val VIEW_AREA_ON_MAP_LABEL = "Посмотреть на карте"
+internal const val SEND_AREA_LABEL = "Отправить ареал"
+internal const val DELETE_AREA_LABEL = "Удалить ареал"
+internal const val DELETE_AREA_CONFIRM_LABEL = "Удалить"
+internal const val CANCEL_LABEL = "Отмена"
+
+internal const val VIEW_AREA_ON_MAP_DESCRIPTION = "Посмотреть ареал на карте"
+internal const val SEND_AREA_DESCRIPTION = "Отправить файл ареала"
+internal const val EDIT_AREA_SECTIONS_IN_VIEW_DESCRIPTION = "Изменить участки просматриваемого ареала"
+
+/**
+ * Labels of the offline-map step of the Ареал workflow.
+ *
+ * The `Загрузить карту` action, its confirmation and the alternative-map actions are named here
+ * because the in-app help names them too, and a renamed button must not leave the help lying.
+ */
+internal const val LOAD_AREA_MAP_LABEL = "Загрузить карту"
+internal const val LOAD_AREA_MAP_CONFIRM_LABEL = "Загрузить"
+internal const val CHOOSE_ANOTHER_AREA_MAP_LABEL = "Выбрать другую"
+internal const val OTHER_AREA_MAPS_LABEL = "Другие карты"
+internal const val AREA_MAP_READY_LABEL = "Офлайн-карта загружена"
+internal const val LOAD_AREA_MAP_DESCRIPTION = "Загрузить офлайн-карту для ареала"
+internal const val AREA_MAP_READY_DESCRIPTION = "Для ареала загружена офлайн-карта"
 
 private val coverageFill = Color(0xFF1565C0).copy(alpha = 0.16f)
 private val coverageBorder = Color(0xFF0D47A1).copy(alpha = 0.9f)
@@ -80,7 +135,7 @@ internal fun OfflineMapPackagePanel(
             }
             if (!desiredCoverageConfigured) {
                 Text(
-                    "Сначала выберите участок, который должен работать без сети.",
+                    "Сначала создайте ареал, который должен работать без сети.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Button(
@@ -88,7 +143,7 @@ internal fun OfflineMapPackagePanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .semantics { contentDescription = SELECT_OFFLINE_COVERAGE_DESCRIPTION },
-                ) { Text("Выбрать участок") }
+                ) { Text(CREATE_AREA_LABEL) }
             } else {
                 Text(
                     "Импорт: сначала manifest, затем соответствующий PMTiles.",
@@ -106,7 +161,7 @@ internal fun OfflineMapPackagePanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .semantics { contentDescription = SELECT_OFFLINE_COVERAGE_DESCRIPTION },
-                ) { Text("Изменить участок") }
+                ) { Text(EDIT_AREA_SECTIONS_LABEL) }
             }
         }
     }
@@ -132,8 +187,6 @@ internal fun CoverageSelectionEntry(
 internal fun MapCoverageSelectionControls(
     fragmentCount: Int,
     viewportSummary: MapAreaBoundsSummary?,
-    selectedSummary: MapAreaBoundsSummary? = null,
-    showDevBoundsExport: Boolean = false,
     title: String = "Участок",
     canAddFragment: Boolean,
     onAddFragment: () -> Unit,
@@ -141,8 +194,6 @@ internal fun MapCoverageSelectionControls(
     onShowAll: () -> Unit,
     onClear: () -> Unit,
     onDone: () -> Unit,
-    onCopySelectedBounds: () -> Unit = {},
-    onCancel: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -157,7 +208,14 @@ internal fun MapCoverageSelectionControls(
             modifier = Modifier.padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // "Готово" is the only way out of the editor, and it saves. There is deliberately no
+            // plain exit action here: a second dismissal button is what silently discarded the
+            // user's selection. Leaving without saving stays available, but only through the
+            // explicit unsaved-changes confirmation on Back.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     text = title,
                     modifier = Modifier.weight(1f).padding(start = 4.dp),
@@ -169,22 +227,11 @@ internal fun MapCoverageSelectionControls(
                         contentDescription = DONE_COVERAGE_SELECTION_DESCRIPTION
                     },
                 ) {
-                    Text("Готово")
+                    Text(DONE_COVERAGE_SELECTION_LABEL)
                 }
-                TextButton(onClick = onCancel) { Text("Выйти") }
             }
             viewportSummary?.let { summary ->
                 CoverageViewportSummary(summary)
-            }
-            if (showDevBoundsExport && selectedSummary != null) {
-                TextButton(
-                    onClick = onCopySelectedBounds,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics { contentDescription = COPY_SELECTED_COVERAGE_DESCRIPTION },
-                ) {
-                    Text("Копировать bbox", maxLines = 1)
-                }
             }
             Button(
                 onClick = onAddFragment,
@@ -193,18 +240,23 @@ internal fun MapCoverageSelectionControls(
                     .fillMaxWidth()
                     .semantics { contentDescription = ADD_COVERAGE_FRAGMENT_DESCRIPTION },
             ) {
-                Text("Добавить участок")
+                Text(ADD_COVERAGE_FRAGMENT_LABEL)
             }
-            Row(modifier = Modifier.fillMaxWidth()) {
-                TextButton(
-                    onClick = onUndo,
-                    enabled = fragmentCount > 0,
-                    modifier = Modifier.weight(1f).semantics {
-                        contentDescription = UNDO_COVERAGE_FRAGMENT_DESCRIPTION
-                    },
-                ) {
-                    Text("Отмена", maxLines = 1)
-                }
+            // "Отменить последний" needs a full-width row: it stays readable at font_scale 1.7,
+            // where a three-button row would clip or ellipsize it.
+            TextButton(
+                onClick = onUndo,
+                enabled = fragmentCount > 0,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentDescription = UNDO_COVERAGE_FRAGMENT_DESCRIPTION },
+            ) {
+                Text(UNDO_COVERAGE_FRAGMENT_LABEL)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 TextButton(
                     onClick = onShowAll,
                     enabled = fragmentCount > 0,
@@ -212,7 +264,7 @@ internal fun MapCoverageSelectionControls(
                         contentDescription = SHOW_ALL_COVERAGE_DESCRIPTION
                     },
                 ) {
-                    Text("Обзор", maxLines = 1)
+                    Text(SHOW_ALL_COVERAGE_LABEL)
                 }
                 TextButton(
                     onClick = onClear,
@@ -221,7 +273,7 @@ internal fun MapCoverageSelectionControls(
                         contentDescription = CLEAR_COVERAGE_DESCRIPTION
                     },
                 ) {
-                    Text("Сброс", maxLines = 1)
+                    Text(CLEAR_COVERAGE_LABEL)
                 }
             }
         }
@@ -256,6 +308,12 @@ private fun CoverageViewportSummary(summary: MapAreaBoundsSummary) {
     }
 }
 
+/**
+ * Confirmation for "Очистить всё".
+ *
+ * Clearing is a draft operation: it only empties the working selection. The persisted selection is
+ * written on save, so declining here or leaving without saving both keep the previous selection.
+ */
 @Composable
 internal fun ClearCoverageSelectionDialog(
     onConfirm: () -> Unit,
@@ -263,14 +321,130 @@ internal fun ClearCoverageSelectionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Очистить выбор?") },
+        modifier = Modifier.testTag(CLEAR_COVERAGE_DIALOG_TAG),
+        title = { Text("Очистить выбранные участки?") },
         text = { Text("Все выбранные участки исчезнут с карты в текущем сеансе.") },
         confirmButton = {
-            Button(onClick = onConfirm) { Text("Очистить") }
+            Button(onClick = onConfirm) { Text(CLEAR_COVERAGE_CONFIRM_LABEL) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
+            TextButton(onClick = onDismiss) { Text(CANCEL_LABEL) }
         },
+    )
+}
+
+/**
+ * Names the Ареал on first save, and renames it later. The same dialog serves both, so the two
+ * paths cannot drift apart.
+ *
+ * The field is prefilled, so the common case is a single tap. A blank name never closes the dialog
+ * and never creates or renames anything.
+ */
+@Composable
+internal fun AreaNameDialog(
+    name: String,
+    blankName: Boolean,
+    onNameChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(AREA_NAME_DIALOG_TAG),
+        title = { Text(AREA_NAME_DIALOG_TITLE) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = onNameChange,
+                    singleLine = true,
+                    isError = blankName,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(AREA_NAME_FIELD_TAG),
+                )
+                if (blankName) {
+                    Text(
+                        text = BLANK_AREA_NAME_MESSAGE,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag(AREA_NAME_ERROR_TAG),
+                    )
+                }
+            }
+        },
+        // Stacked full-width actions stay readable at font_scale 1.7.
+        confirmButton = {
+            Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) { Text(SAVE_COVERAGE_CHANGES_LABEL) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(CANCEL_LABEL) }
+        },
+    )
+}
+
+/**
+ * Confirmation for the only user-facing way to remove an Ареал.
+ *
+ * It states explicitly what is removed and what is kept, because an empty editor draft can no longer
+ * delete the Ареал.
+ */
+@Composable
+internal fun DeleteAreaDialog(
+    areaName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(DELETE_AREA_DIALOG_TAG),
+        title = { Text("Удалить ареал «$areaName»?") },
+        text = { Text("Будут удалены сохранённые участки этого ареала. Территория и точки наблюдения останутся.") },
+        confirmButton = {
+            Button(onClick = onConfirm) { Text(DELETE_AREA_CONFIRM_LABEL) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(CANCEL_LABEL) }
+        },
+    )
+}
+
+/**
+ * Confirmation shown when Back tries to leave the editor with unsaved changes.
+ *
+ * The three actions are deliberately named instead of "Да"/"Нет": each one states the outcome, and
+ * none of them can discard the draft without the user having chosen that explicitly.
+ */
+@Composable
+internal fun CoverageUnsavedChangesDialog(
+    onSave: () -> Unit,
+    onDiscard: () -> Unit,
+    onStay: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onStay,
+        modifier = Modifier.testTag(UNSAVED_COVERAGE_CHANGES_DIALOG_TAG),
+        title = { Text("Сохранить изменения участка?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Выбранные участки изменены, но ещё не сохранены.")
+                // Stacked full-width actions keep every label readable at font_scale 1.7.
+                Button(
+                    onClick = onSave,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(SAVE_COVERAGE_CHANGES_LABEL) }
+                TextButton(
+                    onClick = onDiscard,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(DISCARD_COVERAGE_CHANGES_LABEL) }
+                TextButton(
+                    onClick = onStay,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(STAY_IN_COVERAGE_SELECTION_LABEL) }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {},
     )
 }
 
@@ -309,6 +483,35 @@ internal fun MapCoverageViewportFrame(
             color = viewportFrame,
             style = Stroke(width = 3.dp.toPx()),
         )
+    }
+}
+
+/**
+ * The whole interface of the Ареал view mode: one small action.
+ *
+ * Viewing is not editing, so the editor panel («Участок», «Текущий участок», «Добавить участок»,
+ * «Отменить последний», «Очистить всё», «Готово») must not appear here. Changing участки is a
+ * separate, deliberate step through [EDIT_AREA_SECTIONS_LABEL].
+ */
+@Composable
+internal fun AreaViewControls(
+    onEditSections: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.testTag(AREA_VIEW_CONTROLS_TAG),
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 3.dp,
+        shadowElevation = 2.dp,
+    ) {
+        TextButton(
+            onClick = onEditSections,
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .semantics { contentDescription = EDIT_AREA_SECTIONS_IN_VIEW_DESCRIPTION },
+        ) {
+            Text(EDIT_AREA_SECTIONS_LABEL)
+        }
     }
 }
 

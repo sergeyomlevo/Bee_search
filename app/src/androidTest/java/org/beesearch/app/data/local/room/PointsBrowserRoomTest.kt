@@ -95,7 +95,7 @@ class PointsBrowserRoomTest {
     private fun territoryEntity(id: UUID, code: String) = TerritoryEntity(id, code, code, "R", "D", Instant.EPOCH, Instant.EPOCH)
     private fun observerEntity() = ObserverEntity(observer, "O1", "Doe", "Jane", null, null, Instant.EPOCH, Instant.EPOCH)
     private fun point(t: UUID, year: Int, number: Int, result: BeePresenceResult?) = ObservationPointEntity(UUID.randomUUID(), t, observer, year, number, result, null, 56.0, 43.0, null, null, null, Instant.parse("$year-01-01T00:00:00Z"), null, Instant.parse("$year-01-01T01:00:00Z"))
-    private fun bee(point: UUID, color: String = "red", createdAt: Instant = Instant.EPOCH) = BeeEntity(UUID.randomUUID(), point, color, MarkPosition.RIGHT_WING, createdAt)
+    private fun bee(point: UUID, color: String = "red", createdAt: Instant = Instant.EPOCH) = BeeEntity(UUID.randomUUID(), point, color, MarkPosition.ABDOMEN, createdAt)
     private fun cycle(bee: UUID, sequence: Int, returned: Boolean, azimuth: Double? = null): FlightCycleEntity {
         val departure = Instant.parse("2026-09-17T06:00:00Z").plusSeconds(sequence.toLong())
         return FlightCycleEntity(UUID.randomUUID(), bee, sequence, departure, if (returned) departure.plusSeconds(3600) else null, azimuth, false, false, false, departure, departure)

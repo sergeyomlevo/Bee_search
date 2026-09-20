@@ -374,6 +374,12 @@ guidance. Apple HIG, Android Developers и Material guidance — baseline для
 эргономики и accessibility, а не разрешение молча менять Bee Search semantics
 или переносить iOS visual conventions в Android application.
 
+Как моделировать намерение, которое должно выполниться один раз (открыть
+editor, войти в специальный режим, показать одноразовое действие), определяет
+архитектурное правило AGENTS.md, «One-shot UI/navigation actions»: one-shot
+request с lifecycle request → handle → consume, а не долговечный Boolean или
+ненулевой счётчик. UI policy это правило не дублирует.
+
 ## 11. External design baselines
 
 Эта policy адаптирована с учётом официальных источников, а не заменяет их:

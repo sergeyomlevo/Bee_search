@@ -40,6 +40,15 @@ internal data class ValidatedMapPackage(
 
 internal class MapPackageValidationException(message: String) : IllegalArgumentException(message)
 
+/**
+ * The D065 rejection shown when a package does not cover the current Ареал.
+ *
+ * Named so the Ареал screen can offer "choose another map" for exactly this outcome without copying
+ * the wording, and without weakening the coverage rule itself.
+ */
+internal const val MAP_PACKAGE_COVERAGE_MISMATCH_MESSAGE =
+    "Выбранные участки не полностью покрыты этой картой"
+
 /** The field vector renderer supported by this first D063/D065 implementation. */
 internal object BeeSearchMapPackageCompatibility {
     const val PROFILE_ID = "bee-search-field"
@@ -191,7 +200,7 @@ internal object MapPackageValidator {
     ): ValidatedMapPackage {
         BeeSearchMapPackageCompatibility.validate(manifest)
         if (desiredCoverage.isEmpty()) {
-            throw MapPackageValidationException("Сначала выберите участок для офлайн-карты")
+            throw MapPackageValidationException("Сначала создайте ареал для офлайн-карты")
         }
         if (pmtilesFile.name != manifest.pmtilesFile || !pmtilesFile.isFile) {
             throw MapPackageValidationException("Выбранный PMTiles файл не соответствует описанию карты")
@@ -210,7 +219,7 @@ internal object MapPackageValidator {
             throw MapPackageValidationException("Границы PMTiles не соответствуют заявленному покрытию")
         }
         if (desiredCoverage.any { desired -> manifest.coverageFragments.none { it.bounds.contains(desired.bounds) } }) {
-            throw MapPackageValidationException("Выбранные участки не полностью покрыты этой картой")
+            throw MapPackageValidationException(MAP_PACKAGE_COVERAGE_MISMATCH_MESSAGE)
         }
         return ValidatedMapPackage(manifest = manifest, pmtilesFile = pmtilesFile, header = header)
     }

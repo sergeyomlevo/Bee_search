@@ -24,6 +24,31 @@ RULE_SET_VERSION = 2
 # excluded solely because it is sequence 1 or shorter than one minute.
 APPLIED_RULES: tuple[dict[str, Any], ...] = ()
 
+# Bee marks were renamed from a wing vocabulary to a thorax/abdomen vocabulary.
+# Both vocabularies denote the same physical positions, so an archive written by
+# either application version is readable.  ``LEFT_WING`` carries no confirmed
+# physical meaning, so it stays a separate legacy value and is never renamed.
+MARK_POSITION_CANONICAL = {
+    "THORAX": "THORAX",
+    "NONE": "THORAX",
+    "ABDOMEN": "ABDOMEN",
+    "RIGHT_WING": "ABDOMEN",
+    "LEFT_WING": "LEFT_WING",
+}
+
+
+def canonical_mark_position(value: Any) -> str:
+    """Canonical position of a stored bee mark token, or fail closed.
+
+    The canonical value is what identifies a physical position.  It is used for
+    validation and for the duplicate-mark invariant; it deliberately does not
+    rewrite the token stored in the archive.
+    """
+    canonical = MARK_POSITION_CANONICAL.get(value) if isinstance(value, str) else None
+    if canonical is None:
+        raise BackupError("invalid bee mark position")
+    return canonical
+
 
 def _number(value: Any, label: str, minimum: float | None = None,
             maximum: float | None = None, maximum_inclusive: bool = True) -> int | float:
@@ -180,10 +205,13 @@ def build_evidence(path: Path) -> dict[str, Any]:
             raise BackupError("broken bee foreign key")
         if not isinstance(bee["markColor"], str) or not bee["markColor"].strip():
             raise BackupError("blank bee mark color")
-        if bee["markPosition"] not in ("NONE", "RIGHT_WING", "LEFT_WING"):
-            raise BackupError("invalid bee mark position")
+        # A legacy token and its renamed equivalent are one physical position, so
+        # the duplicate-mark invariant is evaluated on the canonical position.
+        # Otherwise an archive holding both NONE and THORAX for one color on one
+        # ObservationPoint would pass as two different marks.
+        canonical_position = canonical_mark_position(bee["markPosition"])
         integer(bee["createdAt"], "bee.createdAt")
-        bee_key = (point_id, bee["markColor"], bee["markPosition"])
+        bee_key = (point_id, bee["markColor"], canonical_position)
         if bee_key in bee_keys:
             raise BackupError("duplicate bee mark")
         bee_keys.add(bee_key)

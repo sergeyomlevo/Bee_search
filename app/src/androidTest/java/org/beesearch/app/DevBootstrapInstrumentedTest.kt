@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewObservationPoint
+import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapCoverageFragment
 import org.beesearch.app.ui.map.MapGeoBounds
 import org.beesearch.app.ui.map.MapPackageAvailability
@@ -73,7 +74,7 @@ class DevBootstrapInstrumentedTest {
                 ),
             ),
         )
-        container.mapCoverageStore.replace(territory.id, coverage)
+        container.mapAreaStore.create(territory.id, territory.name, coverage.map { it.bounds })
         val import = container.mapPackageStore.import(
             territoryId = territory.id,
             desiredCoverage = coverage,
@@ -98,21 +99,15 @@ class DevBootstrapInstrumentedTest {
                 gpsAccuracyM = 5.0,
             ),
             markColor = "WHITE",
-            markPosition = MarkPosition.NONE,
+            markPosition = MarkPosition.THORAX,
         )
-        listOf(
-            "WHITE" to MarkPosition.RIGHT_WING,
-            "WHITE" to MarkPosition.LEFT_WING,
-            "YELLOW" to MarkPosition.NONE,
-            "YELLOW" to MarkPosition.RIGHT_WING,
-            "YELLOW" to MarkPosition.LEFT_WING,
-            "BLUE" to MarkPosition.NONE,
-            "BLUE" to MarkPosition.RIGHT_WING,
-            "BLUE" to MarkPosition.LEFT_WING,
-            "RED" to MarkPosition.NONE,
-        ).forEach { (color, position) ->
-            container.observationRepository.addBee(point.id, color, position)
-        }
+        // One Bee per real mark, so the prepared DEV Point shows all ten new
+        // marking variants in a mixed-state list.
+        org.beesearch.app.domain.model.BeeMarkCatalog.supportedCombinations
+            .drop(1)
+            .forEach { (color, position) ->
+                container.observationRepository.addBee(point.id, color, position)
+            }
         val preparedBees = container.observationRepository.observeBees(point.id).first()
         assertEquals(10, preparedBees.size)
         container.observationRepository.startInitialGroupRelease(point.id)
@@ -129,7 +124,8 @@ class DevBootstrapInstrumentedTest {
         val settings = container.settingsRepository.getSettings()
         assertEquals(territory.id, settings.currentTerritoryId)
         assertEquals(observer.id, settings.currentObserverId)
-        assertEquals(coverage, container.mapCoverageStore.load(territory.id))
+        val storedArea = container.mapAreaStore.load(territory.id, territory.name) as MapAreaReadResult.Present
+        assertEquals(coverage.map { it.bounds }, storedArea.area.bounds)
         assertNotNull(container.observationRepository.observeActivePoint().first())
         assertEquals(10, container.observationRepository.observeBees(point.id).first().size)
         val flightCycles = container.observationRepository.observeFlightCyclesForPoint(point.id).first()

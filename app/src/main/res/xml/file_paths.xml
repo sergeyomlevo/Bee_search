@@ -3,4 +3,7 @@
     <cache-path
         name="observation_attachment_capture"
         path="observation-attachments-staging/" />
+    <cache-path
+        name="area_share"
+        path="area-share/" />
 </paths>

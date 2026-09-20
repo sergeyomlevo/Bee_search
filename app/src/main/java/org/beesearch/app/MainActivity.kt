@@ -45,6 +45,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import org.beesearch.app.ui.map.CurrentTerritoryScreen
 import org.beesearch.app.ui.map.OfflineMapManagementScreen
+import org.beesearch.app.ui.area.AreaRoute
+import org.beesearch.app.ui.area.AreaViewRoute
 import org.beesearch.app.ui.data.DataRoute
 import org.beesearch.app.ui.help.HelpScreen
 import org.beesearch.app.ui.points.PointDetailRoute
@@ -115,7 +117,7 @@ private fun BeeSearchApp(
     val currentTerritory by viewModel.currentTerritory.collectAsStateWithLifecycle()
     val currentObserver by viewModel.currentObserver.collectAsStateWithLifecycle()
     val feedback by viewModel.feedback.collectAsStateWithLifecycle()
-    val coverageEditNonce by viewModel.coverageEditNonce.collectAsStateWithLifecycle()
+    val areaEditorRequestToken by viewModel.areaEditorRequestToken.collectAsStateWithLifecycle()
     val locationState by viewModel.locationState.collectAsStateWithLifecycle()
     val observationPointDraft by viewModel.observationPointDraft.collectAsStateWithLifecycle()
     val observationPointPreparationDraft by viewModel.observationPointPreparationDraft.collectAsStateWithLifecycle()
@@ -146,6 +148,12 @@ private fun BeeSearchApp(
         )
     }
 
+    // Materialise the user-facing exchange tree once per process so the folder exists and is
+    // predictable before the user goes looking for it. Idempotent: existing folders are reused.
+    LaunchedEffect(application) {
+        application.container.exchangeStorage.ensure()
+    }
+
     Bee_searchTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -169,19 +177,45 @@ private fun BeeSearchApp(
                         onOpenHelp = viewModel::openHelp,
                         onOpenData = viewModel::openData,
                     )
-                    AppRoute.Help -> HelpScreen(onBack = viewModel::openSettings)
+                    AppRoute.Help -> HelpScreen(
+                        exchangeStorage = application.container.exchangeStorage,
+                        onBack = viewModel::openSettings,
+                    )
                     AppRoute.Data -> DataRoute(
                         application = application,
                         onBack = viewModel::openSettings,
                     )
                     AppRoute.Objects -> ObjectsScreen(
                         onBack = viewModel::openCurrentTerritory,
+                        onOpenArea = viewModel::openArea,
                         onOpenObservationPoints = viewModel::openPoints,
+                    )
+                    AppRoute.Area -> AreaRoute(
+                        territory = currentTerritory,
+                        areaStore = application.container.mapAreaStore,
+                        areaMirror = application.container.areaExchangeMirror,
+                        areaTransport = application.container.areaTransport,
+                        mapPackageStore = application.container.mapPackageStore,
+                        mapDiscovery = application.container.areaMapDiscovery,
+                        exchangeStorage = application.container.exchangeStorage,
+                        onCreate = { viewModel.openAreaSectionsEditor(returnToView = false) },
+                        onViewOnMap = viewModel::openAreaView,
+                        onBack = viewModel::openObjects,
+                    )
+                    AppRoute.AreaView -> AreaViewRoute(
+                        territory = currentTerritory,
+                        mapAreaStore = application.container.mapAreaStore,
+                        mapPackageStore = application.container.mapPackageStore,
+                        locationState = locationState,
+                        locationPermissionGranted = locationPermissionGranted,
+                        onRequestLocationPermission = requestLocationPermission,
+                        onEditSections = { viewModel.openAreaSectionsEditor(returnToView = true) },
+                        onBack = viewModel::openArea,
                     )
                     AppRoute.Points -> PointsRoute(
                         territory = currentTerritory,
                         repository = application.container.observationRepository,
-                        mapCoverageStore = application.container.mapCoverageStore,
+                        mapAreaStore = application.container.mapAreaStore,
                         mapPackageStore = application.container.mapPackageStore,
                         onBack = viewModel::openObjects,
                         onChooseTerritory = viewModel::openTerritoryManagement,
@@ -213,14 +247,15 @@ private fun BeeSearchApp(
                     )
                     AppRoute.OfflineMapManagement -> OfflineMapManagementScreen(
                         territory = currentTerritory,
-                        mapCoverageStore = application.container.mapCoverageStore,
+                        mapAreaStore = application.container.mapAreaStore,
                         mapPackageStore = application.container.mapPackageStore,
+                        exchangeStorage = application.container.exchangeStorage,
                         onBack = viewModel::returnToStartup,
                         onEditCoverageOnMap = viewModel::openMapWithCoverageEdit,
                     )
                     AppRoute.CurrentTerritory -> CurrentTerritoryScreen(
                         territory = currentTerritory,
-                        mapCoverageStore = application.container.mapCoverageStore,
+                        mapAreaStore = application.container.mapAreaStore,
                         mapPackageStore = application.container.mapPackageStore,
                         locationState = locationState,
                         observationPointDraft = observationPointDraft,
@@ -233,7 +268,9 @@ private fun BeeSearchApp(
                         onOpenSettings = viewModel::openSettings,
                         onOpenOfflineMaps = viewModel::openOfflineMaps,
                         onOpenTerritories = viewModel::openTerritoryManagement,
-                        coverageEditNonce = coverageEditNonce,
+                        areaEditorRequest = areaEditorRequestToken,
+                        onAreaEditorRequestHandled = viewModel::consumeAreaEditorRequest,
+                        onCoverageEditFinished = viewModel::completeAreaSectionsEditing,
                     )
                     AppRoute.PrepareObservationPoint -> observationPointPreparationDraft?.let { draft ->
                         ObservationPointPreparationScreen(

@@ -1,8 +1,5 @@
 package org.beesearch.app.ui.map
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -55,7 +52,6 @@ import org.beesearch.app.MapGpsMarker
 import org.beesearch.app.MapTarget
 import org.beesearch.app.beeSearchFieldMapProfile
 import org.beesearch.app.beeSearchActivePmtilesMapProfile
-import org.beesearch.app.BuildConfig
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.model.ObservationPointSummary
 import org.beesearch.app.visibleMapMeasurement
@@ -70,12 +66,22 @@ import org.maplibre.android.maps.Style
 internal enum class BeeMapMode {
     FIELD,
     POINT_BROWSER,
+
+    /**
+     * Read-only Ареал review: the saved участки on a clean map.
+     *
+     * It exists so that looking at the Ареал is not the same screen as editing it: no editor panel,
+     * no center target and no record controls, only the saved geometry, the normal map controls and
+     * one small action that switches to the editor.
+     */
+    AREA_VIEW,
 }
 
 @Composable
 internal fun BeeMap(
     territoryId: UUID?,
-    coverageStore: MapCoverageStore,
+    territoryName: String?,
+    areaStore: MapAreaStore,
     packageStore: MapPackageStore,
     locationState: LocationUiState,
     locationPermissionGranted: Boolean,
@@ -83,10 +89,26 @@ internal fun BeeMap(
     onRequestCreateRecord: (Double, Double) -> Unit,
     onCoverageTerritoryMissing: () -> Unit = {},
     onOpenOfflineMaps: () -> Unit = {},
-    coverageEditNonce: Int = 0,
+    /**
+     * The pending request to open the участки editor; [AreaEditorRequest.NO_REQUEST] means nothing is
+     * pending.
+     *
+     * Only an explicit user action produces a request. It is consumed through
+     * [onAreaEditorRequestHandled] as soon as the editor opens, so a later visit to the map cannot
+     * replay an older request and open the editor on its own.
+     */
+    areaEditorRequest: Int = AreaEditorRequest.NO_REQUEST,
+    /** Reports that the pending request was handled, so it cannot be replayed. */
+    onAreaEditorRequestHandled: () -> Unit = {},
     mode: BeeMapMode = BeeMapMode.FIELD,
     savedObservationPoints: List<ObservationPointSummary> = emptyList(),
     onSelectSavedObservationPoint: (UUID) -> Unit = {},
+    /** Leaves the Ареал view mode; the host decides which screen that means. */
+    onExitAreaView: () -> Unit = {},
+    /** Opens the участки editor from the Ареал view mode. */
+    onEditAreaSections: () -> Unit = {},
+    /** The участки editor session ended, however it ended, and the host may restore its route. */
+    onCoverageSessionEnded: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -101,6 +123,7 @@ internal fun BeeMap(
     var recenteredUntilNextGesture by remember { mutableStateOf(false) }
     var coverageSelectionMode by remember { mutableStateOf(false) }
     var editingTerritoryId by remember { mutableStateOf<UUID?>(null) }
+    var persistedArea by remember { mutableStateOf<MapAreaReadResult>(MapAreaReadResult.Absent) }
     var persistedCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
     var workingCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
     var coverageLoadedFor by remember { mutableStateOf<UUID?>(null) }
@@ -108,10 +131,17 @@ internal fun BeeMap(
     var coverageViewportBounds by remember { mutableStateOf<MapGeoBounds?>(null) }
     var packageAvailability by remember { mutableStateOf<MapPackageAvailability>(MapPackageAvailability.Missing) }
     var clearSelectionConfirmationVisible by remember { mutableStateOf(false) }
+    var unsavedCoverageChangesVisible by remember { mutableStateOf(false) }
+    var createAreaConfirmationVisible by remember { mutableStateOf(false) }
+    var areaNameInput by remember { mutableStateOf("") }
+    var areaNameBlank by remember { mutableStateOf(false) }
     var developerBasemap by remember { mutableStateOf(DeveloperBasemap.ONLINE) }
     var mapCameraRevision by remember { mutableStateOf(0) }
     var coverageControlsHeightPx by remember { mutableStateOf(0) }
     val coverageCameraEdgePaddingPx = with(LocalDensity.current) { 16.dp.roundToPx() }
+    // View mode has almost no chrome, so the framing only needs to clear the small action button.
+    val areaViewEdgePaddingPx = with(LocalDensity.current) { 32.dp.roundToPx() }
+    val areaViewBottomPaddingPx = with(LocalDensity.current) { 96.dp.roundToPx() }
     val normalCameraPadding = remember { normalMapCameraPadding() }
     val reading = (locationState as? LocationUiState.Available)?.reading
     val gpsPosition = reading?.let { MapTarget(it.latitude, it.longitude) }
@@ -129,21 +159,25 @@ internal fun BeeMap(
     val latestTerritoryId by rememberUpdatedState(territoryId)
     val onlineMapProfile = remember { beeSearchFieldMapProfile() }
     val coroutineScope = rememberCoroutineScope()
-    LaunchedEffect(territoryId, coverageStore) {
+    LaunchedEffect(territoryId, areaStore, territoryName) {
         if (editingTerritoryId != null && editingTerritoryId != territoryId) {
             coverageSelectionMode = false
             editingTerritoryId = null
             workingCoverage = emptyList()
         }
         coverageLoadedFor = null
+        persistedArea = MapAreaReadResult.Absent
         persistedCoverage = emptyList()
         if (territoryId != null) {
             coverageLoading = true
-            persistedCoverage = try {
-                coverageStore.load(territoryId)
+            // Reading also migrates a readable legacy selection into a named Ареал.
+            val read = try {
+                areaStore.load(territoryId, territoryName)
             } catch (_: Exception) {
-                emptyList()
+                MapAreaReadResult.Corrupt("не удалось прочитать сохранённый ареал")
             }
+            persistedArea = read
+            persistedCoverage = (read as? MapAreaReadResult.Present)?.area?.coverageFragments().orEmpty()
             coverageLoadedFor = territoryId
             coverageLoading = false
         } else {
@@ -160,42 +194,168 @@ internal fun BeeMap(
             }
         }
     }
-    // External request (Settings → Офлайн-карты → «Изменить участок») opens the
-    // spatial coverage-selection mode for the current territory.
-    LaunchedEffect(coverageEditNonce, territoryId, coverageLoadedFor, coverageLoading) {
+    // An explicit user request (the Ареал screen, the Ареал view, or Settings → Офлайн-карты →
+    // «Изменить участки») opens the участки editor once. The request is consumed here, because
+    // returning to the map is not a request: without that, every later visit would reload the Ареал,
+    // see the old request again and open the editor by itself.
+    LaunchedEffect(areaEditorRequest, territoryId, coverageLoadedFor, coverageLoading) {
         if (
-            coverageEditNonce > 0 &&
-            territoryId != null &&
-            !coverageLoading &&
-            coverageLoadedFor == territoryId
+            !shouldOpenAreaEditor(
+                requestToken = areaEditorRequest,
+                territoryId = territoryId,
+                areaLoaded = !coverageLoading && coverageLoadedFor == territoryId,
+            )
         ) {
-            editingTerritoryId = territoryId
-            workingCoverage = persistedCoverage
-            coverageSelectionMode = true
+            return@LaunchedEffect
         }
+        editingTerritoryId = territoryId
+        workingCoverage = persistedCoverage
+        coverageSelectionMode = true
+        onAreaEditorRequestHandled()
     }
-    val coverageFragments = when {
-        coverageSelectionMode -> workingCoverage
-        territoryId != null && coverageLoadedFor == territoryId && !coverageLoading -> persistedCoverage
-        else -> emptyList()
-    }
+    // Mode decides what the Ареал looks like here: the editor works on the draft and marks the next
+    // viewport, the view mode shows exactly the stored участки, the field map draws nothing.
+    val areaPresentation = mapAreaPresentation(
+        mode = mode,
+        editorOpen = coverageSelectionMode,
+        working = workingCoverage,
+        persisted = persistedCoverage,
+        persistedLoaded = territoryId != null && coverageLoadedFor == territoryId && !coverageLoading,
+    )
+    val coverageFragments = areaPresentation.fragments
     val coverageViewportSummary = if (coverageSelectionMode) {
         coverageViewportBounds?.let(::coverageBoundsSummary)
     } else {
         null
     }
-    val selectedCoverageSummary = if (coverageSelectionMode && workingCoverage.size == 1) {
-        coverageBoundsSummary(workingCoverage.single().bounds)
-    } else {
-        null
-    }
     val activeMapPackage = (packageAvailability as? MapPackageAvailability.Ready)?.activePackage
     val activeVectorProfile = activeMapPackage?.let(::beeSearchActivePmtilesMapProfile)
-    BackHandler(enabled = mode == BeeMapMode.FIELD && coverageSelectionActive) {
+    // The editor has no unsaved work the moment it opens: the draft starts as the persisted
+    // selection. Only a draft operation (add / undo last / clear all) makes it dirty.
+    val coverageSelectionDirty = coverageSelectionMode &&
+        isCoverageSelectionDirty(persisted = persistedCoverage, working = workingCoverage)
+
+    /**
+     * Leaves the editor. [restoreDraft] puts the persisted selection back into the draft, which is
+     * how "leave without saving" discards the session without ever having written anything: the
+     * store is only written by [commitCoverage] and the first-create confirmation.
+     */
+    fun leaveCoverageSelection(restoreDraft: Boolean) {
+        if (restoreDraft) workingCoverage = persistedCoverage
+        unsavedCoverageChangesVisible = false
+        clearSelectionConfirmationVisible = false
+        createAreaConfirmationVisible = false
+        areaNameBlank = false
+        map?.restoreNormalCameraPadding(normalCameraPadding)
         coverageSelectionMode = false
         editingTerritoryId = null
-        workingCoverage = emptyList()
+        // The host may have opened this editor from the Ареал workflow; it decides where to return.
+        onCoverageSessionEnded()
     }
+
+    /** Saves edited участки of an existing Ареал, keeping its UUID and name. */
+    fun saveAreaBounds(id: UUID, bounds: List<MapGeoBounds>) {
+        coroutineScope.launch {
+            val result = try {
+                areaStore.updateBounds(id, bounds)
+            } catch (_: Exception) {
+                MapAreaChangeResult.Refused(CORRUPT_AREA_MESSAGE)
+            }
+            when (result) {
+                is MapAreaChangeResult.Saved -> {
+                    if (id == latestTerritoryId) {
+                        persistedArea = MapAreaReadResult.Present(result.area)
+                        persistedCoverage = result.area.coverageFragments()
+                    }
+                    leaveCoverageSelection(restoreDraft = false)
+                }
+
+                // The stored value stays untouched: stay in the editor with the draft intact.
+                is MapAreaChangeResult.Refused ->
+                    Toast.makeText(appContext, result.reason, Toast.LENGTH_LONG).show()
+
+                MapAreaChangeResult.Deleted -> leaveCoverageSelection(restoreDraft = false)
+            }
+        }
+    }
+
+    /** The single committed exit for both «Готово» and Back → «Сохранить». */
+    fun commitCoverage() {
+        val id = editingTerritoryId
+        if (id == null) {
+            leaveCoverageSelection(restoreDraft = false)
+            return
+        }
+        when (val plan = planAreaCommit(persistedArea, workingCoverage, territoryName)) {
+            AreaCommitPlan.ExitWithoutCreating -> leaveCoverageSelection(restoreDraft = false)
+
+            is AreaCommitPlan.CreateWithName -> {
+                // First creation asks for the name; nothing is written until it is confirmed.
+                areaNameInput = plan.initialName
+                areaNameBlank = false
+                // The name question answers the unsaved-changes question it may have been reached
+                // from, so that question must not stay stacked behind it.
+                unsavedCoverageChangesVisible = false
+                createAreaConfirmationVisible = true
+            }
+
+            AreaCommitPlan.UpdateBounds -> saveAreaBounds(id, workingCoverage.map { it.bounds })
+
+            is AreaCommitPlan.Refused -> {
+                Toast.makeText(appContext, plan.message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /** Creates the Ареал after the first-save name dialog was confirmed. */
+    fun createAreaFromNameDialog() {
+        val name = normalizedAreaName(areaNameInput)
+        if (name == null) {
+            areaNameBlank = true
+            return
+        }
+        val id = editingTerritoryId ?: return
+        val draft = workingCoverage.map { it.bounds }
+        coroutineScope.launch {
+            val result = try {
+                areaStore.create(id, name, draft)
+            } catch (_: Exception) {
+                MapAreaChangeResult.Refused(CORRUPT_AREA_MESSAGE)
+            }
+            when (result) {
+                is MapAreaChangeResult.Saved -> {
+                    createAreaConfirmationVisible = false
+                    areaNameBlank = false
+                    if (id == latestTerritoryId) {
+                        persistedArea = MapAreaReadResult.Present(result.area)
+                        persistedCoverage = result.area.coverageFragments()
+                    }
+                    leaveCoverageSelection(restoreDraft = false)
+                }
+
+                // Nothing is written, so the editor keeps the draft and stays open.
+                is MapAreaChangeResult.Refused -> {
+                    createAreaConfirmationVisible = false
+                    Toast.makeText(appContext, result.reason, Toast.LENGTH_LONG).show()
+                }
+
+                MapAreaChangeResult.Deleted -> createAreaConfirmationVisible = false
+            }
+        }
+    }
+
+    // Back never discards silently. With unsaved changes it asks the user to choose an outcome;
+    // without them it closes the editor directly.
+    BackHandler(enabled = mode == BeeMapMode.FIELD && coverageSelectionActive) {
+        if (coverageSelectionDirty) {
+            unsavedCoverageChangesVisible = true
+        } else {
+            leaveCoverageSelection(restoreDraft = true)
+        }
+    }
+
+    // Viewing is not a dead end: Back returns to the screen the user came from.
+    BackHandler(enabled = mode == BeeMapMode.AREA_VIEW, onBack = onExitAreaView)
 
     LaunchedEffect(coverageSelectionMode, map) {
         coverageViewportBounds = if (coverageSelectionMode) {
@@ -291,6 +451,26 @@ internal fun BeeMap(
             }
         }
 
+        // Entering the Ареал view frames the whole saved Ареал once. The outer extent is camera
+        // framing only: the участки themselves are drawn unchanged, including any overlap.
+        LaunchedEffect(mode, map, coverageFragments, areaPresentation.frameWholeArea) {
+            if (!areaPresentation.frameWholeArea || coverageFragments.isEmpty()) {
+                return@LaunchedEffect
+            }
+            val mapInstance = map ?: return@LaunchedEffect
+            unionBounds(coverageFragments.map(MapCoverageFragment::bounds))?.let { bounds ->
+                mapInstance.moveCamera(
+                    CameraUpdateFactory.newLatLngBounds(
+                        bounds.toLatLngBounds(),
+                        areaViewEdgePaddingPx,
+                        areaViewEdgePaddingPx,
+                        areaViewEdgePaddingPx,
+                        areaViewBottomPaddingPx,
+                    ),
+                )
+            }
+        }
+
         DisposableEffect(map, mapView, gpsPosition) {
             val mapInstance = map
             val currentMapView = mapView
@@ -337,14 +517,18 @@ internal fun BeeMap(
             }
         }
 
-        if (coverageSelectionActive) {
+        if (areaPresentation.drawFragments) {
+            // The same saved участки in both modes: viewing never re-derives, merges or simplifies
+            // the canonical geometry.
             MapCoverageFragmentsOverlay(
                 fragments = coverageFragments,
                 map = map,
                 cameraRevision = mapCameraRevision,
                 modifier = Modifier.fillMaxSize().zIndex(1f),
             )
-            MapCoverageViewportFrame(Modifier.fillMaxSize().zIndex(2f))
+            if (areaPresentation.showViewportFrame) {
+                MapCoverageViewportFrame(Modifier.fillMaxSize().zIndex(2f))
+            }
         }
 
         if (
@@ -375,7 +559,7 @@ internal fun BeeMap(
             MapCenterTarget(Modifier.align(Alignment.Center).zIndex(2f))
         }
 
-        if (mode == BeeMapMode.POINT_BROWSER) {
+        if (mode == BeeMapMode.POINT_BROWSER || mode == BeeMapMode.AREA_VIEW) {
             mapZoom?.let { zoom ->
                 MapZoomIndicator(
                     zoom = zoom,
@@ -454,8 +638,6 @@ internal fun BeeMap(
             MapCoverageSelectionControls(
                 fragmentCount = coverageFragments.size,
                 viewportSummary = coverageViewportSummary,
-                selectedSummary = selectedCoverageSummary,
-                showDevBoundsExport = BuildConfig.DEBUG,
                 title = "Участок",
                 canAddFragment = map != null,
                 onAddFragment = {
@@ -487,50 +669,29 @@ internal fun BeeMap(
                     }
                 },
                 onClear = { clearSelectionConfirmationVisible = true },
-                onDone = {
-                    val id = editingTerritoryId
-                    if (id != null) {
-                        val selectedCoverage = workingCoverage
-                        coroutineScope.launch {
-                            try {
-                                coverageStore.replace(id, selectedCoverage)
-                                if (id == latestTerritoryId) persistedCoverage = selectedCoverage
-                                map?.restoreNormalCameraPadding(normalCameraPadding)
-                                coverageSelectionMode = false
-                                editingTerritoryId = null
-                            } catch (_: Exception) {
-                                Toast.makeText(
-                                    appContext,
-                                    "Не удалось сохранить участок",
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        }
-                    }
-                },
-                onCopySelectedBounds = {
-                    workingCoverage.singleOrNull()?.let { selected ->
-                        val text = formatMapPackageBuilderBounds(selected.bounds)
-                        val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("Bee Search map bbox", text))
-                        Toast.makeText(appContext, "Bbox скопирован", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                onCancel = {
-                    coverageSelectionMode = false
-                    editingTerritoryId = null
-                    workingCoverage = emptyList()
-                },
+                onDone = { commitCoverage() },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(horizontal = 12.dp, vertical = 12.dp)
                     .onSizeChanged { coverageControlsHeightPx = it.height }
                     .zIndex(3f),
             )
+        } else if (mode == BeeMapMode.AREA_VIEW && territoryId != null) {
+            AreaViewControls(
+                onEditSections = onEditAreaSections,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp)
+                    .zIndex(3f),
+            )
         } else if (mode == BeeMapMode.FIELD && territoryId != null) {
             CoverageSelectionEntry(
                 onEnter = {
                     if (!coverageLoading && coverageLoadedFor == territoryId) {
+                        // A damaged stored value is not silently replaced by an empty editor.
+                        if (persistedArea is MapAreaReadResult.Corrupt) {
+                            Toast.makeText(appContext, CORRUPT_AREA_MESSAGE, Toast.LENGTH_LONG).show()
+                        }
                         editingTerritoryId = territoryId
                         workingCoverage = persistedCoverage
                         coverageSelectionMode = true
@@ -552,6 +713,31 @@ internal fun BeeMap(
                     clearSelectionConfirmationVisible = false
                 },
                 onDismiss = { clearSelectionConfirmationVisible = false },
+            )
+        }
+
+        if (unsavedCoverageChangesVisible) {
+            CoverageUnsavedChangesDialog(
+                onSave = { commitCoverage() },
+                onDiscard = { leaveCoverageSelection(restoreDraft = true) },
+                onStay = { unsavedCoverageChangesVisible = false },
+            )
+        }
+
+        if (createAreaConfirmationVisible) {
+            AreaNameDialog(
+                name = areaNameInput,
+                blankName = areaNameBlank,
+                onNameChange = {
+                    areaNameInput = it
+                    if (areaNameBlank) areaNameBlank = false
+                },
+                onConfirm = { createAreaFromNameDialog() },
+                // Cancelling keeps the draft and every stored value untouched.
+                onDismiss = {
+                    createAreaConfirmationVisible = false
+                    areaNameBlank = false
+                },
             )
         }
 

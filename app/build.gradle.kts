@@ -25,6 +25,9 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".dev"
+            // Single source of truth for the user-facing file-exchange variant. The exchange
+            // directory must never be derived from the application id by string inspection.
+            buildConfigField("String", "EXCHANGE_VARIANT", "\"Dev\"")
         }
         create("beta") {
             initWith(getByName("release"))
@@ -32,11 +35,13 @@ android {
             versionNameSuffix = "-beta.1"
             isDebuggable = false
             signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("String", "EXCHANGE_VARIANT", "\"Beta\"")
         }
         release {
             optimization {
                 enable = false
             }
+            buildConfigField("String", "EXCHANGE_VARIANT", "\"Stable\"")
         }
     }
     compileOptions {

@@ -4,7 +4,6 @@ package org.beesearch.app.ui.data
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.beesearch.app.BeeSearchApplication
+import org.beesearch.app.data.exchange.CreateExchangeDocument
+import org.beesearch.app.data.exchange.ExchangeFolder
 import org.beesearch.app.domain.model.ObservationDataCounts
 
 internal const val BACKUP_DOCUMENT_NAME = "bee-search-backup.zip"
@@ -46,12 +47,18 @@ internal fun DataRoute(
 ) {
     val viewModel: DataViewModel = viewModel(factory = DataViewModel.factory(application))
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val exchangeStorage = application.container.exchangeStorage
+    // Export writes into the exchange Data folder; the user still confirms name and location.
     val createDocument = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/zip"),
+        CreateExchangeDocument(
+            mimeType = "application/zip",
+            initialFolder = exchangeStorage.initialDocumentUri(ExchangeFolder.DATA),
+        ),
     ) { destination ->
         destination?.let(viewModel::export)
     }
     LaunchedEffect(viewModel) { viewModel.refreshCounts() }
+    LaunchedEffect(exchangeStorage) { exchangeStorage.ensure() }
 
     DataScreen(
         state = state,
@@ -60,6 +67,7 @@ internal fun DataRoute(
         onDeleteCompletedPoint = viewModel::deleteCompletedObservationPoint,
         onClearObservationData = viewModel::clearObservationData,
         onDismissStatus = viewModel::dismissStatus,
+        exchangeDataPath = exchangeStorage.userVisiblePath(ExchangeFolder.DATA),
     )
 }
 
@@ -71,6 +79,7 @@ internal fun DataScreen(
     onDeleteCompletedPoint: (java.util.UUID) -> Unit,
     onClearObservationData: () -> Unit,
     onDismissStatus: () -> Unit = {},
+    exchangeDataPath: String? = null,
 ) {
     var showClearConfirmation by rememberSaveable { mutableStateOf(false) }
     val busy = state.operation != null
@@ -113,6 +122,13 @@ internal fun DataScreen(
                         modifier = Modifier.fillMaxWidth().testTag("export-data"),
                     ) {
                         Text(if (state.operation == DataOperation.EXPORT) "Экспорт…" else "Экспортировать данные")
+                    }
+                    exchangeDataPath?.let { path ->
+                        Text(
+                            "Папка обмена: $path",
+                            modifier = Modifier.testTag("export-exchange-path"),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
             }

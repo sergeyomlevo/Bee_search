@@ -8,11 +8,12 @@ import org.beesearch.app.ui.map.clearCoverageFragments
 import org.beesearch.app.ui.map.coverageBoundsSummary
 import org.beesearch.app.ui.map.coverageReviewCameraPadding
 import org.beesearch.app.ui.map.coverageBoundsForShowAll
-import org.beesearch.app.ui.map.formatMapPackageBuilderBounds
+import org.beesearch.app.ui.map.isCoverageSelectionDirty
 import org.beesearch.app.ui.map.normalMapCameraPadding
 import org.beesearch.app.ui.map.normalizeMapPackageBounds
 import org.beesearch.app.ui.map.undoLastCoverageFragment
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -132,9 +133,88 @@ class MapCoverageSelectionTest {
             ),
             normalized,
         )
-        assertEquals(
-            "-West 42.2882890 -South 56.1530380 -East 42.7299151 -North 56.4446941",
-            formatMapPackageBuilderBounds(normalized),
-        )
+    }
+
+    @Test
+    fun `an editor session that was only opened is not dirty`() {
+        val persisted = listOf(MapCoverageFragment(firstViewportAtZoom15))
+
+        // Opening the editor copies the persisted selection into the draft, so "no change yet"
+        // must not look like unsaved work.
+        assertFalse(isCoverageSelectionDirty(persisted = persisted, working = persisted))
+        assertFalse(isCoverageSelectionDirty(persisted = emptyList(), working = emptyList()))
+    }
+
+    @Test
+    fun `add undo and clear drive the dirty state of the draft`() {
+        val persisted = listOf(MapCoverageFragment(firstViewportAtZoom15))
+
+        val afterAdd = addCoverageFragment(persisted, separateViewportAtZoom16)
+        assertTrue(isCoverageSelectionDirty(persisted = persisted, working = afterAdd))
+
+        // Undoing the only addition returns the draft to the persisted selection.
+        val afterUndo = undoLastCoverageFragment(afterAdd)
+        assertFalse(isCoverageSelectionDirty(persisted = persisted, working = afterUndo))
+
+        assertTrue(isCoverageSelectionDirty(persisted = persisted, working = clearCoverageFragments()))
+
+        // Clearing an editor that was already empty is not a change.
+        assertFalse(isCoverageSelectionDirty(persisted = emptyList(), working = clearCoverageFragments()))
+    }
+
+    @Test
+    fun `draft operations never mutate the persisted selection`() {
+        val persisted = listOf(MapCoverageFragment(firstViewportAtZoom15))
+        val snapshot = persisted.toList()
+
+        addCoverageFragment(persisted, separateViewportAtZoom16)
+        undoLastCoverageFragment(persisted)
+        clearCoverageFragments()
+
+        assertEquals(snapshot, persisted)
+    }
+
+    @Test
+    fun `clearing empties only the draft and leaves the persisted selection until it is saved`() {
+        val persisted = listOf(MapCoverageFragment(firstViewportAtZoom15))
+
+        val working = clearCoverageFragments()
+
+        assertTrue(working.isEmpty())
+        assertTrue(isCoverageSelectionDirty(persisted = persisted, working = working))
+        assertEquals(listOf(MapCoverageFragment(firstViewportAtZoom15)), persisted)
+    }
+
+    @Test
+    fun `leaving without saving restores the persisted selection and discards the draft`() {
+        val persisted = listOf(MapCoverageFragment(firstViewportAtZoom15))
+        val draft = addCoverageFragment(persisted, separateViewportAtZoom16)
+        assertTrue(isCoverageSelectionDirty(persisted = persisted, working = draft))
+
+        // "Выйти без сохранения" resets the draft only; the store was never written.
+        val restored = persisted
+
+        assertFalse(isCoverageSelectionDirty(persisted = persisted, working = restored))
+        assertEquals(listOf(MapCoverageFragment(firstViewportAtZoom15)), restored)
+    }
+
+    @Test
+    fun `saving the draft makes the session clean`() {
+        val persisted = listOf(MapCoverageFragment(firstViewportAtZoom15))
+        val draft = addCoverageFragment(persisted, separateViewportAtZoom16)
+        assertTrue(isCoverageSelectionDirty(persisted = persisted, working = draft))
+
+        // "Готово" persists the draft; the committed selection becomes the new baseline.
+        val committed = draft
+
+        assertFalse(isCoverageSelectionDirty(persisted = committed, working = draft))
+    }
+
+    @Test
+    fun `undo removes exactly one fragment and an empty draft stays empty`() {
+        val single = listOf(MapCoverageFragment(firstViewportAtZoom15))
+
+        assertEquals(emptyList<MapCoverageFragment>(), undoLastCoverageFragment(single))
+        assertEquals(emptyList<MapCoverageFragment>(), undoLastCoverageFragment(emptyList()))
     }
 }

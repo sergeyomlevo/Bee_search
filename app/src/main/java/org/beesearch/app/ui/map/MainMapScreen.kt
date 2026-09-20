@@ -44,7 +44,7 @@ import org.beesearch.app.formatMapMeasurement
 @Composable
 internal fun CurrentTerritoryScreen(
     territory: Territory?,
-    mapCoverageStore: MapCoverageStore,
+    mapAreaStore: MapAreaStore,
     mapPackageStore: MapPackageStore,
     locationState: LocationUiState,
     observationPointDraft: ObservationPointCreationDraft?,
@@ -57,7 +57,11 @@ internal fun CurrentTerritoryScreen(
     onOpenSettings: () -> Unit,
     onOpenOfflineMaps: () -> Unit = {},
     onOpenTerritories: () -> Unit,
-    coverageEditNonce: Int = 0,
+    /** Pending request to open the участки editor; a plain return to the map never produces one. */
+    areaEditorRequest: Int = AreaEditorRequest.NO_REQUEST,
+    onAreaEditorRequestHandled: () -> Unit = {},
+    /** Called when the участки editor session ends, so the Ареал workflow can restore its screen. */
+    onCoverageEditFinished: () -> Unit = {},
 ) {
     MapFirstScaffold(
         onOpenObjects = onOpenObjects,
@@ -66,7 +70,8 @@ internal fun CurrentTerritoryScreen(
         Box(modifier = mapModifier) {
             BeeMap(
                     territoryId = territory?.id,
-                    coverageStore = mapCoverageStore,
+                    territoryName = territory?.name,
+                    areaStore = mapAreaStore,
                     packageStore = mapPackageStore,
                     locationState = locationState,
                     locationPermissionGranted = locationPermissionGranted,
@@ -74,7 +79,9 @@ internal fun CurrentTerritoryScreen(
                     onRequestCreateRecord = onRequestCreateRecord,
                     onCoverageTerritoryMissing = onOpenSettings,
                     onOpenOfflineMaps = onOpenOfflineMaps,
-                    coverageEditNonce = coverageEditNonce,
+                    areaEditorRequest = areaEditorRequest,
+                    onAreaEditorRequestHandled = onAreaEditorRequestHandled,
+                    onCoverageSessionEnded = onCoverageEditFinished,
                     modifier = Modifier.fillMaxSize().testTag(MAIN_MAP_VIEWPORT_TAG),
                 )
             if (observationPointDraft != null) {

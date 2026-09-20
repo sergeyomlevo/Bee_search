@@ -20,6 +20,10 @@ import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.WeatherStatus
+import org.beesearch.app.ui.map.MapArea
+import org.beesearch.app.ui.map.MapAreaCodec
+import org.beesearch.app.ui.map.MapAreaReadResult
+import org.beesearch.app.ui.map.MapGeoBounds
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -151,6 +155,96 @@ class BackupServiceTest {
         }
         assertEquals(9, "\"collectionSchemaVersion\":1".toRegex().findAll(manifest).count())
     }
+
+    /** A named Ареал travels in the existing map-coverage settings section, with no archive change. */
+    @Test fun aV2AreaRoundTripsThroughTheExistingSettingsSection() = runBlocking {
+        val ids = seed(source)
+        val area = MapArea(
+            id = UUID.fromString("7e82a310-1f4c-4a2b-9c3d-8e5f6a7b8c9d"),
+            name = "Лух",
+            bounds = listOf(MapGeoBounds(north = 57.111673, east = 39.026918, south = 56.562186, west = 38.470994)),
+        )
+        val encoded = MapAreaCodec.encode(area)
+        sourceStore.edit {
+            it[stringPreferencesKey("current_territory_id")] = ids.territory1.toString()
+            it[stringPreferencesKey("map_coverage_${ids.territory1}")] = encoded
+        }
+
+        service(source, sourceStore).export(archive)
+        service(target, targetStore).restore(archive)
+
+        val restored = targetStore.data.first()[stringPreferencesKey("map_coverage_${ids.territory1}")]
+        assertEquals(encoded, restored)
+        assertEquals(MapAreaReadResult.Present(area), MapAreaCodec.decode(restored))
+    }
+
+    /**
+     * An archive written by the previous release persisted `NONE` for a thorax
+     * mark and `RIGHT_WING` for a mark that was really placed on the abdomen.
+     * Those tokens must be read through the compatibility mapping instead of
+     * being rejected, and a legacy `LEFT_WING` row must survive untouched.
+     */
+    @Test fun archiveWrittenBeforeThoraxAbdomenMarkingKeepsLegacySemantics() = runBlocking {
+        seed(source); service(source, sourceStore).export(archive)
+        val base = zipEntries(archive)
+        val currentRows = String(base.getValue("research/bees.json")).lines().filter(String::isNotBlank)
+        val pointId = field(currentRows[0], "observationPointId")
+        val createdAt = NOW.toEpochMilli()
+        val legacyBees = listOf(
+            legacyBeeRow(field(currentRows[0], "id"), pointId, "WHITE", "NONE", createdAt),
+            legacyBeeRow(field(currentRows[1], "id"), pointId, "BLUE", "RIGHT_WING", createdAt),
+            legacyBeeRow(UUID.randomUUID().toString(), pointId, "RED", "LEFT_WING", createdAt),
+        ).joinToString("\n", postfix = "\n")
+
+        service(target, targetStore).restore(replaceCollection(base, "bees", legacyBees))
+
+        val restored = target.backupDao().bees().associateBy { it.markColor }
+        assertEquals(MarkPosition.THORAX, restored.getValue("WHITE").markPosition)
+        assertEquals(MarkPosition.ABDOMEN, restored.getValue("BLUE").markPosition)
+        assertEquals(MarkPosition.LEFT_WING, restored.getValue("RED").markPosition)
+        assertEquals(3, target.backupDao().beeCount())
+        assertEquals(3, target.backupDao().flightCycleCount())
+    }
+
+    /**
+     * A new archive uses the new marking semantics, keeps a legacy `LEFT_WING`
+     * row honest, and leaves FlightCycle content untouched.
+     */
+    @Test fun archiveCarriesNewMarkSemanticsAndRoundTripsThem() = runBlocking {
+        seed(source)
+        val populatedPoint = source.backupDao().observationPoints()
+            .first { it.beePresenceResult == BeePresenceResult.BEES_FOUND }
+        source.backupDao().insertBees(
+            listOf(BeeEntity(UUID.randomUUID(), populatedPoint.id, "RED", MarkPosition.ABDOMEN, NOW)),
+        )
+        val sourceCycles = source.backupDao().flightCycles().map { it.id to it.sequenceNumber }.sortedBy { it.first }
+
+        service(source, sourceStore).export(archive)
+        val beesJson = String(zipEntries(archive).getValue("research/bees.json"))
+        assertTrue(beesJson.contains("\"markPosition\":\"THORAX\""))
+        assertTrue(beesJson.contains("\"markPosition\":\"ABDOMEN\""))
+        assertTrue(beesJson.contains("\"markPosition\":\"LEFT_WING\""))
+        assertFalse(beesJson.contains("RIGHT_WING"))
+        assertFalse(beesJson.contains("\"NONE\""))
+
+        service(target, targetStore).restore(archive)
+        val restoredMarks = target.backupDao().bees().map { it.markPosition }.toSet()
+        assertEquals(
+            setOf(MarkPosition.THORAX, MarkPosition.ABDOMEN, MarkPosition.LEFT_WING),
+            restoredMarks,
+        )
+        assertEquals(3, target.backupDao().beeCount())
+        assertEquals(sourceCycles, target.backupDao().flightCycles().map { it.id to it.sequenceNumber }.sortedBy { it.first })
+    }
+
+    private fun legacyBeeRow(
+        id: String,
+        pointId: String,
+        color: String,
+        position: String,
+        createdAt: Long,
+    ) = "{\"id\":\"$id\",\"observationPointId\":\"$pointId\",\"markColor\":\"$color\"," +
+        "\"markPosition\":\"$position\",\"createdAt\":$createdAt}"
 
     @Test fun integrityFailuresAreExplicit() = runBlocking {
         seed(source); service(source, sourceStore).export(archive)
@@ -313,7 +407,7 @@ class BackupServiceTest {
         val d=db.backupDao(); d.insertTerritories(listOf(TerritoryEntity(t1,"T1","One","R","D",NOW,NOW),TerritoryEntity(t2,"T2","Two","R","D",NOW,NOW)))
         d.insertObservers(listOf(ObserverEntity(o1,"O1","Ivanov","Ivan",null,null,NOW,NOW),ObserverEntity(o2,"O2","Petrov","Petr","P", "contact",NOW,NOW)))
         d.insertObservationPoints(listOf(ObservationPointEntity(p1,t1,o1,2026,1,BeePresenceResult.NO_BEES_FOUND,null,56.1,42.7,null,null,null,NOW,null,NOW.plusSeconds(10)), ObservationPointEntity(p2,t2,o2,2026,1,BeePresenceResult.BEES_FOUND,"P2",56.2,42.8,56.19,42.79,4.5,NOW,NOW.plusSeconds(20),null,"description")))
-        d.insertBees(listOf(BeeEntity(b1,p2,"WHITE",MarkPosition.NONE,NOW),BeeEntity(b2,p2,"BLUE",MarkPosition.LEFT_WING,NOW)))
+        d.insertBees(listOf(BeeEntity(b1,p2,"WHITE",MarkPosition.THORAX,NOW),BeeEntity(b2,p2,"BLUE",MarkPosition.LEFT_WING,NOW)))
         d.insertFlightCycles(listOf(FlightCycleEntity(UUID.randomUUID(),b1,1,NOW.plusSeconds(20),NOW.plusSeconds(80),null,false,true,false,NOW.plusSeconds(20),NOW.plusSeconds(80)), FlightCycleEntity(UUID.randomUUID(),b1,2,NOW.plusSeconds(90),null,0.0,true,false,false,NOW.plusSeconds(90),NOW.plusSeconds(90)), FlightCycleEntity(UUID.randomUUID(),b2,1,NOW.plusSeconds(20),NOW.plusSeconds(70),247.5,true,true,false,NOW.plusSeconds(20),NOW.plusSeconds(70))))
         return Ids(t1,t2,o1,o2)
     }
