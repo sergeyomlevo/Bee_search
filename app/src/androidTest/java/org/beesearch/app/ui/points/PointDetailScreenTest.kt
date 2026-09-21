@@ -158,16 +158,68 @@ class PointDetailScreenTest {
     }
 
     @Test
-    fun beeHistoryKeepsMarksAndCycleFacts() {
+    fun beeMatrixKeepsMarksAndOpensTheCorrectCycleDetails() {
         setDetailContent(detail = detail(description = null, bees = 1))
 
-        scrollTo("bee-mark-WHITE-THORAX")
+        scrollTo("bee-flight-matrix")
+        composeRule.onNodeWithTag("bee-flight-matrix").assertIsDisplayed()
+        composeRule.onNodeWithTag("matrix-bee-$beeId").assertIsDisplayed()
         composeRule.onNodeWithTag("bee-mark-WHITE-THORAX").assertExists()
-        scrollTo("detail-bee-$beeId")
-        composeRule.onNodeWithTag("detail-bee-$beeId").assertIsDisplayed()
-        composeRule.onNodeWithText("Цикл 1").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("00:01:10").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("91°").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Ц1").assertIsDisplayed()
+        composeRule.onNodeWithText("1:10").assertIsDisplayed()
+        composeRule.onNodeWithText("91°").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("matrix-cell-$beeId-1").performClick()
+        composeRule.onNodeWithTag("cycle-detail-dialog").assertIsDisplayed()
+        composeRule.onNodeWithText("Пчела 1 · Цикл 1").assertIsDisplayed()
+        composeRule.onNodeWithText("00:01:10").assertIsDisplayed()
+        composeRule.onNodeWithTag("dismiss-cycle-detail").performClick()
+        composeRule.onNodeWithTag("cycle-detail-dialog").assertDoesNotExist()
+    }
+
+    @Test
+    fun tappingAnEmptyMatrixCellDoesNothing() {
+        val history = singleHistory(
+            cycles = listOf(
+                cycle(number = 2, durationSeconds = 70, azimuthDeg = null),
+            ),
+        )
+        setDetailContent(detail = detail(description = null, historiesOverride = listOf(history)))
+
+        scrollTo("bee-flight-matrix")
+        composeRule.onNodeWithTag("matrix-cell-$beeId-1").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("cycle-detail-dialog").assertDoesNotExist()
+    }
+
+    @Test
+    fun openCycleUsesEllipsisAndExplainsTheStateInDetails() {
+        val history = singleHistory(
+            cycles = listOf(cycle(number = 1, durationSeconds = null, azimuthDeg = null)),
+        )
+        setDetailContent(detail = detail(description = null, historiesOverride = listOf(history)))
+
+        scrollTo("bee-flight-matrix")
+        composeRule.onNodeWithText("…").assertIsDisplayed()
+        composeRule.onNodeWithTag("matrix-cell-$beeId-1").performClick()
+        composeRule.onNodeWithText("Цикл открыт · Пчела в полёте").assertIsDisplayed()
+    }
+
+    @Test
+    fun wideMatrixScrollsCyclesWhileBeeIdentityStaysFixed() {
+        val history = singleHistory(
+            cycles = (1..12).map { number -> cycle(number, durationSeconds = number * 10L, azimuthDeg = null) },
+        )
+        setDetailContent(detail = detail(description = null, historiesOverride = listOf(history)))
+
+        scrollTo("bee-flight-matrix")
+        val identityBefore = composeRule.onNodeWithTag("matrix-bee-$beeId")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithTag("matrix-cell-$beeId-12").performScrollTo().assertIsDisplayed()
+        val identityAfter = composeRule.onNodeWithTag("matrix-bee-$beeId")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+
+        assertEquals(identityBefore.left, identityAfter.left, 1f)
+        assertEquals(identityBefore.right, identityAfter.right, 1f)
     }
 
     @Test
@@ -235,6 +287,32 @@ class PointDetailScreenTest {
     }
 
     @Test
+    fun beeMatrixRemainsReadableAtLargeSystemFontScale() {
+        composeRule.setContent {
+            val deviceDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(deviceDensity.density, fontScale = 1.7f),
+            ) {
+                Bee_searchTheme {
+                    PointDetailScreen(
+                        state = PointDetailUiState(
+                            detail = detail(description = null, bees = 1),
+                            isLoading = false,
+                        ),
+                        fileStore = null,
+                        onBack = {},
+                    )
+                }
+            }
+        }
+
+        scrollTo("bee-flight-matrix")
+        composeRule.onNodeWithText("Пчела 1").assertIsDisplayed()
+        composeRule.onNodeWithText("1:10").assertIsDisplayed()
+        composeRule.onNodeWithText("91°").assertIsDisplayed()
+    }
+
+    @Test
     fun detailMessageIsShownAndDismissible() {
         var dismissed = false
         setDetailContent(
@@ -288,6 +366,7 @@ class PointDetailScreenTest {
         bees: Int = 0,
         completed: Boolean = true,
         weather: ObservationPointWeather? = null,
+        historiesOverride: List<BeeObservationHistory>? = null,
     ) = ObservationPointDetail(
         point = ObservationPoint(
             id = pointId,
@@ -308,33 +387,10 @@ class PointDetailScreenTest {
         ),
         territory = devTerritory,
         observer = observer,
-        beeHistories = if (bees == 0) {
+        beeHistories = historiesOverride ?: if (bees == 0) {
             emptyList()
         } else {
-            listOf(
-                BeeObservationHistory(
-                    bee = Bee(
-                        id = beeId,
-                        observationPointId = pointId,
-                        markColor = "WHITE",
-                        markPosition = MarkPosition.THORAX,
-                        createdAt = Instant.parse("2026-09-17T05:30:00Z"),
-                    ),
-                    flightCycles = listOf(
-                        FlightCycle(
-                            id = UUID.randomUUID(),
-                            beeId = beeId,
-                            sequenceNumber = 1,
-                            departureTime = Instant.parse("2026-09-17T05:30:00Z"),
-                            returnTime = Instant.parse("2026-09-17T05:31:10Z"),
-                            azimuthDeg = 91.0,
-                            azimuthCaptureConsumed = true,
-                            createdAt = Instant.parse("2026-09-17T05:30:00Z"),
-                            updatedAt = Instant.parse("2026-09-17T05:31:10Z"),
-                        ),
-                    ),
-                ),
-            )
+            listOf(singleHistory(listOf(cycle(number = 1, durationSeconds = 70, azimuthDeg = 91.0))))
         },
         weather = weather,
         attachments = List(photos) { index ->
@@ -350,6 +406,29 @@ class PointDetailScreenTest {
                 createdAt = Instant.parse("2026-09-17T05:40:00Z"),
             )
         },
+    )
+
+    private fun singleHistory(cycles: List<FlightCycle>) = BeeObservationHistory(
+        bee = Bee(
+            id = beeId,
+            observationPointId = pointId,
+            markColor = "WHITE",
+            markPosition = MarkPosition.THORAX,
+            createdAt = Instant.parse("2026-09-17T05:30:00Z"),
+        ),
+        flightCycles = cycles,
+    )
+
+    private fun cycle(number: Int, durationSeconds: Long?, azimuthDeg: Double?) = FlightCycle(
+        id = UUID.randomUUID(),
+        beeId = beeId,
+        sequenceNumber = number,
+        departureTime = Instant.parse("2026-09-17T05:30:00Z"),
+        returnTime = durationSeconds?.let { Instant.parse("2026-09-17T05:30:00Z").plusSeconds(it) },
+        azimuthDeg = azimuthDeg,
+        azimuthCaptureConsumed = azimuthDeg != null,
+        createdAt = Instant.parse("2026-09-17T05:30:00Z"),
+        updatedAt = Instant.parse("2026-09-17T05:31:10Z"),
     )
 
     private companion object {

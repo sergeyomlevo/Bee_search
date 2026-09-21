@@ -12,8 +12,12 @@ cannot switch the operational one.
 
 The separate `Просмотр точки` title and the separate `Свойства точки` screen are
 gone. One screen titled `Точка №N` shows the point data, description, photos,
-weather snapshot and the existing Bee/FlightCycle history; its menu deletes
-exactly that point after a confirmation naming it. The description/photo/weather
+weather snapshot and a Bee × FlightCycle matrix; its menu deletes exactly that
+point after a confirmation naming it. One row is one Bee, one column is the same
+`sequenceNumber` across Bees, and only the cycle region scrolls horizontally.
+Completed cells show compact duration and optional azimuth, open cells show `…`,
+and absent cycles show `—`; tapping a real cycle opens its persisted details.
+The description/photo/weather
 sections and one point ViewModel were reused from the former properties screen,
 so there is no duplicated exporter, repository or media path.
 
@@ -36,31 +40,28 @@ a non-working one.
 
 ## Verification status
 
-351 JVM unit tests, 265 connected tests on Samsung SM-S938B (12 expected opt-in
-skips, 0 failures), lint, `compileDebugKotlin`, `compileDebugAndroidTestKotlin`
-and `assembleDebug` pass.
+357 JVM unit tests and the focused 18-test Point detail suite on Samsung
+SM-S938B pass with 0 failures. Lint, `compileDebugKotlin`,
+`compileDebugAndroidTestKotlin`, `assembleDebug` and `assembleDebugAndroidTest`
+also pass.
 
 Measured on that device at system `font_scale=1.7`: chrome above the map fell
 from 216dp to 154dp and the map grew from 436dp to 546dp of the 700dp content
 area; the old header alone was 96dp because the inner `Scaffold`/`TopAppBar`
 re-applied the status-bar inset the app-level scaffold had already consumed.
 
-Manual Samsung checks covered the compact Points header, both filters, the
-Map/Table switch, marker and table opening, the `Точка №16` screen with its
-metadata/description/photos/weather/bees sections, the point menu, Settings
-without the relocated entries, and the Ареал screen (two sections, 4.8 km²,
-offline map loaded). The two real ObservationPoints (№15, №16), 9 bees, 23
-flight cycles, the observer, the current Territory, the Ареал and the active map
-package pointer were confirmed intact afterwards; no destructive action was
-performed on real data.
+Manual Samsung checks at system `font_scale=1.7` covered the real points №15
+(5 Bees / 12 cycles, columns through `Ц4`) and №16 (4 Bees / 6 completed plus
+2 open cycles). Bee identity stayed fixed during horizontal scroll; `…`, `—`,
+durations and the cycle dialog were readable. The point №15 `Пчела 1 / Ц4`
+dialog showed the correct departure, return and `00:04:35`; the point №16 open
+cycle dialog showed the full open/in-flight state. Room DB/WAL and DataStore
+SHA-256 values were identical before and after, and the active PMTiles package
+remained present. No destructive action was performed on real data.
 
 ## Next task
 
-A. Bee × FlightCycle matrix on the point screen: one row per Bee, one column per
-cycle number, horizontal scrolling, readable/sticky Bee identity, duration in the
-cell with azimuth as an optional second line, and a cell detail. The current
-Bee/FlightCycle presentation stays functional until that work starts.
-B. Single-ObservationPoint export, only as a new technical task: the audit
+Single-ObservationPoint export, only as a new technical task: the audit
 confirmed no per-point export backend exists, and a single-point archive would
 need its own contract decision because backup v2 requires every point to have a
 weather row and validates all foreign keys.

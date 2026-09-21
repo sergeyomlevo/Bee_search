@@ -16,12 +16,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -38,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,7 +50,6 @@ import org.beesearch.app.domain.model.ObservationPointDetail
 import org.beesearch.app.domain.repository.ObservationDataMaintenance
 import org.beesearch.app.domain.repository.ObservationRepository
 import org.beesearch.app.domain.weather.WeatherSyncScheduler
-import org.beesearch.app.ui.observation.BeeMarkIcon
 import org.beesearch.app.ui.properties.PointDescriptionSection
 import org.beesearch.app.ui.properties.PointPhotoSection
 import org.beesearch.app.ui.properties.WeatherBlock
@@ -325,35 +320,12 @@ private fun PointDetailContent(
             PointSection("Пчёлы") {
                 if (detail.beeHistories.isEmpty()) {
                     Text("Пчёл: 0", modifier = Modifier.padding(bottom = 8.dp))
-                }
-            }
-        }
-        items(detail.beeHistories, key = { history -> "bee-${history.bee.id}" }) { history ->
-            Card(Modifier.fillMaxWidth().testTag("detail-bee-${history.bee.id}")) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    BeeMarkIcon(
-                        markColor = history.bee.markColor,
-                        markPosition = history.bee.markPosition,
-                        height = PointDetailBeeMarkHeight,
+                } else {
+                    BeeFlightMatrixView(
+                        matrix = remember(detail.beeHistories) {
+                            buildBeeFlightMatrix(detail.beeHistories)
+                        },
                     )
-                    Text("Циклов: ${history.flightCycles.size}")
-                    history.flightCycles.forEach { cycle ->
-                        HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                        Text("Цикл ${cycle.sequenceNumber}", fontWeight = FontWeight.Bold)
-                        DetailField("Вылет", formatPointDateTime(cycle.departureTime))
-                        if (cycle.returnTime == null) {
-                            Text("Открыт", color = MaterialTheme.colorScheme.primary)
-                        } else {
-                            DetailField("Прилёт", formatPointDateTime(cycle.returnTime))
-                            DetailField(
-                                "Длительность",
-                                formatCompletedFlightDuration(cycle.departureTime, cycle.returnTime),
-                            )
-                        }
-                        cycle.azimuthDeg?.let { azimuth ->
-                            DetailField("Азимут", String.format(Locale.ROOT, "%.0f°", azimuth))
-                        }
-                    }
                 }
             }
         }
@@ -376,7 +348,7 @@ private fun PointSection(title: String, content: @Composable () -> Unit) {
  * right column at large system font scale. Stacking them keeps the value on the full width.
  */
 @Composable
-private fun DetailField(label: String, value: String) {
+internal fun DetailField(label: String, value: String) {
     Column(Modifier.fillMaxWidth()) {
         Text(
             text = label,
@@ -445,9 +417,6 @@ private fun PointDeleteDialog(
         },
     )
 }
-
-/** Sized to stay readily identifiable inside a Point history card. */
-private val PointDetailBeeMarkHeight = 72.dp
 
 internal fun formatCompletedFlightDuration(departure: Instant, returned: Instant): String {
     val seconds = Duration.between(departure, returned).seconds.coerceAtLeast(0)
