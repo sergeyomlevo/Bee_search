@@ -224,6 +224,8 @@ private fun BeeSearchApp(
                         maintenance = application.container.observationDataMaintenance,
                         fileStore = application.container.attachmentFileStore,
                         weatherScheduler = application.container.weatherSyncScheduler,
+                        pointExporter = application.container.observationPointDocumentExporter,
+                        exchangeStorage = application.container.exchangeStorage,
                         onBack = { viewModel.closePointDetail(currentRoute) },
                         onDeleted = viewModel::openPoints,
                     )

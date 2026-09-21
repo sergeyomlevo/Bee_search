@@ -247,11 +247,31 @@ class PointDetailScreenTest {
     }
 
     @Test
-    fun runningPointOffersNoDeleteAction() {
-        // The backend deletes only completed points, so an unfinished point shows no delete command.
-        setDetailContent(detail = detail(description = null, completed = false))
+    fun pointMenuOffersExportWithoutChangingTheBeeMatrix() {
+        var exports = 0
+        setDetailContent(
+            detail = detail(description = null, completed = true, bees = 1),
+            onExportPoint = { exports += 1 },
+        )
 
-        composeRule.onNodeWithTag("point-menu").assertDoesNotExist()
+        composeRule.onNodeWithTag("point-menu").performClick()
+        composeRule.onNodeWithTag("point-menu-export").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(1, exports) }
+        scrollTo("bee-flight-matrix")
+        composeRule.onNodeWithTag("bee-flight-matrix").assertIsDisplayed()
+    }
+
+    @Test
+    fun runningPointOffersSnapshotExportButNoDeleteAction() {
+        var exports = 0
+        setDetailContent(
+            detail = detail(description = null, completed = false),
+            onExportPoint = { exports += 1 },
+        )
+
+        composeRule.onNodeWithTag("point-menu").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("point-menu-export").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(1, exports) }
         composeRule.onNodeWithTag("point-menu-delete").assertDoesNotExist()
     }
 
@@ -340,6 +360,7 @@ class PointDetailScreenTest {
         onStartDescriptionEditing: () -> Unit = {},
         onPickPhoto: () -> Unit = {},
         onDeletePhoto: (ObservationPointAttachment) -> Unit = {},
+        onExportPoint: () -> Unit = {},
         onDeletePoint: () -> Unit = {},
         onDismissMessage: () -> Unit = {},
     ) {
@@ -353,6 +374,7 @@ class PointDetailScreenTest {
                     onStartDescriptionEditing = onStartDescriptionEditing,
                     onPickPhoto = onPickPhoto,
                     onDeletePhoto = onDeletePhoto,
+                    onExportPoint = onExportPoint,
                     onDeletePoint = onDeletePoint,
                     onDismissMessage = onDismissMessage,
                 )

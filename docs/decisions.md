@@ -2371,6 +2371,37 @@ Territory, UUID, Bee, description и photos не отправляются.
 
 ---
 
+# D086 — Single ObservationPoint export package v1
+
+**Статус:** ACCEPTED
+
+Экспорт одной ObservationPoint является отдельным переносимым контрактом, а не
+вариантом complete logical backup. ZIP package имеет профиль
+`SINGLE_OBSERVATION_POINT` и собственный `formatVersion = 1`; Room остаётся v7,
+а полный backup остаётся v2.
+
+Пакет содержит ровно одну ObservationPoint, её description, фактическое persisted
+состояние weather, всех принадлежащих ей Bee и FlightCycle, attachment metadata и
+photo bytes. Territory и Observer входят только как минимальный context snapshot.
+Открытый FlightCycle сохраняется с nullable return time; export не обращается к
+weather provider и не изменяет source data.
+
+Manifest задаёт point JSON entry и attachment entries вместе с byte length и SHA-256.
+Validator отклоняет неподдерживаемую версию, malformed JSON, duplicate identities и
+ZIP entries, broken graph references, traversal/absolute paths, отсутствующий blob и
+несовпадение size/hash. Structured graph сериализуется в устойчивом порядке. Имя файла
+служит только человеку и включает Territory code, номер и дату точки и short UUID.
+
+Другие ObservationPoint, другие Territory/Observer, Area, PMTiles, active map state,
+DataStore current selections, настройки и Exchange directory contents в пакет не
+входят. Экспорт использует SAF CreateDocument с начальным `Exchange/Data`, остаётся
+read-only и доступен как согласованный snapshot активной точки. Selective import,
+share/server transports и запись package обратно в Room не входят в это решение.
+
+Следующий свободный номер durable decision: **D087**.
+
+---
+
 # Закрытые архитектурные вопросы
 
 - O001 — формат offline vector Map Package закрыт решением D063: PMTiles;

@@ -1666,6 +1666,16 @@ Logical backup core реализует versioned архив согласно D06
 существующему `BackupService`, а UI не знает формат ZIP, manifest или правила
 целостности. Broad storage permissions не требуются.
 
+Single ObservationPoint export отделён от logical backup пакетом
+`data/pointexport`. Транзакционный `getObservationPointDetail(pointId)` является
+единственным source read: он возвращает выбранную Point, Territory/Observer context,
+weather, Bee/FlightCycle и attachment metadata, после чего exporter сверяет app-owned
+photo bytes с size/SHA metadata. Pure codec пишет и валидирует format v1 ZIP с
+`manifest.json`, `point.json` и `attachments/<attachmentId>`. Он не читает DataStore,
+Area, карты или сеть и не имеет restore/import side effects. UI только запускает
+существующий `CreateExchangeDocument` с начальным `Exchange/Data` и передаёт выбранный
+URI document adapter-у.
+
 Очистка observation data проходит через repository operation и одну Room
 transaction в порядке FlightCycle → Bee → ObservationPoint. Territory, Observer,
 DataStore settings и map packages не входят в эту транзакцию. Help является

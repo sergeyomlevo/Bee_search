@@ -3,6 +3,7 @@ package org.beesearch.app.ui.points
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
 import java.io.InputStream
 import java.time.Clock
 import java.time.Instant
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.beesearch.app.data.media.AttachmentDeletionBatch
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
+import org.beesearch.app.data.pointexport.ObservationPointDocumentExporter
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.EntityNotFoundException
 import org.beesearch.app.domain.model.ObservationPointAttachment
@@ -37,6 +39,7 @@ internal data class PointDetailUiState(
     val isDescriptionSaving: Boolean = false,
     val isPhotoSaving: Boolean = false,
     val isDeletingPoint: Boolean = false,
+    val isExportingPoint: Boolean = false,
     val message: String? = null,
 )
 
@@ -45,6 +48,7 @@ internal class PointDetailViewModel(
     private val maintenance: ObservationDataMaintenance,
     private val fileStore: ObservationAttachmentFileStore,
     private val weatherScheduler: WeatherSyncScheduler,
+    private val pointExporter: ObservationPointDocumentExporter,
     private val pointId: UUID,
     private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
@@ -172,6 +176,21 @@ internal class PointDetailViewModel(
         }
     }
 
+    fun exportPoint(destination: Uri) {
+        if (mutableState.value.isExportingPoint) return
+        mutableState.value = mutableState.value.copy(isExportingPoint = true, message = null)
+        viewModelScope.launch {
+            runCatching { pointExporter.export(pointId, destination) }
+                .onSuccess {
+                    mutableState.value = mutableState.value.copy(message = "Точка экспортирована")
+                }
+                .onFailure {
+                    mutableState.value = mutableState.value.copy(message = "Не удалось экспортировать точку")
+                }
+            mutableState.value = mutableState.value.copy(isExportingPoint = false)
+        }
+    }
+
     /**
      * Deletes this ObservationPoint through the existing selective-delete backend.
      *
@@ -211,11 +230,12 @@ internal class PointDetailViewModel(
             maintenance: ObservationDataMaintenance,
             fileStore: ObservationAttachmentFileStore,
             weatherScheduler: WeatherSyncScheduler,
+            pointExporter: ObservationPointDocumentExporter,
             pointId: UUID,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                PointDetailViewModel(repository, maintenance, fileStore, weatherScheduler, pointId) as T
+                PointDetailViewModel(repository, maintenance, fileStore, weatherScheduler, pointExporter, pointId) as T
         }
     }
 }

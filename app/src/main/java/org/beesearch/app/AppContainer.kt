@@ -5,6 +5,10 @@ import android.content.Context
 import org.beesearch.app.data.backup.BackupDocumentExporter
 import org.beesearch.app.data.backup.BackupService
 import org.beesearch.app.data.backup.SafBackupDocumentExporter
+import org.beesearch.app.data.pointexport.ObservationPointExportService
+import org.beesearch.app.data.pointexport.ObservationPointDocumentExporter
+import org.beesearch.app.data.pointexport.RepositoryObservationPointExportSource
+import org.beesearch.app.data.pointexport.SafObservationPointDocumentExporter
 import org.beesearch.app.data.exchange.AndroidAreaMapDiscovery
 import org.beesearch.app.data.exchange.AndroidAreaShareTransport
 import org.beesearch.app.data.exchange.AreaExchangeMirror
@@ -118,6 +122,14 @@ internal class AppContainer(context: Context) {
         contentResolver = context.contentResolver,
         cacheDirectory = context.cacheDir,
     )
+    val observationPointDocumentExporter: ObservationPointDocumentExporter =
+        SafObservationPointDocumentExporter(
+            service = ObservationPointExportService(
+                source = RepositoryObservationPointExportSource(observationRepository),
+                attachmentStore = attachmentFileStore,
+            ),
+            contentResolver = context.contentResolver,
+        )
     val createObservationPoint = CreateObservationPoint(
         settingsRepository = settingsRepository,
         pointCreator = observationRepository,

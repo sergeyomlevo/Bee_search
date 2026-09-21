@@ -3,6 +3,7 @@
 package org.beesearch.app.ui.points
 
 import android.content.ContentResolver
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -45,6 +46,11 @@ import java.time.Instant
 import java.util.Locale
 import java.util.UUID
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
+import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
+import org.beesearch.app.data.exchange.CreateExchangeDocument
+import org.beesearch.app.data.exchange.ExchangeFolder
+import org.beesearch.app.data.pointexport.ObservationPointDocumentExporter
+import org.beesearch.app.data.pointexport.observationPointExportFileName
 import org.beesearch.app.domain.model.ObservationPointAttachment
 import org.beesearch.app.domain.model.ObservationPointDetail
 import org.beesearch.app.domain.repository.ObservationDataMaintenance
@@ -66,6 +72,8 @@ internal fun PointDetailRoute(
     maintenance: ObservationDataMaintenance,
     fileStore: ObservationAttachmentFileStore,
     weatherScheduler: WeatherSyncScheduler,
+    pointExporter: ObservationPointDocumentExporter,
+    exchangeStorage: BeeSearchExchangeStorage,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
 ) {
@@ -76,6 +84,7 @@ internal fun PointDetailRoute(
             maintenance = maintenance,
             fileStore = fileStore,
             weatherScheduler = weatherScheduler,
+            pointExporter = pointExporter,
             pointId = pointId,
         ),
     )
@@ -86,6 +95,14 @@ internal fun PointDetailRoute(
     var deleteTarget by remember { mutableStateOf<ObservationPointAttachment?>(null) }
     var confirmDeletePoint by rememberSaveable { mutableStateOf(false) }
     var cameraPath by rememberSaveable { mutableStateOf<String?>(null) }
+    val createExportDocument = rememberLauncherForActivityResult(
+        CreateExchangeDocument(
+            mimeType = "application/zip",
+            initialFolder = exchangeStorage.initialDocumentUri(ExchangeFolder.DATA),
+        ),
+    ) { destination: Uri? ->
+        destination?.let(viewModel::exportPoint)
+    }
 
     val importUri = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -133,6 +150,9 @@ internal fun PointDetailRoute(
             },
             onDeletePhoto = viewModel::deletePhoto,
             onRetryWeather = viewModel::retryWeather,
+            onExportPoint = {
+                state.detail?.let { createExportDocument.launch(observationPointExportFileName(it)) }
+            },
             onDeletePoint = { viewModel.deletePoint(onDeleted = onDeleted) },
             onDismissMessage = viewModel::dismissMessage,
         )
@@ -163,6 +183,7 @@ internal fun PointDetailScreen(
     onPickPhoto: () -> Unit = {},
     onDeletePhoto: (ObservationPointAttachment) -> Unit = {},
     onRetryWeather: () -> Unit = {},
+    onExportPoint: () -> Unit = {},
     onDeletePoint: () -> Unit = {},
     onDismissMessage: () -> Unit = {},
 ) {
@@ -171,22 +192,26 @@ internal fun PointDetailScreen(
     var deletePhotoTarget by remember { mutableStateOf<ObservationPointAttachment?>(null) }
     val detail = state.detail
     val deletable = detail?.point?.completedAt != null && !state.isDeletingPoint
-
     Column(Modifier.fillMaxSize()) {
         CompactScreenHeader(
             title = detail?.let { "Точка №${it.point.pointNumber}" } ?: "Точка",
             onBack = onBack,
         ) {
-            if (deletable) {
+            if (detail != null) {
                 HeaderMenuButton(
-                    items = listOf(
-                        HeaderMenuItem(
+                    items = buildList {
+                        add(HeaderMenuItem(
+                            label = "Экспортировать точку",
+                            testTag = "point-menu-export",
+                            onClick = onExportPoint,
+                        ))
+                        if (deletable) add(HeaderMenuItem(
                             label = "Удалить точку",
                             testTag = "point-menu-delete",
                             isDestructive = true,
                             onClick = { confirmDeletePoint = true },
-                        ),
-                    ),
+                        ))
+                    },
                     menuDescription = "Действия с этой точкой",
                     testTag = "point-menu",
                 )

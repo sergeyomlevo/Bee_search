@@ -1488,6 +1488,13 @@ ObservationPoint, блокируется и не изменяет coverage.
 строка `encoded` для своего `territoryId`; формат и версии архива при этом не меняются.
 Указатель активного Map Package остаётся device-local и в backup не входит.
 
+Single ObservationPoint export не меняет Room schema и не является выборкой полного
+backup. Package format v1 содержит ровно одну persisted ObservationPoint, её weather,
+attachment metadata и bytes, Bee/FlightCycle graph, а Territory и Observer — только
+как context snapshot. `return_time = null`, nullable description/weather fields и
+необязательный azimuth сохраняются без подстановки значений. Package identity хранится
+в manifest; человекочитаемое имя файла не является ключом данных.
+
 Дополнительно Ареал имеет переносимый **managed-файл** в
 `Download/BeeSearch/<вариант>/Exchange/Areas/<имя>--<short-id>.json` (D083). Файл
 содержит весь Ареал — `formatVersion`, полный `areaId`, `name` и 1..N участков — и
