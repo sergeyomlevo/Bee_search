@@ -231,7 +231,7 @@ internal fun WeatherBlock(
             }
         }
         Text(
-            "Данные погоды: Open-Meteo",
+            "Open-Meteo",
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .padding(top = 4.dp)

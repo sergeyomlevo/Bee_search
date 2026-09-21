@@ -144,7 +144,7 @@ class PointDetailScreenTest {
         scrollTo("weather-loaded")
         composeRule.onNodeWithTag("weather-loaded").assertIsDisplayed()
         composeRule.onNodeWithText("Температура: 19.1 °C").assertIsDisplayed()
-        composeRule.onNodeWithText("Данные погоды: Open-Meteo").assertIsDisplayed()
+        composeRule.onNodeWithText("Open-Meteo").assertIsDisplayed()
         composeRule.onNodeWithTag("weather-attribution").assertIsDisplayed()
     }
 
@@ -164,6 +164,9 @@ class PointDetailScreenTest {
         scrollTo("bee-flight-matrix")
         composeRule.onNodeWithTag("bee-flight-matrix").assertIsDisplayed()
         composeRule.onNodeWithTag("matrix-bee-$beeId").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Пчела 1, Белая метка, грудь").assertIsDisplayed()
+        composeRule.onNodeWithText("Пчела 1").assertDoesNotExist()
+        composeRule.onNodeWithText("1").assertIsDisplayed()
         composeRule.onNodeWithTag("bee-mark-WHITE-THORAX").assertExists()
         composeRule.onNodeWithText("Ц1").assertIsDisplayed()
         composeRule.onNodeWithText("1:10").assertIsDisplayed()
@@ -205,7 +208,7 @@ class PointDetailScreenTest {
     }
 
     @Test
-    fun wideMatrixScrollsCyclesWhileBeeIdentityStaysFixed() {
+    fun wideMatrixScrollsTheBeeIdentityTogetherWithCycles() {
         val history = singleHistory(
             cycles = (1..12).map { number -> cycle(number, durationSeconds = number * 10L, azimuthDeg = null) },
         )
@@ -216,10 +219,12 @@ class PointDetailScreenTest {
             .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         composeRule.onNodeWithTag("matrix-cell-$beeId-12").performScrollTo().assertIsDisplayed()
         val identityAfter = composeRule.onNodeWithTag("matrix-bee-$beeId")
-            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            .fetchSemanticsNode().boundsInRoot
 
-        assertEquals(identityBefore.left, identityAfter.left, 1f)
-        assertEquals(identityBefore.right, identityAfter.right, 1f)
+        assertTrue(
+            "Bee identity must move left with the whole matrix: before=$identityBefore after=$identityAfter",
+            identityAfter.left < identityBefore.left,
+        )
     }
 
     @Test
@@ -327,7 +332,9 @@ class PointDetailScreenTest {
         }
 
         scrollTo("bee-flight-matrix")
-        composeRule.onNodeWithText("Пчела 1").assertIsDisplayed()
+        composeRule.onNodeWithText("Пчела 1").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Пчела 1, Белая метка, грудь").assertIsDisplayed()
+        composeRule.onNodeWithText("1").assertIsDisplayed()
         composeRule.onNodeWithText("1:10").assertIsDisplayed()
         composeRule.onNodeWithText("91°").assertIsDisplayed()
     }

@@ -18,7 +18,7 @@ class BeeFlightMatrixTest {
 
         assertEquals(listOf(1), matrix.columns)
         assertEquals(1, matrix.rows.size)
-        assertEquals("Пчела 1", matrix.rows.single().label)
+        assertEquals(1, matrix.rows.single().displayNumber)
         assertEquals("5:12", matrix.rows.single().cells.single()?.durationText)
     }
 
@@ -74,6 +74,7 @@ class BeeFlightMatrixTest {
         )
 
         assertEquals(listOf(earlier.id, later.id), matrix.rows.map { it.bee.id })
+        assertEquals(listOf(1, 2), matrix.rows.map { it.displayNumber })
         assertEquals("RED", matrix.rows[0].bee.markColor)
         assertEquals(MarkPosition.ABDOMEN, matrix.rows[0].bee.markPosition)
     }

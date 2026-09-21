@@ -45,7 +45,7 @@ internal data class BeeFlightMatrix(
 
 internal data class BeeFlightMatrixRow(
     val bee: Bee,
-    val label: String,
+    val displayNumber: Int,
     val cells: List<BeeFlightMatrixCell?>,
 )
 
@@ -68,7 +68,7 @@ internal fun buildBeeFlightMatrix(histories: List<BeeObservationHistory>): BeeFl
         val cyclesByNumber = history.flightCycles.associateBy(FlightCycle::sequenceNumber)
         BeeFlightMatrixRow(
             bee = history.bee,
-            label = "Пчела ${index + 1}",
+            displayNumber = index + 1,
             cells = columns.map { number ->
                 cyclesByNumber[number]?.let { cycle ->
                     BeeFlightMatrixCell(
@@ -106,35 +106,32 @@ internal fun BeeFlightMatrixView(
     var selectedRow by remember { mutableStateOf<BeeFlightMatrixRow?>(null) }
     val horizontalScroll = rememberScrollState()
 
-    Row(modifier.fillMaxWidth().testTag("bee-flight-matrix")) {
-        Column(Modifier.width(BeeIdentityColumnWidth)) {
-            MatrixHeaderCell("Пчела", Modifier.fillMaxWidth())
-            matrix.rows.forEach { row -> BeeIdentityCell(row) }
-        }
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(horizontalScroll),
-        ) {
-            Row {
-                matrix.columns.forEach { number ->
-                    MatrixHeaderCell("Ц$number", Modifier.width(CycleColumnWidth).testTag("matrix-header-$number"))
-                }
+    Column(
+        modifier
+            .fillMaxWidth()
+            .horizontalScroll(horizontalScroll)
+            .testTag("bee-flight-matrix"),
+    ) {
+        Row {
+            MatrixHeaderCell("№", Modifier.width(BeeIdentityColumnWidth))
+            matrix.columns.forEach { number ->
+                MatrixHeaderCell("Ц$number", Modifier.width(CycleColumnWidth).testTag("matrix-header-$number"))
             }
-            matrix.rows.forEach { row ->
-                Row {
-                    row.cells.forEachIndexed { columnIndex, cell ->
-                        val sequenceNumber = matrix.columns[columnIndex]
-                        FlightCycleCell(
-                            row = row,
-                            sequenceNumber = sequenceNumber,
-                            cell = cell,
-                            onClick = {
-                                selectedRow = row
-                                selectedCell = cell
-                            },
-                        )
-                    }
+        }
+        matrix.rows.forEach { row ->
+            Row {
+                BeeIdentityCell(row)
+                row.cells.forEachIndexed { columnIndex, cell ->
+                    val sequenceNumber = matrix.columns[columnIndex]
+                    FlightCycleCell(
+                        row = row,
+                        sequenceNumber = sequenceNumber,
+                        cell = cell,
+                        onClick = {
+                            selectedRow = row
+                            selectedCell = cell
+                        },
+                    )
                 }
             }
         }
@@ -166,25 +163,31 @@ private fun MatrixHeaderCell(text: String, modifier: Modifier) {
 @Composable
 private fun BeeIdentityCell(row: BeeFlightMatrixRow) {
     val markDescription = BeeMarkCatalog.displayName(row.bee.markColor, row.bee.markPosition)
+    val beeLabel = "Пчела ${row.displayNumber}"
     Surface(
         modifier = Modifier
-            .fillMaxWidth()
+            .width(BeeIdentityColumnWidth)
             .height(MatrixRowHeight)
             .testTag("matrix-bee-${row.bee.id}")
-            .semantics { contentDescription = "${row.label}, $markDescription" },
+            .semantics { contentDescription = "$beeLabel, $markDescription" },
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(
-            Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+        Row(
+            Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
         ) {
             BeeMarkIcon(
                 markColor = row.bee.markColor,
                 markPosition = row.bee.markPosition,
                 height = MatrixBeeMarkHeight,
             )
-            Text(row.label, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
+            Text(
+                text = row.displayNumber.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
@@ -197,10 +200,10 @@ private fun FlightCycleCell(
     onClick: () -> Unit,
 ) {
     val description = if (cell == null) {
-        "${row.label}, цикл $sequenceNumber: нет данных"
+        "Пчела ${row.displayNumber}, цикл $sequenceNumber: нет данных"
     } else {
         buildString {
-            append("${row.label}, цикл $sequenceNumber: ")
+            append("Пчела ${row.displayNumber}, цикл $sequenceNumber: ")
             append(if (cell.cycle.returnTime == null) "открыт, пчела в полёте" else cell.durationText)
             cell.azimuthText?.let { append(", азимут $it") }
         }
@@ -215,7 +218,7 @@ private fun FlightCycleCell(
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -238,7 +241,7 @@ private fun FlightCycleDetailDialog(
     val cycle = cell.cycle
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("${row.label} · Цикл ${cycle.sequenceNumber}") },
+        title = { Text("Пчела ${row.displayNumber} · Цикл ${cycle.sequenceNumber}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 BeeMarkIcon(
@@ -264,9 +267,9 @@ private fun FlightCycleDetailDialog(
     )
 }
 
-private val BeeIdentityColumnWidth = 120.dp
-private val CycleColumnWidth = 96.dp
+private val BeeIdentityColumnWidth = 64.dp
+private val CycleColumnWidth = 88.dp
 private val MatrixHeaderHeight = 56.dp
-private val MatrixRowHeight = 112.dp
-private val MatrixBeeMarkHeight = 52.dp
+private val MatrixRowHeight = 88.dp
+private val MatrixBeeMarkHeight = 44.dp
 private val DialogBeeMarkHeight = 64.dp
