@@ -524,3 +524,47 @@ development documentation and can be adopted before I010 is fully implemented.
 тайлы. В перспективе слой должен поддерживать offline-использование,
 экспорт/импорт и резервное копирование. Сейчас это только идея: не определяет
 Room schema, UI, конкретный формат хранения или implementation milestone.
+
+## I012 — Compact Bee / FlightCycle matrix
+
+**Status:** `done`
+
+**Description:** Make the Bee-by-cycle history matrix more compact on a phone without reducing the readability of recorded times. Remove the redundant word `Пчела` from every row and represent the first column by the Bee mark icon plus a short numeric identifier (`1`, `2`, `3`, ...). The column should be only wide enough for that compact identity.
+
+The Bee identity column should scroll horizontally together with the cycle columns rather than remain frozen. On a narrow phone screen it is more useful to expose an additional cycle column than to keep the Bee identifier permanently visible; with the small number of simultaneously observed Bees, row order remains understandable after horizontal scrolling. Reduce unnecessary row/column padding where practical, but do not shrink the flight-time text merely to fit more columns.
+
+**Motivation / expected value:** The current fixed, text-heavy first column consumes a large share of the phone width, so only about two cycle columns may remain visible. A compact moving identity column should make three or more cycle columns visible and improve rapid comparison of repeated flights in the field and during point review.
+
+**Dependencies / prerequisites:** The existing Bee/FlightCycle matrix and `BeeMarkIcon`; physical-device testing on the field phone; accessibility must not depend on color alone, so the mark-position variant and numeric row identity must remain distinguishable.
+
+**Notes:** This is a presentation change only. It must not change Bee identity, FlightCycle ordering, stored data, or analysis semantics. Exact dimensions and whether the header is omitted or reduced to a compact marker such as `№` remain UI details. Implemented in `f437e19`; current behavior is reflected in authoritative project documentation.
+
+## I013 — Thermal-drone assisted search inside a probable nest area
+
+**Status:** `idea`
+
+**Description:** Investigate using a drone with a thermal camera as a second-stage search tool after Bee Search has narrowed the probable nest location to a relatively small area (for example, roughly a hectare). The drone would survey the area for localized thermal anomalies that may correspond to an occupied tree hollow or its entrance; suspicious locations would then be checked on the ground and, if confirmed, recorded as `Nest` objects.
+
+The first research workflow should not require Bee Search to control the aircraft. Bee Search may export a survey polygon or other simple area representation to suitable mission software, while candidate thermal locations may later be imported or recorded back in Bee Search. A practical flight pattern may combine an autonomous grid/lawnmower route with operator supervision and manual interruption. Survey geometry should consider oblique views from several directions rather than relying only on a nadir view from above the canopy, because foliage and trunk visibility may be the dominant limitation.
+
+**Motivation / expected value:** An occupied hollow can create a detectable thermal contrast at a small entrance, particularly when the surrounding tree surface has cooled. If probable-distance analysis has already reduced the search area, thermal surveying may reduce the amount of difficult ground inspection needed to find the actual nest.
+
+**Dependencies / prerequisites:** Treat this as an experimental method, not an accepted detection technique. First validate it against one or more already known occupied nests, comparing viewing angle, distance, altitude and time of day. Cloudy conditions, after sunset, night or pre-dawn may provide useful thermal contrast, but the effective window must be established experimentally. Flight safety, local aviation rules, obstacle avoidance, thermal-camera capability and radio performance in forest must be handled by the drone system/operator rather than assumed by Bee Search.
+
+**Notes:** GNSS navigation and the controller-to-drone radio link do not inherently require mobile internet, so a preloaded survey mission can in principle operate offline. Forest attenuation and obstacles mean open-field range specifications must not be treated as guaranteed working range. Initial trials should favour safe above-canopy flight with oblique thermal observation; low flight among trees should not be assumed safe merely because GNSS is available. No machine-learning or automatic hotspot classifier is required for the first PoC.
+
+## I014 — User georeferenced raster layers from old maps and imagery
+
+**Status:** `idea`
+
+**Description:** Allow Bee Search to display user-supplied georeferenced raster material as an optional offline overlay over or alongside the modern base map. Typical sources include scanned or photographed old detailed paper maps, historical aerial photographs, satellite imagery, or other raster material useful for field navigation and interpretation.
+
+Complex georeferencing should be prepared outside Bee Search, preferably on a PC with GIS software. The user identifies multiple stable control points visible both on the source image and in modern coordinates (for example durable road junctions), rectifies/warps the source, and exports a ready georeferenced raster package. Bee Search then displays that prepared layer; it should not initially implement its own control-point fitting or reprojection workflow.
+
+Use more than four corner points when the source permits it: well-distributed control points can account for rotation, scale, skew and deformation of old paper or photographs. Some independently known points should be reserved for checking registration error rather than used to fit the transform. The source coordinate reference system may be unknown if control-point registration still produces a validated modern-coordinate raster.
+
+**Motivation / expected value:** Old maps can contain roads, clearings, boundaries and other field detail missing from current maps, while recent imagery can reveal river meanders, new clearings and landscape changes. A georeferenced overlay lets these sources be compared with current GPS position, ObservationPoints, probable nest zones and future Nest records without changing the canonical base map.
+
+**Dependencies / prerequisites:** Define one or more supported offline raster package formats, coverage metadata, import/activation lifecycle, storage/backup rules and map-layer ordering. The UI should support at least layer on/off and useful opacity/transparency control. Registration quality/error should be retained as metadata where available.
+
+**Notes:** Generalize this as a `user georeferenced raster layer` capability rather than a special-case old-paper-map feature. The original source/year and, when known, original CRS should remain provenance metadata. Bee Search research objects continue to use modern geographic coordinates independently of the raster source.
