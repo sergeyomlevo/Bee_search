@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.runtime.mutableStateOf
 import java.time.Instant
 import java.util.UUID
 import org.beesearch.app.domain.model.BeePresenceResult
@@ -151,6 +152,7 @@ class PointsScreenTest {
                     onSelectYear = {},
                     onSelectViewMode = { mode = it },
                     onSelectPoint = {},
+                    onDismissPointSelection = {},
                     onOpenPoint = {},
                 )
             }
@@ -160,6 +162,68 @@ class PointsScreenTest {
         composeRule.onNodeWithTag("point-row-${second.id}").assertIsDisplayed()
         composeRule.onNodeWithTag("points-mode-map").performClick()
         composeRule.runOnIdle { assertEquals(PointsViewMode.MAP, mode) }
+    }
+
+    @Test
+    fun selectedPointPreviewCanBeClosed() {
+        val point = summary(1)
+        val state = mutableStateOf(browserState(points = listOf(point), viewMode = PointsViewMode.MAP, selectedPoint = point))
+
+        composeRule.setContent {
+            Bee_searchTheme {
+                PointsScreen(
+                    territories = listOf(devTerritory),
+                    state = state.value,
+                    mapAreaStore = UnusedMapAreaStore(),
+                    mapPackageStore = UnusedMapPackageStore(),
+                    onBack = {},
+                    onSelectTerritory = {},
+                    onSelectYear = {},
+                    onSelectViewMode = {},
+                    onSelectPoint = {},
+                    onDismissPointSelection = { state.value = state.value.copy(selectedPoint = null) },
+                    onOpenPoint = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("selected-point-card").assertIsDisplayed()
+        composeRule.onNodeWithTag("dismiss-selected-point").performClick()
+        composeRule.onNodeWithTag("selected-point-card").assertDoesNotExist()
+    }
+
+    @Test
+    fun switchingFromMapClearsTheSelectedPointPreview() {
+        val point = summary(1)
+        var mode: PointsViewMode? = null
+        var dismissed = false
+
+        setBrowserContent(
+            state = browserState(points = listOf(point), viewMode = PointsViewMode.MAP, selectedPoint = point),
+            onSelectViewMode = { mode = it },
+            onDismissPointSelection = { dismissed = true },
+        )
+
+        composeRule.onNodeWithTag("points-mode-table").performClick()
+        composeRule.runOnIdle {
+            assertEquals(true, dismissed)
+            assertEquals(PointsViewMode.TABLE, mode)
+        }
+    }
+
+    @Test
+    fun openingSelectedPointClearsPreviewBeforeNavigation() {
+        val point = summary(1)
+        val events = mutableListOf<String>()
+
+        setBrowserContent(
+            state = browserState(points = listOf(point), viewMode = PointsViewMode.MAP, selectedPoint = point),
+            onDismissPointSelection = { events += "dismiss" },
+            onOpenPoint = { events += "open:$it" },
+        )
+
+        composeRule.onNodeWithTag("open-selected-point").performClick()
+        composeRule.runOnIdle { assertEquals(listOf("dismiss", "open:${point.id}"), events) }
     }
 
     @Test
@@ -217,6 +281,8 @@ class PointsScreenTest {
         onBack: () -> Unit = {},
         onSelectTerritory: (UUID) -> Unit = {},
         onSelectYear: (PointsYearFilter) -> Unit = {},
+        onSelectViewMode: (PointsViewMode) -> Unit = {},
+        onDismissPointSelection: () -> Unit = {},
         onExportAll: () -> Unit = {},
         onDeleteAll: () -> Unit = {},
         onDismissMessage: () -> Unit = {},
@@ -232,8 +298,9 @@ class PointsScreenTest {
                     onBack = onBack,
                     onSelectTerritory = onSelectTerritory,
                     onSelectYear = onSelectYear,
-                    onSelectViewMode = {},
+                    onSelectViewMode = onSelectViewMode,
                     onSelectPoint = {},
+                    onDismissPointSelection = onDismissPointSelection,
                     onOpenPoint = onOpenPoint,
                     onExportAll = onExportAll,
                     onDeleteAll = onDeleteAll,

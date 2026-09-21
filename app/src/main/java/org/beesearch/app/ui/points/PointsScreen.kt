@@ -122,6 +122,7 @@ internal fun PointsRoute(
         onSelectYear = pointsViewModel::selectYear,
         onSelectViewMode = pointsViewModel::selectViewMode,
         onSelectPoint = pointsViewModel::selectPoint,
+        onDismissPointSelection = pointsViewModel::clearPointSelection,
         onOpenPoint = onOpenPoint,
         onExportAll = { createDocument.launch(BACKUP_DOCUMENT_NAME) },
         onDeleteAll = pointsViewModel::deleteAllPoints,
@@ -140,6 +141,7 @@ internal fun PointsScreen(
     onSelectYear: (PointsYearFilter) -> Unit,
     onSelectViewMode: (PointsViewMode) -> Unit,
     onSelectPoint: (UUID) -> Unit,
+    onDismissPointSelection: () -> Unit,
     onOpenPoint: (UUID) -> Unit,
     onExportAll: () -> Unit = {},
     onDeleteAll: () -> Unit = {},
@@ -178,7 +180,10 @@ internal fun PointsScreen(
         )
         PointsModeSwitch(
             viewMode = state.viewMode,
-            onSelectViewMode = onSelectViewMode,
+            onSelectViewMode = { mode ->
+                if (mode != state.viewMode) onDismissPointSelection()
+                onSelectViewMode(mode)
+            },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
         )
         state.message?.let { message ->
@@ -210,7 +215,11 @@ internal fun PointsScreen(
                 state.selectedPoint?.let { selected ->
                     SelectedPointCard(
                         point = selected,
-                        onOpen = { onOpenPoint(selected.id) },
+                        onOpen = {
+                            onDismissPointSelection()
+                            onOpenPoint(selected.id)
+                        },
+                        onDismiss = onDismissPointSelection,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(12.dp)
@@ -497,6 +506,7 @@ private fun PointTableRow(
 private fun SelectedPointCard(
     point: ObservationPointSummary,
     onOpen: () -> Unit,
+    onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(modifier.fillMaxWidth()) {
@@ -505,8 +515,13 @@ private fun SelectedPointCard(
             Text(formatPointDateTime(point.createdAt))
             Text(pointResultLabel(point.beePresenceResult))
             Text("Пчёл: ${point.beeCount}")
-            TextButton(onClick = onOpen, modifier = Modifier.testTag("open-selected-point")) {
-                Text("Открыть")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onDismiss, modifier = Modifier.testTag("dismiss-selected-point")) {
+                    Text("Закрыть")
+                }
+                TextButton(onClick = onOpen, modifier = Modifier.testTag("open-selected-point")) {
+                    Text("Открыть")
+                }
             }
         }
     }
