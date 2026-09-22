@@ -2398,7 +2398,41 @@ DataStore current selections, настройки и Exchange directory contents 
 read-only и доступен как согласованный snapshot активной точки. Selective import,
 share/server transports и запись package обратно в Room не входят в это решение.
 
-Следующий свободный номер durable decision: **D087**.
+---
+
+# D087 — Beta release выполняется только canonical fail-closed workflow
+
+**Статус:** ACCEPTED
+
+Canonical локальный выпуск Beta выполняется только через
+`tools/beta-release/beta_release.py`. Этот workflow является единственным признанным
+способом выпустить Beta; прямой `assembleBeta` сам по себе выпуском не является и
+обязательную проверку не заменяет.
+
+`app/build.gradle.kts` остаётся единственным источником `versionName`, Beta sequence
+и `versionCode`. Product version выбирает владелец: агент не выводит и не назначает
+её автоматически. Новая Beta не может повторять уже выпущенный `versionName`, Beta
+sequence в той же product line не может откатываться, а `versionCode` должен быть
+выше `versionCode` всех ранее выпущенных Beta. Commit hash является provenance
+артефакта, а не номером версии, и не подменяет product/Beta versioning.
+
+Canonical локальный архив выпущенных Beta для этого workflow —
+`C:\App\Bee_search_beta_releases`. Архив является неизменяемым evidence истории
+выпусков: уже выпущенные артефакты не перезаписываются. При отсутствующей, неполной
+или противоречивой истории workflow останавливается по fail-closed, а не продолжает
+выпуск.
+
+Изменение signing identity является отдельным осознанным release decision. Пока такое
+решение не принято явно, workflow обязан остановиться, а не принять новую подпись
+автоматически.
+
+Эксплуатационные детали — команды, требования к окружению, состав проверок, форма
+имени артефакта и коды отказа — остаются в `tools/beta-release/README.md`; это решение
+фиксирует только правило и canonical workflow. Оно не меняет Room schema, runtime
+приложения, application id, Dev/Stable варианты и доставку Stable, а также не
+определяет серверную синхронизацию выпусков.
+
+Следующий свободный номер durable decision: **D088**.
 
 ---
 
