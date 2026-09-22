@@ -9,6 +9,13 @@
 принятый PMTiles baseline D063. Он не меняет Room schema v5, текущие
 domain-модели или offline-first workflow.
 
+**Терминология:** принятое предметное решение D088 определяет три конкретных
+долговечных физических типа (Дупло / Колода / Пасека, то есть `Hollow` / `LogHive` /
+`Apiary`) и отдельную историческую сущность `Inspection` («Осмотр»). Где ниже в этом
+документе написано `Nest` или `NestInspection`, читать соответственно «физический
+объект (Дупло / Колода / Пасека)» и «Осмотр»; вопрос про их domain decision, который
+этот документ оставлял открытым, решён в D088.
+
 ## 1. Goals
 
 Будущая серверная часть Bee Search должна:
@@ -94,8 +101,8 @@ rendering. Benchmark Territory площадью около 883.6 км² дал P
 | server change log/cursor | Server-owned / derived | Server sync subsystem | Не является research domain data |
 | analysis result / nest candidate | Derived/recomputable analysis data | Конкретный analysis run | Не переписывает observations; обычно можно пересчитать |
 | сохранённый research analysis artifact | Derived/recomputable, иногда сохраняемый artifact | Analysis service/author | Требует input/profile/version provenance |
-| подтверждённый `Nest` (будущее) | Вероятно syncable domain data | Требует отдельного domain decision | Отличать от вычисленного candidate |
-| `NestInspection` (будущее) | Вероятно syncable domain data | Field author + server revision history | Модель пока не проектируется |
+| подтверждённый физический объект — Дупло / Колода / Пасека (будущее) | Вероятно syncable domain data | Domain decision принято: D088 (типы, identity, обозначение, relation) | Отличать от вычисленного candidate |
+| `Inspection` / Осмотр (будущее) | Вероятно syncable domain data | Field author + server revision history | D088: самостоятельная историческая сущность; schema пока не проектируется |
 | custom research point/line/path/polygon | Syncable domain data, если объект предназначен для sharing | Field author + server revision history | Geometry хранится вне MapLibre style/source state |
 | device-local draft/measurement preview | Local-only | Устройство | После подтверждения может породить syncable object |
 | imported GPX/reference overlay | Local-only или syncable — определяется явным import intent | Устройство до публикации | Нельзя автоматически считать canonical research data |
@@ -903,7 +910,7 @@ protocol.
 | Custom points/ориентиры | Да, после определения domain meaning | Canonical local entity с UUID; MapLibre layer только projection |
 | Roads/tracks/cutlines/routes | Да, после узкого domain decision | Geometry не в PMTiles; whole-object revisions; local draft отдельно от confirmed object |
 | Polygons/boundaries | Да, после определения ownership | Явный geometry type/CRS/territory/author; без vertex CRDT v1 |
-| `Nest` / `NestInspection` | Не до domain decision | Отличать confirmed object, inspection и derived candidate; UUID/provenance |
+| физические объекты и `Inspection` | Domain decision принято (D088); server design ещё не начат | Отличать confirmed object, inspection и derived candidate; UUID/provenance |
 | Local analysis | Да | Recomputable result маркируется input/algorithm version и не переписывает observations |
 | Map overlays | Да | Строятся из canonical local state; MapLibre state не является persistence |
 

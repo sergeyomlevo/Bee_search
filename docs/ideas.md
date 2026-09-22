@@ -340,6 +340,15 @@ complements the broader field UI simplification in I004.
 
 **Status:** `idea`
 
+**Partially superseded by accepted D088 (`docs/decisions.md`):** the model proposed below — "a
+general nest (`Nest`) rather than specifically as a hollow (`Hollow`)" — is **not** the accepted
+model. Accepted are three concrete durable physical types (Дупло / Колода / Пасека, i.e.
+`Hollow` / `LogHive` / `Apiary`), each with its own identity and human-readable designation, and
+`Nest` («гнездо») keeps its separate meaning of an *estimated* location. The useful parts of this
+idea remain valid as idea material: the Obsidian nest form as a possible source for future field
+design, media captured with the record, and provenance linking a found object to the observations
+that led to it.
+
 **Description:** Extend Bee Search beyond flight tracking to document a wild-bee
 nest after it has been located. Treat this as the natural final stage of the
 same research workflow: field search → ObservationPoint evidence → probable
@@ -395,6 +404,16 @@ straightforward to transform into, the established Obsidian nest records.
 ## I009 — Long-term nest inspections
 
 **Status:** `idea`
+
+**Partially superseded by accepted D088 (`docs/decisions.md`):** the entity the visits belong to
+is a concrete durable physical object (Дупло / Колода / Пасека), not a generic `Nest`, and the
+accepted name for one visit is `Inspection` («Осмотр»), not `NestInspection`. The core of this
+idea is **confirmed** by D088 and remains its design source: a long-lived object collecting any
+number of dated visits, each visit a separate historical record that never rewrites the previous
+one, stable characteristics on the object versus time-varying observations on the visit, media
+belonging to the visit that produced it, and the Obsidian inspection form as the starting point
+for the future field design. D088 explicitly defers the Inspection schema, its media and weather
+handling.
 
 **Description:** Treat a found `Nest` as a long-lived research object that can
 receive any number of dated follow-up inspections over the lifetime of the
