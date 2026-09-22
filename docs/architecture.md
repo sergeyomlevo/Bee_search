@@ -1779,6 +1779,12 @@ Gradle
 Kotlin DSL
 ```
 
+Канонический локальный выпуск Beta выполняется только через
+`tools/beta-release/beta_release.py`; правила product version, Beta sequence,
+монотонного Android versionCode, commit provenance и fail-closed проверки архива
+описаны рядом в `tools/beta-release/README.md`. Прямая публикация результата
+`assembleBeta` минует обязательную проверку и не является release workflow.
+
 Проект уже создан с:
 
 ```text
