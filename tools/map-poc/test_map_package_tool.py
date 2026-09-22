@@ -145,6 +145,40 @@ def write_indexed_pmtiles(path: Path, bounds: tool.Bounds, tiles: set[tuple[int,
 
 
 class MapPackageToolTest(unittest.TestCase):
+    def test_package_id_accepts_canonical_unicode_and_space_stems(self) -> None:
+        for package_id in (
+            "Лух--7e82a310--map-v1",
+            "Beta Test Territory--9cc6cc3a--map-v1",
+            "territory-benchmark-v1",
+        ):
+            self.assertEqual(package_id, tool.validate_package_id(package_id))
+
+    def test_package_id_rejects_path_like_or_unsafe_stems(self) -> None:
+        for package_id in (
+            "",
+            ".",
+            "..",
+            "../escape",
+            "folder\\escape",
+            "bad:name",
+            "CON",
+            "nul.txt",
+            "COM1.map",
+            "COM¹.map",
+            "bad\nname",
+            "bad\u0085name",
+            " leading",
+            "-leading",
+            "trailing ",
+            "trailing.",
+        ):
+            with self.subTest(package_id=package_id), self.assertRaises(tool.ContractError):
+                tool.validate_package_id(package_id)
+
+    def test_package_id_rejects_stems_over_established_length_limit(self) -> None:
+        with self.assertRaises(tool.ContractError):
+            tool.validate_package_id("я" * 97)
+
     def test_area_json_preserves_every_bounds_and_derives_generation_extent(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             area = Path(directory) / "area.json"

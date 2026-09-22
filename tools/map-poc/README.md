@@ -130,7 +130,7 @@ Run preflight before the full Planetiler pass:
   -AreaJson '<exported-area.json>' `
   -SourcePbf '<source-containing-all-required-regions.osm.pbf>' `
   -SourceCoveragePolygon '<region-a.poly>','<region-b.poly>' `
-  -PackageId <versioned-package-id> `
+  -PackageId 'Beta Test Territory--9cc6cc3a--map-v1' `
   -PlanOnly
 ```
 
@@ -145,7 +145,7 @@ After reviewing preflight, omit `-PlanOnly` to build:
   -AreaJson '<exported-area.json>' `
   -SourcePbf '<source-containing-all-required-regions.osm.pbf>' `
   -SourceCoveragePolygon '<region-a.poly>','<region-b.poly>' `
-  -PackageId <versioned-package-id>
+  -PackageId 'Beta Test Territory--9cc6cc3a--map-v1'
 ```
 
 This entry point uses the pinned Planetiler 0.10.0 jar and the existing
@@ -179,18 +179,36 @@ Deliver only the validated pair to user-accessible Samsung storage:
 ```powershell
 .\tools\map-poc\push-map-package-for-import.ps1 `
   -PackageDirectory '.\tools\map-poc\work\packages\<packageId>' `
-  -PackageId <packageId> `
+  -PackageId 'Beta Test Territory--9cc6cc3a--map-v1' `
+  -Variant Beta `
   -Serial <device-serial>
 ```
 
 The script validates the local pair, pushes it to
-`/sdcard/Download/BeeSearch/<packageId>/`, verifies the device SHA-256, and
-registers both user files with Android media storage so they are immediately
-visible in the system document picker. It
-does not write app-private storage. In Bee Search DEV choose `Импортировать
-карту` or `Заменить карту`, select the manifest first and the matching PMTiles
-second. The real `MapPackageStore` then performs staging, D065 validation,
-immutable installation, and active-pointer replacement.
+`/sdcard/Download/BeeSearch/<Variant>/Exchange/OfflineMaps/`, verifies the
+device SHA-256, and registers both user files with Android media storage so
+they are immediately visible in the system document picker. It
+does not write app-private storage. Use `-Variant Stable`, `-Variant Beta`, or
+`-Variant Dev` to match the installed application. In Bee Search choose
+`Импортировать карту` or `Заменить карту`, select the manifest first and the
+matching PMTiles second. The real `MapPackageStore` then performs staging, D065
+validation, immutable installation, and active-pointer replacement.
+
+`PackageId` is the map file stem, not a delivery directory. For an exported
+Area, use the canonical `<areaStem>--map-v<N>` form from D083/D084. For
+example, `Лух--7e82a310--map-v1` and the real Unicode/space stem
+`Beta Test Territory--9cc6cc3a--map-v1` are valid;
+`Lukh--7e82a310--map-v1` is an ASCII/Latin example. The PC tools
+preserve Unicode and spaces, but reject path separators, traversal, control
+characters, Windows-forbidden characters/device names, unsafe leading or
+trailing characters, and names longer than 96 Unicode code points.
+
+The Area JSON is normally obtained from
+`Download/BeeSearch/<Variant>/Exchange/Areas/`. Generate the pair on the PC,
+deliver it to `Download/BeeSearch/<Variant>/Exchange/OfflineMaps/`, then use
+the Bee Search SAF import flow. The picker starts in that folder when the
+platform permits the initial URI; externally copied files are still selected
+manually: manifest first, then the matching `.pmtiles`.
 
 For a negative atomic-replacement check, keep a valid package active and choose
 the new manifest followed by a different old PMTiles file. Rejection must leave

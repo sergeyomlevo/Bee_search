@@ -11,6 +11,7 @@ import json
 import math
 import struct
 import sys
+import unicodedata
 import zlib
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -22,10 +23,49 @@ PROFILE_VERSION = "v1"
 STYLE_VERSION = "vector-pmtiles-v1"
 PMTILES_HEADER_BYTES = 127
 COORDINATE_EPSILON = 1e-7
+# Keep the established PC entry-point limit while allowing Unicode code points
+# used by the canonical Area stem. D083's 60-code-point Area name plus its
+# stable id/map suffix remains comfortably within this limit.
+MAX_PACKAGE_ID_CODE_POINTS = 96
+WINDOWS_FORBIDDEN_FILENAME_CHARACTERS = set('<>:"/\\|?*')
+WINDOWS_RESERVED_FILENAME_BASES = {"CON", "PRN", "AUX", "NUL"} | {
+    f"{prefix}{number}" for prefix in ("COM", "LPT") for number in range(1, 10)
+} | {
+    f"{prefix}{number}" for prefix in ("COM", "LPT") for number in ("¹", "²", "³")
+}
 
 
 class ContractError(ValueError):
     pass
+
+
+def validate_package_id(package_id: str) -> str:
+    """Validate a package file stem accepted by both PC map entry points.
+
+    D083/D084 preserve Unicode and spaces from the sanitised Area stem, so an
+    ASCII-only rule is not sufficient. This remains a filename-stem contract:
+    separators, traversal, control characters, Windows-forbidden characters,
+    and trailing space/dot are rejected before any output path is created.
+    """
+    if not package_id or package_id in {".", ".."}:
+        raise ContractError("PackageId must be a non-empty filename stem")
+    if any(character in package_id for character in ("/", "\\")):
+        raise ContractError("PackageId must not contain path separators")
+    if any(character in WINDOWS_FORBIDDEN_FILENAME_CHARACTERS for character in package_id):
+        raise ContractError("PackageId contains a filesystem-forbidden character")
+    if package_id.split(".", 1)[0].upper() in WINDOWS_RESERVED_FILENAME_BASES:
+        raise ContractError("PackageId uses a Windows-reserved filename")
+    if any(unicodedata.category(character) == "Cc" for character in package_id):
+        raise ContractError("PackageId must not contain control characters")
+    if package_id[0].isspace() or package_id[0] in {".", "-"}:
+        raise ContractError("PackageId must not start with whitespace, a dot, or a hyphen")
+    if package_id[-1].isspace() or package_id[-1] == ".":
+        raise ContractError("PackageId must not end with whitespace or a dot")
+    if len(package_id) > MAX_PACKAGE_ID_CODE_POINTS:
+        raise ContractError(
+            f"PackageId must use at most {MAX_PACKAGE_ID_CODE_POINTS} Unicode code points"
+        )
+    return package_id
 
 
 @dataclass(frozen=True)
@@ -540,8 +580,7 @@ def manifest_for(
     dataset_version: str,
     coverage: Bounds | list[Bounds],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    if not package_id or Path(package_id).name != package_id:
-        raise ContractError("PackageId must be a non-empty path-safe name")
+    validate_package_id(package_id)
     if not dataset_version.strip():
         raise ContractError("DatasetVersion must not be blank")
     coverages = [coverage] if isinstance(coverage, Bounds) else coverage
@@ -696,6 +735,9 @@ def main() -> None:
     artifact_parser = subparsers.add_parser("artifact-info")
     artifact_parser.add_argument("--artifact", type=Path, required=True)
 
+    package_id_parser = subparsers.add_parser("validate-package-id")
+    package_id_parser.add_argument("--package-id", required=True)
+
     create_parser = subparsers.add_parser("create-manifest")
     create_parser.add_argument("--artifact", type=Path, required=True)
     create_parser.add_argument("--manifest", type=Path, required=True)
@@ -750,6 +792,8 @@ def main() -> None:
         )
     elif args.command == "artifact-info":
         write_json(read_pmtiles(args.artifact))
+    elif args.command == "validate-package-id":
+        write_json({"packageId": validate_package_id(args.package_id)})
     elif args.command == "create-manifest":
         coverages = parse_coverages(args)
         manifest, artifact_info = manifest_for(

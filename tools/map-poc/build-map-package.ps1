@@ -66,9 +66,6 @@ if ($AreaJson) {
     $selectedNorth = [double]$North
 }
 
-if ($PackageId -notmatch '^[a-z0-9][a-z0-9._-]{0,95}$') {
-    throw 'PackageId must use 1-96 lowercase ASCII letters, digits, dot, underscore, or hyphen.'
-}
 if ($DatasetVersion.Trim().Length -eq 0) { throw 'DatasetVersion must not be blank.' }
 if ($MaxHeapGb -lt 2) { throw 'MaxHeapGb must be at least 2.' }
 foreach ($requiredFile in @($profile, $planetilerJar, $packageTool, $Java)) {
@@ -76,6 +73,8 @@ foreach ($requiredFile in @($profile, $planetilerJar, $packageTool, $Java)) {
         throw "Required local tool/input is missing: $requiredFile"
     }
 }
+& $Python $packageTool validate-package-id --package-id $PackageId | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'PackageId validation failed.' }
 if (-not (Select-String -LiteralPath $profile -Pattern '^version:\s*1\s*$' -Quiet)) {
     throw 'The existing bee-search-field profile version is not the D065-compatible version 1.'
 }
