@@ -1,8 +1,10 @@
 param(
-    [Parameter(Mandatory = $true)] [double]$West,
-    [Parameter(Mandatory = $true)] [double]$South,
-    [Parameter(Mandatory = $true)] [double]$East,
-    [Parameter(Mandatory = $true)] [double]$North,
+    [Nullable[double]]$West,
+    [Nullable[double]]$South,
+    [Nullable[double]]$East,
+    [Nullable[double]]$North,
+    [string]$AreaJson,
+    [string[]]$SourceCoveragePolygon,
     [Parameter(Mandatory = $true)] [string]$PackageId,
     [string]$SourcePbf,
     [string]$DatasetVersion,
@@ -29,6 +31,41 @@ if (-not $OutputDirectory) { $OutputDirectory = Join-Path $workDir 'packages' }
 $sourceItem = Get-Item -LiteralPath $SourcePbf -ErrorAction Stop
 if (-not $DatasetVersion) { $DatasetVersion = $sourceItem.BaseName }
 
+$areaInfo = $null
+$sourceCoverageValidation = $null
+if ($AreaJson) {
+    if ($null -ne $West -or $null -ne $South -or $null -ne $East -or $null -ne $North) {
+        throw 'Use either -AreaJson or -West/-South/-East/-North, not both.'
+    }
+    $areaItem = Get-Item -LiteralPath $AreaJson -ErrorAction Stop
+    $areaInfoText = & $Python $packageTool area-info --area-json $areaItem.FullName
+    if ($LASTEXITCODE -ne 0) { throw 'Area JSON validation failed.' }
+    $areaInfo = $areaInfoText | ConvertFrom-Json
+    $selectedWest = [double]$areaInfo.generationBounds.west
+    $selectedSouth = [double]$areaInfo.generationBounds.south
+    $selectedEast = [double]$areaInfo.generationBounds.east
+    $selectedNorth = [double]$areaInfo.generationBounds.north
+    if (-not $SourceCoveragePolygon -or $SourceCoveragePolygon.Count -eq 0) {
+        throw '-SourceCoveragePolygon is required with -AreaJson; a PBF header bbox is not proof that every Area bounds is covered.'
+    }
+    $coverageArguments = @($packageTool, 'validate-source-coverage', '--area-json', $areaItem.FullName)
+    foreach ($polygon in $SourceCoveragePolygon) {
+        $polygonItem = Get-Item -LiteralPath $polygon -ErrorAction Stop
+        $coverageArguments += @('--source-coverage-polygon', $polygonItem.FullName)
+    }
+    $sourceCoverageText = & $Python @coverageArguments
+    if ($LASTEXITCODE -ne 0) { throw 'One or more Area bounds are outside the selected source coverage.' }
+    $sourceCoverageValidation = $sourceCoverageText | ConvertFrom-Json
+} else {
+    if ($null -eq $West -or $null -eq $South -or $null -eq $East -or $null -eq $North) {
+        throw 'Explicit generation requires -West, -South, -East and -North, or use -AreaJson.'
+    }
+    $selectedWest = [double]$West
+    $selectedSouth = [double]$South
+    $selectedEast = [double]$East
+    $selectedNorth = [double]$North
+}
+
 if ($PackageId -notmatch '^[a-z0-9][a-z0-9._-]{0,95}$') {
     throw 'PackageId must use 1-96 lowercase ASCII letters, digits, dot, underscore, or hyphen.'
 }
@@ -45,10 +82,10 @@ if (-not (Select-String -LiteralPath $profile -Pattern '^version:\s*1\s*$' -Quie
 
 $invariant = [Globalization.CultureInfo]::InvariantCulture
 function Format-Coordinate([double]$Value) { $Value.ToString('0.#######', $invariant) }
-$westText = Format-Coordinate $West
-$southText = Format-Coordinate $South
-$eastText = Format-Coordinate $East
-$northText = Format-Coordinate $North
+$westText = Format-Coordinate $selectedWest
+$southText = Format-Coordinate $selectedSouth
+$eastText = Format-Coordinate $selectedEast
+$northText = Format-Coordinate $selectedNorth
 
 $preflightArguments = @(
     $packageTool, 'source-info', '--source', $sourceItem.FullName,
@@ -58,8 +95,12 @@ $preflightText = & $Python @preflightArguments
 if ($LASTEXITCODE -ne 0) { throw 'Map package preflight failed. See the error above.' }
 $preflight = $preflightText | ConvertFrom-Json
 $sourceHeaderContains = $preflight.sourceHeaderContainsSelectedBounds
-$sourceCoverageCheckBasis = 'OSM PBF header bbox'
-if ($null -eq $sourceHeaderContains) {
+$sourceCoverageCheckBasis = if ($AreaJson) {
+    'Every Area bounds passed source coverage polygon validation'
+} else {
+    'OSM PBF header bbox'
+}
+if (-not $AreaJson -and $null -eq $sourceHeaderContains) {
     if (-not $MergedSourceCoverageVerified) {
         throw 'The merged OSM PBF header has no bbox. Verify its component extract polygons, then pass -MergedSourceCoverageVerified and -SourceCoverageEvidence.'
     }
@@ -83,9 +124,18 @@ Write-Host "Source OSM PBF: $($sourceItem.FullName)"
 Write-Host "Source header bbox contains selected bbox: $sourceHeaderContains"
 Write-Host "Preliminary complexity: $complexity"
 Write-Host "Coverage check basis: $sourceCoverageCheckBasis"
+if ($AreaJson) {
+    foreach ($result in $sourceCoverageValidation.bounds) {
+        Write-Host "Source coverage bounds[$($result.index)]: PASS"
+    }
+}
 
 if ($PlanOnly) {
     $preflight | Add-Member -NotePropertyName preliminaryComplexity -NotePropertyValue $complexity
+    if ($AreaJson) {
+        $preflight | Add-Member -NotePropertyName area -NotePropertyValue $areaInfo
+        $preflight | Add-Member -NotePropertyName sourceCoverageValidation -NotePropertyValue $sourceCoverageValidation
+    }
     $preflight | ConvertTo-Json -Depth 8
     return
 }
@@ -137,16 +187,31 @@ try {
         throw 'Planetiler read no OSM ways. The source PBF is incomplete or was merged incorrectly; refusing to create a package manifest.'
     }
 
-    $manifestText = & $Python $packageTool create-manifest `
-        --artifact $pmtiles `
-        --manifest $manifest `
-        --package-id $PackageId `
-        --dataset-version $DatasetVersion `
-        --west $westText --south $southText --east $eastText --north $northText
+    $manifestArguments = @(
+        $packageTool, 'create-manifest',
+        '--artifact', $pmtiles,
+        '--manifest', $manifest,
+        '--package-id', $PackageId,
+        '--dataset-version', $DatasetVersion
+    )
+    if ($AreaJson) {
+        $manifestArguments += @('--area-json', $areaItem.FullName)
+    } else {
+        $manifestArguments += @('--west', $westText, '--south', $southText, '--east', $eastText, '--north', $northText)
+    }
+    $manifestText = & $Python @manifestArguments
     if ($LASTEXITCODE -ne 0) { throw 'D065 manifest generation failed.' }
     $validatedText = & $Python $packageTool validate-package --artifact $pmtiles --manifest $manifest
     if ($LASTEXITCODE -ne 0) { throw 'Generated PMTiles and D065 manifest failed local validation.' }
     $validated = $validatedText | ConvertFrom-Json
+    $artifactAreaValidation = $null
+    if ($AreaJson) {
+        $artifactAreaText = & $Python $packageTool validate-artifact-area --area-json $areaItem.FullName --artifact $pmtiles
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Generated PMTiles lacks usable tile data in one or more Area bounds.'
+        }
+        $artifactAreaValidation = $artifactAreaText | ConvertFrom-Json
+    }
     # The package is about to move atomically from staging to this immutable
     # directory; keep the durable report path useful after that move.
     $validated.artifact.path = Join-Path $finalDirectory "$PackageId.pmtiles"
@@ -160,6 +225,8 @@ try {
         source = $preflight.source
         sourceHeaderContainsSelectedBounds = $sourceHeaderContains
         sourceCoverageCheckBasis = $sourceCoverageCheckBasis
+        sourceCoverageValidation = $sourceCoverageValidation
+        artifactAreaValidation = $artifactAreaValidation
         preliminaryComplexity = $complexity
         planetilerVersion = '0.10.0'
         profileId = 'bee-search-field'
@@ -185,6 +252,11 @@ try {
     Write-Host "Tiles / entries / contents: $($validated.artifact.addressedTiles) / $($validated.artifact.tileEntries) / $($validated.artifact.tileContents)"
     Write-Host "Zoom: $($validated.artifact.minZoom)-$($validated.artifact.maxZoom)"
     Write-Host "SHA256: $($validated.artifact.sha256)"
+    if ($AreaJson) {
+        foreach ($result in $artifactAreaValidation.bounds) {
+            Write-Host "PMTiles tile data bounds[$($result.index)]: PASS ($($result.populatedCells)/$($result.cellGrid * $result.cellGrid) cells)"
+        }
+    }
     Write-Host "Manifest: $(Join-Path $finalDirectory ([IO.Path]::GetFileName($manifest)))"
 } finally {
     if (-not $buildSucceeded -and (Test-Path -LiteralPath $stage)) {

@@ -105,59 +105,58 @@ sprite dependency.
 
 ## Local D063/D065 map-package build
 
-The pre-server package workflow starts with the normal production
-`MapCoverageSelection` in Bee Search. Add exactly one visible rectangle.
-The map editor then offers `Копировать bbox`, available in every build type and
-shown while exactly one rectangle is selected; it copies the saved
-rectangle in the argument order expected by the builder:
+This is the canonical operator workflow when a user provides an Area JSON and
+asks to create an offline map. Do not manually copy only the first `bounds`
+item, and do not treat the outer bbox or a successful Android import as proof
+that the source contains map data for every requested area.
 
-```text
--West <W> -South <S> -East <E> -North <N>
-```
+An Area request is complete only when all entries in `bounds` pass both gates:
 
-The saved coordinates are normalized outward to the 10^-7 degree precision of
-the PMTiles v3 header. The selected rectangle remains map coverage in DataStore;
-it is not a Territory boundary or Room/domain geodata.
+1. before Planetiler, the union of the selected source-region `.poly`
+   footprints covers every `bounds[i]`;
+2. after Planetiler, the PMTiles directory contains usable spatial tile data
+   across every `bounds[i]`.
+
+If the Area crosses source-region boundaries, first use a canonical merged PBF
+containing every required extract and pass every component `.poly` footprint.
+The builder fails closed when any requested bounds is not covered. A PBF header
+bbox is only an envelope around an irregular extract and is deliberately not
+accepted as the Area-source proof.
 
 Run preflight before the full Planetiler pass:
 
 ```powershell
 .\tools\map-poc\build-map-package.ps1 `
-  -West <W> -South <S> -East <E> -North <N> `
+  -AreaJson '<exported-area.json>' `
+  -SourcePbf '<source-containing-all-required-regions.osm.pbf>' `
+  -SourceCoveragePolygon '<region-a.poly>','<region-b.poly>' `
   -PackageId <versioned-package-id> `
   -PlanOnly
 ```
 
-Preflight validates the coordinates, reports width, height and approximate
-area, and checks that the selected rectangle is inside the bbox declared by the
-local source OSM PBF header. It never downloads or substitutes source data. The
-default source is the existing ignored
-`work/volga-fed-district-260830.osm.pbf`; use `-SourcePbf` when the selected
-coverage belongs to another existing extract. A header bbox is an extract
-envelope, so a selection near an irregular Geofabrik boundary still needs a
-source-footprint review before the expensive build.
-
-A locally merged PBF may legitimately omit a header bbox. In that case the
-builder refuses to continue until the component extract polygons have been
-checked to cover the complete selected rectangle. Record that review explicitly
-with `-MergedSourceCoverageVerified` and `-SourceCoverageEvidence <text>`; the
-evidence is preserved in `build-report.json`.
+Preflight parses the complete `bounds` array, reports the one outer generation
+extent, fingerprints the selected PBF, and records a separate PASS for every
+requested bounds. It never downloads or silently substitutes source data.
 
 After reviewing preflight, omit `-PlanOnly` to build:
 
 ```powershell
 .\tools\map-poc\build-map-package.ps1 `
-  -West <W> -South <S> -East <E> -North <N> `
+  -AreaJson '<exported-area.json>' `
+  -SourcePbf '<source-containing-all-required-regions.osm.pbf>' `
+  -SourceCoveragePolygon '<region-a.poly>','<region-b.poly>' `
   -PackageId <versioned-package-id>
 ```
 
 This entry point uses the pinned Planetiler 0.10.0 jar and the existing
 `field-profile.yml` directly. Planetiler writes PMTiles v3 into a temporary
 directory. The builder also refuses a malformed merged source when Planetiler
-reports no OSM ways, even if Planetiler itself exits successfully. It then reads the actual PMTiles header, derives zoom and
-bounds, counts addressed tiles/entries/contents from the header, computes byte
-length and SHA-256, creates the D065 sidecar, validates the pair, and finally
-moves the completed output to the immutable local directory:
+reports no OSM ways, even if Planetiler itself exits successfully. It then
+reads the actual PMTiles header and directory, verifies spatial tile presence
+for every original Area bounds, derives zoom and bounds, counts addressed
+tiles/entries/contents, computes byte length and SHA-256, creates a D065
+sidecar containing every Area coverage fragment, validates the pair, and only
+then moves the completed output to the immutable local directory:
 
 ```text
 work/packages/<packageId>/
@@ -170,6 +169,10 @@ work/packages/<packageId>/
 An existing final package directory is never overwritten. Failed staging is
 removed and cannot replace a completed output. Generated packages remain
 ignored workstation artifacts.
+
+The explicit `-West/-South/-East/-North` mode remains available for low-level
+diagnostics, but it is not the workflow for an exported Area JSON because it
+cannot prove that the operator preserved the complete `bounds` array.
 
 Deliver only the validated pair to user-accessible Samsung storage:
 
