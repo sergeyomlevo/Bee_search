@@ -39,14 +39,15 @@ node tools/luna-delegation-audit/report-audit.js path\to\audit-dir
 
 Official contract reference: [Codex Hooks](https://developers.openai.com/codex/hooks).
 
-## Live tests still required
+## Live verification after configuration changes
 
-1. **EXPLICIT DELEGATION**: after restart and `/hooks` trust, assign a safe,
-   bounded task explicitly to `luna-worker`. This proves only the technical
-   route to `gpt-5.6-luna`.
-2. **AUTONOMOUS DELEGATION**: in a later fresh ordinary task with no mention
-   of Luna/subagents, observe whether the root delegates due to the AGENTS
+1. **EXPLICIT DELEGATION**: assign a safe, bounded read-only task to
+   `luna-worker` or `luna-verifier` and confirm matching `SubagentStart` /
+   `SubagentStop` records with model `gpt-6-luna`. This verifies the technical
+   route, not autonomous routing policy.
+2. **AUTONOMOUS DELEGATION**: in a later ordinary task with no mention of
+   Luna/subagents, observe whether the root delegates due to the AGENTS
    preference.
 
-The current session cannot prove either live route until hooks reload and
-trust are completed.
+When changing hooks themselves, reload and trust them before relying on a
+new live audit record.

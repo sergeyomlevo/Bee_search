@@ -336,7 +336,7 @@ of defining, waiting for, and reviewing the subtask is comparable to completing
 it directly. Prefer `luna-verifier` for independent diff/tests/build/device
 verification when a separate check is genuinely useful, but not automatically
 after every small task.
-Both roles and default subagents use `gpt-5.6-luna` with `medium` reasoning,
+Both roles and default subagents use `gpt-6-luna` with `medium` reasoning,
 configured in `.codex/config.toml` and `.codex/agents/`.
 When the spawn tool exposes model/effort overrides, pass those Luna values
 explicitly with a scoped handoff instead of inheriting the root model. If the

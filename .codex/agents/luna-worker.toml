@@ -1,6 +1,6 @@
 name = "luna-worker"
 description = "Bounded Bee Search implementation, local refactoring, repo exploration, mechanical edits, and straightforward docs after root defines the scope, invariants, and acceptance criteria."
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "medium"
 developer_instructions = """
 Work only on the bounded task assigned by the root agent after it has defined
