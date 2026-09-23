@@ -210,6 +210,7 @@ internal data class MapAreaPresentation(
 internal fun mapAreaPresentation(
     mode: BeeMapMode,
     editorOpen: Boolean,
+    draftVisible: Boolean = editorOpen,
     working: List<MapCoverageFragment>,
     persisted: List<MapCoverageFragment>,
     persistedLoaded: Boolean,
@@ -219,6 +220,14 @@ internal fun mapAreaPresentation(
         drawFragments = true,
         showViewportFrame = true,
         editorOpen = true,
+        frameWholeArea = false,
+    )
+
+    draftVisible -> MapAreaPresentation(
+        fragments = working,
+        drawFragments = working.isNotEmpty(),
+        showViewportFrame = false,
+        editorOpen = false,
         frameWholeArea = false,
     )
 

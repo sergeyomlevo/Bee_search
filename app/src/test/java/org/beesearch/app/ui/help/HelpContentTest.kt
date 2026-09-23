@@ -2,6 +2,7 @@ package org.beesearch.app.ui.help
 
 import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
 import org.beesearch.app.ui.map.CREATE_AREA_LABEL
+import org.beesearch.app.ui.map.CREATE_COVERAGE_FRAGMENT_LABEL
 import org.beesearch.app.ui.map.DELETE_AREA_LABEL
 import org.beesearch.app.ui.map.EDIT_AREA_SECTIONS_LABEL
 import org.beesearch.app.ui.map.LOAD_AREA_MAP_LABEL
@@ -311,6 +312,7 @@ class HelpContentTest {
     fun participantSectionNamesExactlyTheActionsTheEditorShows() {
         val text = sectionText("Создание участка офлайн-карты")
         listOf(
+            CREATE_COVERAGE_FRAGMENT_LABEL,
             ADD_COVERAGE_FRAGMENT_LABEL,
             UNDO_COVERAGE_FRAGMENT_LABEL,
             SHOW_ALL_COVERAGE_LABEL,
@@ -327,10 +329,9 @@ class HelpContentTest {
     @Test
     fun retiredEditorActionNamesAreNotPresentedAsCurrent() {
         val text = allHelpText()
-        // The editor used to end with a plain "Выйти", and the undo/clear actions used to be called
-        // "Отмена" and "Сброс". None of those names may be offered as a current action again.
+        // The editor used to end with a plain "Выйти", and clear used to be called "Сброс".
+        // "Отмена" is now deliberately scoped to the unfinished current fragment.
         assertFalse(text, text.contains("«Выйти»"))
-        assertFalse(text, text.contains("«Отмена»"))
         assertFalse(text, text.contains("«Сброс»"))
     }
 

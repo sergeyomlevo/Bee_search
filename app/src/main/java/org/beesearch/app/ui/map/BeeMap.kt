@@ -123,6 +123,7 @@ internal fun BeeMap(
     var mapZoom by remember { mutableStateOf<Double?>(null) }
     var recenteredUntilNextGesture by remember { mutableStateOf(false) }
     var coverageSelectionMode by remember { mutableStateOf(false) }
+    var coverageFragmentEditorVisible by remember { mutableStateOf(false) }
     var editingTerritoryId by remember { mutableStateOf<UUID?>(null) }
     var persistedArea by remember { mutableStateOf<MapAreaReadResult>(MapAreaReadResult.Absent) }
     var persistedCoverage by remember { mutableStateOf(emptyList<MapCoverageFragment>()) }
@@ -163,6 +164,7 @@ internal fun BeeMap(
     LaunchedEffect(territoryId, areaStore, territoryName) {
         if (editingTerritoryId != null && editingTerritoryId != territoryId) {
             coverageSelectionMode = false
+            coverageFragmentEditorVisible = false
             editingTerritoryId = null
             workingCoverage = emptyList()
         }
@@ -212,18 +214,23 @@ internal fun BeeMap(
         editingTerritoryId = territoryId
         workingCoverage = persistedCoverage
         coverageSelectionMode = true
+        // Creating a new Ареал starts on the unobstructed map. Existing-area editing keeps its
+        // established single-panel workflow.
+        coverageFragmentEditorVisible = persistedArea !is MapAreaReadResult.Absent
         onAreaEditorRequestHandled()
     }
     // Mode decides what the Ареал looks like here: the editor works on the draft and marks the next
     // viewport, the view mode shows exactly the stored участки, the field map draws nothing.
     val areaPresentation = mapAreaPresentation(
         mode = mode,
-        editorOpen = coverageSelectionMode,
+        editorOpen = coverageSelectionMode && coverageFragmentEditorVisible,
+        draftVisible = coverageSelectionMode,
         working = workingCoverage,
         persisted = persistedCoverage,
         persistedLoaded = territoryId != null && coverageLoadedFor == territoryId && !coverageLoading,
     )
     val coverageFragments = areaPresentation.fragments
+    val creatingArea = coverageSelectionMode && persistedArea is MapAreaReadResult.Absent
     val coverageViewportSummary = if (coverageSelectionMode) {
         coverageViewportBounds?.let(::coverageBoundsSummary)
     } else {
@@ -249,6 +256,7 @@ internal fun BeeMap(
         areaNameBlank = false
         map?.restoreNormalCameraPadding(normalCameraPadding)
         coverageSelectionMode = false
+        coverageFragmentEditorVisible = false
         editingTerritoryId = null
         // The host may have opened this editor from the Ареал workflow; it decides where to return.
         onCoverageSessionEnded()
@@ -348,7 +356,9 @@ internal fun BeeMap(
     // Back never discards silently. With unsaved changes it asks the user to choose an outcome;
     // without them it closes the editor directly.
     BackHandler(enabled = mode == BeeMapMode.FIELD && coverageSelectionActive) {
-        if (coverageSelectionDirty) {
+        if (creatingArea && coverageFragmentEditorVisible) {
+            coverageFragmentEditorVisible = false
+        } else if (coverageSelectionDirty) {
             unsavedCoverageChangesVisible = true
         } else {
             leaveCoverageSelection(restoreDraft = true)
@@ -635,7 +645,7 @@ internal fun BeeMap(
             )
         }
 
-        if (mode == BeeMapMode.FIELD && coverageSelectionActive) {
+        if (mode == BeeMapMode.FIELD && coverageSelectionActive && coverageFragmentEditorVisible) {
             MapCoverageSelectionControls(
                 fragmentCount = coverageFragments.size,
                 viewportSummary = coverageViewportSummary,
@@ -647,6 +657,7 @@ internal fun BeeMap(
                             fragments = workingCoverage,
                             bounds = MapGeoBounds.fromMapLibre(visibleBounds),
                         )
+                        if (creatingArea) coverageFragmentEditorVisible = false
                     }
                 },
                 onUndo = {
@@ -670,11 +681,26 @@ internal fun BeeMap(
                     }
                 },
                 onClear = { clearSelectionConfirmationVisible = true },
-                onDone = { commitCoverage() },
+                onDone = if (creatingArea) null else ::commitCoverage,
+                onCancelFragment = if (creatingArea) {
+                    { coverageFragmentEditorVisible = false }
+                } else {
+                    null
+                },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(horizontal = 12.dp, vertical = 12.dp)
                     .onSizeChanged { coverageControlsHeightPx = it.height }
+                    .zIndex(3f),
+            )
+        } else if (mode == BeeMapMode.FIELD && creatingArea) {
+            AreaCreationControls(
+                fragmentCount = coverageFragments.size,
+                onCreateFragment = { coverageFragmentEditorVisible = true },
+                onDone = ::commitCoverage,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
                     .zIndex(3f),
             )
         } else if (mode == BeeMapMode.AREA_VIEW && territoryId != null) {
@@ -696,6 +722,7 @@ internal fun BeeMap(
                         editingTerritoryId = territoryId
                         workingCoverage = persistedCoverage
                         coverageSelectionMode = true
+                        coverageFragmentEditorVisible = true
                     } else {
                         onCoverageTerritoryMissing()
                     }

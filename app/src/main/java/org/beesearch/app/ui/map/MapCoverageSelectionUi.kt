@@ -32,11 +32,14 @@ import org.maplibre.android.maps.MapLibreMap
 
 internal const val ENTER_COVERAGE_SELECTION_DESCRIPTION = "Сформировать offline coverage"
 internal const val ADD_COVERAGE_FRAGMENT_DESCRIPTION = "Добавить видимый участок карты"
+internal const val START_COVERAGE_FRAGMENT_DESCRIPTION = "Начать создание участка"
+internal const val CANCEL_COVERAGE_FRAGMENT_DESCRIPTION = "Отменить создание участка"
 internal const val UNDO_COVERAGE_FRAGMENT_DESCRIPTION = "Отменить последний добавленный участок"
 internal const val SHOW_ALL_COVERAGE_DESCRIPTION = "Показать всё выбранное покрытие"
 internal const val CLEAR_COVERAGE_DESCRIPTION = "Очистить выбранное покрытие"
 internal const val DONE_COVERAGE_SELECTION_DESCRIPTION = "Завершить выбор offline coverage"
 internal const val MAP_COVERAGE_SELECTION_CONTROLS_TAG = "map-coverage-selection-controls"
+internal const val AREA_CREATION_CONTROLS_TAG = "area-creation-controls"
 internal const val CURRENT_COVERAGE_SUMMARY_TAG = "current-coverage-summary"
 internal const val AREA_VIEW_CONTROLS_TAG = "area-view-controls"
 internal const val IMPORT_OFFLINE_MAP_DESCRIPTION = "Импортировать офлайн-карту"
@@ -51,6 +54,7 @@ internal const val OFFLINE_MAP_PACKAGE_PANEL_TAG = "offline-map-package-panel"
  * so the help test asserts these very strings instead of a copy of them.
  */
 internal const val ADD_COVERAGE_FRAGMENT_LABEL = "Добавить участок"
+internal const val CREATE_COVERAGE_FRAGMENT_LABEL = "Создать участок"
 internal const val UNDO_COVERAGE_FRAGMENT_LABEL = "Отменить последний"
 internal const val SHOW_ALL_COVERAGE_LABEL = "Обзор"
 internal const val CLEAR_COVERAGE_LABEL = "Очистить всё"
@@ -193,7 +197,8 @@ internal fun MapCoverageSelectionControls(
     onUndo: () -> Unit,
     onShowAll: () -> Unit,
     onClear: () -> Unit,
-    onDone: () -> Unit,
+    onDone: (() -> Unit)?,
+    onCancelFragment: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -208,10 +213,9 @@ internal fun MapCoverageSelectionControls(
             modifier = Modifier.padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            // "Готово" is the only way out of the editor, and it saves. There is deliberately no
-            // plain exit action here: a second dismissal button is what silently discarded the
-            // user's selection. Leaving without saving stays available, but only through the
-            // explicit unsaved-changes confirmation on Back.
+            // Existing-area editing still leaves only through "Готово"/Back confirmation. During
+            // new-Area creation, "Отмена" closes only the unfinished current-fragment form; the
+            // already added draft fragments and the compact workflow controls remain on the map.
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -221,13 +225,25 @@ internal fun MapCoverageSelectionControls(
                     modifier = Modifier.weight(1f).padding(start = 4.dp),
                     style = MaterialTheme.typography.labelLarge,
                 )
-                TextButton(
-                    onClick = onDone,
-                    modifier = Modifier.semantics {
-                        contentDescription = DONE_COVERAGE_SELECTION_DESCRIPTION
-                    },
-                ) {
-                    Text(DONE_COVERAGE_SELECTION_LABEL)
+                onCancelFragment?.let { cancel ->
+                    TextButton(
+                        onClick = cancel,
+                        modifier = Modifier.semantics {
+                            contentDescription = CANCEL_COVERAGE_FRAGMENT_DESCRIPTION
+                        },
+                    ) {
+                        Text(CANCEL_LABEL)
+                    }
+                }
+                onDone?.let { done ->
+                    TextButton(
+                        onClick = done,
+                        modifier = Modifier.semantics {
+                            contentDescription = DONE_COVERAGE_SELECTION_DESCRIPTION
+                        },
+                    ) {
+                        Text(DONE_COVERAGE_SELECTION_LABEL)
+                    }
                 }
             }
             viewportSummary?.let { summary ->
@@ -275,6 +291,53 @@ internal fun MapCoverageSelectionControls(
                 ) {
                     Text(CLEAR_COVERAGE_LABEL)
                 }
+            }
+        }
+    }
+}
+
+/** Compact controls shown while a new Ареал draft is being positioned on the map. */
+@Composable
+internal fun AreaCreationControls(
+    fragmentCount: Int,
+    onCreateFragment: () -> Unit,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .widthIn(max = 336.dp)
+            .testTag(AREA_CREATION_CONTROLS_TAG),
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 3.dp,
+        shadowElevation = 2.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(
+                onClick = onCreateFragment,
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = START_COVERAGE_FRAGMENT_DESCRIPTION },
+            ) {
+                Text(
+                    if (fragmentCount == 0) {
+                        CREATE_COVERAGE_FRAGMENT_LABEL
+                    } else {
+                        ADD_COVERAGE_FRAGMENT_LABEL
+                    },
+                )
+            }
+            TextButton(
+                onClick = onDone,
+                modifier = Modifier.semantics {
+                    contentDescription = DONE_COVERAGE_SELECTION_DESCRIPTION
+                },
+            ) {
+                Text(DONE_COVERAGE_SELECTION_LABEL)
             }
         }
     }

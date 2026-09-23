@@ -25,12 +25,14 @@ class MapAreaPresentationTest {
     private fun presentation(
         mode: BeeMapMode,
         editorOpen: Boolean = false,
+        draftVisible: Boolean = editorOpen,
         working: List<MapCoverageFragment> = emptyList(),
         persisted: List<MapCoverageFragment> = persistedFragments,
         persistedLoaded: Boolean = true,
     ) = mapAreaPresentation(
         mode = mode,
         editorOpen = editorOpen,
+        draftVisible = draftVisible,
         working = working,
         persisted = persisted,
         persistedLoaded = persistedLoaded,
@@ -100,6 +102,24 @@ class MapAreaPresentationTest {
         // Nothing is drawn, but the editor keeps showing which rectangle «Добавить участок» would add.
         assertTrue(editor.fragments.isEmpty())
         assertTrue(editor.showViewportFrame)
+    }
+
+    @Test
+    fun `a new area draft stays visible while its fragment editor is closed`() {
+        val draft = listOf(MapCoverageFragment(stored), MapCoverageFragment(extra))
+
+        val freeMap = presentation(
+            mode = BeeMapMode.FIELD,
+            editorOpen = false,
+            draftVisible = true,
+            working = draft,
+        )
+
+        assertEquals(draft, freeMap.fragments)
+        assertTrue(freeMap.drawFragments)
+        assertFalse(freeMap.showViewportFrame)
+        assertFalse(freeMap.editorOpen)
+        assertFalse(freeMap.frameWholeArea)
     }
 
     @Test

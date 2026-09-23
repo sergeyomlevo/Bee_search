@@ -4,7 +4,9 @@ import android.net.Uri
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -44,6 +46,7 @@ class AreaEditorEntryUiTest {
 
     /** Stands for a map instance: a navigation round-trip produces a new one. */
     private val mapInstance = mutableIntStateOf(0)
+    private val recordRequests = mutableIntStateOf(0)
 
     private fun showMap(store: MapAreaStore = FakeAreaStore(area)) {
         composeRule.setContent {
@@ -57,7 +60,7 @@ class AreaEditorEntryUiTest {
                         locationState = LocationUiState.PermissionRequired,
                         locationPermissionGranted = false,
                         onRequestLocationPermission = {},
-                        onRequestCreateRecord = { _, _ -> },
+                        onRequestCreateRecord = { _, _ -> recordRequests.intValue += 1 },
                         areaEditorRequest = requestToken.intValue,
                         // The view model finishes the request; the map only reports that it handled it.
                         onAreaEditorRequestHandled = {
@@ -96,6 +99,74 @@ class AreaEditorEntryUiTest {
         assertEditorPanelShown()
     }
 
+    @Test
+    fun aNewAreaRequestStartsOnTheFreeMapAndOpensTheFragmentEditorExplicitly() {
+        showMap(FakeAreaStore(null))
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle { requestToken.intValue = 1 }
+        composeRule.waitForIdle()
+
+        assertNoEditorPanel(allowCompactControls = true)
+        composeRule.onNodeWithTag(AREA_CREATION_CONTROLS_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText(CREATE_COVERAGE_FRAGMENT_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(CREATE_RECORD_DESCRIPTION).assertDoesNotExist()
+        assertEquals(0, recordRequests.intValue)
+
+        composeRule.onNodeWithText(CREATE_COVERAGE_FRAGMENT_LABEL).performClick()
+        assertEditorPanelShown(isNewArea = true)
+
+        composeRule.onNodeWithText(CANCEL_LABEL).performClick()
+        assertNoEditorPanel(allowCompactControls = true)
+        composeRule.onNodeWithText(CREATE_COVERAGE_FRAGMENT_LABEL).assertIsDisplayed()
+    }
+
+    @Test
+    fun addingAFragmentReturnsToTheFreeMapAndCancelingTheNextKeepsIt() {
+        showMap(FakeAreaStore(null))
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { requestToken.intValue = 1 }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(CREATE_COVERAGE_FRAGMENT_LABEL).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching {
+                composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertIsEnabled()
+            }.isSuccess
+        }
+        composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).performClick()
+        composeRule.waitForIdle()
+
+        assertNoEditorPanel(allowCompactControls = true)
+        composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertIsDisplayed()
+
+        composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).performClick()
+        assertEditorPanelShown(isNewArea = true)
+        composeRule.onNodeWithText(CANCEL_LABEL).performClick()
+
+        assertNoEditorPanel(allowCompactControls = true)
+        composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertIsDisplayed()
+    }
+
+    @Test
+    fun doneAfterTheFirstFragmentUsesTheExistingAreaNameFlow() {
+        showMap(FakeAreaStore(null))
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { requestToken.intValue = 1 }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(CREATE_COVERAGE_FRAGMENT_LABEL).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching {
+                composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertIsEnabled()
+            }.isSuccess
+        }
+        composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).performClick()
+        composeRule.onNodeWithText(DONE_COVERAGE_SELECTION_LABEL).performClick()
+
+        composeRule.onNodeWithTag(AREA_NAME_DIALOG_TAG).assertIsDisplayed()
+    }
+
     // Regression guard:
     // a consumed editor request must never resurrect after map recreation.
     @Test
@@ -121,23 +192,30 @@ class AreaEditorEntryUiTest {
         assertEquals(1, handledRequests.intValue)
     }
 
-    private fun assertEditorPanelShown() {
+    private fun assertEditorPanelShown(isNewArea: Boolean = false) {
         composeRule.onNodeWithTag(MAP_COVERAGE_SELECTION_CONTROLS_TAG).assertIsDisplayed()
         composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertIsDisplayed()
         composeRule.onNodeWithText(CLEAR_COVERAGE_LABEL).assertIsDisplayed()
-        composeRule.onNodeWithText(DONE_COVERAGE_SELECTION_LABEL).assertIsDisplayed()
+        if (isNewArea) {
+            composeRule.onNodeWithText(CANCEL_LABEL).assertIsDisplayed()
+            composeRule.onNodeWithText(DONE_COVERAGE_SELECTION_LABEL).assertDoesNotExist()
+        } else {
+            composeRule.onNodeWithText(DONE_COVERAGE_SELECTION_LABEL).assertIsDisplayed()
+        }
     }
 
-    private fun assertNoEditorPanel() {
+    private fun assertNoEditorPanel(allowCompactControls: Boolean = false) {
         composeRule.onNodeWithTag(MAP_COVERAGE_SELECTION_CONTROLS_TAG).assertDoesNotExist()
-        composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertDoesNotExist()
+        if (!allowCompactControls) {
+            composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertDoesNotExist()
+            composeRule.onNodeWithText(DONE_COVERAGE_SELECTION_LABEL).assertDoesNotExist()
+        }
         composeRule.onNodeWithText(UNDO_COVERAGE_FRAGMENT_LABEL).assertDoesNotExist()
         composeRule.onNodeWithText(CLEAR_COVERAGE_LABEL).assertDoesNotExist()
-        composeRule.onNodeWithText(DONE_COVERAGE_SELECTION_LABEL).assertDoesNotExist()
     }
 
     /** A canonical store that answers reads and accepts a save, so the editor can be finished. */
-    private class FakeAreaStore(private val area: MapArea) : MapAreaStore {
+    private class FakeAreaStore(area: MapArea?) : MapAreaStore {
         private var current: MapArea? = area
 
         override suspend fun load(territoryId: UUID, territoryName: String?): MapAreaReadResult =

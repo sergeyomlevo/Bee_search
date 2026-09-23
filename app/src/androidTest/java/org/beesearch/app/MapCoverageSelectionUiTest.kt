@@ -10,8 +10,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.beesearch.app.ui.map.ADD_COVERAGE_FRAGMENT_LABEL
+import org.beesearch.app.ui.map.AREA_CREATION_CONTROLS_TAG
+import org.beesearch.app.ui.map.AreaCreationControls
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_CONFIRM_LABEL
 import org.beesearch.app.ui.map.CREATE_AREA_LABEL
+import org.beesearch.app.ui.map.CREATE_COVERAGE_FRAGMENT_LABEL
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_DIALOG_TAG
 import org.beesearch.app.ui.map.CLEAR_COVERAGE_LABEL
 import org.beesearch.app.ui.map.CURRENT_COVERAGE_SUMMARY_TAG
@@ -94,6 +97,45 @@ class MapCoverageSelectionUiTest {
 
         composeRule.onNodeWithText("Отмена").assertDoesNotExist()
         composeRule.onNodeWithText("Сброс").assertDoesNotExist()
+    }
+
+    @Test
+    fun newAreaUsesCompactControlsBetweenFragments() {
+        var createFragment = 0
+        var done = 0
+        composeRule.setContent {
+            Bee_searchTheme {
+                AreaCreationControls(
+                    fragmentCount = 0,
+                    onCreateFragment = { createFragment += 1 },
+                    onDone = { done += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(AREA_CREATION_CONTROLS_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText(CREATE_COVERAGE_FRAGMENT_LABEL).performClick()
+        composeRule.onNodeWithText(DONE_COVERAGE_SELECTION_LABEL).performClick()
+        composeRule.runOnIdle {
+            assertTrue(createFragment == 1)
+            assertTrue(done == 1)
+        }
+    }
+
+    @Test
+    fun newAreaOffersAnotherFragmentAfterTheFirstOne() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                AreaCreationControls(
+                    fragmentCount = 1,
+                    onCreateFragment = {},
+                    onDone = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(ADD_COVERAGE_FRAGMENT_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithText(CREATE_COVERAGE_FRAGMENT_LABEL).assertDoesNotExist()
     }
 
     @Test
