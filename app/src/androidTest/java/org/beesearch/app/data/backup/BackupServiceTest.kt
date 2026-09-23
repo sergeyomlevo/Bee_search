@@ -202,11 +202,16 @@ class BackupServiceTest {
         val base = zipEntries(archive)
 
         assertFailure<BrokenBackupForeignKey>(replaceCollection(base, "physical-objects", ""))
-        assertFailure<BackupDomainInvariantViolation>(replaceCollection(base, "apiaries", ""))
+        val missingApiary = replaceCollection(base, "apiaries", "")
+        assertThrows(BackupDomainInvariantViolation::class.java) {
+            runBlocking { service(target, targetStore).restore(missingApiary) }
+        }
+        assertEquals(0, target.backupDao().total())
         val beeRows = String(base.getValue(BackupContractV3.collections.getValue("bees")))
-        assertFailure<BrokenBackupForeignKey>(
-            replaceCollection(base, "bees", beeRows.replace(apiaryId.toString(), UUID.randomUUID().toString())),
-        )
+        val danglingSource = replaceCollection(base, "bees", beeRows.replace(apiaryId.toString(), UUID.randomUUID().toString()))
+        assertThrows(BrokenBackupForeignKey::class.java) {
+            runBlocking { service(target, targetStore).restore(danglingSource) }
+        }
         assertEquals(0, target.backupDao().total())
     }
 
@@ -369,7 +374,13 @@ class BackupServiceTest {
     }
 
     @Test fun injectedMidRestoreFailureRollsBackRoomAndDoesNotTouchSettings() = runBlocking {
-        seed(source); service(source, sourceStore).export(archive)
+        val ids = seed(source)
+        val apiaryId = UUID.randomUUID()
+        source.backupDao().insertPhysicalObjects(
+            listOf(PhysicalObjectEntity(apiaryId, ids.territory2, PhysicalObjectType.APIARY, 1, 56.4, 43.0, NOW)),
+        )
+        source.backupDao().insertApiaries(listOf(ApiaryEntity(apiaryId, null)))
+        service(source, sourceStore).export(archive)
         val fake = FakeSettings(PortableSettingsSnapshot(null, null, emptyMap()))
         val failing = BackupService(target, fake, checkpoint = RestoreCheckpoint { if (it == "observation-points") error("forced") })
         assertThrows(BackupDatabaseRestoreFailure::class.java) { runBlocking { failing.restore(archive) } }
@@ -493,6 +504,7 @@ class BackupServiceTest {
     }
     private data class Ids(val territory1: UUID,val territory2: UUID,val observer1: UUID,val observer2: UUID)
     private class FakeSettings(var value: PortableSettingsSnapshot, var fail: Boolean=false): PortableSettingsStore { var replaceCalls=0; override suspend fun snapshot()=value; override suspend fun replace(snapshot: PortableSettingsSnapshot){ replaceCalls++; if(fail) error("forced settings failure"); value=snapshot } }
-    private suspend fun BackupDao.total() = territoryCount()+observerCount()+observationPointCount()+beeCount()+flightCycleCount()
+    private suspend fun BackupDao.total() = territoryCount()+observerCount()+observationPointCount()+
+        physicalObjectCount()+apiaries().size+beeCount()+flightCycleCount()
     private companion object { val NOW: Instant = Instant.parse("2026-09-10T06:00:00Z") }
 }

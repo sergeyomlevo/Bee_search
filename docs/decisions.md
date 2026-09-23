@@ -2347,6 +2347,8 @@ stem: если совместимость подтверждена провер�
 
 **Статус:** ACCEPTED
 
+**Уточняется:** D088 и его реализация позже ввели Room v8 и Complete backup v3 для физических объектов; приведённые ниже Room v7 и backup v2 описывают состояние на момент D085.
+
 ObservationPoint properties v1 включает plain-text `description`, 0..N app-owned
 фотографий и один автоматический weather snapshot: `temperatureC`,
 `windSpeedMps`, `windDirectionDeg`. Давление, влажность, облачность, осадки,
@@ -2390,6 +2392,8 @@ Territory, UUID, Bee, description и photos не отправляются.
 # D086 — Single ObservationPoint export package v1
 
 **Статус:** ACCEPTED
+
+**Уточняется:** D088 и его реализация позже ввели Room v8 и Complete backup v3; отдельный `SINGLE_OBSERVATION_POINT` с `formatVersion = 1` остаётся неизменным.
 
 Экспорт одной ObservationPoint является отдельным переносимым контрактом, а не
 вариантом complete logical backup. ZIP package имеет профиль
