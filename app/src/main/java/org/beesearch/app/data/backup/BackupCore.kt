@@ -105,7 +105,7 @@ internal class BackupService(
         validateGraph(graph)
         val portable = settings.snapshot()
         validateSettings(portable, graph)
-        val blobs = blobsV2(graph, portable, attachmentStore)
+        val blobs = blobsV3(graph, portable, attachmentStore)
         val id = UUID.randomUUID()
         output.parentFile?.mkdirs()
         ZipOutputStream(BufferedOutputStream(FileOutputStream(output))).use { zip ->
@@ -137,6 +137,8 @@ internal class BackupService(
                 if (dao.totalCount() != 0) throw BackupDestinationNotEmpty("research database is not empty")
                 dao.insertTerritories(parsed.graph.territories); checkpoint.afterCollection("territories")
                 dao.insertObservers(parsed.graph.observers); checkpoint.afterCollection("observers")
+                dao.insertPhysicalObjects(parsed.graph.physicalObjects); checkpoint.afterCollection("physical-objects")
+                dao.insertApiaries(parsed.graph.apiaries); checkpoint.afterCollection("apiaries")
                 dao.insertObservationPoints(parsed.graph.points); checkpoint.afterCollection("observation-points")
                 dao.insertBees(parsed.graph.bees); checkpoint.afterCollection("bees")
                 dao.insertFlightCycles(parsed.graph.cycles); checkpoint.afterCollection("flight-cycles")
@@ -216,14 +218,19 @@ internal class BackupService(
 private data class Blob(val name: String, val path: String, val bytes: ByteArray, val count: Int)
 private data class Graph(
     val territories: List<TerritoryEntity>, val observers: List<ObserverEntity>,
+    val physicalObjects: List<PhysicalObjectEntity> = emptyList(), val apiaries: List<ApiaryEntity> = emptyList(),
     val points: List<ObservationPointEntity>, val bees: List<BeeEntity>, val cycles: List<FlightCycleEntity>,
     val weather: List<ObservationPointWeatherEntity> = emptyList(),
     val attachments: List<ObservationPointAttachmentEntity> = emptyList(),
 )
 private data class Parsed(val archiveId: UUID, val graph: Graph, val settings: PortableSettingsSnapshot, val blobs: List<Blob>)
 
-private suspend fun BackupDao.snapshot() = Graph(territories(), observers(), observationPoints(), bees(), flightCycles(), observationPointWeather(), observationPointAttachments())
-private suspend fun BackupDao.totalCount() = territoryCount() + observerCount() + observationPointCount() + beeCount() + flightCycleCount()
+private suspend fun BackupDao.snapshot() = Graph(
+    territories = territories(), observers = observers(), physicalObjects = physicalObjects(), apiaries = apiaries(),
+    points = observationPoints(), bees = bees(), cycles = flightCycles(),
+    weather = observationPointWeather(), attachments = observationPointAttachments(),
+)
+private suspend fun BackupDao.totalCount() = territoryCount() + observerCount() + physicalObjectCount() + observationPointCount() + beeCount() + flightCycleCount()
 
 private const val MANIFEST = "manifest.json"
 private const val MAX_ENTRIES = 64
@@ -254,14 +261,14 @@ private fun blobs(graph: Graph, settings: PortableSettingsSnapshot): List<Blob> 
     )
 }
 
-private fun blobsV2(
+private fun blobsV3(
     graph: Graph,
     settings: PortableSettingsSnapshot,
     attachmentStore: ObservationAttachmentFileStore?,
 ): List<Blob> {
     fun rows(name: String, values: List<String>): Blob {
         val text = values.joinToString("\n", postfix = if (values.isEmpty()) "" else "\n")
-        return Blob(name, BackupContractV2.collections.getValue(name), text.toByteArray(StandardCharsets.UTF_8), values.size)
+        return Blob(name, BackupContractV3.collections.getValue(name), text.toByteArray(StandardCharsets.UTF_8), values.size)
     }
     val weatherByPoint = graph.weather.associateBy { it.observationPointId }
     val weatherRows = graph.points.map { point ->
@@ -270,8 +277,10 @@ private fun blobsV2(
     val result = mutableListOf(
         rows("territories", graph.territories.sortedBy { it.id.toString() }.map { it.json() }),
         rows("observers", graph.observers.sortedBy { it.id.toString() }.map { it.json() }),
+        rows("physical-objects", graph.physicalObjects.sortedBy { it.id.toString() }.map { it.json() }),
+        rows("apiaries", graph.apiaries.sortedBy { it.physicalObjectId.toString() }.map { it.json() }),
         rows("observation-points", graph.points.sortedBy { it.id.toString() }.map { it.jsonV2() }),
-        rows("bees", graph.bees.sortedBy { it.id.toString() }.map { it.json() }),
+        rows("bees", graph.bees.sortedBy { it.id.toString() }.map { it.jsonV3() }),
         rows("flight-cycles", graph.cycles.sortedBy { it.id.toString() }.map { it.json() }),
         rows("observation-point-weather", weatherRows.sortedBy { it.observationPointId.toString() }.map { it.json() }),
         rows("observation-point-attachments", graph.attachments.sortedBy { it.id.toString() }.map { it.json() }),
@@ -286,16 +295,16 @@ private fun blobsV2(
         if (file.length() != attachment.byteSize || sha256(file) != attachment.sha256) throw BackupIntegrityMismatch("attachment file mismatch")
         validatePathName(attachment.relativePath)
         domain(attachment.relativePath == ObservationAttachmentFileStore.relativePath(attachment.observationPointId, attachment.id), "attachment path is not deterministic")
-        val archivePath = "${BackupContractV2.ATTACHMENT_PREFIX}${attachment.observationPointId}/${attachment.id}"
+        val archivePath = "${BackupContractV3.ATTACHMENT_PREFIX}${attachment.observationPointId}/${attachment.id}"
         result += Blob("attachment-file:${attachment.id}", archivePath, file.readBytes(), 1)
     }
     return result
 }
 
 private fun manifest(id: UUID, created: Instant, appVersion: String, blobs: List<Blob>) = obj(
-    "backupFormatVersion" to "2", "archiveSchemaVersion" to "2", "archiveId" to j(id),
+    "backupFormatVersion" to "3", "archiveSchemaVersion" to "3", "archiveId" to j(id),
     "createdAt" to created.toEpochMilli().toString(), "sourceAppVersion" to j(appVersion),
-    "roomSchemaVersion" to "7", "profile" to j(BackupContractV2.PROFILE),
+    "roomSchemaVersion" to "8", "profile" to j(BackupContractV3.PROFILE),
     "collections" to blobs.joinToString(",", "[", "]") { obj(
         "name" to j(it.name), "path" to j(it.path), "collectionSchemaVersion" to "1", "required" to "true",
         "recordCount" to it.count.toString(), "byteLength" to it.bytes.size.toString(), "sha256" to j(sha256(it.bytes)),
@@ -306,9 +315,13 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
     val manifest = objectFrom(entries[MANIFEST] ?: throw MissingBackupCollection(MANIFEST), "manifest")
     val format = manifest.int("backupFormatVersion")
     val schema = manifest.int("archiveSchemaVersion")
-    if (format !in 1..2) throw UnsupportedBackupFormat("unsupported backup format")
+    if (format !in 1..3) throw UnsupportedBackupFormat("unsupported backup format")
     if (schema != format) throw UnsupportedArchiveSchema("unsupported archive schema")
-    val contract = if (format == 1) BackupContractV1.collections else BackupContractV2.collections
+    val contract = when (format) {
+        1 -> BackupContractV1.collections
+        2 -> BackupContractV2.collections
+        else -> BackupContractV3.collections
+    }
     val archiveId = manifest.uuid("archiveId"); manifest.long("createdAt")
     if (manifest.string("sourceAppVersion").isBlank()) throw MalformedBackup("blank sourceAppVersion")
     manifest.int("roomSchemaVersion")
@@ -324,7 +337,7 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
         if (!describedNames.add(name)) throw MalformedBackup("duplicate collection $name")
         val required = item.bool("required")
         if (name !in contract) {
-            if (format == 2 && name.startsWith("attachment-file:")) {
+            if (format >= 2 && name.startsWith("attachment-file:")) {
                 val path = item.string("path")
                 if (!path.startsWith(BackupContractV2.ATTACHMENT_PREFIX)) throw MalformedBackup("unsafe attachment path")
                 validatePathName(path)
@@ -365,11 +378,16 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
     if (entries.keys != listedPaths) throw MalformedBackup("unlisted ZIP entry")
     fun objects(name: String) = rows(known.getValue(name).bytes, name).map { objectFrom(it.toByteArray(StandardCharsets.UTF_8), name) }
     val graph = Graph(
-        objects("territories").map(::territory), objects("observers").map(::observer),
-        objects("observation-points").map { if (format == 1) point(it) else pointV2(it) }, objects("bees").map(::bee), objects("flight-cycles").map(::cycle),
-        if (format == 2) objects("observation-point-weather").map(::weather)
+        territories = objects("territories").map(::territory),
+        observers = objects("observers").map(::observer),
+        physicalObjects = if (format == 3) objects("physical-objects").map(::physicalObject) else emptyList(),
+        apiaries = if (format == 3) objects("apiaries").map(::apiary) else emptyList(),
+        points = objects("observation-points").map { if (format == 1) point(it) else pointV2(it) },
+        bees = objects("bees").map { if (format == 3) beeV3(it) else bee(it) },
+        cycles = objects("flight-cycles").map(::cycle),
+        weather = if (format >= 2) objects("observation-point-weather").map(::weather)
         else objects("observation-points").map { ObservationPointWeatherEntity(it.uuid("id"), WeatherStatus.PENDING, null, null, null, null, null, null) },
-        if (format == 2) objects("observation-point-attachments").map(::attachment) else emptyList(),
+        attachments = if (format >= 2) objects("observation-point-attachments").map(::attachment) else emptyList(),
     )
     val portableRows = objects("portable-settings")
     if (portableRows.size != 1) throw BackupIntegrityMismatch("portable-settings must contain one record")
@@ -381,7 +399,7 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
     val portable = portableRows.single()
     val settings = PortableSettingsSnapshot(portable.optionalUuid("currentTerritoryId"), portable.optionalUuid("currentObserverId"), coverage)
     validateGraph(graph); validateSettings(settings, graph)
-    if (format == 2) validateAttachments(graph, known)
+    if (format >= 2) validateAttachments(graph, known)
     return Parsed(archiveId, graph, settings, known.values.toList())
 }
 
@@ -468,11 +486,29 @@ private fun validateAttachments(graph: Graph, blobs: Map<String, Blob>) {
 
 private fun validateGraph(g: Graph) {
     val ids = hashSetOf<UUID>(); fun ids(label: String, values: List<UUID>) = values.forEach { if (!ids.add(it)) throw DuplicateBackupIdentity("duplicate $label id $it") }
-    ids("territory", g.territories.map { it.id }); ids("observer", g.observers.map { it.id }); ids("point", g.points.map { it.id }); ids("bee", g.bees.map { it.id }); ids("cycle", g.cycles.map { it.id })
+    ids("territory", g.territories.map { it.id }); ids("observer", g.observers.map { it.id }); ids("physical object", g.physicalObjects.map { it.id }); ids("point", g.points.map { it.id }); ids("bee", g.bees.map { it.id }); ids("cycle", g.cycles.map { it.id })
     unique(g.territories, "territory code") { it.code }; unique(g.observers, "observer code") { it.code }
     g.territories.forEach { domain(it.code.isNotBlank() && it.name.isNotBlank() && it.region.isNotBlank() && it.district.isNotBlank(), "blank territory field"); ordered(it.createdAt, it.updatedAt, "territory") }
     g.observers.forEach { domain(it.code.isNotBlank() && it.lastName.isNotBlank() && it.firstName.isNotBlank(), "blank observer field"); ordered(it.createdAt, it.updatedAt, "observer") }
     val territories = g.territories.mapTo(hashSetOf()) { it.id }; val observers = g.observers.mapTo(hashSetOf()) { it.id }
+    unique(g.physicalObjects, "physical object designation") { listOf(it.territoryId, it.objectType, it.sequenceNumber) }
+    g.physicalObjects.forEach { value ->
+        if (value.territoryId !in territories) throw BrokenBackupForeignKey("physical object ${value.id} territory missing")
+        domain(value.sequenceNumber > 0, "invalid physical object sequence")
+        coordinate(value.latitude, -90.0, 90.0); coordinate(value.longitude, -180.0, 180.0)
+    }
+    val physicalObjects = g.physicalObjects.associateBy { it.id }
+    val apiaryIds = hashSetOf<UUID>()
+    g.apiaries.forEach { value ->
+        if (!apiaryIds.add(value.physicalObjectId)) throw DuplicateBackupIdentity("duplicate apiary subtype")
+        val identity = physicalObjects[value.physicalObjectId]
+            ?: throw BrokenBackupForeignKey("apiary ${value.physicalObjectId} object missing")
+        domain(identity.objectType == org.beesearch.app.domain.model.PhysicalObjectType.APIARY, "apiary subtype type mismatch")
+    }
+    domain(
+        physicalObjects.values.filter { it.objectType == org.beesearch.app.domain.model.PhysicalObjectType.APIARY }.mapTo(hashSetOf()) { it.id } == apiaryIds,
+        "apiary subtype missing",
+    )
     unique(g.points, "point number") { listOf(it.territoryId, it.observationYear, it.observerId, it.pointNumber) }
     g.points.forEach { p ->
         if (p.territoryId !in territories) throw BrokenBackupForeignKey("point ${p.id} territory missing")
@@ -483,7 +519,11 @@ private fun validateGraph(g: Graph) {
         domain(p.completedAt == null || p.beePresenceResult != null, "completed point has no presence result")
     }
     val points = g.points.mapTo(hashSetOf()) { it.id }; unique(g.bees, "bee mark") { listOf(it.observationPointId, it.markColor, it.markPosition) }
-    g.bees.forEach { if (it.observationPointId !in points) throw BrokenBackupForeignKey("bee ${it.id} point missing"); domain(it.markColor.isNotBlank(), "blank mark color") }
+    g.bees.forEach {
+        if (it.observationPointId !in points) throw BrokenBackupForeignKey("bee ${it.id} point missing")
+        if (it.sourceObjectId != null && it.sourceObjectId !in physicalObjects) throw BrokenBackupForeignKey("bee ${it.id} source object missing")
+        domain(it.markColor.isNotBlank(), "blank mark color")
+    }
     val beesByPoint = g.bees.groupBy { it.observationPointId }
     g.points.forEach { p -> val n = beesByPoint[p.id].orEmpty().size; domain(p.beePresenceResult != BeePresenceResult.NO_BEES_FOUND || (n == 0 && p.completedAt != null), "invalid NO_BEES_FOUND point"); domain(p.beePresenceResult != BeePresenceResult.BEES_FOUND || n > 0, "BEES_FOUND point has no bees"); domain(n == 0 || p.beePresenceResult == BeePresenceResult.BEES_FOUND, "point with bees lacks result") }
     val bees = g.bees.mapTo(hashSetOf()) { it.id }; unique(g.cycles, "flight sequence") { it.beeId to it.sequenceNumber }
@@ -500,11 +540,14 @@ private fun validateGraph(g: Graph) {
 
 private fun territory(o: JsonObject) = TerritoryEntity(o.uuid("id"), o.string("code"), o.string("name"), o.string("region"), o.string("district"), o.instant("createdAt"), o.instant("updatedAt"))
 private fun observer(o: JsonObject) = ObserverEntity(o.uuid("id"), o.string("code"), o.string("lastName"), o.string("firstName"), o.optionalString("middleName"), o.optionalString("contact"), o.instant("createdAt"), o.instant("updatedAt"))
+private fun physicalObject(o: JsonObject) = PhysicalObjectEntity(o.uuid("id"), o.uuid("territoryId"), o.enum("objectType"), o.int("sequenceNumber"), o.double("latitude"), o.double("longitude"), o.instant("createdAt"))
+private fun apiary(o: JsonObject) = ApiaryEntity(o.uuid("physicalObjectId"), o.optionalString("name"))
 private fun point(o: JsonObject) = ObservationPointEntity(o.uuid("id"), o.uuid("territoryId"), o.uuid("observerId"), o.int("observationYear"), o.int("pointNumber"), o.optionalEnum<BeePresenceResult>("beePresenceResult"), o.optionalString("code"), o.double("latitude"), o.double("longitude"), o.optionalDouble("gpsLatitude"), o.optionalDouble("gpsLongitude"), o.optionalDouble("gpsAccuracyM"), o.instant("createdAt"), o.optionalInstant("initialGroupReleaseAt"), o.optionalInstant("completedAt"))
 private fun pointV2(o: JsonObject) = ObservationPointEntity(o.uuid("id"), o.uuid("territoryId"), o.uuid("observerId"), o.int("observationYear"), o.int("pointNumber"), o.optionalEnum<BeePresenceResult>("beePresenceResult"), o.optionalString("code"), o.double("latitude"), o.double("longitude"), o.optionalDouble("gpsLatitude"), o.optionalDouble("gpsLongitude"), o.optionalDouble("gpsAccuracyM"), o.instant("createdAt"), o.optionalInstant("initialGroupReleaseAt"), o.optionalInstant("completedAt"), o.optionalString("description"))
 private fun weather(o: JsonObject) = ObservationPointWeatherEntity(o.uuid("observationPointId"), o.enum<WeatherStatus>("status"), o.optionalDouble("temperatureC"), o.optionalDouble("windSpeedMps"), o.optionalDouble("windDirectionDeg"), o.optionalInstant("sampleAt"), o.optionalInstant("fetchedAt"), o.optionalString("source"))
 private fun attachment(o: JsonObject) = ObservationPointAttachmentEntity(o.uuid("id"), o.uuid("observationPointId"), o.enum<AttachmentType>("type"), o.string("relativePath"), o.optionalString("originalFileName"), o.optionalString("mimeType"), o.long("byteSize"), o.string("sha256"), o.instant("createdAt"))
 private fun bee(o: JsonObject) = BeeEntity(o.uuid("id"), o.uuid("observationPointId"), o.string("markColor"), o.markPosition("markPosition"), o.instant("createdAt"))
+private fun beeV3(o: JsonObject) = BeeEntity(o.uuid("id"), o.uuid("observationPointId"), o.string("markColor"), o.markPosition("markPosition"), o.instant("createdAt"), o.optionalUuid("sourceObjectId"))
 private fun cycle(o: JsonObject) = FlightCycleEntity(o.uuid("id"), o.uuid("beeId"), o.int("sequenceNumber"), o.instant("departureTime"), o.optionalInstant("returnTime"), o.optionalDouble("azimuthDeg"), o.bool("azimuthCaptureConsumed"), o.bool("initialGroupLaunch"), o.bool("initialGroupLaunchCorrectionEligible"), o.instant("createdAt"), o.instant("updatedAt"))
 
 private fun objectFrom(bytes: ByteArray, label: String): JsonObject = try { JSON.parseToJsonElement(decode(bytes)).jsonObject } catch (e: Exception) { throw MalformedBackup("invalid JSON in $label", e) }
@@ -538,11 +581,14 @@ private fun parseUuid(value: String, label: String) = try { UUID.fromString(valu
 
 private fun TerritoryEntity.json() = obj("id" to j(id), "code" to j(code), "name" to j(name), "region" to j(region), "district" to j(district), "createdAt" to j(createdAt), "updatedAt" to j(updatedAt))
 private fun ObserverEntity.json() = obj("id" to j(id), "code" to j(code), "lastName" to j(lastName), "firstName" to j(firstName), "middleName" to j(middleName), "contact" to j(contact), "createdAt" to j(createdAt), "updatedAt" to j(updatedAt))
+private fun PhysicalObjectEntity.json() = obj("id" to j(id), "territoryId" to j(territoryId), "objectType" to j(objectType.name), "sequenceNumber" to sequenceNumber.toString(), "latitude" to latitude.toString(), "longitude" to longitude.toString(), "createdAt" to j(createdAt))
+private fun ApiaryEntity.json() = obj("physicalObjectId" to j(physicalObjectId), "name" to j(name))
 private fun ObservationPointEntity.json() = obj("id" to j(id), "territoryId" to j(territoryId), "observerId" to j(observerId), "observationYear" to observationYear.toString(), "pointNumber" to pointNumber.toString(), "beePresenceResult" to j(beePresenceResult?.name), "code" to j(code), "latitude" to latitude.toString(), "longitude" to longitude.toString(), "gpsLatitude" to (gpsLatitude?.toString() ?: "null"), "gpsLongitude" to (gpsLongitude?.toString() ?: "null"), "gpsAccuracyM" to (gpsAccuracyM?.toString() ?: "null"), "createdAt" to j(createdAt), "initialGroupReleaseAt" to j(initialGroupReleaseAt), "completedAt" to j(completedAt))
 private fun ObservationPointEntity.jsonV2() = obj("id" to j(id), "territoryId" to j(territoryId), "observerId" to j(observerId), "observationYear" to observationYear.toString(), "pointNumber" to pointNumber.toString(), "beePresenceResult" to j(beePresenceResult?.name), "code" to j(code), "latitude" to latitude.toString(), "longitude" to longitude.toString(), "gpsLatitude" to (gpsLatitude?.toString() ?: "null"), "gpsLongitude" to (gpsLongitude?.toString() ?: "null"), "gpsAccuracyM" to (gpsAccuracyM?.toString() ?: "null"), "createdAt" to j(createdAt), "initialGroupReleaseAt" to j(initialGroupReleaseAt), "completedAt" to j(completedAt), "description" to j(description))
 private fun ObservationPointWeatherEntity.json() = obj("observationPointId" to j(observationPointId), "status" to j(status.name), "temperatureC" to (temperatureC?.toString() ?: "null"), "windSpeedMps" to (windSpeedMps?.toString() ?: "null"), "windDirectionDeg" to (windDirectionDeg?.toString() ?: "null"), "sampleAt" to j(sampleAt), "fetchedAt" to j(fetchedAt), "source" to j(source))
 private fun ObservationPointAttachmentEntity.json() = obj("id" to j(id), "observationPointId" to j(observationPointId), "type" to j(type.name), "relativePath" to j(relativePath), "originalFileName" to j(originalFileName), "mimeType" to j(mimeType), "byteSize" to byteSize.toString(), "sha256" to j(sha256), "createdAt" to j(createdAt))
 private fun BeeEntity.json() = obj("id" to j(id), "observationPointId" to j(observationPointId), "markColor" to j(markColor), "markPosition" to j(markPosition.name), "createdAt" to j(createdAt))
+private fun BeeEntity.jsonV3() = obj("id" to j(id), "observationPointId" to j(observationPointId), "markColor" to j(markColor), "markPosition" to j(markPosition.name), "createdAt" to j(createdAt), "sourceObjectId" to j(sourceObjectId))
 private fun FlightCycleEntity.json() = obj("id" to j(id), "beeId" to j(beeId), "sequenceNumber" to sequenceNumber.toString(), "departureTime" to j(departureTime), "returnTime" to j(returnTime), "azimuthDeg" to (azimuthDeg?.toString() ?: "null"), "azimuthCaptureConsumed" to azimuthCaptureConsumed.toString(), "initialGroupLaunch" to isInitialGroupLaunch.toString(), "initialGroupLaunchCorrectionEligible" to isFirstDepartureCancellationEligible.toString(), "createdAt" to j(createdAt), "updatedAt" to j(updatedAt))
 private fun obj(vararg fields: Pair<String, String>) = fields.joinToString(",", "{", "}") { j(it.first) + ":" + it.second }
 private fun j(value: String) = JsonPrimitive(value).toString()

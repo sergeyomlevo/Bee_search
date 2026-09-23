@@ -139,6 +139,73 @@ class BeeSearchMigrationTest {
     }
 
     @Test
+    fun migrationFromSevenToEightPreservesResearchDataAndAddsNullableObjectRelation() {
+        val databaseName = "$DATABASE_NAME-7-8"
+        val territoryId = UUID.randomUUID().toString()
+        val observerId = UUID.randomUUID().toString()
+        val pointId = UUID.randomUUID().toString()
+        val beeId = UUID.randomUUID().toString()
+        val cycleId = UUID.randomUUID().toString()
+        val attachmentId = UUID.randomUUID().toString()
+        val timestamp = Instant.parse("2026-09-22T08:00:00Z").toEpochMilli()
+
+        migrationHelper.createDatabase(databaseName, 7).apply {
+            execSQL("INSERT INTO territories VALUES (?, 'T', 'Territory', 'R', 'D', ?, ?)", arrayOf<Any>(territoryId, timestamp, timestamp))
+            execSQL("INSERT INTO observers VALUES (?, 'O', 'Last', 'First', NULL, NULL, ?, ?)", arrayOf<Any>(observerId, timestamp, timestamp))
+            execSQL(
+                """
+                INSERT INTO observation_points (
+                    id, territory_id, observer_id, observation_year, point_number,
+                    bee_presence_result, code, latitude, longitude, gps_latitude,
+                    gps_longitude, gps_accuracy_m, created_at, initial_group_release_at,
+                    completed_at, description
+                ) VALUES (?, ?, ?, 2026, 1, 'BEES_FOUND', 'P1', 56.1, 42.7,
+                    56.11, 42.71, 4.0, ?, ?, NULL, 'description')
+                """.trimIndent(),
+                arrayOf<Any>(pointId, territoryId, observerId, timestamp, timestamp),
+            )
+            execSQL("INSERT INTO bees VALUES (?, ?, 'WHITE', 'THORAX', ?)", arrayOf<Any>(beeId, pointId, timestamp))
+            execSQL(
+                "INSERT INTO flight_cycles VALUES (?, ?, 1, ?, NULL, NULL, 0, 1, 1, ?, ?)",
+                arrayOf<Any>(cycleId, beeId, timestamp, timestamp, timestamp),
+            )
+            execSQL(
+                "INSERT INTO observation_point_weather VALUES (?, 'LOADED', 18.0, 2.0, 247.0, ?, ?, 'Open-Meteo')",
+                arrayOf<Any>(pointId, timestamp, timestamp),
+            )
+            execSQL(
+                "INSERT INTO observation_point_attachments VALUES (?, ?, 'PHOTO', ?, 'пчела.jpg', 'image/jpeg', 3, ?, ?)",
+                arrayOf<Any>(attachmentId, pointId, "observation-attachments/$pointId/$attachmentId", "0".repeat(64), timestamp),
+            )
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(databaseName, 8, true, MIGRATION_7_8)
+        migrated.query("SELECT source_object_id FROM bees WHERE id = ?", arrayOf(beeId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue(cursor.isNull(0))
+        }
+        listOf(
+            "territories" to territoryId,
+            "observers" to observerId,
+            "observation_points" to pointId,
+            "bees" to beeId,
+            "flight_cycles" to cycleId,
+            "observation_point_weather" to pointId,
+            "observation_point_attachments" to attachmentId,
+        ).forEach { (table, id) ->
+            val column = if (table == "observation_point_weather") "observation_point_id" else "id"
+            migrated.query("SELECT COUNT(*) FROM $table WHERE $column = ?", arrayOf(id)).use { cursor ->
+                cursor.moveToFirst()
+                assertEquals("$table must survive migration", 1, cursor.getInt(0))
+            }
+        }
+        migrated.query("SELECT COUNT(*) FROM physical_objects").use { cursor -> cursor.moveToFirst(); assertEquals(0, cursor.getInt(0)) }
+        migrated.query("SELECT COUNT(*) FROM apiaries").use { cursor -> cursor.moveToFirst(); assertEquals(0, cursor.getInt(0)) }
+        migrated.close()
+    }
+
+    @Test
     fun migrationFromTwoToThreeBackfillsCaptureConsumptionAndPreservesCycles() {
         val databaseName = "$DATABASE_NAME-2-3"
         val territoryId = UUID.randomUUID().toString()

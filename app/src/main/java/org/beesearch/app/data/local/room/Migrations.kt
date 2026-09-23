@@ -313,6 +313,52 @@ internal val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+/** Adds the append-only physical-object identity branch accepted by D088. */
+internal val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS physical_objects (
+                id TEXT NOT NULL,
+                territory_id TEXT NOT NULL,
+                object_type TEXT NOT NULL,
+                sequence_number INTEGER NOT NULL,
+                latitude REAL NOT NULL,
+                longitude REAL NOT NULL,
+                created_at INTEGER NOT NULL,
+                PRIMARY KEY(id),
+                FOREIGN KEY(territory_id) REFERENCES territories(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_physical_objects_territory_id ON physical_objects(territory_id)")
+        db.execSQL(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS index_physical_objects_territory_id_object_type_sequence_number
+            ON physical_objects(territory_id, object_type, sequence_number)
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS apiaries (
+                physical_object_id TEXT NOT NULL,
+                name TEXT,
+                PRIMARY KEY(physical_object_id),
+                FOREIGN KEY(physical_object_id) REFERENCES physical_objects(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            ALTER TABLE bees
+            ADD COLUMN source_object_id TEXT
+                REFERENCES physical_objects(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_bees_source_object_id ON bees(source_object_id)")
+    }
+}
+
 private data class LegacyObservationPoint(
     val id: String,
     val territoryId: String,

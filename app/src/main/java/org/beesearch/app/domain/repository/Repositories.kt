@@ -13,6 +13,10 @@ import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.CompletedObservationPointSummary
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.domain.model.Hollow
+import org.beesearch.app.domain.model.LogHive
+import org.beesearch.app.domain.model.Apiary
+import org.beesearch.app.domain.model.TerritoryPhysicalObjects
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.ObservationPointAttachment
 import org.beesearch.app.domain.model.ObservationPointWeather
@@ -50,6 +54,20 @@ interface ObserverRepository {
     ): Observer
     suspend fun updateObserver(observer: Observer): Observer
     suspend fun deleteObserver(id: UUID)
+}
+
+interface PhysicalObjectRepository {
+    suspend fun createHollow(territoryId: UUID, latitude: Double, longitude: Double): Hollow
+    suspend fun createLogHive(territoryId: UUID, latitude: Double, longitude: Double): LogHive
+    suspend fun createApiary(territoryId: UUID, latitude: Double, longitude: Double, name: String?): Apiary
+
+    suspend fun getHollow(id: UUID): Hollow?
+    suspend fun getLogHive(id: UUID): LogHive?
+    suspend fun getApiary(id: UUID): Apiary?
+    suspend fun listForTerritory(territoryId: UUID): TerritoryPhysicalObjects
+
+    suspend fun setBeeSourceObject(beeId: UUID, sourceObjectId: UUID?): Bee
+    suspend fun getBeeSourceObjectId(beeId: UUID): UUID?
 }
 
 interface ObservationPointCreator {

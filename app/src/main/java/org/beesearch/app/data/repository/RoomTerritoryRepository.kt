@@ -65,7 +65,7 @@ internal class RoomTerritoryRepository(
     }
 
     override suspend fun ensureTerritoryCanBeDeleted(id: UUID) {
-        if (territoryDao.countObservationPoints(id) != 0) {
+        if (territoryDao.countObservationPoints(id) != 0 || territoryDao.countPhysicalObjects(id) != 0) {
             throw TerritoryInUseException()
         }
         if (territoryDao.getById(id) == null) {

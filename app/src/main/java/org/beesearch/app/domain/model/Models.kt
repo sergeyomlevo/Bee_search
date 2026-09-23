@@ -150,6 +150,7 @@ data class Bee(
     val markColor: String,
     val markPosition: MarkPosition,
     val createdAt: Instant,
+    val sourceObjectId: UUID? = null,
 )
 
 data class FlightCycle(

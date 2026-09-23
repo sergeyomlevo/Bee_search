@@ -1682,8 +1682,9 @@ DataStore settings и map packages не входят в эту транзакц�
 отдельной offline presentation feature; MainActivity остаётся только app host и
 маршрутизатором существующего route mechanism.
 
-ObservationPoint properties v1 использует Room schema v7. `description` остаётся
-полем ObservationPoint; attachment metadata и one-to-one weather snapshot имеют
+ObservationPoint properties v1 введены в Room schema v7; текущая schema v8
+добавляет физические объекты и nullable явную связь Bee с ними (D088).
+`description` остаётся полем ObservationPoint; attachment metadata и one-to-one weather snapshot имеют
 отдельные таблицы. Photo bytes копируются в
 `files/observation-attachments/<pointId>/<attachmentId>` и никогда не зависят от
 долговечности исходного content URI. Selective/full deletion сначала безопасно

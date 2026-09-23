@@ -1,4 +1,4 @@
-# Logical backup formats v1 and v2
+# Logical backup formats v1, v2 and v3
 
 The Bee Search backup is a logical ZIP archive, not a SQLite file. Version 1
 uses `backupFormatVersion=1` and `archiveSchemaVersion=1` and has these fixed
@@ -33,7 +33,7 @@ The reader rejects duplicate or unsafe ZIP paths, unlisted entries, more than
 Unknown required collections are rejected. Unknown optional collections may be
 ignored only after their declared path, length, and hash are valid.
 
-Version 2 is the current Complete backup contract. It retains the v1 research and
+Version 2 retains the v1 research and
 portable-settings collections and adds `observation-point-weather`,
 `observation-point-attachments`, and photo entries under `attachments/`.
 ObservationPoint records also carry nullable `description`. Every attachment entry
@@ -43,11 +43,21 @@ reject the archive before research data is written. Files are staged and validat
 then activated before the single Room restore transaction; activation and database
 failures compensate activated files.
 
-The importer remains backward-compatible with v1. A v1 point restores with
+Version 3 is the current Complete backup contract for Room schema v8. It adds
+required `physical-objects` and `apiaries` collections to v2 and a nullable
+`sourceObjectId` field to each Bee record. The object collection stores UUID,
+Territory UUID, concrete type, immutable sequence number, coordinates and creation
+time. The Apiary collection stores its object UUID and nullable name. Restore
+validates identities, Territory and Bee references, unique designation scope,
+and the exact Apiary subtype relationship before inserting objects and Apiaries
+ahead of Bees in the same Room transaction. No point-export D086 contract changes.
+
+The importer remains backward-compatible with v1 and v2. Older archives restore
+without physical objects and with null Bee source links. A v1 point restores with
 `description = null`, no attachments, and a `PENDING` weather row whose snapshot
 values are null. No historical weather value is invented.
 
-Both formats retain the bounded reader limits: at most 64 entries, 16 MiB per entry,
+All formats retain the bounded reader limits: at most 64 entries, 16 MiB per entry,
 and 64 MiB total uncompressed payload. Consequently each imported photo is limited
 to 16 MiB and a Complete backup containing all photos must fit the total limit.
 Offline PMTiles remain excluded.
@@ -55,4 +65,4 @@ Offline PMTiles remain excluded.
 Android cloud backup/device transfer includes ordinary app-owned attachment files by
 default because only map packages and DEV bootstrap files are excluded by Bee Search
 rules. Android cloud backup has a platform quota and is not the canonical Complete
-backup; logical backup v2 is the explicit portable research archive.
+backup; logical backup v3 is the explicit portable research archive.

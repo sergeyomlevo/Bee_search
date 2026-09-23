@@ -2,46 +2,26 @@
 
 ## Current milestone
 
-Single ObservationPoint export is implemented under D086. `Точка №N → ⋮ →
-Экспортировать точку` launches the existing Exchange/Data `CreateDocument`
-flow with a readable Territory/point/date/short-UUID filename. The action is a
-read-only snapshot and is available for completed and active points; delete
-remains restricted to completed points.
-
-`data/pointexport` is deliberately separate from complete backup v2. Its ZIP
-format v1 contains `manifest.json`, `point.json`, and optional binary
-`attachments/<attachmentId>` entries for exactly one point. The graph includes
-Territory/Observer context, persisted point/description/weather, every Bee and
-FlightCycle (including open cycles), attachment metadata, and photo bytes. The
-codec validates version/profile, graph ownership and duplicate identities,
-ZIP paths/duplicates, missing/unlisted entries, and attachment size/SHA-256.
-Structured order and ZIP entry timestamps are deterministic.
-
-Room remains v7 and complete backup remains v2. Area, PMTiles, active-map state,
-DataStore selections/settings and other ObservationPoints are never read into
-the single-point package. Selective import and future share/server transports
-remain outside scope.
+D088 physical object data foundation is implemented. Room schema v8 adds an
+internal `physical_objects` identity table, an `apiaries` subtype table, and
+nullable `bees.source_object_id`. Concrete domain types are Hollow, LogHive and
+Apiary. Sequence numbers are allocated transactionally within Territory and
+type; records are retained and no object deletion API exists. Linked deletion
+is restricted. Complete backup v3 preserves both new collections and the Bee
+link; v1/v2 readers remain supported. D086 single-point export v1 is unchanged.
 
 ## Verification status
 
-369 JVM unit tests pass with 0 failures. The preserving Samsung SM-S938B run
-reports `OK (38 tests)`: 18 complete-backup v2 tests, the CreateDocument contract,
-and 19 Point detail/matrix tests. Lint, `compileDebugKotlin`,
-`compileDebugAndroidTestKotlin`, `assembleDebug` and `assembleDebugAndroidTest`
-pass.
-
-Manual Samsung smoke exported real point №16 to Exchange/Data with the proposed
-name. Package validation passed: profile/version and point checksum matched,
-only point №16 was present, with 4 Bees / 8 cycles, LOADED weather and zero
-attachments. Point №15 remained visible, and the real matrix still showed
-completed and open cycles. The temporary export was removed after validation.
-Room DB, DataStore, active PMTiles manifest and PMTiles bytes had identical
-SHA-256 values before and after; the DEV package remained installed.
+JVM unit tests, lint and debug/androidTest compilation passed. The preserving
+Samsung SM-S938B workflow reported `OK (34 tests)` for migration, backup and
+repository checks before a small Apiary name pass-through adjustment, then
+`OK (25 tests)` for backup and repository after that adjustment. The DEV
+package remained installed; Beta was not touched.
 
 ## Next task
 
-Selective point import is not implemented. Future share/server transports must
-reuse the package contract without turning it into complete backup v3.
+The next implementation stage is Objects V1 UI, after owner review of this
+foundation. Inspection and research tooling remain separate future work.
 
 ## Previous milestone
 

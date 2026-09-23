@@ -44,6 +44,8 @@ internal abstract class BackupDao {
     @Query("SELECT * FROM territories ORDER BY id") abstract suspend fun territories(): List<TerritoryEntity>
     @Query("SELECT * FROM observers ORDER BY id") abstract suspend fun observers(): List<ObserverEntity>
     @Query("SELECT * FROM observation_points ORDER BY id") abstract suspend fun observationPoints(): List<ObservationPointEntity>
+    @Query("SELECT * FROM physical_objects ORDER BY id") abstract suspend fun physicalObjects(): List<PhysicalObjectEntity>
+    @Query("SELECT * FROM apiaries ORDER BY physical_object_id") abstract suspend fun apiaries(): List<ApiaryEntity>
     @Query("SELECT * FROM bees ORDER BY id") abstract suspend fun bees(): List<BeeEntity>
     @Query("SELECT * FROM flight_cycles ORDER BY id") abstract suspend fun flightCycles(): List<FlightCycleEntity>
     @Query("SELECT * FROM observation_point_attachments ORDER BY id") abstract suspend fun observationPointAttachments(): List<ObservationPointAttachmentEntity>
@@ -51,11 +53,14 @@ internal abstract class BackupDao {
     @Query("SELECT COUNT(*) FROM territories") abstract suspend fun territoryCount(): Int
     @Query("SELECT COUNT(*) FROM observers") abstract suspend fun observerCount(): Int
     @Query("SELECT COUNT(*) FROM observation_points") abstract suspend fun observationPointCount(): Int
+    @Query("SELECT COUNT(*) FROM physical_objects") abstract suspend fun physicalObjectCount(): Int
     @Query("SELECT COUNT(*) FROM bees") abstract suspend fun beeCount(): Int
     @Query("SELECT COUNT(*) FROM flight_cycles") abstract suspend fun flightCycleCount(): Int
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertTerritories(value: List<TerritoryEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertObservers(value: List<ObserverEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertObservationPoints(value: List<ObservationPointEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertPhysicalObjects(value: List<PhysicalObjectEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertApiaries(value: List<ApiaryEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertBees(value: List<BeeEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertFlightCycles(value: List<FlightCycleEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertObservationPointAttachments(value: List<ObservationPointAttachmentEntity>)
@@ -81,6 +86,39 @@ internal interface TerritoryDao {
 
     @Query("SELECT COUNT(*) FROM observation_points WHERE territory_id = :id")
     suspend fun countObservationPoints(id: UUID): Int
+
+    @Query("SELECT COUNT(*) FROM physical_objects WHERE territory_id = :id")
+    suspend fun countPhysicalObjects(id: UUID): Int
+}
+
+@Dao
+internal interface PhysicalObjectDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertObject(value: PhysicalObjectEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertApiary(value: ApiaryEntity)
+
+    @Query("SELECT * FROM physical_objects WHERE id = :id")
+    suspend fun getById(id: UUID): PhysicalObjectEntity?
+
+    @Query("SELECT * FROM physical_objects WHERE territory_id = :territoryId ORDER BY object_type, sequence_number, id")
+    suspend fun getForTerritory(territoryId: UUID): List<PhysicalObjectEntity>
+
+    @Query("SELECT * FROM apiaries WHERE physical_object_id = :id")
+    suspend fun getApiary(id: UUID): ApiaryEntity?
+
+    @Query("SELECT * FROM apiaries WHERE physical_object_id IN (:ids) ORDER BY physical_object_id")
+    suspend fun getApiaries(ids: Collection<UUID>): List<ApiaryEntity>
+
+    @Query(
+        """
+        SELECT COALESCE(MAX(sequence_number), 0) + 1
+        FROM physical_objects
+        WHERE territory_id = :territoryId AND object_type = :objectType
+        """,
+    )
+    suspend fun getNextSequenceNumber(territoryId: UUID, objectType: org.beesearch.app.domain.model.PhysicalObjectType): Int
 }
 
 @Dao
@@ -285,6 +323,9 @@ internal interface BeeDao {
 
     @Query("SELECT * FROM bees WHERE id = :id")
     suspend fun getById(id: UUID): BeeEntity?
+
+    @Query("UPDATE bees SET source_object_id = :sourceObjectId WHERE id = :beeId")
+    suspend fun setSourceObject(beeId: UUID, sourceObjectId: UUID?): Int
 
     @Query("SELECT * FROM bees WHERE observation_point_id = :pointId ORDER BY created_at, id")
     suspend fun getForPoint(pointId: UUID): List<BeeEntity>

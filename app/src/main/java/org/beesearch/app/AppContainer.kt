@@ -26,11 +26,13 @@ import org.beesearch.app.data.local.settings.settingsDataStore
 import org.beesearch.app.data.local.settings.DataStoreMapAreaStore
 import org.beesearch.app.data.local.settings.DataStoreMapPackageStore
 import org.beesearch.app.data.repository.RoomObservationRepository
+import org.beesearch.app.data.repository.RoomPhysicalObjectRepository
 import org.beesearch.app.data.repository.RoomObserverRepository
 import org.beesearch.app.data.repository.RoomTerritoryRepository
 import org.beesearch.app.data.weather.OpenMeteoWeatherProvider
 import org.beesearch.app.data.weather.WorkManagerWeatherSyncScheduler
 import org.beesearch.app.domain.repository.ObservationRepository
+import org.beesearch.app.domain.repository.PhysicalObjectRepository
 import org.beesearch.app.domain.repository.ObserverRepository
 import org.beesearch.app.domain.repository.SettingsRepository
 import org.beesearch.app.domain.repository.TerritoryRepository
@@ -121,6 +123,13 @@ internal class AppContainer(context: Context) {
         ),
         contentResolver = context.contentResolver,
         cacheDirectory = context.cacheDir,
+    )
+    val physicalObjectRepository: PhysicalObjectRepository = RoomPhysicalObjectRepository(
+        database = database,
+        objectDao = database.physicalObjectDao(),
+        territoryDao = database.territoryDao(),
+        beeDao = database.beeDao(),
+        clock = clock,
     )
     val observationPointDocumentExporter: ObservationPointDocumentExporter =
         SafObservationPointDocumentExporter(

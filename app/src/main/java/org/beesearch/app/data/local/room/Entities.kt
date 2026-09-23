@@ -9,6 +9,7 @@ import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.WeatherStatus
+import org.beesearch.app.domain.model.PhysicalObjectType
 import java.time.Instant
 import java.util.UUID
 
@@ -39,6 +40,45 @@ internal data class ObserverEntity(
     val contact: String?,
     @ColumnInfo(name = "created_at") val createdAt: Instant,
     @ColumnInfo(name = "updated_at") val updatedAt: Instant,
+)
+
+@Entity(
+    tableName = "physical_objects",
+    foreignKeys = [ForeignKey(
+        entity = TerritoryEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["territory_id"],
+        onDelete = ForeignKey.RESTRICT,
+        onUpdate = ForeignKey.NO_ACTION,
+    )],
+    indices = [
+        Index(value = ["territory_id"]),
+        Index(value = ["territory_id", "object_type", "sequence_number"], unique = true),
+    ],
+)
+internal data class PhysicalObjectEntity(
+    @PrimaryKey val id: UUID,
+    @ColumnInfo(name = "territory_id") val territoryId: UUID,
+    @ColumnInfo(name = "object_type") val objectType: PhysicalObjectType,
+    @ColumnInfo(name = "sequence_number") val sequenceNumber: Int,
+    val latitude: Double,
+    val longitude: Double,
+    @ColumnInfo(name = "created_at") val createdAt: Instant,
+)
+
+@Entity(
+    tableName = "apiaries",
+    foreignKeys = [ForeignKey(
+        entity = PhysicalObjectEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["physical_object_id"],
+        onDelete = ForeignKey.RESTRICT,
+        onUpdate = ForeignKey.NO_ACTION,
+    )],
+)
+internal data class ApiaryEntity(
+    @PrimaryKey @ColumnInfo(name = "physical_object_id") val physicalObjectId: UUID,
+    val name: String?,
 )
 
 @Entity(
@@ -137,9 +177,17 @@ internal data class ObservationPointWeatherEntity(
             onDelete = ForeignKey.RESTRICT,
             onUpdate = ForeignKey.NO_ACTION,
         ),
+        ForeignKey(
+            entity = PhysicalObjectEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["source_object_id"],
+            onDelete = ForeignKey.RESTRICT,
+            onUpdate = ForeignKey.NO_ACTION,
+        ),
     ],
     indices = [
         Index(value = ["observation_point_id"]),
+        Index(value = ["source_object_id"]),
         Index(
             value = ["observation_point_id", "mark_color", "mark_position"],
             unique = true,
@@ -152,6 +200,7 @@ internal data class BeeEntity(
     @ColumnInfo(name = "mark_color") val markColor: String,
     @ColumnInfo(name = "mark_position") val markPosition: MarkPosition,
     @ColumnInfo(name = "created_at") val createdAt: Instant,
+    @ColumnInfo(name = "source_object_id") val sourceObjectId: UUID? = null,
 )
 
 @Entity(

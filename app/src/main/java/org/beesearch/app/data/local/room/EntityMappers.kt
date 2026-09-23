@@ -62,6 +62,7 @@ internal fun BeeEntity.toDomain(): Bee = Bee(
     markColor = markColor,
     markPosition = markPosition,
     createdAt = createdAt,
+    sourceObjectId = sourceObjectId,
 )
 
 internal fun FlightCycleEntity.toDomain(): FlightCycle = FlightCycle(

@@ -34,6 +34,28 @@ internal object BackupContractV2 {
 
     const val ATTACHMENT_PREFIX = "attachments/"
 }
+
+/** Complete backup schema carrying the D088 physical-object branch and Bee provenance link. */
+internal object BackupContractV3 {
+    const val FORMAT = 3
+    const val SCHEMA = 3
+    const val PROFILE = BackupContractV1.PROFILE
+    val collections = linkedMapOf(
+        "territories" to "research/territories.json",
+        "observers" to "research/observers.json",
+        "physical-objects" to "research/physical-objects.json",
+        "apiaries" to "research/apiaries.json",
+        "observation-points" to "research/observation-points.json",
+        "bees" to "research/bees.json",
+        "flight-cycles" to "research/flight-cycles.json",
+        "observation-point-weather" to "research/observation-point-weather.json",
+        "observation-point-attachments" to "research/observation-point-attachments.json",
+        "portable-settings" to "settings/portable-settings.json",
+        "map-coverage" to "settings/map-coverage.json",
+    )
+
+    const val ATTACHMENT_PREFIX = BackupContractV2.ATTACHMENT_PREFIX
+}
 internal sealed class BackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
 internal class UnsupportedBackupFormat(message: String) : BackupException(message)
 internal class UnsupportedArchiveSchema(message: String) : BackupException(message)

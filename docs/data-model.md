@@ -1751,7 +1751,7 @@ ObservationPoint, Bee и FlightCycle, потому что невозможно �
 
 ---
 
-# 69.1. Room schema v6/v7
+# 69.1. Room schema v6/v7/v8
 
 Schema v6 сохраняет Points Browser/read-side изменения предыдущей итерации.
 Schema v7 выполняет non-destructive migration 6 → 7: добавляет nullable
@@ -1759,6 +1759,10 @@ Schema v7 выполняет non-destructive migration 6 → 7: добавляе
 `observation_point_weather`. Для каждой существующей точки создаётся weather row
 со статусом `PENDING` и всеми значениями snapshot `null`; фиктивная погода не
 подставляется. Existing UUID, Bee и FlightCycle сохраняются.
+
+Schema v8 выполняет non-destructive migration 7 → 8 для физических объектов
+и nullable явной связи Bee, описанной в разделе 71.1. Существующие Bee получают
+`source_object_id = null`; исходные FlightCycle не меняются.
 
 Новая ObservationPoint создаётся вместе с `PENDING` weather row в одной Room
 transaction. Успешно загруженный `LOADED` snapshot не перезаписывается обычным
@@ -1825,10 +1829,10 @@ ObservationPoint 2
 
 ---
 
-# 71.1. Долговечные физические объекты — принятая schema boundary (не реализована)
+# 71.1. Долговечные физические объекты — Room schema v8
 
-Принято решением D088; Room schema и миграции этой задачей не вводятся. Раздел фиксирует
-границу, к которой должна прийти реализация Objects V1, а не текущее состояние базы.
+Принято решением D088. Room schema v8 реализует эту границу таблицами
+`physical_objects` и `apiaries`, а также nullable FK `bees.source_object_id`.
 
 ## Общая внутренняя identity-запись
 
@@ -1876,7 +1880,7 @@ subtype-свойства. Они добавляются аддитивной м�
 ## Связь Bee → объект
 
 ```text
-bees.object_id   UUID   nullable, FK → identity.id (RESTRICT)
+bees.source_object_id   UUID   nullable, FK → identity.id (RESTRICT)
 ```
 
 Связь задаётся только явно, не выводится из расстояния, ближайшего объекта или координат, и
@@ -1887,10 +1891,10 @@ bees.object_id   UUID   nullable, FK → identity.id (RESTRICT)
 
 Обозначение и `sequence_number` **никогда не выдаются повторно** другому физическому объекту в
 том же scope (D088, раздел 4). Это отдельный инвариант, а не следствие способа выделения
-номера: `MAX(sequence_number) + 1` по живым строкам достаточен только в том случае, если строки
-физических объектов не удаляются физически; при любой другой deletion/archive семантике
-реализация обязана обеспечить непереиспользование другим способом. Конкретный механизм
-выбирается при реализации Objects V1 и здесь не фиксируется.
+номера. В v8 строки физических объектов сохраняются исторически: операция их удаления
+не предоставляется, удаление Territory с объектами блокируется, а следующий номер
+выделяется как `MAX(sequence_number) + 1` внутри одной Room-транзакции. Любая будущая
+возможность физического удаления обязана отдельно сохранить непереиспользование номера.
 
 ---
 
