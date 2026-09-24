@@ -76,7 +76,7 @@ internal fun InitialSetupScreen(
             }
             item {
                 Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().testTag("setup-continue")) {
-                    Text("Продолжить без настройки")
+                    Text(if (state is InitialSetupState.Ready && state.complete) "Готово" else "Продолжить без настройки")
                 }
             }
         }
