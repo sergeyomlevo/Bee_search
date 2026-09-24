@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import java.util.UUID
 import org.beesearch.app.ui.map.AreaNameDialog
 import org.beesearch.app.ui.map.AREA_MAP_READY_LABEL
@@ -17,6 +18,10 @@ import org.beesearch.app.ui.map.DeleteAreaDialog
 import org.beesearch.app.ui.map.MapArea
 import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapGeoBounds
+import org.beesearch.app.ui.map.MapPackageAvailability
+import org.beesearch.app.ui.map.ActiveMapPackage
+import org.beesearch.app.ui.map.MapPackageManifest
+import java.io.File
 import org.beesearch.app.ui.map.SEND_AREA_LABEL
 import org.beesearch.app.ui.map.VIEW_AREA_ON_MAP_LABEL
 import org.beesearch.app.ui.map.areaUnionKm2
@@ -54,6 +59,12 @@ class AreaScreenTest {
         sending: Boolean = false,
         discovering: Boolean = false,
         mapReady: Boolean = false,
+        mapAvailability: MapPackageAvailability? = if (mapReady) MapPackageAvailability.Ready(
+            ActiveMapPackage(
+                MapPackageManifest(1, "test", "test", "test", "v1", "v1", emptyList(),
+                    0, 1, "test.pmtiles", 1, "0".repeat(64)), File("test.pmtiles"),
+            ),
+        ) else MapPackageAvailability.Missing,
         coverageMismatch: Boolean = false,
         onCreate: () -> Unit = {},
         onViewOnMap: () -> Unit = {},
@@ -70,7 +81,7 @@ class AreaScreenTest {
                     message = message,
                     sending = sending,
                     discovering = discovering,
-                    mapReady = mapReady,
+                    mapAvailability = mapAvailability,
                     coverageMismatch = coverageMismatch,
                     onCreate = onCreate,
                     onViewOnMap = onViewOnMap,
@@ -150,7 +161,7 @@ class AreaScreenTest {
         composeRule.onNodeWithTag(VIEW_AREA_ON_MAP_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(SEND_AREA_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(LOAD_AREA_MAP_TAG).assertIsDisplayed()
-        composeRule.onNodeWithTag(DELETE_AREA_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DELETE_AREA_TAG).performScrollTo().assertIsDisplayed()
         // Renaming was retired: the name is set once when the Ареал is created.
         composeRule.onNodeWithText("Переименовать").assertDoesNotExist()
         composeRule.onNodeWithTag("rename-area").assertDoesNotExist()
@@ -175,11 +186,37 @@ class AreaScreenTest {
         show(MapAreaReadResult.Present(area), mapReady = true)
 
         composeRule.onNodeWithTag(AREA_MAP_READY_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(AREA_MAP_GUIDANCE_TAG).assertDoesNotExist()
         composeRule.onNodeWithText(AREA_MAP_READY_LABEL).assertIsDisplayed()
         // The status names no package, path, hash or identifier.
         listOf("package-", ".pmtiles", "sha", "packageId").forEach { technical ->
             composeRule.onNodeWithText(technical, substring = true).assertDoesNotExist()
         }
+    }
+
+    @Test
+    fun missingMapGuidancePersistsAfterSend() {
+        var sent = 0
+        show(MapAreaReadResult.Present(area), onSend = { sent++ })
+        composeRule.onNodeWithTag(AREA_MAP_GUIDANCE_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(SEND_AREA_TAG).performClick()
+        composeRule.runOnIdle { assertTrue(sent == 1) }
+        composeRule.onNodeWithTag(AREA_MAP_GUIDANCE_TAG).assertIsDisplayed()
+
+    }
+
+    @Test
+    fun loadingDoesNotClaimMapMissing() {
+        show(MapAreaReadResult.Present(area), mapAvailability = null)
+        composeRule.onNodeWithTag(AREA_MAP_GUIDANCE_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun unavailableMapIsNotReportedAsMissing() {
+        show(MapAreaReadResult.Present(area),
+            mapAvailability = MapPackageAvailability.Unavailable("invalid"))
+        composeRule.onNodeWithTag(AREA_MAP_GUIDANCE_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Карта недоступна", substring = true).assertIsDisplayed()
     }
 
     @Test

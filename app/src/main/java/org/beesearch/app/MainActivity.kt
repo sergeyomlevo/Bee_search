@@ -109,6 +109,8 @@ private fun BeeSearchApp(
     }
     val viewModel: MainViewModel = viewModel(factory = MainViewModel.factory(application))
     val route by viewModel.route.collectAsStateWithLifecycle()
+    val initialSetup by viewModel.visibleInitialSetup.collectAsStateWithLifecycle()
+    val setupSettingsSection by viewModel.setupSettingsSection.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val territories by viewModel.territories.collectAsStateWithLifecycle()
     val observers by viewModel.observers.collectAsStateWithLifecycle()
@@ -152,11 +154,23 @@ private fun BeeSearchApp(
         application.container.exchangeStorage.ensure()
     }
 
+    LaunchedEffect(route) {
+        if (route == AppRoute.InitialSetup) viewModel.onAutomaticSetupShown()
+    }
+
     Bee_searchTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (val currentRoute = route) {
                     AppRoute.Loading -> LoadingScreen()
+                    AppRoute.InitialSetup -> org.beesearch.app.ui.settings.InitialSetupScreen(
+                        state = initialSetup,
+                        onObserver = { viewModel.openSetupSettings(SetupSettingsSection.OBSERVER) },
+                        onTerritory = { viewModel.openSetupSettings(SetupSettingsSection.TERRITORY) },
+                        onArea = viewModel::openSetupArea,
+                        onMap = viewModel::openSetupArea,
+                        onContinue = viewModel::leaveInitialSetup,
+                    )
                     AppRoute.Settings -> SettingsScreen(
                         observers = observers,
                         currentObserverId = settings.currentObserverId,
@@ -173,10 +187,12 @@ private fun BeeSearchApp(
                         onDeleteTerritory = viewModel::deleteTerritory,
                         onOpenOfflineMaps = viewModel::openOfflineMaps,
                         onOpenHelp = viewModel::openHelp,
+                        onOpenInitialSetup = viewModel::openInitialSetup,
+                        initialSetupSection = setupSettingsSection,
                     )
                     AppRoute.Help -> HelpScreen(
                         exchangeStorage = application.container.exchangeStorage,
-                        onBack = viewModel::openSettings,
+                        onBack = viewModel::returnFromHelp,
                     )
                     AppRoute.Objects -> ObjectsScreen(
                         onBack = viewModel::openCurrentTerritory,
@@ -193,7 +209,7 @@ private fun BeeSearchApp(
                         exchangeStorage = application.container.exchangeStorage,
                         onCreate = { viewModel.openAreaSectionsEditor(returnToView = false) },
                         onViewOnMap = viewModel::openAreaView,
-                        onBack = viewModel::openObjects,
+                        onBack = viewModel::returnFromSetupDestination,
                     )
                     AppRoute.AreaView -> AreaViewRoute(
                         territory = currentTerritory,

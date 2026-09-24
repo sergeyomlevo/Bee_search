@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -26,17 +28,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.SetupSettingsSection
 import java.util.UUID
 import org.beesearch.app.ui.territory.TerritoryRow
 
@@ -49,6 +54,8 @@ internal fun SettingsScreen(
     onBack: () -> Unit,
     onOpenOfflineMaps: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
+    onOpenInitialSetup: () -> Unit = {},
+    initialSetupSection: SetupSettingsSection? = null,
     onSelectObserver: (UUID) -> Unit,
     onCreateObserver: (String, String, String, String, String) -> Unit,
     onUpdateObserver: (Observer) -> Unit = {},
@@ -73,24 +80,34 @@ internal fun SettingsScreen(
     var territoryName by rememberSaveable { mutableStateOf("") }
     var region by rememberSaveable { mutableStateOf("") }
     var district by rememberSaveable { mutableStateOf("") }
+    val observerRequester = remember { BringIntoViewRequester() }
+    val territoryRequester = remember { BringIntoViewRequester() }
+    var observerPlaced by remember { mutableStateOf(false) }
+    var territoryPlaced by remember { mutableStateOf(false) }
+    fun navigateBack() {
+        if (addingObserver || addingTerritory || editingObserver != null || editingTerritory != null) {
+            addingObserver = false
+            addingTerritory = false
+            editingObserver = null
+            editingTerritory = null
+        } else onBack()
+    }
+    LaunchedEffect(initialSetupSection, observerPlaced, territoryPlaced) {
+        when (initialSetupSection) {
+            SetupSettingsSection.OBSERVER -> if (observerPlaced) observerRequester.bringIntoView()
+            SetupSettingsSection.TERRITORY -> if (territoryPlaced) territoryRequester.bringIntoView()
+            null -> Unit
+        }
+    }
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
             TopAppBar(title = { Text("Настройки") }, navigationIcon = {
-                TextButton(onClick = {
-                    if (addingObserver || addingTerritory || editingObserver != null || editingTerritory != null) {
-                        addingObserver = false
-                        addingTerritory = false
-                        editingObserver = null
-                        editingTerritory = null
-                    } else onBack()
-                }) { Text("Назад") }
+                TextButton(onClick = ::navigateBack) { Text("Назад") }
             })
         },
     ) { padding ->
-        BackHandler(enabled = addingObserver || addingTerritory || editingObserver != null || editingTerritory != null) {
-            addingObserver = false; addingTerritory = false; editingObserver = null; editingTerritory = null
-        }
+        BackHandler(onBack = ::navigateBack)
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -115,12 +132,20 @@ internal fun SettingsScreen(
                 }
             }
             SettingsDestination(
+                title = "Начальная настройка",
+                description = "Проверить готовность к работе и открыть нужные настройки.",
+                testTag = "settings-initial-setup",
+                onOpen = onOpenInitialSetup,
+            )
+            SettingsDestination(
                 title = "Помощь",
                 description = "Краткий старт и подробная работа с Bee Search.",
                 testTag = "settings-help",
                 onOpen = onOpenHelp,
             )
-            Text("Наблюдатель", style = MaterialTheme.typography.titleMedium)
+            Text("Наблюдатель", style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.bringIntoViewRequester(observerRequester)
+                    .onGloballyPositioned { observerPlaced = true })
             if (observers.isEmpty()) Text("Наблюдателей пока нет.")
             observers.forEach { observer ->
                 ObserverRow(
@@ -152,7 +177,9 @@ internal fun SettingsScreen(
                 }, enabled = codeValue.isNotBlank() && lastValue.isNotBlank() && firstValue.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(if (edit == null) "Добавить наблюдателя" else "Сохранить") }
             }
             HorizontalDivider()
-            Text("Территории", style = MaterialTheme.typography.titleMedium)
+            Text("Территории", style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.bringIntoViewRequester(territoryRequester)
+                    .onGloballyPositioned { territoryPlaced = true })
             if (territories.isEmpty()) Text("Территорий пока нет.")
             territories.forEach { territory ->
                 TerritoryRow(territory, territory.id == currentTerritoryId, { onSelectTerritory(territory.id) }, { editingTerritory = territory; addingTerritory = false }, { deleteTerritory = territory })

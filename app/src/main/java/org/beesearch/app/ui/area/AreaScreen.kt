@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.beesearch.app.data.exchange.AreaExchangeFileName
 import org.beesearch.app.data.exchange.AreaExchangeMirror
@@ -78,6 +79,7 @@ internal const val VIEW_AREA_ON_MAP_TAG = "view-area-on-map"
 internal const val SEND_AREA_TAG = "send-area"
 internal const val LOAD_AREA_MAP_TAG = "load-area-map"
 internal const val AREA_MAP_READY_TAG = "area-map-ready"
+internal const val AREA_MAP_GUIDANCE_TAG = "area-map-guidance"
 internal const val AREA_MAP_MESSAGE_TAG = "area-map-message"
 internal const val AREA_MAP_CHOOSE_ANOTHER_ACTION_TAG = "area-map-choose-another-action"
 internal const val DELETE_AREA_TAG = "delete-area"
@@ -117,21 +119,21 @@ internal fun AreaRoute(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var read by remember { mutableStateOf<MapAreaReadResult>(MapAreaReadResult.Absent) }
+    val territoryId = territory?.id
+    var read by remember(territoryId) { mutableStateOf<MapAreaReadResult?>(null) }
     var deleteVisible by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var sending by remember { mutableStateOf(false) }
     var discovering by remember { mutableStateOf(false) }
-    var mapAvailability by remember {
-        mutableStateOf<MapPackageAvailability>(MapPackageAvailability.Missing)
-    }
     var foundCandidate by remember { mutableStateOf<AreaMapCandidate?>(null) }
     var alternatives by remember { mutableStateOf(emptyList<AreaMapCandidate>()) }
     var alternativesVisible by remember { mutableStateOf(false) }
     var coverageMismatch by remember { mutableStateOf(false) }
-    val territoryId = territory?.id
     val area = (read as? MapAreaReadResult.Present)?.area
     val coverage = area?.coverageFragments().orEmpty()
+    var mapAvailability by remember(territoryId, coverage) {
+        mutableStateOf<MapPackageAvailability?>(null)
+    }
 
     // The offline-map import lives in this shared session: the Ареал screen only decides which pair to
     // hand it, and the session ends in the same MapPackageStore.import as every other entry point.
@@ -168,7 +170,8 @@ internal fun AreaRoute(
         } else {
             try {
                 areaStore.load(territoryId, territory.name)
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
                 MapAreaReadResult.Corrupt("не удалось прочитать ареал")
             }
         }
@@ -180,8 +183,13 @@ internal fun AreaRoute(
     }
 
     LaunchedEffect(territoryId, mapPackageStore, coverage) {
-        if (territoryId == null) return@LaunchedEffect
-        mapAvailability = mapPackageStore.loadActive(territoryId, coverage)
+        if (territoryId == null || area == null) return@LaunchedEffect
+        mapAvailability = try {
+            mapPackageStore.loadActive(territoryId, coverage)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            MapPackageAvailability.Unavailable("Не удалось проверить офлайн-карту")
+        }
     }
 
     /** Loads one discovered package through the shared import flow. */
@@ -232,7 +240,7 @@ internal fun AreaRoute(
         message = message,
         sending = sending,
         discovering = discovering,
-        mapReady = mapAvailability is MapPackageAvailability.Ready,
+        mapAvailability = mapAvailability,
         coverageMismatch = coverageMismatch,
         onCreate = onCreate,
         onViewOnMap = onViewOnMap,
@@ -318,11 +326,11 @@ internal fun AreaRoute(
 @Composable
 internal fun AreaScreen(
     territoryCode: String?,
-    read: MapAreaReadResult,
+    read: MapAreaReadResult?,
     message: String?,
     sending: Boolean,
     discovering: Boolean,
-    mapReady: Boolean,
+    mapAvailability: MapPackageAvailability?,
     coverageMismatch: Boolean,
     onCreate: () -> Unit,
     onViewOnMap: () -> Unit,
@@ -382,6 +390,7 @@ internal fun AreaScreen(
             }
             item {
                 when (read) {
+                    null -> Text("Проверяем ареал…")
                     MapAreaReadResult.Absent -> AreaNotCreated(
                         territoryMissing = territoryCode == null,
                         onCreate = onCreate,
@@ -391,7 +400,7 @@ internal fun AreaScreen(
                         area = read.area,
                         sending = sending,
                         discovering = discovering,
-                        mapReady = mapReady,
+                        mapAvailability = mapAvailability,
                         onViewOnMap = onViewOnMap,
                         onSend = onSend,
                         onLoadMap = onLoadMap,
@@ -451,7 +460,7 @@ private fun AreaCard(
     area: MapArea,
     sending: Boolean,
     discovering: Boolean,
-    mapReady: Boolean,
+    mapAvailability: MapPackageAvailability?,
     onViewOnMap: () -> Unit,
     onSend: () -> Unit,
     onLoadMap: () -> Unit,
@@ -499,13 +508,23 @@ private fun AreaCard(
                     .testTag(LOAD_AREA_MAP_TAG)
                     .semantics { contentDescription = LOAD_AREA_MAP_DESCRIPTION },
             ) { Text(if (discovering) "Поиск карты…" else LOAD_AREA_MAP_LABEL) }
-            if (mapReady) {
+            if (mapAvailability is MapPackageAvailability.Ready) {
                 Text(
                     text = AREA_MAP_READY_LABEL,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier
                         .testTag(AREA_MAP_READY_TAG)
                         .semantics { contentDescription = AREA_MAP_READY_DESCRIPTION },
+                )
+            } else if (mapAvailability != null) {
+                Text(
+                    text = if (mapAvailability is MapPackageAvailability.Unavailable) {
+                        "Карта недоступна. Отправьте ареал кнопкой „Отправить ареал“ тому, кто создаст карту. Полученную карту добавьте через „Загрузить карту“."
+                    } else {
+                        "Для этого ареала нет готовой офлайн-карты. Отправьте его кнопкой „Отправить ареал“ тому, кто создаст карту. Полученную карту добавьте через „Загрузить карту“."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.testTag(AREA_MAP_GUIDANCE_TAG),
                 )
             }
             TextButton(

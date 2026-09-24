@@ -8,16 +8,65 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertTrue
+import org.beesearch.app.SetupSettingsSection
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenImeTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun initialSetupCanBeOpenedManuallyFromSettings() {
+        var opened = false
+        composeRule.setContent { Bee_searchTheme {
+            SettingsScreen(
+                observers = emptyList(), currentObserverId = null,
+                territories = emptyList(), currentTerritoryId = null,
+                onBack = {}, onOpenInitialSetup = { opened = true },
+                onSelectObserver = {}, onCreateObserver = { _, _, _, _, _ -> },
+                onSelectTerritory = {}, onCreateTerritory = { _, _, _, _ -> },
+            )
+        } }
+        composeRule.onNodeWithTag("settings-initial-setup").performClick()
+        composeRule.runOnIdle { assertTrue(opened) }
+    }
+
+    @Test
+    fun systemBackUsesContextualSettingsReturn() {
+        var returned = false
+        composeRule.setContent { Bee_searchTheme {
+            SettingsScreen(
+                observers = emptyList(), currentObserverId = null,
+                territories = emptyList(), currentTerritoryId = null,
+                onBack = { returned = true },
+                onSelectObserver = {}, onCreateObserver = { _, _, _, _, _ -> },
+                onSelectTerritory = {}, onCreateTerritory = { _, _, _, _ -> },
+            )
+        } }
+        Espresso.pressBack()
+        composeRule.runOnIdle { assertTrue(returned) }
+    }
+
+    @Test
+    fun checklistTerritoryEntryBringsExistingSectionIntoView() {
+        composeRule.setContent { Bee_searchTheme {
+            SettingsScreen(
+                observers = emptyList(), currentObserverId = null,
+                territories = emptyList(), currentTerritoryId = null,
+                onBack = {}, initialSetupSection = SetupSettingsSection.TERRITORY,
+                onSelectObserver = {}, onCreateObserver = { _, _, _, _, _ -> },
+                onSelectTerritory = {}, onCreateTerritory = { _, _, _, _ -> },
+            )
+        } }
+        composeRule.onNodeWithText("Территории").assertIsDisplayed()
+    }
 
     @Test
     fun territoryFormKeepsLastFieldReachableAtLargeFontScale() {

@@ -31,6 +31,7 @@ interface SettingsRepository {
     suspend fun getSettings(): AppSettings
     suspend fun setCurrentTerritoryId(territoryId: UUID?)
     suspend fun setCurrentObserverId(observerId: UUID?)
+    suspend fun setInitialSetupOfferHandled(handled: Boolean)
 }
 
 interface TerritoryRepository {

@@ -11,6 +11,8 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
@@ -42,6 +44,7 @@ class DataStoreSettingsRepositoryTest {
     @Test
     fun cleanInstallHasNoCurrentSelectionAndValuesRoundTrip() = runBlocking {
         assertNull(repository.getSettings().currentObserverId)
+        assertFalse(repository.getSettings().initialSetupOfferHandled)
 
         val territoryId = UUID.randomUUID()
         val observerId = UUID.randomUUID()
@@ -51,5 +54,7 @@ class DataStoreSettingsRepositoryTest {
         val settings = repository.getSettings()
         assertEquals(observerId, settings.currentObserverId)
         assertEquals(territoryId, settings.currentTerritoryId)
+        repository.setInitialSetupOfferHandled(true)
+        assertTrue(repository.getSettings().initialSetupOfferHandled)
     }
 }

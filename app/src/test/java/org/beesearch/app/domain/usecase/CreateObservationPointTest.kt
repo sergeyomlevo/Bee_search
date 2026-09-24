@@ -39,6 +39,7 @@ class CreateObservationPointTest {
     }
 
     private class FakeSettings(private val value: AppSettings) : SettingsRepository {
+        override suspend fun setInitialSetupOfferHandled(handled: Boolean) = Unit
         override val settings: Flow<AppSettings> = emptyFlow()
         override suspend fun getSettings() = value
         override suspend fun setCurrentTerritoryId(territoryId: UUID?) = Unit

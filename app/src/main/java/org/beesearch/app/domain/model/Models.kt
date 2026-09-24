@@ -6,6 +6,7 @@ import java.util.UUID
 data class AppSettings(
     val currentTerritoryId: UUID?,
     val currentObserverId: UUID?,
+    val initialSetupOfferHandled: Boolean = false,
 )
 
 data class Territory(

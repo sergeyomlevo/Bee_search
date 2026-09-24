@@ -2,6 +2,30 @@
 
 ## Current milestone
 
+Initial Setup V1 adds a non-blocking, four-step readiness checklist for the
+current Observer, Territory, Ареал and coverage-compatible offline map. The
+first incomplete launch opens it after local state loads unless an active
+ObservationPoint needs recovery. Settings provides repeat access. One
+device-local `initial_setup_offer_handled` flag suppresses repeat automatic
+offers; no readiness or Area-sent flags are persisted. The Ареал screen now
+keeps the send/load guidance visible until a suitable map is Ready.
+
+## Verification status
+
+Focused JVM tests, debug/androidTest Kotlin compilation, lint and debug build
+passed. Preserving Samsung SM-S938B instrumentation passed for checklist UI,
+DataStore settings, Settings navigation, Ареал guidance and map loading. The
+DEV package was updated in place without clearing data; Beta was not touched.
+Independent luna-verifier was launched but hit a usage limit before a verdict;
+root performed a separate self-review.
+
+## Next task
+
+Owner review of the local Initial Setup commit and manual in-app acceptance on
+Samsung; no push or Beta release was performed for this milestone.
+
+## Previous milestone
+
 D088 physical object data foundation is implemented. Room schema v8 adds an
 internal `physical_objects` identity table, an `apiaries` subtype table, and
 nullable `bees.source_object_id`. Concrete domain types are Hollow, LogHive and

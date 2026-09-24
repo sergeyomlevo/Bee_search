@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import java.nio.file.Files
@@ -285,7 +286,7 @@ class AreaMapLoadingTest {
 
         composeRule.onNodeWithTag(VIEW_AREA_ON_MAP_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(SEND_AREA_TAG).assertIsDisplayed()
-        composeRule.onNodeWithTag(DELETE_AREA_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DELETE_AREA_TAG).performScrollTo().assertIsDisplayed()
     }
 
     /** A canonical store that only reads, and counts any attempt to write. */

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -54,6 +55,11 @@ import org.beesearch.app.domain.usecase.CreateObservationPoint
 import org.beesearch.app.domain.usecase.StartupDestination
 import org.beesearch.app.domain.usecase.StartupRouter
 import org.beesearch.app.ui.map.AreaEditorRequest
+import org.beesearch.app.ui.map.MapAreaReadResult
+import org.beesearch.app.ui.map.MapAreaStore
+import org.beesearch.app.ui.map.MapPackageAvailability
+import org.beesearch.app.ui.map.MapPackageStore
+import org.beesearch.app.ui.map.coverageFragments
 import java.util.UUID
 import java.io.InputStream
 import java.time.Clock
@@ -64,6 +70,7 @@ import org.beesearch.app.data.media.StagedObservationPointPhoto
 sealed interface AppRoute {
     data object Loading : AppRoute
     data object Settings : AppRoute
+    data object InitialSetup : AppRoute
     data object Help : AppRoute
     data object Objects : AppRoute
     data object Area : AppRoute
@@ -103,6 +110,52 @@ internal data class UiFeedback(
     val displayMode: FeedbackDisplayMode,
 )
 
+internal sealed interface InitialSetupState {
+    val generation: Int
+    data class Loading(
+        val activePoint: ObservationPoint? = null,
+        override val generation: Int = 0,
+    ) : InitialSetupState
+    data class Ready(
+        val activePoint: ObservationPoint?,
+        val observer: Observer?,
+        val territory: Territory?,
+        val area: MapAreaReadResult,
+        val map: MapPackageAvailability?,
+        val offerHandled: Boolean,
+        override val generation: Int = 0,
+    ) : InitialSetupState {
+        val complete: Boolean get() = observer != null && territory != null &&
+            area is MapAreaReadResult.Present && map is MapPackageAvailability.Ready
+    }
+}
+
+internal enum class SetupSettingsSection { OBSERVER, TERRITORY }
+
+private data class InitialSetupFacts(
+    val activePoint: ObservationPoint?,
+    val settings: AppSettings,
+    val territories: List<Territory>,
+    val observers: List<Observer>,
+)
+
+internal fun startupDestinationFor(state: InitialSetupState): StartupDestination = when (state) {
+    is InitialSetupState.Loading -> state.activePoint?.let(StartupDestination::ResumeObservation)
+        ?: StartupDestination.Loading
+    is InitialSetupState.Ready -> StartupRouter.decide(
+        activePoint = state.activePoint,
+        currentTerritoryId = state.territory?.id,
+        territories = listOfNotNull(state.territory),
+        currentObserverId = state.observer?.id,
+        observers = listOfNotNull(state.observer),
+        setupComplete = state.complete,
+        offerHandled = state.offerHandled,
+    )
+}
+
+internal fun visibleInitialSetupFor(state: InitialSetupState, generation: Int): InitialSetupState =
+    if (state.generation == generation) state else InitialSetupState.Loading(generation = generation)
+
 internal class MainViewModel(
     private val settingsRepository: SettingsRepository,
     private val territoryRepository: TerritoryRepository,
@@ -112,9 +165,15 @@ internal class MainViewModel(
     private val attachmentFileStore: ObservationAttachmentFileStore,
     private val locationProvider: LocationProvider,
     private val territoryCoverageDeletion: TerritoryCoverageDeletion,
+    private val mapAreaStore: MapAreaStore,
+    private val mapPackageStore: MapPackageStore,
     private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
     private val manualRoute = MutableStateFlow<AppRoute?>(null)
+    private val setupRefresh = MutableStateFlow(0)
+    private val _setupSettingsSection = MutableStateFlow<SetupSettingsSection?>(null)
+    val setupSettingsSection: StateFlow<SetupSettingsSection?> = _setupSettingsSection.asStateFlow()
+    private var setupReturnPending = false
 
     /**
      * The pending request to open the участки editor.
@@ -194,25 +253,54 @@ internal class MainViewModel(
     val currentObserver: StateFlow<Observer?> = combine(settings, observers) { appSettings, allObservers ->
         appSettings.currentObserverId?.let { id -> allObservers.firstOrNull { it.id == id } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    val startupDestination: StateFlow<StartupDestination> = combine(
-        activePoint,
-        settings,
-        territories,
-        observers,
+    private val setupFacts = combine(
+        observationRepository.observeActivePoint(),
+        settingsRepository.settings,
+        territoryRepository.observeTerritories(),
+        observerRepository.observeObservers(),
     ) { point, appSettings, allTerritories, allObservers ->
-        StartupRouter.decide(
-            activePoint = point,
-            currentTerritoryId = appSettings.currentTerritoryId,
-            territories = allTerritories,
-            currentObserverId = appSettings.currentObserverId,
-            observers = allObservers,
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StartupDestination.Loading)
+        InitialSetupFacts(point, appSettings, allTerritories, allObservers)
+    }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val initialSetup: StateFlow<InitialSetupState> = combine(setupFacts, setupRefresh) { facts, generation ->
+        facts to generation
+    }.flatMapLatest { (facts, generation) ->
+            flow {
+                emit(InitialSetupState.Loading(facts.activePoint, generation))
+                val territory = facts.settings.currentTerritoryId?.let { id ->
+                    facts.territories.firstOrNull { it.id == id }
+                }
+                val observer = facts.settings.currentObserverId?.let { id ->
+                    facts.observers.firstOrNull { it.id == id }
+                }
+                val area = if (territory == null) MapAreaReadResult.Absent else try {
+                    mapAreaStore.load(territory.id, territory.name)
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    MapAreaReadResult.Corrupt("Не удалось прочитать ареал")
+                }
+                val map = if (territory != null && area is MapAreaReadResult.Present) try {
+                    mapPackageStore.loadActive(territory.id, area.area.coverageFragments())
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    MapPackageAvailability.Unavailable("Не удалось проверить офлайн-карту")
+                } else null
+                emit(InitialSetupState.Ready(facts.activePoint, observer, territory, area, map,
+                    facts.settings.initialSetupOfferHandled, generation))
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InitialSetupState.Loading())
+    val visibleInitialSetup: StateFlow<InitialSetupState> = combine(initialSetup, setupRefresh) { state, generation ->
+        visibleInitialSetupFor(state, generation)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InitialSetupState.Loading())
+    val startupDestination: StateFlow<StartupDestination> = initialSetup.map(::startupDestinationFor)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StartupDestination.Loading)
     val route: StateFlow<AppRoute> = combine(startupDestination, manualRoute) { destination, manual ->
         manual ?: destination.toRoute()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppRoute.Loading)
 
     fun openSettings() {
+        setupReturnPending = false
+        _setupSettingsSection.value = null
         manualRoute.value = AppRoute.Settings
         clearFeedback()
     }
@@ -222,12 +310,19 @@ internal class MainViewModel(
         clearFeedback()
     }
 
+    fun returnFromHelp() {
+        manualRoute.value = AppRoute.Settings
+        clearFeedback()
+    }
+
     fun openObjects() {
+        setupReturnPending = false
         manualRoute.value = AppRoute.Objects
         clearFeedback()
     }
 
     fun openPoints() {
+        setupReturnPending = false
         manualRoute.value = AppRoute.Points
         clearFeedback()
     }
@@ -310,12 +405,14 @@ internal class MainViewModel(
     }
 
     fun openMapWithCoverageEdit() {
+        setupReturnPending = false
         manualRoute.value = AppRoute.CurrentTerritory
         areaEditorRequest.request()
         clearFeedback()
     }
 
     fun openCurrentTerritory() {
+        setupReturnPending = false
         manualRoute.value = AppRoute.CurrentTerritory
         clearFeedback()
     }
@@ -326,14 +423,58 @@ internal class MainViewModel(
     }
 
     fun returnToStartup() {
-        manualRoute.value = null
+        returnToSetupOrStartup()
         clearFeedback()
+    }
+
+    private fun returnToSetupOrStartup() {
+        if (setupReturnPending) setupRefresh.value += 1
+        manualRoute.value = if (setupReturnPending) AppRoute.InitialSetup else null
+    }
+
+    fun openInitialSetup() {
+        setupReturnPending = false
+        setupRefresh.value += 1
+        manualRoute.value = AppRoute.InitialSetup
+        clearFeedback()
+    }
+
+    fun onAutomaticSetupShown() {
+        if (manualRoute.value != null) return
+        manualRoute.value = AppRoute.InitialSetup
+        viewModelScope.launch { settingsRepository.setInitialSetupOfferHandled(true) }
+    }
+
+    fun leaveInitialSetup() {
+        setupReturnPending = false
+        viewModelScope.launch {
+            settingsRepository.setInitialSetupOfferHandled(true)
+            // Keep the map explicit until the DataStore Flow reaches startup routing: dropping
+            // the override immediately could briefly replay the old automatic setup route.
+            manualRoute.value = AppRoute.CurrentTerritory
+        }
+    }
+
+    fun openSetupSettings(section: SetupSettingsSection) {
+        setupReturnPending = true
+        _setupSettingsSection.value = section
+        manualRoute.value = AppRoute.Settings
+    }
+
+    fun openSetupArea() {
+        setupReturnPending = true
+        manualRoute.value = AppRoute.Area
+    }
+
+    fun returnFromSetupDestination() {
+        if (setupReturnPending) setupRefresh.value += 1
+        manualRoute.value = if (setupReturnPending) AppRoute.InitialSetup else AppRoute.Objects
     }
 
     fun setCurrentTerritory(territoryId: UUID) {
         launchOperation {
             settingsRepository.setCurrentTerritoryId(territoryId)
-            manualRoute.value = null
+            returnToSetupOrStartup()
             showSuccessFeedback("Текущая территория изменена")
         }
     }
@@ -341,7 +482,7 @@ internal class MainViewModel(
     fun setCurrentObserver(observerId: UUID) {
         launchOperation {
             settingsRepository.setCurrentObserverId(observerId)
-            manualRoute.value = null
+            returnToSetupOrStartup()
             showSuccessFeedback("Текущий наблюдатель изменён")
         }
     }
@@ -363,7 +504,7 @@ internal class MainViewModel(
         launchOperation {
             val territory = territoryRepository.createTerritory(code, name, region, district)
             settingsRepository.setCurrentTerritoryId(territory.id)
-            manualRoute.value = null
+            returnToSetupOrStartup()
             showSuccessFeedback("Территория создана и выбрана текущей")
         }
     }
@@ -391,7 +532,7 @@ internal class MainViewModel(
                 code, lastName, firstName, middleName, contact,
             )
             settingsRepository.setCurrentObserverId(observer.id)
-            manualRoute.value = null
+            returnToSetupOrStartup()
             showSuccessFeedback("Наблюдатель создан и выбран текущим")
         }
     }
@@ -873,6 +1014,7 @@ internal class MainViewModel(
         is StartupDestination.ResumeObservation -> AppRoute.ResumeObservation(point)
         StartupDestination.ReadyForMap -> AppRoute.CurrentTerritory
         StartupDestination.SettingsRequired -> AppRoute.Settings
+        StartupDestination.InitialSetup -> AppRoute.InitialSetup
     }
 
     companion object {
@@ -892,6 +1034,8 @@ internal class MainViewModel(
                             territoryRepository = application.container.territoryRepository,
                             areaStore = application.container.mapAreaStore,
                         ),
+                        mapAreaStore = application.container.mapAreaStore,
+                        mapPackageStore = application.container.mapPackageStore,
                     ) as T
                 }
             }

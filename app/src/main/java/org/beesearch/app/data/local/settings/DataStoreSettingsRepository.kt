@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -57,9 +58,14 @@ internal class DataStoreSettingsRepository(
         }
     }
 
+    override suspend fun setInitialSetupOfferHandled(handled: Boolean) {
+        dataStore.edit { it[INITIAL_SETUP_OFFER_HANDLED] = handled }
+    }
+
     private fun toSettings(preferences: Preferences): AppSettings = AppSettings(
         currentTerritoryId = preferences[CURRENT_TERRITORY_ID]?.let(::parseUuidOrNull),
         currentObserverId = preferences[CURRENT_OBSERVER_ID]?.let(::parseUuidOrNull),
+        initialSetupOfferHandled = preferences[INITIAL_SETUP_OFFER_HANDLED] ?: false,
     )
 
     private fun parseUuidOrNull(value: String): UUID? = runCatching {
@@ -69,6 +75,7 @@ internal class DataStoreSettingsRepository(
     private companion object {
         val CURRENT_TERRITORY_ID = stringPreferencesKey("current_territory_id")
         val CURRENT_OBSERVER_ID = stringPreferencesKey("current_observer_id")
+        val INITIAL_SETUP_OFFER_HANDLED = booleanPreferencesKey("initial_setup_offer_handled")
         val LEGACY_OBSERVER_CODE = stringPreferencesKey("observer_code")
     }
 }

@@ -53,4 +53,22 @@ class StartupRouterTest {
     @Test fun `opens map with valid selections`() {
         assertEquals(StartupDestination.ReadyForMap, StartupRouter.decide(null, territory.id, listOf(territory), observer.id, listOf(observer)))
     }
+
+    @Test fun `first incomplete setup opens checklist after authoritative load`() {
+        assertEquals(StartupDestination.InitialSetup,
+            StartupRouter.decide(null, null, emptyList(), null, emptyList(),
+                setupComplete = false, offerHandled = false))
+    }
+
+    @Test fun `handled offer does not reopen checklist automatically`() {
+        assertEquals(StartupDestination.ReadyForMap,
+            StartupRouter.decide(null, null, emptyList(), null, emptyList(),
+                setupComplete = false, offerHandled = true))
+    }
+
+    @Test fun `completed setup needs no initial offer`() {
+        assertEquals(StartupDestination.ReadyForMap,
+            StartupRouter.decide(null, territory.id, listOf(territory), observer.id, listOf(observer),
+                setupComplete = true, offerHandled = false))
+    }
 }

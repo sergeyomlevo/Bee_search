@@ -9,6 +9,7 @@ sealed interface StartupDestination {
     data object Loading : StartupDestination
     data class ResumeObservation(val point: ObservationPoint) : StartupDestination
     data object ReadyForMap : StartupDestination
+    data object InitialSetup : StartupDestination
     data object SettingsRequired : StartupDestination
 }
 
@@ -19,8 +20,11 @@ object StartupRouter {
         territories: List<Territory>,
         currentObserverId: UUID?,
         observers: List<Observer>,
+        setupComplete: Boolean = true,
+        offerHandled: Boolean = true,
     ): StartupDestination = when {
         activePoint != null -> StartupDestination.ResumeObservation(activePoint)
+        !offerHandled && !setupComplete -> StartupDestination.InitialSetup
         else -> StartupDestination.ReadyForMap
     }
 }
