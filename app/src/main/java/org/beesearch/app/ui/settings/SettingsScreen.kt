@@ -86,6 +86,12 @@ internal fun SettingsScreen(
     val territoryRequester = remember { BringIntoViewRequester() }
     var observerPlaced by remember { mutableStateOf(false) }
     var territoryPlaced by remember { mutableStateOf(false) }
+    // The checklist opens the form of a missing value directly; the viewport then follows the first
+    // meaningful input of that form, so the user sees what to do without searching down the page.
+    val observerFormRequester = remember { BringIntoViewRequester() }
+    val territoryFormRequester = remember { BringIntoViewRequester() }
+    var observerFormPlaced by remember { mutableStateOf(false) }
+    var territoryFormPlaced by remember { mutableStateOf(false) }
     fun navigateBack() {
         if (addingObserver || addingTerritory || editingObserver != null || editingTerritory != null) {
             addingObserver = false
@@ -95,9 +101,25 @@ internal fun SettingsScreen(
         } else onBack()
     }
     LaunchedEffect(initialSetupSection, observerPlaced, territoryPlaced) {
+        // The direct-entry case scrolls to the opened form itself, which sits below the section header.
+        if (initialSetupCreatesMissingValue) return@LaunchedEffect
         when (initialSetupSection) {
             SetupSettingsSection.OBSERVER -> if (observerPlaced) observerRequester.bringIntoView()
             SetupSettingsSection.TERRITORY -> if (territoryPlaced) territoryRequester.bringIntoView()
+            null -> Unit
+        }
+    }
+    // Runs once the expanded form has actually been placed, so the request targets laid-out content.
+    LaunchedEffect(
+        initialSetupSection,
+        initialSetupCreatesMissingValue,
+        observerFormPlaced,
+        territoryFormPlaced,
+    ) {
+        if (!initialSetupCreatesMissingValue) return@LaunchedEffect
+        when (initialSetupSection) {
+            SetupSettingsSection.OBSERVER -> if (observerFormPlaced) observerFormRequester.bringIntoView()
+            SetupSettingsSection.TERRITORY -> if (territoryFormPlaced) territoryFormRequester.bringIntoView()
             null -> Unit
         }
     }
@@ -185,7 +207,7 @@ internal fun SettingsScreen(
                 val firstValue = edit?.firstName ?: firstName
                 val middleValue = edit?.middleName ?: middleName
                 val contactValue = edit?.contact ?: contact
-                OutlinedTextField(codeValue, { if (edit == null) observerCode = it else editingObserver = edit.copy(code = it) }, Modifier.fillMaxWidth().testTag("observer-code-field"), label = { Text("Код") }, singleLine = true)
+                OutlinedTextField(codeValue, { if (edit == null) observerCode = it else editingObserver = edit.copy(code = it) }, Modifier.fillMaxWidth().testTag("observer-code-field").bringIntoViewRequester(observerFormRequester).onGloballyPositioned { observerFormPlaced = true }, label = { Text("Код") }, singleLine = true)
                 OutlinedTextField(lastValue, { if (edit == null) lastName = it else editingObserver = edit.copy(lastName = it) }, Modifier.fillMaxWidth(), label = { Text("Фамилия") }, singleLine = true)
                 OutlinedTextField(firstValue, { if (edit == null) firstName = it else editingObserver = edit.copy(firstName = it) }, Modifier.fillMaxWidth(), label = { Text("Имя") }, singleLine = true)
                 OutlinedTextField(middleValue, { if (edit == null) middleName = it else editingObserver = edit.copy(middleName = it) }, Modifier.fillMaxWidth(), label = { Text("Отчество (необязательно)") }, singleLine = true)
@@ -210,7 +232,7 @@ internal fun SettingsScreen(
                 val edit = editingTerritory
                 Text(if (edit == null) "Добавить территорию" else "Изменить территорию", style = MaterialTheme.typography.titleSmall)
                 val codeValue = edit?.code ?: territoryCode; val nameValue = edit?.name ?: territoryName; val regionValue = edit?.region ?: region; val districtValue = edit?.district ?: district
-                OutlinedTextField(codeValue, { if (edit == null) territoryCode = it else editingTerritory = edit.copy(code = it) }, Modifier.fillMaxWidth().testTag("territory-code-field"), label = { Text("Код") }, singleLine = true)
+                OutlinedTextField(codeValue, { if (edit == null) territoryCode = it else editingTerritory = edit.copy(code = it) }, Modifier.fillMaxWidth().testTag("territory-code-field").bringIntoViewRequester(territoryFormRequester).onGloballyPositioned { territoryFormPlaced = true }, label = { Text("Код") }, singleLine = true)
                 OutlinedTextField(nameValue, { if (edit == null) territoryName = it else editingTerritory = edit.copy(name = it) }, Modifier.fillMaxWidth(), label = { Text("Название") }, singleLine = true)
                 OutlinedTextField(regionValue, { if (edit == null) region = it else editingTerritory = edit.copy(region = it) }, Modifier.fillMaxWidth(), label = { Text("Область / регион") }, singleLine = true)
                 OutlinedTextField(districtValue, { if (edit == null) district = it else editingTerritory = edit.copy(district = it) }, Modifier.fillMaxWidth().testTag("territory-district-field"), label = { Text("Район") }, singleLine = true)

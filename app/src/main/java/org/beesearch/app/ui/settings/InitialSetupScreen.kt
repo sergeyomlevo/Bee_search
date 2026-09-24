@@ -2,7 +2,6 @@
 
 package org.beesearch.app.ui.settings
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,7 +33,6 @@ internal fun InitialSetupScreen(
     onMap: () -> Unit,
     onContinue: () -> Unit,
 ) {
-    BackHandler(onBack = onContinue)
     Scaffold(topBar = { TopAppBar(title = { Text("Начальная настройка") }) }) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).testTag("initial-setup"),
@@ -74,9 +72,16 @@ internal fun InitialSetupScreen(
                     }
                 }
             }
-            item {
-                Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().testTag("setup-continue")) {
-                    Text(if (state is InitialSetupState.Ready && state.complete) "Готово" else "Продолжить без настройки")
+            // The device-local offer flag means "the user handled the offer", so only this deliberate
+            // labelled choice sets it. A system Back press is deliberately not wired to it, and the exit
+            // does not exist before the checklist itself is on screen: otherwise a stray Back press on a
+            // not yet read checklist marked the offer handled and the next launch fell through to the
+            // map's territory blocker instead of offering the checklist.
+            if (state is InitialSetupState.Ready) {
+                item {
+                    Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().testTag("setup-continue")) {
+                        Text(if (state.complete) "Готово" else "Продолжить без настройки")
+                    }
                 }
             }
         }

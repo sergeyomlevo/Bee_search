@@ -1,5 +1,8 @@
 package org.beesearch.app.ui.settings
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -8,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.beesearch.app.ui.theme.Bee_searchTheme
@@ -154,5 +158,46 @@ class SettingsScreenImeTest {
 
         composeRule.onNodeWithTag("observer-code-field").assertDoesNotExist()
         composeRule.onNodeWithText("+ Добавить наблюдателя").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun checklistObserverEntryBringsTheOpenedFormIntoView() {
+        composeRule.setContent { Bee_searchTheme {
+            // A short viewport: the opened form starts below the fold, so only the screen's own scroll
+            // request can make it visible.
+            Box(Modifier.height(320.dp)) {
+                SettingsScreen(
+                    observers = emptyList(), currentObserverId = null,
+                    territories = emptyList(), currentTerritoryId = null,
+                    onBack = {},
+                    initialSetupSection = SetupSettingsSection.OBSERVER,
+                    initialSetupCreatesMissingValue = true,
+                    onSelectObserver = {}, onCreateObserver = { _, _, _, _, _ -> },
+                    onSelectTerritory = {}, onCreateTerritory = { _, _, _, _ -> },
+                )
+            }
+        } }
+
+        // No performScrollTo on purpose: the checklist step must show the form by itself.
+        composeRule.onNodeWithTag("observer-code-field").assertIsDisplayed()
+    }
+
+    @Test
+    fun checklistTerritoryEntryBringsTheOpenedFormIntoView() {
+        composeRule.setContent { Bee_searchTheme {
+            Box(Modifier.height(320.dp)) {
+                SettingsScreen(
+                    observers = emptyList(), currentObserverId = null,
+                    territories = emptyList(), currentTerritoryId = null,
+                    onBack = {},
+                    initialSetupSection = SetupSettingsSection.TERRITORY,
+                    initialSetupCreatesMissingValue = true,
+                    onSelectObserver = {}, onCreateObserver = { _, _, _, _, _ -> },
+                    onSelectTerritory = {}, onCreateTerritory = { _, _, _, _ -> },
+                )
+            }
+        } }
+
+        composeRule.onNodeWithTag("territory-code-field").assertIsDisplayed()
     }
 }

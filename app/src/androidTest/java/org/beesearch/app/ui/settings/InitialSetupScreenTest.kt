@@ -1,5 +1,6 @@
 package org.beesearch.app.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
@@ -9,9 +10,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
+import androidx.test.espresso.Espresso
 import java.io.File
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import org.beesearch.app.InitialSetupState
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
@@ -23,6 +26,7 @@ import org.beesearch.app.ui.map.MapPackageAvailability
 import org.beesearch.app.ui.map.MapPackageManifest
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -35,6 +39,26 @@ class InitialSetupScreenTest {
         } }
         composeRule.onNodeWithText("Проверяем данные…").assertIsDisplayed()
         composeRule.onNodeWithTag("setup-observer").assertDoesNotExist()
+        composeRule.onNodeWithTag("setup-continue").assertDoesNotExist()
+    }
+
+    @Test fun systemBackIsNotAnOfferHandlingAction() {
+        val continued = AtomicBoolean(false)
+        val backReachedHarness = AtomicBoolean(false)
+        composeRule.setContent { Bee_searchTheme {
+            // The harness stands in for whatever is behind the checklist. A Back press that the user
+            // did not aim at the labelled exit must not mark the Initial Setup offer handled.
+            BackHandler(enabled = true) { backReachedHarness.set(true) }
+            InitialSetupScreen(
+                InitialSetupState.Ready(null, null, null, MapAreaReadResult.Absent, null, false),
+                { }, { }, { }, { }, { continued.set(true) },
+            )
+        } }
+
+        Espresso.pressBack()
+
+        assertEquals(false, continued.get())
+        assertTrue(backReachedHarness.get())
     }
 
     @Test fun eachStepAndExitAreReachableAtLargeFontScale() {
