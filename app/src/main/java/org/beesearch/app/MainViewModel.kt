@@ -156,6 +156,19 @@ internal fun startupDestinationFor(state: InitialSetupState): StartupDestination
 internal fun visibleInitialSetupFor(state: InitialSetupState, generation: Int): InitialSetupState =
     if (state.generation == generation) state else InitialSetupState.Loading(generation = generation)
 
+/**
+ * Where a saved Observer or Territory returns after it was opened from the Initial Setup checklist.
+ *
+ * A step that the checklist opened returns to the checklist, so the recalculated readiness is visible.
+ * The same step opened outside the checklist keeps the ordinary startup route.
+ */
+internal fun setupStepReturnRoute(setupStepPending: Boolean): AppRoute? =
+    if (setupStepPending) AppRoute.InitialSetup else null
+
+/** The same contextual return for a setup destination that has its own ordinary destination. */
+internal fun setupDestinationReturnRoute(setupStepPending: Boolean): AppRoute =
+    if (setupStepPending) AppRoute.InitialSetup else AppRoute.Objects
+
 internal class MainViewModel(
     private val settingsRepository: SettingsRepository,
     private val territoryRepository: TerritoryRepository,
@@ -429,7 +442,7 @@ internal class MainViewModel(
 
     private fun returnToSetupOrStartup() {
         if (setupReturnPending) setupRefresh.value += 1
-        manualRoute.value = if (setupReturnPending) AppRoute.InitialSetup else null
+        manualRoute.value = setupStepReturnRoute(setupReturnPending)
     }
 
     fun openInitialSetup() {
@@ -439,10 +452,16 @@ internal class MainViewModel(
         clearFeedback()
     }
 
+    /**
+     * The automatic offer is on screen: pin its route while authoritative facts settle.
+     *
+     * The device-local offer flag is deliberately not written here. It means "the user handled the
+     * offer", so writing it while merely showing the checklist made the next launch skip the offer and
+     * fall through to the map's territory blocker. Only [leaveInitialSetup] handles the offer.
+     */
     fun onAutomaticSetupShown() {
         if (manualRoute.value != null) return
         manualRoute.value = AppRoute.InitialSetup
-        viewModelScope.launch { settingsRepository.setInitialSetupOfferHandled(true) }
     }
 
     fun leaveInitialSetup() {
@@ -468,7 +487,7 @@ internal class MainViewModel(
 
     fun returnFromSetupDestination() {
         if (setupReturnPending) setupRefresh.value += 1
-        manualRoute.value = if (setupReturnPending) AppRoute.InitialSetup else AppRoute.Objects
+        manualRoute.value = setupDestinationReturnRoute(setupReturnPending)
     }
 
     fun setCurrentTerritory(territoryId: UUID) {

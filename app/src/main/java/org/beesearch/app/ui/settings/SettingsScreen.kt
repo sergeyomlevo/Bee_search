@@ -56,6 +56,8 @@ internal fun SettingsScreen(
     onOpenHelp: () -> Unit = {},
     onOpenInitialSetup: () -> Unit = {},
     initialSetupSection: SetupSettingsSection? = null,
+    /** The checklist step opened a value that does not exist yet, so its existing form opens directly. */
+    initialSetupCreatesMissingValue: Boolean = false,
     onSelectObserver: (UUID) -> Unit,
     onCreateObserver: (String, String, String, String, String) -> Unit,
     onUpdateObserver: (Observer) -> Unit = {},
@@ -96,6 +98,23 @@ internal fun SettingsScreen(
         when (initialSetupSection) {
             SetupSettingsSection.OBSERVER -> if (observerPlaced) observerRequester.bringIntoView()
             SetupSettingsSection.TERRITORY -> if (territoryPlaced) territoryRequester.bringIntoView()
+            null -> Unit
+        }
+    }
+    // A checklist step whose value is still missing opens the existing create form directly, so the
+    // user does not have to find the section and its "+" button first. The condition is derived from
+    // authoritative readiness, so it never reopens a form the user already closed in this visit.
+    LaunchedEffect(initialSetupSection, initialSetupCreatesMissingValue) {
+        if (!initialSetupCreatesMissingValue) return@LaunchedEffect
+        when (initialSetupSection) {
+            SetupSettingsSection.OBSERVER -> {
+                editingObserver = null
+                addingObserver = true
+            }
+            SetupSettingsSection.TERRITORY -> {
+                editingTerritory = null
+                addingTerritory = true
+            }
             null -> Unit
         }
     }
@@ -166,7 +185,7 @@ internal fun SettingsScreen(
                 val firstValue = edit?.firstName ?: firstName
                 val middleValue = edit?.middleName ?: middleName
                 val contactValue = edit?.contact ?: contact
-                OutlinedTextField(codeValue, { if (edit == null) observerCode = it else editingObserver = edit.copy(code = it) }, Modifier.fillMaxWidth(), label = { Text("Код") }, singleLine = true)
+                OutlinedTextField(codeValue, { if (edit == null) observerCode = it else editingObserver = edit.copy(code = it) }, Modifier.fillMaxWidth().testTag("observer-code-field"), label = { Text("Код") }, singleLine = true)
                 OutlinedTextField(lastValue, { if (edit == null) lastName = it else editingObserver = edit.copy(lastName = it) }, Modifier.fillMaxWidth(), label = { Text("Фамилия") }, singleLine = true)
                 OutlinedTextField(firstValue, { if (edit == null) firstName = it else editingObserver = edit.copy(firstName = it) }, Modifier.fillMaxWidth(), label = { Text("Имя") }, singleLine = true)
                 OutlinedTextField(middleValue, { if (edit == null) middleName = it else editingObserver = edit.copy(middleName = it) }, Modifier.fillMaxWidth(), label = { Text("Отчество (необязательно)") }, singleLine = true)

@@ -6,12 +6,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -47,20 +50,29 @@ internal fun TerritoryManagementScreen(
     var name by rememberSaveable { mutableStateOf("") }
     var region by rememberSaveable { mutableStateOf("") }
     var district by rememberSaveable { mutableStateOf("") }
-    Scaffold(topBar = {
+    Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0), topBar = {
         TopAppBar(title = { Text("Территории") }, navigationIcon = {
             TextButton(onClick = onBack) { Text("Назад") }
         }, actions = {
             TextButton(onClick = onOpenSettings) { Text("Настройки") }
         })
     }) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
+        // The form is one scrollable surface with IME padding, so the focused field and the lower
+        // fields stay reachable while the keyboard is open. Same pattern as the Settings form.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 16.dp),
+        ) {
             Text("Новая территория", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = code,
                 onValueChange = { code = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("territory-form-code-field"),
                 label = { Text("Код территории") },
                 singleLine = true,
             )
@@ -75,7 +87,7 @@ internal fun TerritoryManagementScreen(
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(region, { region = it }, Modifier.fillMaxWidth(), label = { Text("Область / регион") }, singleLine = true)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(district, { district = it }, Modifier.fillMaxWidth(), label = { Text("Район") }, singleLine = true)
+            OutlinedTextField(district, { district = it }, Modifier.fillMaxWidth().testTag("territory-form-district-field"), label = { Text("Район") }, singleLine = true)
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = { onCreateTerritory(code, name, region, district) },
@@ -88,17 +100,13 @@ internal fun TerritoryManagementScreen(
             if (territories.isEmpty()) {
                 Text("Территорий пока нет.")
             } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(territories, key = { it.id }) { territory ->
-                        TerritoryRow(
-                            territory = territory,
-                            isCurrent = territory.id == currentTerritoryId,
-                            onSelect = { onSelectTerritory(territory.id) },
-                        )
-                    }
+                territories.forEach { territory ->
+                    TerritoryRow(
+                        territory = territory,
+                        isCurrent = territory.id == currentTerritoryId,
+                        onSelect = { onSelectTerritory(territory.id) },
+                    )
+                    Spacer(Modifier.height(8.dp))
                 }
             }
         }

@@ -103,4 +103,56 @@ class SettingsScreenImeTest {
             .performClick()
             .assertIsDisplayed()
     }
+
+    @Test
+    fun checklistObserverEntryOpensTheObserverFlowDirectly() {
+        composeRule.setContent { Bee_searchTheme {
+            SettingsScreen(
+                observers = emptyList(), currentObserverId = null,
+                territories = emptyList(), currentTerritoryId = null,
+                onBack = {},
+                initialSetupSection = SetupSettingsSection.OBSERVER,
+                initialSetupCreatesMissingValue = true,
+                onSelectObserver = {}, onCreateObserver = { _, _, _, _, _ -> },
+                onSelectTerritory = {}, onCreateTerritory = { _, _, _, _ -> },
+            )
+        } }
+
+        composeRule.onNodeWithTag("observer-code-field").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun checklistTerritoryEntryOpensTheTerritoryFormDirectly() {
+        composeRule.setContent { Bee_searchTheme {
+            SettingsScreen(
+                observers = emptyList(), currentObserverId = null,
+                territories = emptyList(), currentTerritoryId = null,
+                onBack = {},
+                initialSetupSection = SetupSettingsSection.TERRITORY,
+                initialSetupCreatesMissingValue = true,
+                onSelectObserver = {}, onCreateObserver = { _, _, _, _, _ -> },
+                onSelectTerritory = {}, onCreateTerritory = { _, _, _, _ -> },
+            )
+        } }
+
+        composeRule.onNodeWithTag("territory-code-field").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun aReadyChecklistStepOnlyShowsItsSection() {
+        composeRule.setContent { Bee_searchTheme {
+            SettingsScreen(
+                observers = emptyList(), currentObserverId = null,
+                territories = emptyList(), currentTerritoryId = null,
+                onBack = {},
+                initialSetupSection = SetupSettingsSection.OBSERVER,
+                initialSetupCreatesMissingValue = false,
+                onSelectObserver = {}, onCreateObserver = { _, _, _, _, _ -> },
+                onSelectTerritory = {}, onCreateTerritory = { _, _, _, _ -> },
+            )
+        } }
+
+        composeRule.onNodeWithTag("observer-code-field").assertDoesNotExist()
+        composeRule.onNodeWithText("+ Добавить наблюдателя").performScrollTo().assertIsDisplayed()
+    }
 }

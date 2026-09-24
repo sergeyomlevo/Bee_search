@@ -4,6 +4,7 @@ import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.Territory
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import java.time.Instant
 import java.util.UUID
@@ -54,10 +55,18 @@ class StartupRouterTest {
         assertEquals(StartupDestination.ReadyForMap, StartupRouter.decide(null, territory.id, listOf(territory), observer.id, listOf(observer)))
     }
 
-    @Test fun `first incomplete setup opens checklist after authoritative load`() {
-        assertEquals(StartupDestination.InitialSetup,
-            StartupRouter.decide(null, null, emptyList(), null, emptyList(),
-                setupComplete = false, offerHandled = false))
+    @Test fun `clean first run opens the checklist instead of the territory blocker`() {
+        val destination = StartupRouter.decide(
+            activePoint = null,
+            currentTerritoryId = null,
+            territories = emptyList(),
+            currentObserverId = null,
+            observers = emptyList(),
+            setupComplete = false,
+            offerHandled = false,
+        )
+        assertEquals(StartupDestination.InitialSetup, destination)
+        assertNotEquals(StartupDestination.ReadyForMap, destination)
     }
 
     @Test fun `handled offer does not reopen checklist automatically`() {

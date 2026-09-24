@@ -111,6 +111,15 @@ private fun BeeSearchApp(
     val route by viewModel.route.collectAsStateWithLifecycle()
     val initialSetup by viewModel.visibleInitialSetup.collectAsStateWithLifecycle()
     val setupSettingsSection by viewModel.setupSettingsSection.collectAsStateWithLifecycle()
+    // A checklist step whose value does not exist yet opens its existing create form directly; a step
+    // that is already ready only brings its section into view. Readiness stays authoritative.
+    val initialSetupCreatesMissingValue = (initialSetup as? InitialSetupState.Ready)?.let { state ->
+        when (setupSettingsSection) {
+            SetupSettingsSection.OBSERVER -> state.observer == null
+            SetupSettingsSection.TERRITORY -> state.territory == null
+            null -> false
+        }
+    } ?: false
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val territories by viewModel.territories.collectAsStateWithLifecycle()
     val observers by viewModel.observers.collectAsStateWithLifecycle()
@@ -189,6 +198,7 @@ private fun BeeSearchApp(
                         onOpenHelp = viewModel::openHelp,
                         onOpenInitialSetup = viewModel::openInitialSetup,
                         initialSetupSection = setupSettingsSection,
+                        initialSetupCreatesMissingValue = initialSetupCreatesMissingValue,
                     )
                     AppRoute.Help -> HelpScreen(
                         exchangeStorage = application.container.exchangeStorage,
