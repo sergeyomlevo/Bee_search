@@ -14,6 +14,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.beesearch.app.data.local.room.*
+import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
 import org.beesearch.app.domain.backup.*
 import org.beesearch.app.domain.model.AttachmentType
@@ -95,6 +96,40 @@ class BackupServiceTest {
         val names = zipEntries(archive).keys
         assertFalse(names.any { it.startsWith(BackupContractV3.ATTACHMENT_PREFIX) })
         assertFalse(zipEntries(archive).values.any { String(it).contains("source.pmtiles") || String(it).contains("/private/source/path") })
+    }
+
+    @Test fun completeRestoreKeepsTheInstallingDevicesOfferState() = runBlocking {
+        val ids = seed(source)
+        sourceStore.edit {
+            it[stringPreferencesKey("current_territory_id")] = ids.territory2.toString()
+            it[stringPreferencesKey("current_observer_id")] = ids.observer2.toString()
+        }
+        val installStateFile = temp("install-state.preferences_pb")
+        val targetInstallState = dataStore(installStateFile)
+        try {
+            val targetRepository = DataStoreSettingsRepository(targetStore, targetInstallState)
+            // The target installation already handled the Initial Setup offer on this device.
+            targetRepository.setInitialSetupOfferHandled(true)
+
+            service(source, sourceStore).export(archive)
+            val archiveText = zipEntries(archive).values.joinToString("\n") { String(it) }
+            assertFalse(
+                "Complete Backup must not export the install-local offer state",
+                archiveText.contains("initial_setup_offer_handled"),
+            )
+            assertFalse(archiveText.contains("offerHandled"))
+            assertFalse(archiveText.contains("install-state"))
+
+            service(target, targetStore).restore(archive)
+
+            assertTrue(
+                "a Complete restore must not import or reset the target installation's offer state",
+                targetRepository.getSettings().initialSetupOfferHandled,
+            )
+            assertEquals(ids.territory2, targetRepository.getSettings().currentTerritoryId)
+        } finally {
+            installStateFile.delete()
+        }
     }
 
     @Test fun v3RoundTripPreservesPropertiesWeatherAndPhotoBytes() = runBlocking {

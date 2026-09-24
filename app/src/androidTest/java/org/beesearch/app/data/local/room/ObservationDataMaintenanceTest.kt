@@ -148,7 +148,11 @@ class ObservationDataMaintenanceTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {
             val dataStore = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferenceFile })
-            val settings = DataStoreSettingsRepository(dataStore)
+            val installStateDataStore = PreferenceDataStoreFactory.create(
+                scope = scope,
+                produceFile = { File(context.cacheDir, "install-${UUID.randomUUID()}.preferences_pb") },
+            )
+            val settings = DataStoreSettingsRepository(dataStore, installStateDataStore)
             val areaStore = DataStoreMapAreaStore(dataStore)
             val coverage = listOf(MapCoverageFragment(MapGeoBounds(57.0, 43.0, 56.0, 42.0)))
             val activeMapKey = stringPreferencesKey("map_package_active_${territory.id}")
@@ -213,7 +217,11 @@ class ObservationDataMaintenanceTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {
             val dataStore = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferenceFile })
-            val settings = DataStoreSettingsRepository(dataStore)
+            val installStateDataStore = PreferenceDataStoreFactory.create(
+                scope = scope,
+                produceFile = { File(context.cacheDir, "install-${UUID.randomUUID()}.preferences_pb") },
+            )
+            val settings = DataStoreSettingsRepository(dataStore, installStateDataStore)
             val areaStore = DataStoreMapAreaStore(dataStore)
             val coverage = listOf(MapCoverageFragment(MapGeoBounds(57.0, 43.0, 56.0, 42.0)))
             val activeMapKey = stringPreferencesKey("map_package_active_${territory.id}")

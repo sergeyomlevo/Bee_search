@@ -33,9 +33,13 @@ import org.beesearch.app.data.repository.RoomTerritoryRepository
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.usecase.CreateObservationPoint
 import org.beesearch.app.domain.weather.WeatherSyncScheduler
+import org.beesearch.app.ui.map.MapAreaReadResult
+import org.beesearch.app.ui.map.MapGeoBounds
+import org.beesearch.app.ui.map.MapPackageAvailability
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,11 +64,17 @@ class CleanStartupIntegrationTest {
         Room.inMemoryDatabaseBuilder(context, BeeSearchDatabase::class.java)
             .allowMainThreadQueries()
             .build()
+    private val settingsFile = File(context.cacheDir, "clean-startup-settings-${UUID.randomUUID()}.preferences_pb")
+    private val installStateFile = File(context.cacheDir, "clean-startup-install-${UUID.randomUUID()}.preferences_pb")
     private val dataStore: DataStore<Preferences> = PreferenceDataStoreFactory.create(
         scope = storeScope,
-        produceFile = { File(context.cacheDir, "clean-startup-${UUID.randomUUID()}.preferences_pb") },
+        produceFile = { settingsFile },
     )
-    private val settingsRepository = DataStoreSettingsRepository(dataStore)
+    private val installStateDataStore: DataStore<Preferences> = PreferenceDataStoreFactory.create(
+        scope = storeScope,
+        produceFile = { installStateFile },
+    )
+    private val settingsRepository = DataStoreSettingsRepository(dataStore, installStateDataStore)
     private val territoryRepository = RoomTerritoryRepository(database.territoryDao(), Clock.systemUTC())
     private val observerRepository = RoomObserverRepository(database.observerDao(), Clock.systemUTC())
     private val observationRepository = RoomObservationRepository(
@@ -85,6 +95,8 @@ class CleanStartupIntegrationTest {
     fun tearDown() {
         database.close()
         storeScope.cancel()
+        settingsFile.delete()
+        installStateFile.delete()
     }
 
     private fun newViewModel(): MainViewModel = MainViewModel(
@@ -242,6 +254,37 @@ class CleanStartupIntegrationTest {
                 "active ObservationPoint recovery must win over the checklist, was $first",
                 first is AppRoute.ResumeObservation,
             )
+        } finally {
+            activity.cancel()
+        }
+    }
+
+    @Test
+    fun restoredStateWithoutTheOfflineMapStillAsksForTheMap() = runBlocking {
+        // A restore can bring Observer, Territory and the Ареал while the PMTiles package stays
+        // device-local, which is exactly the state the checklist has to report honestly.
+        val territory = territoryRepository.createTerritory(
+            "LPO", "Лухское полесье", "Владимирская область", "Лухский район",
+        )
+        val observer = observerRepository.createObserver("OBS", "Иванов", "Иван", null, null)
+        settingsRepository.setCurrentTerritoryId(territory.id)
+        settingsRepository.setCurrentObserverId(observer.id)
+        areaStore.create(territory.id, territory.name, listOf(MapGeoBounds(57.0, 39.0, 56.0, 38.0)))
+
+        val viewModel = newViewModel()
+        val activity = mirrorActivityStartup(viewModel)
+        try {
+            assertEquals(AppRoute.InitialSetup, firstUserRoute(viewModel))
+            val state = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+                viewModel.visibleInitialSetup.first { it is InitialSetupState.Ready }
+            } as InitialSetupState.Ready
+
+            assertFalse("the offer must not be treated as handled on a fresh installation", state.offerHandled)
+            assertNotNull("restored Observer", state.observer)
+            assertNotNull("restored Territory", state.territory)
+            assertTrue("restored Ареал", state.area is MapAreaReadResult.Present)
+            assertFalse("the offline map is not restored, so the checklist stays incomplete", state.complete)
+            assertTrue(state.map == null || state.map !is MapPackageAvailability.Ready)
         } finally {
             activity.cancel()
         }

@@ -23,6 +23,7 @@ import org.beesearch.app.data.media.FileAwareObservationDataMaintenance
 import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.local.settings.settingsDataStore
+import org.beesearch.app.data.local.settings.installStateDataStore
 import org.beesearch.app.data.local.settings.DataStoreMapAreaStore
 import org.beesearch.app.data.local.settings.DataStoreMapPackageStore
 import org.beesearch.app.data.repository.RoomObservationRepository
@@ -56,7 +57,10 @@ internal class AppContainer(context: Context) {
     val attachmentFileStore = ObservationAttachmentFileStore(context.filesDir, context.cacheDir)
     val weatherSyncScheduler = WorkManagerWeatherSyncScheduler(context)
 
-    val settingsRepository: SettingsRepository = DataStoreSettingsRepository(context.settingsDataStore)
+    val settingsRepository: SettingsRepository = DataStoreSettingsRepository(
+        dataStore = context.settingsDataStore,
+        installStateDataStore = installStateDataStore(context),
+    )
 
     /**
      * The Ареал of the current Territory.
