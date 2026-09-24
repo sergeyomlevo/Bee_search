@@ -15,7 +15,7 @@ android {
         applicationId = "org.beesearch.app"
         minSdk = 29
         targetSdk = 37
-        versionCode = 5
+        versionCode = 6
         versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -32,7 +32,7 @@ android {
         create("beta") {
             initWith(getByName("release"))
             applicationIdSuffix = ".beta"
-            versionNameSuffix = "-beta.2"
+            versionNameSuffix = "-beta.3"
             isDebuggable = false
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "EXCHANGE_VARIANT", "\"Beta\"")
