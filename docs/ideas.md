@@ -338,7 +338,7 @@ complements the broader field UI simplification in I004.
 
 ## I008 — Found nest documentation
 
-**Status:** `idea`
+**Status:** `partially implemented; remaining idea`
 
 **Partially superseded by accepted D088 (`docs/decisions.md`):** the model proposed below — "a
 general nest (`Nest`) rather than specifically as a hollow (`Hollow`)" — is **not** the accepted
@@ -394,7 +394,12 @@ relationships, offline lifecycle, and any automatic heading/location capture
 must also be designed explicitly. Existing Territory and observer semantics
 must be reused rather than duplicated.
 
-**Notes:** This idea does not turn Bee Search into a general-purpose field
+**Notes:** Objects V1 (D089) now implements the concrete Hollow/LogHive portion
+of this idea, including stable physical characteristics, creator provenance and
+object-owned photo/video creation media. The generic Nest model, track/GPX and
+Inspection remain outside this implementation and require their own decisions.
+
+This idea does not turn Bee Search into a general-purpose field
 notebook. Its intended product boundary is the search for and documentation of
 wild honey-bee nests. Obsidian can remain a long-term viewing, note-taking, and
 analysis environment, while Bee Search provides structured field capture. A

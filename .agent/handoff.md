@@ -2,6 +2,33 @@
 
 ## Current milestone
 
+Objects V1 extends the accepted D088 foundation with creation, storage,
+viewing and correction of Hollow and LogHive records. Creation starts from the
+main-map `+` chooser, reuses the map-centre location confirmation and production
+`HeadingProvider`, and persists only after a valid form is confirmed. Room v9
+adds immutable creator provenance, subtype tables and normalized 1:N object
+media; Complete Backup v4 covers the new data while v1-v3 remain readable.
+
+## Verification status
+
+The full JVM unit suite, debug build and debug/androidTest assembly pass. A
+preserving Samsung SM-S938B run reports `OK (55 tests)` across backup,
+migration, repository, map/create navigation, object forms and Objects browser.
+The DEV package remained installed and its data was not cleared; Stable and
+Beta were not touched. Manual Samsung checks opened the Objects browser and
+confirmed it survives app restart. A live create flow, physical compass
+measurement and camera/photo-picker interaction remain unverified because the
+device had no GPS fix; system location was restored to its original disabled
+state after the check.
+
+## Next task
+
+Owner review and real-field acceptance with a GPS fix: create/edit both object
+types, exercise the physical compass, camera and multi-item picker, then confirm
+persistence after restart. No push, Beta release or version change was made.
+
+## Previous milestone
+
 Initial Setup V1 adds a non-blocking, four-step readiness checklist for the
 current Observer, Territory, Ареал and coverage-compatible offline map. The
 first incomplete launch opens it after local state loads unless an active

@@ -2077,6 +2077,23 @@ FlightCycle конкретной Bee и координат физическог�
 
 ---
 
+## 73.2. Objects V1: создание и хранение
+
+Objects V1 сохраняет D088 boundary: `Hollow`, `LogHive` и `Apiary` остаются конкретными
+domain types, а общая `physical_objects` identity используется только как internal
+persistence/FK boundary. Основной create path начинается на карте (`+`), переиспользует
+map crosshair для выбора координат, затем записывает subtype properties транзакционно после
+успешной валидации формы. Номер выделяется в той же транзакции, поэтому отмена/invalid create
+не создаёт row и не расходует designation.
+
+Creator хранится стабильным Observer UUID с `RESTRICT`; старые foundation rows допускают
+nullable creator. Creation media хранятся нормализованно в `physical_object_media` (1:N) с
+app-owned files, типом image/video, размером и hash. Это отдельная граница от будущей
+Inspection media.
+
+Room schema v9 и Complete Backup v4 переносят subtype, creator и object media, при этом
+backup reader сохраняет поддержку v1–v3. Track/GPX и Inspection остаются deferred.
+
 # 74. Критерий правильности архитектуры
 
 Архитектура считается подходящей, если она позволяет:

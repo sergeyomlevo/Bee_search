@@ -43,7 +43,7 @@ reject the archive before research data is written. Files are staged and validat
 then activated before the single Room restore transaction; activation and database
 failures compensate activated files.
 
-Version 3 is the current Complete backup contract for Room schema v8. It adds
+Version 3 was the Complete backup contract for Room schema v8. It adds
 required `physical-objects` and `apiaries` collections to v2 and a nullable
 `sourceObjectId` field to each Bee record. The object collection stores UUID,
 Territory UUID, concrete type, immutable sequence number, coordinates and creation
@@ -65,4 +65,23 @@ Offline PMTiles remain excluded.
 Android cloud backup/device transfer includes ordinary app-owned attachment files by
 default because only map packages and DEV bootstrap files are excluded by Bee Search
 rules. Android cloud backup has a platform quota and is not the canonical Complete
-backup; logical backup v3 is the explicit portable research archive.
+backup; logical backup v4 is the explicit portable research archive.
+
+## Version 4
+
+Version 4 is the Complete backup contract for Room schema v9 and Objects V1. It retains all
+v3 collections and adds `hollows`, `log-hives` and `physical-object-media`. Physical-object
+records additionally carry nullable `creatorObserverId`; subtype records carry the stable
+characteristics of Hollow and LogHive. Each object-media row identifies one `IMAGE` or `VIDEO`
+item, its owning object, deterministic relative path, byte size and SHA-256. Media bytes are
+stored as separate `physical-object-media/<physicalObjectId>/<mediaId>` entries, not embedded
+in Room JSON.
+
+Restore validates object ownership, subtype/type matching, creator Observer references, media
+paths, sizes and hashes before the Room transaction; file activation and database failure are
+compensated. v4 readers preserve backward readability of supported v1, v2 and v3 archives. v3
+physical objects restore with null creator and null historical subtype properties; no values are
+invented. PMTiles/device-local map packages remain excluded.
+
+All existing archive limits remain unchanged: at most 64 entries, 16 MiB per entry and 64 MiB
+total uncompressed payload. Track/GPX and Inspection data are not part of v4.

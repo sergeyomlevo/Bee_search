@@ -1800,9 +1800,10 @@ time_zone_id
 `PhysicalPlace` в этом списке остаётся непринятой сущностью места наблюдений (раздел 71) и не
 тождественен долговечным физическим объектам Дупло/Колода/Пасека, принятым решением D088:
 физический объект — это наблюдаемая вещь с собственными координатами и историей осмотров, а не
-вывод «здесь было несколько наблюдений». Реализованная в Room v8 schema boundary
-физических объектов описана в разделе 71.1; пользовательский Objects V1 UI, Осмотры и
-исследовательские алгоритмы пока не реализованы. Complete backup v3 сохраняет эти факты.
+вывод «здесь было несколько наблюдений». Реализованная в Room v9 schema boundary
+физических объектов описана в разделе 71.1; Objects V1 UI для Дупла и Колоды реализован,
+а Осмотры и исследовательские алгоритмы пока не реализованы. Complete backup v4 сохраняет
+эти факты и поддерживает чтение v1–v3.
 
 ---
 
@@ -1830,10 +1831,11 @@ ObservationPoint 2
 
 ---
 
-# 71.1. Долговечные физические объекты — Room schema v8
+# 71.1. Долговечные физические объекты — Room schema v9
 
-Принято решением D088. Room schema v8 реализует эту границу таблицами
-`physical_objects` и `apiaries`, а также nullable FK `bees.source_object_id`.
+Принято решением D088 и уточнено D089. Room schema v9 реализует эту границу таблицами
+`physical_objects`, `apiaries`, `hollows`, `log_hives` и `physical_object_media`, а также
+nullable FK `bees.source_object_id`.
 
 ## Общая внутренняя identity-запись
 
@@ -1845,6 +1847,7 @@ sequence_number  Int       NOT NULL, >= 1, выделяется в scope Territo
 latitude         Double    фактические координаты объекта
 longitude        Double    фактические координаты объекта
 created_at       Instant
+creator_observer_id UUID nullable for historical foundation rows, FK → observers.id (RESTRICT)
 ```
 
 ```text
@@ -1871,12 +1874,33 @@ name        String nullable
 у разных Пасек допустимы. Первичный ключ, равный FK, допускает не более одной subtype-строки на
 объект.
 
-## Отложено до появления реальных свойств
+## Subtype-таблица Дупла
 
-Subtype-таблицы Дупла и Колоды не создаются, пока у этих типов нет ни одного реального
-subtype-свойства. Они добавляются аддитивной миграцией вместе со своим первым свойством
-(таблица со ссылкой на ту же identity-запись плюс заполнение строк для существующих объектов
-этого типа) без изменения UUID, обозначения, координат и существующих связей.
+`hollows.physical_object_id` — PK/FK → `physical_objects.id` (RESTRICT). Поля `tree`,
+`entrance_height_cm`, `entrance_azimuth_deg`, `outer_diameter_cm`, `internal_diameter_cm` и
+`notes` nullable на storage-уровне для сохранения исторических foundation rows; новый create
+flow требует все общие обязательные поля, а internal diameter остаётся nullable.
+
+## Subtype-таблица Колоды
+
+`log_hives.physical_object_id` — PK/FK → `physical_objects.id` (RESTRICT). Поля `tree`,
+`entrance_height_cm`, `entrance_azimuth_deg`, `outer_diameter_cm`, `material`,
+`internal_diameter_cm`, `internal_height_cm` и `notes` nullable на storage-уровне для
+исторических rows; новый create flow требует все перечисленные конструктивные поля, кроме
+optional notes.
+
+## Медиа физического объекта
+
+`physical_object_media` — нормализованная 1:N таблица с `id`, `physical_object_id`, типом
+`IMAGE`/`VIDEO`, относительным app-owned path, исходным именем/MIME (если доступны), размером,
+SHA-256 и `created_at`. FK — `RESTRICT`. Медиа создания не смешиваются с будущей media schema
+Осмотра.
+
+## Миграция и исторические rows
+
+Migration `v8 → v9` добавляет nullable creator FK, subtype tables и media table. Для уже
+существующих Hollow/LogHive создаются subtype rows с null-характеристиками: migration не
+выдумывает обязательные значения и сохраняет UUID, designation, координаты и Bee links.
 
 ## Связь Bee → объект
 
