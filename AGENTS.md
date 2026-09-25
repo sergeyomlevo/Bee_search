@@ -560,6 +560,29 @@ user to finish one Bee before interacting with another.
 
 Field ergonomics take priority over visual or architectural sophistication.
 
+### UI development — mockup-first
+
+For any NEW UI or SUBSTANTIAL redesign of an existing UI, use the project's
+mockup-first workflow before production implementation.
+
+Full workflow and rules: `docs/ui/Создание интерфейсов.md`.
+
+Approved UI artifacts are stored under `docs/ui/mockups/`. An approved UI
+normally consists of `<name>-vN.png` as the visual reference and
+`<name>-vN.md` as the semantic and behavioral contract.
+
+- Production implementation starts only after explicit owner approval.
+- Before implementation, read both the PNG and MD.
+- PNG governs visual composition; MD governs semantics, data, states and
+  behavior.
+- On material ambiguity, stop and ask instead of inventing.
+- An approved mockup is not permission to redesign domain or data architecture.
+- Preserve composition under the target Android device's real system
+  `fontScale`.
+- Significant UI requires device screenshot comparison with the approved
+  mockup; compilation and tests alone do not establish visual acceptance.
+- Minor local UI fixes do not require the complete mockup-first cycle.
+
 ---
 
 ## 14. Architecture Discipline
