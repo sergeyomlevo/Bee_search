@@ -43,7 +43,7 @@ Official contract reference: [Codex Hooks](https://developers.openai.com/codex/h
 
 1. **EXPLICIT DELEGATION**: assign a safe, bounded read-only task to
    `luna-worker` or `luna-verifier` and confirm matching `SubagentStart` /
-   `SubagentStop` records with model `gpt-6-luna`. This verifies the technical
+   `SubagentStop` records with model `gpt-5.6-luna`. This verifies the technical
    route, not autonomous routing policy.
 2. **AUTONOMOUS DELEGATION**: in a later ordinary task with no mention of
    Luna/subagents, observe whether the root delegates due to the AGENTS
