@@ -30,8 +30,8 @@
         </activity>
 
         <!--
-            Exposes only the two narrow cache subdirectories declared in file_paths.xml: staged
-            ObservationPoint photo captures and the shareable copy created by «Отправить ареал».
+            Exposes only the narrow cache subdirectories declared in file_paths.xml: staged
+            photo captures and the shareable copy created by «Отправить ареал».
         -->
         <provider
             android:name="androidx.core.content.FileProvider"

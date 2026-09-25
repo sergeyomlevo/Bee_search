@@ -206,6 +206,54 @@ class BeeSearchMigrationTest {
     }
 
     @Test
+    fun migrationFromEightToNinePreservesObjectIdentityBeeLinkAndInitializesHistoricalSubtypeRows() {
+        val databaseName = "$DATABASE_NAME-8-9"
+        val territoryId = UUID.randomUUID().toString()
+        val observerId = UUID.randomUUID().toString()
+        val hollowId = UUID.randomUUID().toString()
+        val logHiveId = UUID.randomUUID().toString()
+        val beeId = UUID.randomUUID().toString()
+        val pointId = UUID.randomUUID().toString()
+        val timestamp = Instant.parse("2026-09-22T08:00:00Z").toEpochMilli()
+        migrationHelper.createDatabase(databaseName, 8).apply {
+            execSQL("INSERT INTO territories VALUES (?, 'T', 'Territory', 'R', 'D', ?, ?)", arrayOf<Any>(territoryId, timestamp, timestamp))
+            execSQL("INSERT INTO observers VALUES (?, 'O', 'Last', 'First', NULL, NULL, ?, ?)", arrayOf<Any>(observerId, timestamp, timestamp))
+            execSQL("INSERT INTO physical_objects VALUES (?, ?, 'HOLLOW', 7, 56.1, 42.7, ?)", arrayOf<Any>(hollowId, territoryId, timestamp))
+            execSQL("INSERT INTO physical_objects VALUES (?, ?, 'LOG_HIVE', 3, 56.2, 42.8, ?)", arrayOf<Any>(logHiveId, territoryId, timestamp + 1))
+            execSQL("INSERT INTO observation_points VALUES (?, ?, ?, 2026, 1, 'BEES_FOUND', 'P1', 56.0, 42.0, NULL, NULL, NULL, ?, NULL, NULL, NULL)", arrayOf<Any>(pointId, territoryId, observerId, timestamp))
+            execSQL("INSERT INTO bees VALUES (?, ?, 'WHITE', 'THORAX', ?, ?)", arrayOf<Any>(beeId, pointId, timestamp, hollowId))
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(databaseName, 9, true, MIGRATION_8_9)
+        migrated.query("SELECT territory_id, object_type, sequence_number, latitude, longitude, created_at, creator_observer_id FROM physical_objects ORDER BY object_type").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(territoryId, cursor.getString(0))
+            assertEquals("HOLLOW", cursor.getString(1))
+            assertEquals(7, cursor.getInt(2))
+            assertEquals(56.1, cursor.getDouble(3), 0.0)
+            assertEquals(timestamp, cursor.getLong(5))
+            assertTrue(cursor.isNull(6))
+            assertTrue(cursor.moveToNext())
+            assertEquals("LOG_HIVE", cursor.getString(1))
+            assertEquals(3, cursor.getInt(2))
+        }
+        migrated.query("SELECT source_object_id FROM bees WHERE id = ?", arrayOf(beeId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(hollowId, cursor.getString(0))
+        }
+        migrated.query("SELECT COUNT(*) FROM hollows WHERE physical_object_id = ?", arrayOf(hollowId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+        migrated.query("SELECT COUNT(*) FROM log_hives WHERE physical_object_id = ?", arrayOf(logHiveId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+        migrated.close()
+    }
+
+    @Test
     fun migrationFromTwoToThreeBackfillsCaptureConsumptionAndPreservesCycles() {
         val databaseName = "$DATABASE_NAME-2-3"
         val territoryId = UUID.randomUUID().toString()

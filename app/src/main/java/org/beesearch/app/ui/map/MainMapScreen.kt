@@ -53,6 +53,11 @@ internal fun CurrentTerritoryScreen(
     onRequestCreateRecord: (Double, Double) -> Unit,
     onDismissCreateRecordChooser: () -> Unit,
     onCreateObservationPoint: () -> Unit,
+    onCreateHollow: () -> Unit,
+    onCreateLogHive: () -> Unit,
+    physicalObjectLocationLabel: String? = null,
+    onConfirmPhysicalObjectLocation: (Double, Double) -> Unit = { _, _ -> },
+    onCancelPhysicalObjectLocation: () -> Unit = {},
     onOpenObjects: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenOfflineMaps: () -> Unit = {},
@@ -77,6 +82,9 @@ internal fun CurrentTerritoryScreen(
                     locationPermissionGranted = locationPermissionGranted,
                     onRequestLocationPermission = onRequestLocationPermission,
                     onRequestCreateRecord = onRequestCreateRecord,
+                    locationSelectionLabel = physicalObjectLocationLabel,
+                    onConfirmLocationSelection = onConfirmPhysicalObjectLocation,
+                    onCancelLocationSelection = onCancelPhysicalObjectLocation,
                     onCoverageTerritoryMissing = onOpenSettings,
                     onOpenOfflineMaps = onOpenOfflineMaps,
                     areaEditorRequest = areaEditorRequest,
@@ -88,6 +96,8 @@ internal fun CurrentTerritoryScreen(
                 CreateRecordTypeChooserDialog(
                     onDismiss = onDismissCreateRecordChooser,
                     onCreateObservationPoint = onCreateObservationPoint,
+                    onCreateHollow = onCreateHollow,
+                    onCreateLogHive = onCreateLogHive,
                 )
             }
             if (territory == null) {
@@ -282,6 +292,37 @@ internal fun CompactGpsAccuracy(
             style = MaterialTheme.typography.bodySmall,
             maxLines = 1,
         )
+    }
+}
+
+@Composable
+internal fun PhysicalObjectLocationControls(
+    label: String,
+    canConfirm: Boolean,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.testTag("physical-object-location-controls"),
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 4.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("Положение: $label", style = MaterialTheme.typography.titleMedium)
+            Text("Переместите карту так, чтобы метка была на объекте")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onCancel) { Text("Отмена") }
+                Button(
+                    onClick = onConfirm,
+                    enabled = canConfirm,
+                    modifier = Modifier.testTag("confirm-physical-object-location"),
+                ) { Text("Подтвердить") }
+            }
+        }
     }
 }
 

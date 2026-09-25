@@ -87,6 +87,10 @@ internal fun BeeMap(
     locationPermissionGranted: Boolean,
     onRequestLocationPermission: () -> Unit,
     onRequestCreateRecord: (Double, Double) -> Unit,
+    /** Reuses the map-centre target to confirm a physical object's position. */
+    locationSelectionLabel: String? = null,
+    onConfirmLocationSelection: (Double, Double) -> Unit = { _, _ -> },
+    onCancelLocationSelection: () -> Unit = {},
     onCoverageTerritoryMissing: () -> Unit = {},
     onOpenOfflineMaps: () -> Unit = {},
     /**
@@ -367,6 +371,10 @@ internal fun BeeMap(
 
     // Viewing is not a dead end: Back returns to the screen the user came from.
     BackHandler(enabled = mode == BeeMapMode.AREA_VIEW, onBack = onExitAreaView)
+    BackHandler(
+        enabled = mode == BeeMapMode.FIELD && locationSelectionLabel != null,
+        onBack = onCancelLocationSelection,
+    )
 
     LaunchedEffect(coverageSelectionMode, map) {
         coverageViewportBounds = if (coverageSelectionMode) {
@@ -618,7 +626,7 @@ internal fun BeeMap(
             }
         }
 
-        if (mode == BeeMapMode.FIELD && !coverageSelectionActive) {
+        if (mode == BeeMapMode.FIELD && !coverageSelectionActive && locationSelectionLabel == null) {
             MapIdleControls(
                 canRecenter = reading != null,
                 canCreateRecord = reading != null &&
@@ -642,6 +650,23 @@ internal fun BeeMap(
                     }
                 },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).zIndex(3f),
+            )
+        }
+
+        if (mode == BeeMapMode.FIELD && !coverageSelectionActive && locationSelectionLabel != null) {
+            PhysicalObjectLocationControls(
+                label = locationSelectionLabel,
+                canConfirm = map?.cameraPosition?.target != null,
+                onConfirm = {
+                    map?.cameraPosition?.target?.let { target ->
+                        onConfirmLocationSelection(target.latitude, target.longitude)
+                    }
+                },
+                onCancel = onCancelLocationSelection,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+                    .zIndex(3f),
             )
         }
 
@@ -711,7 +736,9 @@ internal fun BeeMap(
                     .padding(16.dp)
                     .zIndex(3f),
             )
-        } else if (mode == BeeMapMode.FIELD && territoryId != null) {
+        } else if (
+            mode == BeeMapMode.FIELD && territoryId != null && locationSelectionLabel == null
+        ) {
             CoverageSelectionEntry(
                 onEnter = {
                     if (!coverageLoading && coverageLoadedFor == territoryId) {

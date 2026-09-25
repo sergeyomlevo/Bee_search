@@ -28,6 +28,7 @@ import org.beesearch.app.ui.map.MAIN_MAP_VIEWPORT_TAG
 import org.beesearch.app.ui.map.CreateRecordTypeChooserDialog
 import org.beesearch.app.ui.map.MapFirstScaffold
 import org.beesearch.app.ui.map.MapIdleControls
+import org.beesearch.app.ui.map.PhysicalObjectLocationControls
 import org.beesearch.app.ui.map.RECENTER_MAP_DESCRIPTION
 import org.beesearch.app.ui.map.SETTINGS_DESCRIPTION
 import org.beesearch.app.ui.settings.SettingsScreen
@@ -196,8 +197,10 @@ class MainMapScreenTest {
     }
 
     @Test
-    fun createRecordOpensChooserAndOnlyObservationPointIsEnabled() {
+    fun createRecordChooserEnablesObservationPointHollowAndLogHive() {
         var observationPointSelected = false
+        var hollowSelected = false
+        var logHiveSelected = false
 
         composeRule.setContent {
             Bee_searchTheme {
@@ -205,6 +208,8 @@ class MainMapScreenTest {
                     CreateRecordTypeChooserDialog(
                         onDismiss = {},
                         onCreateObservationPoint = { observationPointSelected = true },
+                        onCreateHollow = { hollowSelected = true },
+                        onCreateLogHive = { logHiveSelected = true },
                     )
                 }
             }
@@ -212,11 +217,15 @@ class MainMapScreenTest {
 
         composeRule.onNodeWithTag("create-type-chooser").assertIsDisplayed()
         composeRule.onNodeWithTag("create-observation-point-type").assertIsEnabled().performClick()
-        composeRule.onNodeWithTag("future-create-type-дупло").assertIsNotEnabled()
-        composeRule.onNodeWithTag("future-create-type-колода").assertIsNotEnabled()
+        composeRule.onNodeWithTag("create-hollow-type").assertIsEnabled().performClick()
+        composeRule.onNodeWithTag("create-log-hive-type").assertIsEnabled().performClick()
         composeRule.onNodeWithTag("future-create-type-ловушка").assertIsNotEnabled()
         composeRule.onNodeWithTag("future-create-type-пасека").assertIsNotEnabled()
-        composeRule.runOnIdle { assertTrue(observationPointSelected) }
+        composeRule.runOnIdle {
+            assertTrue(observationPointSelected)
+            assertTrue(hollowSelected)
+            assertTrue(logHiveSelected)
+        }
     }
 
     @Test
@@ -228,6 +237,8 @@ class MainMapScreenTest {
                 CreateRecordTypeChooserDialog(
                     onDismiss = { dismissed = true },
                     onCreateObservationPoint = { observationPointSelected = true },
+                    onCreateHollow = {},
+                    onCreateLogHive = {},
                 )
             }
         }
@@ -237,6 +248,31 @@ class MainMapScreenTest {
         composeRule.runOnIdle {
             assertTrue(dismissed)
             assertTrue(!observationPointSelected)
+        }
+    }
+
+    @Test
+    fun physicalObjectLocationUsesMapCenterConfirmationAndCanBeCancelled() {
+        var confirmed = false
+        var cancelled = false
+        composeRule.setContent {
+            Bee_searchTheme {
+                PhysicalObjectLocationControls(
+                    label = "Дупло",
+                    canConfirm = true,
+                    onConfirm = { confirmed = true },
+                    onCancel = { cancelled = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Переместите карту так, чтобы метка была на объекте")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("confirm-physical-object-location").performClick()
+        composeRule.onNodeWithText("Отмена").performClick()
+        composeRule.runOnIdle {
+            assertTrue(confirmed)
+            assertTrue(cancelled)
         }
     }
 

@@ -51,6 +51,8 @@ import org.beesearch.app.ui.help.HelpScreen
 import org.beesearch.app.ui.points.PointDetailRoute
 import org.beesearch.app.ui.points.PointsRoute
 import org.beesearch.app.ui.objects.ObjectsScreen
+import org.beesearch.app.ui.physicalobjects.PhysicalObjectCreationRoute
+import org.beesearch.app.ui.physicalobjects.PhysicalObjectDetailRoute
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import kotlinx.coroutines.delay
 import org.beesearch.app.ui.observation.BeeObservationScreen
@@ -129,6 +131,8 @@ private fun BeeSearchApp(
     val areaEditorRequestToken by viewModel.areaEditorRequestToken.collectAsStateWithLifecycle()
     val locationState by viewModel.locationState.collectAsStateWithLifecycle()
     val observationPointDraft by viewModel.observationPointDraft.collectAsStateWithLifecycle()
+    val physicalObjectLocationSelection by
+        viewModel.physicalObjectLocationSelection.collectAsStateWithLifecycle()
     val observationPointPreparationDraft by viewModel.observationPointPreparationDraft.collectAsStateWithLifecycle()
     val completingObservationPointId by viewModel.completingObservationPointId.collectAsStateWithLifecycle()
     val beePreparation by viewModel.beePreparation.collectAsStateWithLifecycle()
@@ -208,6 +212,25 @@ private fun BeeSearchApp(
                         onBack = viewModel::openCurrentTerritory,
                         onOpenArea = viewModel::openArea,
                         onOpenObservationPoints = viewModel::openPoints,
+                        currentTerritoryId = settings.currentTerritoryId,
+                        physicalObjectRepository = application.container.physicalObjectRepository,
+                        onOpenPhysicalObject = viewModel::openPhysicalObjectDetail,
+                    )
+                    is AppRoute.CreatePhysicalObject -> PhysicalObjectCreationRoute(
+                        target = currentRoute.target,
+                        repository = application.container.physicalObjectRepository,
+                        mediaStore = application.container.physicalObjectMediaFileStore,
+                        headingProvider = application.container.headingProvider,
+                        onCancel = viewModel::closePhysicalObjectCreation,
+                        onCreated = viewModel::openPhysicalObjectDetail,
+                    )
+                    is AppRoute.PhysicalObjectDetail -> PhysicalObjectDetailRoute(
+                        objectId = currentRoute.objectId,
+                        repository = application.container.physicalObjectRepository,
+                        territories = territories,
+                        observers = observers,
+                        headingProvider = application.container.headingProvider,
+                        onBack = viewModel::closePhysicalObjectDetail,
                     )
                     AppRoute.Area -> AreaRoute(
                         territory = currentTerritory,
@@ -282,6 +305,11 @@ private fun BeeSearchApp(
                         onRequestCreateRecord = viewModel::requestCreateRecord,
                         onDismissCreateRecordChooser = viewModel::dismissCreateRecordChooser,
                         onCreateObservationPoint = viewModel::createObservationPointFromChooser,
+                        onCreateHollow = viewModel::createHollowFromChooser,
+                        onCreateLogHive = viewModel::createLogHiveFromChooser,
+                        physicalObjectLocationLabel = physicalObjectLocationSelection?.label,
+                        onConfirmPhysicalObjectLocation = viewModel::confirmPhysicalObjectLocation,
+                        onCancelPhysicalObjectLocation = viewModel::cancelPhysicalObjectLocationSelection,
                         onOpenObjects = viewModel::openObjects,
                         onOpenSettings = viewModel::openSettings,
                         onOpenOfflineMaps = viewModel::openOfflineMaps,

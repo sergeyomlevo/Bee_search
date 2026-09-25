@@ -359,6 +359,80 @@ internal val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+/** Adds creator provenance, Hollow/LogHive subtype facts and object-owned media. */
+internal val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            ALTER TABLE physical_objects
+            ADD COLUMN creator_observer_id TEXT
+                REFERENCES observers(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_physical_objects_creator_observer_id ON physical_objects(creator_observer_id)",
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS hollows (
+                physical_object_id TEXT NOT NULL,
+                tree TEXT,
+                entrance_height_cm REAL,
+                entrance_azimuth_deg INTEGER,
+                outer_diameter_cm REAL,
+                internal_diameter_cm REAL,
+                notes TEXT,
+                PRIMARY KEY(physical_object_id),
+                FOREIGN KEY(physical_object_id) REFERENCES physical_objects(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "INSERT INTO hollows (physical_object_id) SELECT id FROM physical_objects WHERE object_type = 'HOLLOW'",
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS log_hives (
+                physical_object_id TEXT NOT NULL,
+                tree TEXT,
+                entrance_height_cm REAL,
+                entrance_azimuth_deg INTEGER,
+                outer_diameter_cm REAL,
+                material TEXT,
+                internal_diameter_cm REAL,
+                internal_height_cm REAL,
+                notes TEXT,
+                PRIMARY KEY(physical_object_id),
+                FOREIGN KEY(physical_object_id) REFERENCES physical_objects(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "INSERT INTO log_hives (physical_object_id) SELECT id FROM physical_objects WHERE object_type = 'LOG_HIVE'",
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS physical_object_media (
+                id TEXT NOT NULL,
+                physical_object_id TEXT NOT NULL,
+                media_type TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                original_file_name TEXT,
+                mime_type TEXT,
+                byte_size INTEGER NOT NULL,
+                sha256 TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                PRIMARY KEY(id),
+                FOREIGN KEY(physical_object_id) REFERENCES physical_objects(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_physical_object_media_physical_object_id ON physical_object_media(physical_object_id)",
+        )
+    }
+}
+
 private data class LegacyObservationPoint(
     val id: String,
     val territoryId: String,

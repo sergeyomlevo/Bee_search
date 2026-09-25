@@ -19,6 +19,7 @@ import org.beesearch.app.data.exchange.beeSearchExchangeStorage
 import org.beesearch.app.data.heading.AndroidHeadingProvider
 import org.beesearch.app.data.location.AndroidLocationProvider
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
+import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
 import org.beesearch.app.data.media.FileAwareObservationDataMaintenance
 import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
@@ -55,6 +56,7 @@ internal class AppContainer(context: Context) {
     private val clock = Clock.systemUTC()
     private val database = BeeSearchDatabase.create(context)
     val attachmentFileStore = ObservationAttachmentFileStore(context.filesDir, context.cacheDir)
+    val physicalObjectMediaFileStore = PhysicalObjectMediaFileStore(context.filesDir, context.cacheDir)
     val weatherSyncScheduler = WorkManagerWeatherSyncScheduler(context)
 
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(
@@ -124,6 +126,7 @@ internal class AppContainer(context: Context) {
             database = database,
             settings = context.settingsDataStore,
             attachmentStore = attachmentFileStore,
+            objectMediaStore = physicalObjectMediaFileStore,
         ),
         contentResolver = context.contentResolver,
         cacheDirectory = context.cacheDir,
@@ -132,6 +135,7 @@ internal class AppContainer(context: Context) {
         database = database,
         objectDao = database.physicalObjectDao(),
         territoryDao = database.territoryDao(),
+        observerDao = database.observerDao(),
         beeDao = database.beeDao(),
         clock = clock,
     )

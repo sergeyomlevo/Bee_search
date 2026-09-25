@@ -10,6 +10,7 @@ import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.WeatherStatus
 import org.beesearch.app.domain.model.PhysicalObjectType
+import org.beesearch.app.domain.model.PhysicalObjectMediaType
 import java.time.Instant
 import java.util.UUID
 
@@ -44,15 +45,25 @@ internal data class ObserverEntity(
 
 @Entity(
     tableName = "physical_objects",
-    foreignKeys = [ForeignKey(
-        entity = TerritoryEntity::class,
-        parentColumns = ["id"],
-        childColumns = ["territory_id"],
-        onDelete = ForeignKey.RESTRICT,
-        onUpdate = ForeignKey.NO_ACTION,
-    )],
+    foreignKeys = [
+        ForeignKey(
+            entity = TerritoryEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["territory_id"],
+            onDelete = ForeignKey.RESTRICT,
+            onUpdate = ForeignKey.NO_ACTION,
+        ),
+        ForeignKey(
+            entity = ObserverEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["creator_observer_id"],
+            onDelete = ForeignKey.RESTRICT,
+            onUpdate = ForeignKey.NO_ACTION,
+        ),
+    ],
     indices = [
         Index(value = ["territory_id"]),
+        Index(value = ["creator_observer_id"]),
         Index(value = ["territory_id", "object_type", "sequence_number"], unique = true),
     ],
 )
@@ -63,6 +74,72 @@ internal data class PhysicalObjectEntity(
     @ColumnInfo(name = "sequence_number") val sequenceNumber: Int,
     val latitude: Double,
     val longitude: Double,
+    @ColumnInfo(name = "created_at") val createdAt: Instant,
+    @ColumnInfo(name = "creator_observer_id") val creatorObserverId: UUID? = null,
+)
+
+@Entity(
+    tableName = "hollows",
+    foreignKeys = [ForeignKey(
+        entity = PhysicalObjectEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["physical_object_id"],
+        onDelete = ForeignKey.RESTRICT,
+        onUpdate = ForeignKey.NO_ACTION,
+    )],
+)
+internal data class HollowEntity(
+    @PrimaryKey @ColumnInfo(name = "physical_object_id") val physicalObjectId: UUID,
+    val tree: String?,
+    @ColumnInfo(name = "entrance_height_cm") val entranceHeightCm: Double?,
+    @ColumnInfo(name = "entrance_azimuth_deg") val entranceAzimuthDeg: Int?,
+    @ColumnInfo(name = "outer_diameter_cm") val outerDiameterCm: Double?,
+    @ColumnInfo(name = "internal_diameter_cm") val internalDiameterCm: Double?,
+    val notes: String?,
+)
+
+@Entity(
+    tableName = "log_hives",
+    foreignKeys = [ForeignKey(
+        entity = PhysicalObjectEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["physical_object_id"],
+        onDelete = ForeignKey.RESTRICT,
+        onUpdate = ForeignKey.NO_ACTION,
+    )],
+)
+internal data class LogHiveEntity(
+    @PrimaryKey @ColumnInfo(name = "physical_object_id") val physicalObjectId: UUID,
+    val tree: String?,
+    @ColumnInfo(name = "entrance_height_cm") val entranceHeightCm: Double?,
+    @ColumnInfo(name = "entrance_azimuth_deg") val entranceAzimuthDeg: Int?,
+    @ColumnInfo(name = "outer_diameter_cm") val outerDiameterCm: Double?,
+    val material: String?,
+    @ColumnInfo(name = "internal_diameter_cm") val internalDiameterCm: Double?,
+    @ColumnInfo(name = "internal_height_cm") val internalHeightCm: Double?,
+    val notes: String?,
+)
+
+@Entity(
+    tableName = "physical_object_media",
+    foreignKeys = [ForeignKey(
+        entity = PhysicalObjectEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["physical_object_id"],
+        onDelete = ForeignKey.RESTRICT,
+        onUpdate = ForeignKey.NO_ACTION,
+    )],
+    indices = [Index(value = ["physical_object_id"])],
+)
+internal data class PhysicalObjectMediaEntity(
+    @PrimaryKey val id: UUID,
+    @ColumnInfo(name = "physical_object_id") val physicalObjectId: UUID,
+    @ColumnInfo(name = "media_type") val type: PhysicalObjectMediaType,
+    @ColumnInfo(name = "relative_path") val relativePath: String,
+    @ColumnInfo(name = "original_file_name") val originalFileName: String?,
+    @ColumnInfo(name = "mime_type") val mimeType: String?,
+    @ColumnInfo(name = "byte_size") val byteSize: Long,
+    val sha256: String,
     @ColumnInfo(name = "created_at") val createdAt: Instant,
 )
 

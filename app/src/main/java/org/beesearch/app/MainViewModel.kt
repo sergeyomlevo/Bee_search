@@ -37,6 +37,7 @@ import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
 import org.beesearch.app.domain.model.Observer
+import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.model.ObserverRequiredException
 import org.beesearch.app.domain.model.RequiredFieldException
 import org.beesearch.app.domain.model.TerritoryRequiredException
@@ -84,9 +85,32 @@ sealed interface AppRoute {
     data object TerritoryManagement : AppRoute
     data object OfflineMapManagement : AppRoute
     data object CurrentTerritory : AppRoute
+    data class CreatePhysicalObject(val target: PhysicalObjectCreationTarget) : AppRoute
+    data class PhysicalObjectDetail(val objectId: UUID) : AppRoute
     data object PrepareObservationPoint : AppRoute
     data class ResumeObservation(val point: ObservationPoint) : AppRoute
 }
+
+internal data class PhysicalObjectLocationSelection(
+    val type: PhysicalObjectType,
+    val territoryId: UUID,
+    val observerId: UUID,
+) {
+    val label: String get() = when (type) {
+        PhysicalObjectType.HOLLOW -> "Дупло"
+        PhysicalObjectType.LOG_HIVE -> "Колода"
+        PhysicalObjectType.APIARY -> error("Apiary creation is not part of this flow")
+    }
+}
+
+data class PhysicalObjectCreationTarget(
+    val requestId: UUID,
+    val type: PhysicalObjectType,
+    val territoryId: UUID,
+    val observerId: UUID,
+    val latitude: Double,
+    val longitude: Double,
+)
 
 /** Origin of the single ObservationPoint screen. */
 enum class PointDetailOrigin { POINTS, OBSERVATION }
@@ -198,6 +222,8 @@ internal class MainViewModel(
     private val _feedback = MutableStateFlow<UiFeedback?>(null)
     private val _locationState = MutableStateFlow<LocationUiState>(LocationUiState.PermissionRequired)
     private val _observationPointDraft = MutableStateFlow<ObservationPointCreationDraft?>(null)
+    private val _physicalObjectLocationSelection =
+        MutableStateFlow<PhysicalObjectLocationSelection?>(null)
     private val _observationPointPreparationDraft = MutableStateFlow<ObservationPointPreparationDraft?>(null)
     private val _completingObservationPointId = MutableStateFlow<UUID?>(null)
     private val _beeMutationInProgress = MutableStateFlow(false)
@@ -213,6 +239,8 @@ internal class MainViewModel(
     val locationState: StateFlow<LocationUiState> = _locationState.asStateFlow()
     val observationPointDraft: StateFlow<ObservationPointCreationDraft?> =
         _observationPointDraft.asStateFlow()
+    val physicalObjectLocationSelection: StateFlow<PhysicalObjectLocationSelection?> =
+        _physicalObjectLocationSelection.asStateFlow()
     val observationPointPreparationDraft: StateFlow<ObservationPointPreparationDraft?> =
         _observationPointPreparationDraft.asStateFlow()
     val completingObservationPointId: StateFlow<UUID?> = _completingObservationPointId.asStateFlow()
@@ -312,6 +340,7 @@ internal class MainViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppRoute.Loading)
 
     fun openSettings() {
+        _physicalObjectLocationSelection.value = null
         setupReturnPending = false
         _setupSettingsSection.value = null
         manualRoute.value = AppRoute.Settings
@@ -329,6 +358,7 @@ internal class MainViewModel(
     }
 
     fun openObjects() {
+        _physicalObjectLocationSelection.value = null
         setupReturnPending = false
         manualRoute.value = AppRoute.Objects
         clearFeedback()
@@ -585,11 +615,6 @@ internal class MainViewModel(
     }
 
     fun requestCreateRecord(latitude: Double, longitude: Double) {
-        val existingPoint = activePoint.value
-        if (existingPoint != null) {
-            openResumeObservation(existingPoint)
-            return
-        }
         if (!latitude.isFinite() || latitude !in -90.0..90.0) return
         if (!longitude.isFinite() || longitude !in -180.0..180.0) return
         val territory = currentTerritory.value
@@ -623,12 +648,71 @@ internal class MainViewModel(
     }
 
     fun createObservationPointFromChooser() {
+        val existingPoint = activePoint.value
+        if (existingPoint != null) {
+            _observationPointDraft.value = null
+            openResumeObservation(existingPoint)
+            return
+        }
         val draft = _observationPointDraft.value ?: return
         _observationPointDraft.value = null
         _observationPointPreparationDraft.value = ObservationPointPreparationDraft(
             point = draft.toNewObservationPoint(),
         )
         manualRoute.value = AppRoute.PrepareObservationPoint
+        clearFeedback()
+    }
+
+    fun createHollowFromChooser() = startPhysicalObjectLocationSelection(PhysicalObjectType.HOLLOW)
+
+    fun createLogHiveFromChooser() = startPhysicalObjectLocationSelection(PhysicalObjectType.LOG_HIVE)
+
+    private fun startPhysicalObjectLocationSelection(type: PhysicalObjectType) {
+        val draft = _observationPointDraft.value ?: return
+        _observationPointDraft.value = null
+        _physicalObjectLocationSelection.value = PhysicalObjectLocationSelection(
+            type = type,
+            territoryId = draft.territoryId,
+            observerId = draft.observerId,
+        )
+        clearFeedback()
+    }
+
+    fun confirmPhysicalObjectLocation(latitude: Double, longitude: Double) {
+        val selection = _physicalObjectLocationSelection.value ?: return
+        if (!latitude.isFinite() || latitude !in -90.0..90.0) return
+        if (!longitude.isFinite() || longitude !in -180.0..180.0) return
+        _physicalObjectLocationSelection.value = null
+        manualRoute.value = AppRoute.CreatePhysicalObject(
+            PhysicalObjectCreationTarget(
+                requestId = UUID.randomUUID(),
+                type = selection.type,
+                territoryId = selection.territoryId,
+                observerId = selection.observerId,
+                latitude = latitude,
+                longitude = longitude,
+            ),
+        )
+        clearFeedback()
+    }
+
+    fun cancelPhysicalObjectLocationSelection() {
+        _physicalObjectLocationSelection.value = null
+        clearFeedback()
+    }
+
+    fun closePhysicalObjectCreation() {
+        manualRoute.value = AppRoute.CurrentTerritory
+        clearFeedback()
+    }
+
+    fun openPhysicalObjectDetail(objectId: UUID) {
+        manualRoute.value = AppRoute.PhysicalObjectDetail(objectId)
+        clearFeedback()
+    }
+
+    fun closePhysicalObjectDetail() {
+        manualRoute.value = AppRoute.Objects
         clearFeedback()
     }
 

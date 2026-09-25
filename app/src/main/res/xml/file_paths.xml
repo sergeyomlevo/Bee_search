@@ -4,6 +4,9 @@
         name="observation_attachment_capture"
         path="observation-attachments-staging/" />
     <cache-path
+        name="physical_object_media_capture"
+        path="physical-object-media-staging/" />
+    <cache-path
         name="area_share"
         path="area-share/" />
 </paths>

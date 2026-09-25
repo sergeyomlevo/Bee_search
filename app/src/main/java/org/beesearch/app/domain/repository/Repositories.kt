@@ -17,6 +17,10 @@ import org.beesearch.app.domain.model.Hollow
 import org.beesearch.app.domain.model.LogHive
 import org.beesearch.app.domain.model.Apiary
 import org.beesearch.app.domain.model.TerritoryPhysicalObjects
+import org.beesearch.app.domain.model.NewHollow
+import org.beesearch.app.domain.model.NewLogHive
+import org.beesearch.app.domain.model.HollowProperties
+import org.beesearch.app.domain.model.LogHiveProperties
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.ObservationPointAttachment
 import org.beesearch.app.domain.model.ObservationPointWeather
@@ -58,14 +62,16 @@ interface ObserverRepository {
 }
 
 interface PhysicalObjectRepository {
-    suspend fun createHollow(territoryId: UUID, latitude: Double, longitude: Double): Hollow
-    suspend fun createLogHive(territoryId: UUID, latitude: Double, longitude: Double): LogHive
+    suspend fun createHollow(value: NewHollow): Hollow
+    suspend fun createLogHive(value: NewLogHive): LogHive
     suspend fun createApiary(territoryId: UUID, latitude: Double, longitude: Double, name: String?): Apiary
 
     suspend fun getHollow(id: UUID): Hollow?
     suspend fun getLogHive(id: UUID): LogHive?
     suspend fun getApiary(id: UUID): Apiary?
     suspend fun listForTerritory(territoryId: UUID): TerritoryPhysicalObjects
+    suspend fun updateHollow(id: UUID, properties: HollowProperties): Hollow
+    suspend fun updateLogHive(id: UUID, properties: LogHiveProperties): LogHive
 
     suspend fun setBeeSourceObject(beeId: UUID, sourceObjectId: UUID?): Bee
     suspend fun getBeeSourceObjectId(beeId: UUID): UUID?

@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 internal fun CreateRecordTypeChooserDialog(
     onDismiss: () -> Unit,
     onCreateObservationPoint: () -> Unit,
+    onCreateHollow: () -> Unit,
+    onCreateLogHive: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -28,8 +30,18 @@ internal fun CreateRecordTypeChooserDialog(
                     onClick = onCreateObservationPoint,
                     testTag = "create-observation-point-type",
                 )
-                FutureCreateTypeButton("Дупло")
-                FutureCreateTypeButton("Колода")
+                CreateTypeButton(
+                    label = "Дупло",
+                    enabled = true,
+                    onClick = onCreateHollow,
+                    testTag = "create-hollow-type",
+                )
+                CreateTypeButton(
+                    label = "Колода",
+                    enabled = true,
+                    onClick = onCreateLogHive,
+                    testTag = "create-log-hive-type",
+                )
                 FutureCreateTypeButton("Ловушка")
                 FutureCreateTypeButton("Пасека")
             }

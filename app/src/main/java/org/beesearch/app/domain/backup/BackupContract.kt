@@ -56,6 +56,32 @@ internal object BackupContractV3 {
 
     const val ATTACHMENT_PREFIX = BackupContractV2.ATTACHMENT_PREFIX
 }
+
+/** Complete backup schema for physical-object characteristics, provenance and media. */
+internal object BackupContractV4 {
+    const val FORMAT = 4
+    const val SCHEMA = 4
+    const val PROFILE = BackupContractV1.PROFILE
+    val collections = linkedMapOf(
+        "territories" to "research/territories.json",
+        "observers" to "research/observers.json",
+        "physical-objects" to "research/physical-objects.json",
+        "hollows" to "research/hollows.json",
+        "log-hives" to "research/log-hives.json",
+        "physical-object-media" to "research/physical-object-media.json",
+        "apiaries" to "research/apiaries.json",
+        "observation-points" to "research/observation-points.json",
+        "bees" to "research/bees.json",
+        "flight-cycles" to "research/flight-cycles.json",
+        "observation-point-weather" to "research/observation-point-weather.json",
+        "observation-point-attachments" to "research/observation-point-attachments.json",
+        "portable-settings" to "settings/portable-settings.json",
+        "map-coverage" to "settings/map-coverage.json",
+    )
+
+    const val ATTACHMENT_PREFIX = BackupContractV3.ATTACHMENT_PREFIX
+    const val OBJECT_MEDIA_PREFIX = "physical-object-media/"
+}
 internal sealed class BackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
 internal class UnsupportedBackupFormat(message: String) : BackupException(message)
 internal class UnsupportedArchiveSchema(message: String) : BackupException(message)

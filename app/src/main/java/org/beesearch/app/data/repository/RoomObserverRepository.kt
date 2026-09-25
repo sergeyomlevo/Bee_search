@@ -69,7 +69,7 @@ internal class RoomObserverRepository(
     }
 
     override suspend fun deleteObserver(id: UUID) {
-        if (observerDao.countObservationPoints(id) != 0) {
+        if (observerDao.countObservationPoints(id) != 0 || observerDao.countCreatedPhysicalObjects(id) != 0) {
             throw ObserverInUseException()
         }
         if (observerDao.deleteById(id) != 1) throw org.beesearch.app.domain.model.EntityNotFoundException("Observer")

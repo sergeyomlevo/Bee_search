@@ -45,6 +45,9 @@ internal abstract class BackupDao {
     @Query("SELECT * FROM observers ORDER BY id") abstract suspend fun observers(): List<ObserverEntity>
     @Query("SELECT * FROM observation_points ORDER BY id") abstract suspend fun observationPoints(): List<ObservationPointEntity>
     @Query("SELECT * FROM physical_objects ORDER BY id") abstract suspend fun physicalObjects(): List<PhysicalObjectEntity>
+    @Query("SELECT * FROM hollows ORDER BY physical_object_id") abstract suspend fun hollows(): List<HollowEntity>
+    @Query("SELECT * FROM log_hives ORDER BY physical_object_id") abstract suspend fun logHives(): List<LogHiveEntity>
+    @Query("SELECT * FROM physical_object_media ORDER BY id") abstract suspend fun physicalObjectMedia(): List<PhysicalObjectMediaEntity>
     @Query("SELECT * FROM apiaries ORDER BY physical_object_id") abstract suspend fun apiaries(): List<ApiaryEntity>
     @Query("SELECT * FROM bees ORDER BY id") abstract suspend fun bees(): List<BeeEntity>
     @Query("SELECT * FROM flight_cycles ORDER BY id") abstract suspend fun flightCycles(): List<FlightCycleEntity>
@@ -60,6 +63,9 @@ internal abstract class BackupDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertObservers(value: List<ObserverEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertObservationPoints(value: List<ObservationPointEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertPhysicalObjects(value: List<PhysicalObjectEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertHollows(value: List<HollowEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertLogHives(value: List<LogHiveEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertPhysicalObjectMedia(value: List<PhysicalObjectMediaEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertApiaries(value: List<ApiaryEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertBees(value: List<BeeEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertFlightCycles(value: List<FlightCycleEntity>)
@@ -99,6 +105,15 @@ internal interface PhysicalObjectDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertApiary(value: ApiaryEntity)
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertHollow(value: HollowEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertLogHive(value: LogHiveEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertMedia(values: List<PhysicalObjectMediaEntity>)
+
     @Query("SELECT * FROM physical_objects WHERE id = :id")
     suspend fun getById(id: UUID): PhysicalObjectEntity?
 
@@ -107,6 +122,30 @@ internal interface PhysicalObjectDao {
 
     @Query("SELECT * FROM apiaries WHERE physical_object_id = :id")
     suspend fun getApiary(id: UUID): ApiaryEntity?
+
+    @Query("SELECT * FROM hollows WHERE physical_object_id = :id")
+    suspend fun getHollow(id: UUID): HollowEntity?
+
+    @Query("SELECT * FROM log_hives WHERE physical_object_id = :id")
+    suspend fun getLogHive(id: UUID): LogHiveEntity?
+
+    @Query("SELECT * FROM hollows WHERE physical_object_id IN (:ids) ORDER BY physical_object_id")
+    suspend fun getHollows(ids: Collection<UUID>): List<HollowEntity>
+
+    @Query("SELECT * FROM log_hives WHERE physical_object_id IN (:ids) ORDER BY physical_object_id")
+    suspend fun getLogHives(ids: Collection<UUID>): List<LogHiveEntity>
+
+    @Query("SELECT * FROM physical_object_media WHERE physical_object_id = :id ORDER BY created_at, id")
+    suspend fun getMedia(id: UUID): List<PhysicalObjectMediaEntity>
+
+    @Query("SELECT * FROM physical_object_media WHERE physical_object_id IN (:ids) ORDER BY created_at, id")
+    suspend fun getMediaForObjects(ids: Collection<UUID>): List<PhysicalObjectMediaEntity>
+
+    @Query("UPDATE hollows SET tree = :tree, entrance_height_cm = :entranceHeightCm, entrance_azimuth_deg = :entranceAzimuthDeg, outer_diameter_cm = :outerDiameterCm, internal_diameter_cm = :internalDiameterCm, notes = :notes WHERE physical_object_id = :id")
+    suspend fun updateHollow(id: UUID, tree: String, entranceHeightCm: Double, entranceAzimuthDeg: Int, outerDiameterCm: Double, internalDiameterCm: Double?, notes: String?): Int
+
+    @Query("UPDATE log_hives SET tree = :tree, entrance_height_cm = :entranceHeightCm, entrance_azimuth_deg = :entranceAzimuthDeg, outer_diameter_cm = :outerDiameterCm, material = :material, internal_diameter_cm = :internalDiameterCm, internal_height_cm = :internalHeightCm, notes = :notes WHERE physical_object_id = :id")
+    suspend fun updateLogHive(id: UUID, tree: String, entranceHeightCm: Double, entranceAzimuthDeg: Int, outerDiameterCm: Double, material: String, internalDiameterCm: Double, internalHeightCm: Double, notes: String?): Int
 
     @Query("SELECT * FROM apiaries WHERE physical_object_id IN (:ids) ORDER BY physical_object_id")
     suspend fun getApiaries(ids: Collection<UUID>): List<ApiaryEntity>
@@ -140,6 +179,9 @@ internal interface ObserverDao {
 
     @Query("SELECT COUNT(*) FROM observation_points WHERE observer_id = :id")
     suspend fun countObservationPoints(id: UUID): Int
+
+    @Query("SELECT COUNT(*) FROM physical_objects WHERE creator_observer_id = :id")
+    suspend fun countCreatedPhysicalObjects(id: UUID): Int
 }
 
 @Dao
