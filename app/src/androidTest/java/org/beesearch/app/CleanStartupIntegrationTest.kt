@@ -31,6 +31,7 @@ import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomObserverRepository
 import org.beesearch.app.data.repository.RoomTerritoryRepository
 import org.beesearch.app.domain.model.NewObservationPoint
+import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.usecase.CreateObservationPoint
 import org.beesearch.app.domain.weather.WeatherSyncScheduler
 import org.beesearch.app.ui.map.MapAreaReadResult
@@ -141,11 +142,12 @@ class CleanStartupIntegrationTest {
         val viewModel = newViewModel()
         val objectId = UUID.randomUUID()
 
+        viewModel.openPhysicalObjectDetail(objectId, PhysicalObjectType.HOLLOW)
         viewModel.editPhysicalObjectCoordinates(objectId, "Дупло 7", 56.1, 42.7)
 
         assertEquals(objectId, (viewModel.physicalObjectLocationSelection.value as PhysicalObjectLocationSelection.Edit).objectId)
         assertEquals(MapTarget(56.1, 42.7), viewModel.mapCenterRequest.value?.target)
-        awaitRoute(viewModel, AppRoute.CurrentTerritory)
+        awaitRoute(viewModel, AppRoute.CurrentTerritory())
 
         viewModel.confirmPhysicalObjectLocation(56.2, 42.8)
         val detail = withTimeout(ROUTE_TIMEOUT_MILLIS) {
@@ -158,7 +160,7 @@ class CleanStartupIntegrationTest {
         assertEquals(42.8, requireNotNull(detail.coordinateUpdate).longitude, 0.0)
 
         viewModel.consumePhysicalObjectCoordinateUpdate(requireNotNull(detail.coordinateUpdate).requestId)
-        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(objectId))
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(objectId, PhysicalObjectType.HOLLOW))
     }
 
     @Test
@@ -233,7 +235,7 @@ class CleanStartupIntegrationTest {
         try {
             awaitRoute(viewModel, AppRoute.InitialSetup)
             viewModel.leaveInitialSetup()
-            awaitRoute(viewModel, AppRoute.CurrentTerritory)
+            awaitRoute(viewModel, AppRoute.CurrentTerritory())
             assertTrue(
                 "the labelled exit handles the offer",
                 settingsRepository.getSettings().initialSetupOfferHandled,
@@ -246,10 +248,54 @@ class CleanStartupIntegrationTest {
         val relaunched = newViewModel()
         val nextActivity = mirrorActivityStartup(relaunched)
         try {
-            assertEquals(AppRoute.CurrentTerritory, firstUserRoute(relaunched))
+            assertEquals(AppRoute.CurrentTerritory(), firstUserRoute(relaunched))
         } finally {
             nextActivity.cancel()
         }
+    }
+
+    @Test
+    fun physicalObjectCardKeepsItsReturnPathAcrossTheMap() = runBlocking {
+        val viewModel = newViewModel()
+        val hollowId = UUID.randomUUID()
+        val logHiveId = UUID.randomUUID()
+
+        // Card → map → Back → the same card → Back → its list → Back → Объекты.
+        viewModel.openPhysicalObjectDetail(hollowId, PhysicalObjectType.HOLLOW)
+        viewModel.showPhysicalObjectOnMap(56.19, 42.74)
+        awaitRoute(
+            viewModel,
+            AppRoute.CurrentTerritory(PhysicalObjectCardReturn(hollowId, PhysicalObjectType.HOLLOW)),
+        )
+        viewModel.returnFromPhysicalObjectMap()
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(hollowId, PhysicalObjectType.HOLLOW))
+        viewModel.closePhysicalObjectDetail()
+        awaitRoute(viewModel, AppRoute.PhysicalObjectList(PhysicalObjectType.HOLLOW))
+        viewModel.closePhysicalObjectList()
+        awaitRoute(viewModel, AppRoute.Objects)
+
+        // A second card of another type returns to its own card and then to Колоды.
+        viewModel.openPhysicalObjectDetail(logHiveId, PhysicalObjectType.LOG_HIVE)
+        viewModel.showPhysicalObjectOnMap(56.20, 42.75)
+        viewModel.returnFromPhysicalObjectMap()
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(logHiveId, PhysicalObjectType.LOG_HIVE))
+
+        // Repeating the round trip leaves no stale return target.
+        viewModel.showPhysicalObjectOnMap(56.21, 42.76)
+        viewModel.returnFromPhysicalObjectMap()
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(logHiveId, PhysicalObjectType.LOG_HIVE))
+        viewModel.closePhysicalObjectDetail()
+        awaitRoute(viewModel, AppRoute.PhysicalObjectList(PhysicalObjectType.LOG_HIVE))
+
+        // An ordinary map opening never carries an object return context.
+        viewModel.openCurrentTerritory()
+        val ordinary = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+            viewModel.route.first { it is AppRoute.CurrentTerritory }
+        } as AppRoute.CurrentTerritory
+        assertEquals("an ordinary map opening must not return to an old object card", null, ordinary.returnToObject)
+
+        // A restart does not restore the transient navigation context.
+        assertEquals(AppRoute.InitialSetup, firstUserRoute(newViewModel()))
     }
 
     @Test

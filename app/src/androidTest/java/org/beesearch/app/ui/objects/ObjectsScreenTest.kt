@@ -48,6 +48,40 @@ class ObjectsScreenTest {
     }
 
     @Test
+    fun objectsCatalogShowsCategoriesWithoutObjectInstances() {
+        var openedHollows = false
+        var openedLogHives = false
+        composeRule.setContent {
+            Bee_searchTheme {
+                ObjectsScreen(
+                    onBack = {},
+                    onOpenArea = {},
+                    onOpenObservationPoints = {},
+                    onOpenHollows = { openedHollows = true },
+                    onOpenLogHives = { openedLogHives = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("objects-hollows")
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .performClick()
+        composeRule.onNodeWithTag("objects-log-hives")
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .performClick()
+        // Categories only: no Physical Object instance list is expanded on the top level.
+        composeRule.onNodeWithTag("physical-objects-list").assertDoesNotExist()
+        composeRule.onNodeWithTag("physical-objects-empty").assertDoesNotExist()
+
+        composeRule.runOnIdle {
+            assertEquals(true, openedHollows)
+            assertEquals(true, openedLogHives)
+        }
+    }
+
+    @Test
     fun objectsCatalogOpensTheAreaScreen() {
         var openedArea = false
         composeRule.setContent {

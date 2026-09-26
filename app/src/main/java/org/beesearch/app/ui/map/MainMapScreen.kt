@@ -1,5 +1,6 @@
 package org.beesearch.app.ui.map
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,6 +62,12 @@ internal fun CurrentTerritoryScreen(
     onMapCenterRequestHandled: (UUID) -> Unit = {},
     onConfirmPhysicalObjectLocation: (Double, Double) -> Unit = { _, _ -> },
     onCancelPhysicalObjectLocation: () -> Unit = {},
+    /**
+     * Back on a map opened from a Physical Object card returns to that card.
+     *
+     * It is null for an ordinary map opening, so a plain map never returns to an old object card.
+     */
+    onReturnToObjectCard: (() -> Unit)? = null,
     onOpenObjects: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenOfflineMaps: () -> Unit = {},
@@ -71,6 +78,11 @@ internal fun CurrentTerritoryScreen(
     /** Called when the участки editor session ends, so the Ареал workflow can restore its screen. */
     onCoverageEditFinished: () -> Unit = {},
 ) {
+    // Registered first so the map's own mode handlers (coverage selection, location selection, area
+    // view) keep priority while they are active; this one only handles the plain map opened from a card.
+    if (onReturnToObjectCard != null) {
+        BackHandler(onBack = onReturnToObjectCard)
+    }
     MapFirstScaffold(
         onOpenObjects = onOpenObjects,
         onOpenSettings = onOpenSettings,

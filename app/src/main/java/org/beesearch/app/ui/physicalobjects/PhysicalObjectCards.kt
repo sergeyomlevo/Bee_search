@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import org.beesearch.app.domain.model.Hollow
 import org.beesearch.app.domain.model.LogHive
 import org.beesearch.app.domain.model.PhysicalObjectMedia
+import org.beesearch.app.domain.model.PhysicalObjectType
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.io.File
@@ -45,35 +46,45 @@ import java.util.Locale
 sealed interface PhysicalObjectListItem {
     val id: java.util.UUID
     val designation: String
-    val typeLabel: String
 }
 
 private data class HollowItem(val value: Hollow) : PhysicalObjectListItem {
     override val id get() = value.id
     override val designation get() = value.designation
-    override val typeLabel = "Дупло"
 }
 
 private data class LogHiveItem(val value: LogHive) : PhysicalObjectListItem {
     override val id get() = value.id
     override val designation get() = value.designation
-    override val typeLabel = "Колода"
 }
 
+/**
+ * The list of one Physical Object type.
+ *
+ * A row shows the designation only: `Дупло N` / `Колода N` already carries the type, and the list
+ * itself states the category, so a second line repeating the type is not shown.
+ */
 @Composable
 fun PhysicalObjectsBrowser(
+    type: PhysicalObjectType,
     hollows: List<Hollow>, logHives: List<LogHive>, onOpen: (java.util.UUID) -> Unit,
 ) {
-    val items = hollows.map(::HollowItem) + logHives.map(::LogHiveItem)
+    val items = when (type) {
+        PhysicalObjectType.HOLLOW -> hollows.map(::HollowItem)
+        PhysicalObjectType.LOG_HIVE -> logHives.map(::LogHiveItem)
+        PhysicalObjectType.APIARY -> emptyList()
+    }
     if (items.isEmpty()) {
-        Text("В этой территории пока нет Дупел и Колод.", modifier = Modifier.padding(16.dp).testTag("physical-objects-empty"))
+        Text(
+            type.emptyListMessage(),
+            modifier = Modifier.padding(16.dp).testTag("physical-objects-empty"),
+        )
         return
     }
-    LazyColumn(modifier = Modifier.testTag("physical-objects-browser")) {
+    LazyColumn(modifier = Modifier.testTag("physical-objects-list")) {
         items(items, key = { it.id }) { item ->
             ListItem(
                 headlineContent = { Text(item.designation) },
-                supportingContent = { Text(item.typeLabel) },
                 modifier = Modifier.fillMaxWidth().clickable { onOpen(item.id) }.testTag("physical-object-${item.id}"),
             )
             HorizontalDivider()

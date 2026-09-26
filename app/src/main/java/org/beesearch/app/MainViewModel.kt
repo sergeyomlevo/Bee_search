@@ -84,10 +84,22 @@ sealed interface AppRoute {
     ) : AppRoute
     data object TerritoryManagement : AppRoute
     data object OfflineMapManagement : AppRoute
-    data object CurrentTerritory : AppRoute
+    data class CurrentTerritory(
+        /**
+         * The Physical Object card the map was opened from, so Back returns to that card.
+         *
+         * The origin travels with the route, so leaving the map by any other navigation drops it and an
+         * ordinary map opening can never return to an old object card.
+         */
+        val returnToObject: PhysicalObjectCardReturn? = null,
+    ) : AppRoute
+    /** The Дупла or Колоды list of one object type; the top level shows categories, not instances. */
+    data class PhysicalObjectList(val type: PhysicalObjectType) : AppRoute
     data class CreatePhysicalObject(val target: PhysicalObjectCreationTarget) : AppRoute
     data class PhysicalObjectDetail(
         val objectId: UUID,
+        /** The typed list this card was opened from, so Back returns to the right list. */
+        val listType: PhysicalObjectType,
         val coordinateUpdate: PhysicalObjectCoordinateUpdate? = null,
     ) : AppRoute
     data object PrepareObservationPoint : AppRoute
@@ -111,9 +123,16 @@ internal sealed interface PhysicalObjectLocationSelection {
 
     data class Edit(
         val objectId: UUID,
+        val listType: PhysicalObjectType,
         override val label: String,
     ) : PhysicalObjectLocationSelection
 }
+
+/** The Physical Object card the map was opened from. */
+data class PhysicalObjectCardReturn(
+    val objectId: UUID,
+    val listType: PhysicalObjectType,
+)
 
 data class PhysicalObjectCoordinateUpdate(
     val requestId: UUID,
@@ -420,7 +439,7 @@ internal class MainViewModel(
      */
     fun openAreaSectionsEditor(returnToView: Boolean) {
         areaEditReturnRoute = if (returnToView) AppRoute.AreaView else AppRoute.Area
-        manualRoute.value = AppRoute.CurrentTerritory
+        manualRoute.value = AppRoute.CurrentTerritory()
         areaEditorRequest.request()
         clearFeedback()
     }
@@ -459,7 +478,7 @@ internal class MainViewModel(
         manualRoute.value = when (route.origin) {
             PointDetailOrigin.POINTS -> AppRoute.Points
             PointDetailOrigin.OBSERVATION -> activePoint.value?.let(AppRoute::ResumeObservation)
-                ?: AppRoute.CurrentTerritory
+                ?: AppRoute.CurrentTerritory()
         }
         clearFeedback()
     }
@@ -476,14 +495,14 @@ internal class MainViewModel(
 
     fun openMapWithCoverageEdit() {
         setupReturnPending = false
-        manualRoute.value = AppRoute.CurrentTerritory
+        manualRoute.value = AppRoute.CurrentTerritory()
         areaEditorRequest.request()
         clearFeedback()
     }
 
     fun openCurrentTerritory() {
         setupReturnPending = false
-        manualRoute.value = AppRoute.CurrentTerritory
+        manualRoute.value = AppRoute.CurrentTerritory()
         clearFeedback()
     }
 
@@ -527,7 +546,7 @@ internal class MainViewModel(
             settingsRepository.setInitialSetupOfferHandled(true)
             // Keep the map explicit until the DataStore Flow reaches startup routing: dropping
             // the override immediately could briefly replay the old automatic setup route.
-            manualRoute.value = AppRoute.CurrentTerritory
+            manualRoute.value = AppRoute.CurrentTerritory()
         }
     }
 
@@ -723,6 +742,7 @@ internal class MainViewModel(
             )
             is PhysicalObjectLocationSelection.Edit -> AppRoute.PhysicalObjectDetail(
                 objectId = selection.objectId,
+                listType = selection.listType,
                 coordinateUpdate = PhysicalObjectCoordinateUpdate(
                     requestId = UUID.randomUUID(),
                     latitude = latitude,
@@ -738,7 +758,7 @@ internal class MainViewModel(
         _physicalObjectLocationSelection.value = null
         _mapCenterRequest.value = null
         if (selection is PhysicalObjectLocationSelection.Edit) {
-            manualRoute.value = AppRoute.PhysicalObjectDetail(selection.objectId)
+            manualRoute.value = AppRoute.PhysicalObjectDetail(selection.objectId, selection.listType)
         }
         clearFeedback()
     }
@@ -748,19 +768,32 @@ internal class MainViewModel(
         if (!longitude.isFinite() || longitude !in -180.0..180.0) return
         _physicalObjectLocationSelection.value = PhysicalObjectLocationSelection.Edit(
             objectId = objectId,
+            listType = physicalObjectCardOnScreen()?.listType ?: PhysicalObjectType.HOLLOW,
             label = designation,
         )
         _mapCenterRequest.value = MapCenterRequest(UUID.randomUUID(), MapTarget(latitude, longitude))
-        manualRoute.value = AppRoute.CurrentTerritory
+        manualRoute.value = AppRoute.CurrentTerritory()
         clearFeedback()
     }
 
+    /**
+     * Opens the map centred on this object and remembers the card it was opened from, so Back returns
+     * to that card. Every other way of opening the map produces a route without this origin.
+     */
     fun showPhysicalObjectOnMap(latitude: Double, longitude: Double) {
         if (!latitude.isFinite() || latitude !in -90.0..90.0) return
         if (!longitude.isFinite() || longitude !in -180.0..180.0) return
+        val card = physicalObjectCardOnScreen()?.let { PhysicalObjectCardReturn(it.objectId, it.listType) }
         _physicalObjectLocationSelection.value = null
         _mapCenterRequest.value = MapCenterRequest(UUID.randomUUID(), MapTarget(latitude, longitude))
-        manualRoute.value = AppRoute.CurrentTerritory
+        manualRoute.value = AppRoute.CurrentTerritory(returnToObject = card)
+        clearFeedback()
+    }
+
+    /** Back on a map opened from a Physical Object card returns to that card. */
+    fun returnFromPhysicalObjectMap() {
+        val card = (manualRoute.value as? AppRoute.CurrentTerritory)?.returnToObject ?: return
+        manualRoute.value = AppRoute.PhysicalObjectDetail(card.objectId, card.listType)
         clearFeedback()
     }
 
@@ -771,24 +804,47 @@ internal class MainViewModel(
     fun consumePhysicalObjectCoordinateUpdate(requestId: UUID) {
         val route = manualRoute.value as? AppRoute.PhysicalObjectDetail ?: return
         if (route.coordinateUpdate?.requestId == requestId) {
-            manualRoute.value = AppRoute.PhysicalObjectDetail(route.objectId)
+            manualRoute.value = AppRoute.PhysicalObjectDetail(route.objectId, route.listType)
         }
     }
 
     fun closePhysicalObjectCreation() {
-        manualRoute.value = AppRoute.CurrentTerritory
+        manualRoute.value = AppRoute.CurrentTerritory()
         clearFeedback()
     }
 
-    fun openPhysicalObjectDetail(objectId: UUID) {
-        manualRoute.value = AppRoute.PhysicalObjectDetail(objectId)
+    /** Opens the Дупла or Колоды list of a single object type. */
+    fun openPhysicalObjectList(type: PhysicalObjectType) {
+        manualRoute.value = AppRoute.PhysicalObjectList(type)
         clearFeedback()
     }
 
-    fun closePhysicalObjectDetail() {
+    fun closePhysicalObjectList() {
         manualRoute.value = AppRoute.Objects
         clearFeedback()
     }
+
+    fun openPhysicalObjectDetail(objectId: UUID, listType: PhysicalObjectType) {
+        manualRoute.value = AppRoute.PhysicalObjectDetail(objectId, listType)
+        clearFeedback()
+    }
+
+    /** Back from a card returns to the typed list it was opened from, not straight to `Объекты`. */
+    fun closePhysicalObjectDetail() {
+        manualRoute.value = physicalObjectCardOnScreen()
+            ?.let { AppRoute.PhysicalObjectList(it.listType) }
+            ?: AppRoute.Objects
+        clearFeedback()
+    }
+
+    /**
+     * The Physical Object card the user is on.
+     *
+     * Card actions read their list context from the route itself, so no second copy of the object or
+     * list state is kept and an ordinary map opening cannot inherit it.
+     */
+    private fun physicalObjectCardOnScreen(): AppRoute.PhysicalObjectDetail? =
+        manualRoute.value as? AppRoute.PhysicalObjectDetail
 
     fun abortObservationPointPreparation() {
         val draft = _observationPointPreparationDraft.value ?: return
@@ -1189,7 +1245,7 @@ internal class MainViewModel(
     private fun StartupDestination.toRoute(): AppRoute = when (this) {
         StartupDestination.Loading -> AppRoute.Loading
         is StartupDestination.ResumeObservation -> AppRoute.ResumeObservation(point)
-        StartupDestination.ReadyForMap -> AppRoute.CurrentTerritory
+        StartupDestination.ReadyForMap -> AppRoute.CurrentTerritory()
         StartupDestination.SettingsRequired -> AppRoute.Settings
         StartupDestination.InitialSetup -> AppRoute.InitialSetup
     }

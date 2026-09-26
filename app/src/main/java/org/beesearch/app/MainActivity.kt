@@ -43,6 +43,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.ui.map.CurrentTerritoryScreen
 import org.beesearch.app.ui.map.OfflineMapManagementScreen
 import org.beesearch.app.ui.area.AreaRoute
@@ -53,6 +54,7 @@ import org.beesearch.app.ui.points.PointsRoute
 import org.beesearch.app.ui.objects.ObjectsScreen
 import org.beesearch.app.ui.physicalobjects.PhysicalObjectCreationRoute
 import org.beesearch.app.ui.physicalobjects.PhysicalObjectDetailRoute
+import org.beesearch.app.ui.physicalobjects.PhysicalObjectListRoute
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import kotlinx.coroutines.delay
 import org.beesearch.app.ui.observation.BeeObservationScreen
@@ -153,7 +155,7 @@ private fun BeeSearchApp(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val locationTrackingActive = route == AppRoute.CurrentTerritory &&
+    val locationTrackingActive = route is AppRoute.CurrentTerritory &&
         lifecycleState.isAtLeast(Lifecycle.State.STARTED)
     LaunchedEffect(locationPermissionGranted, locationTrackingActive) {
         viewModel.setLocationTracking(
@@ -213,9 +215,15 @@ private fun BeeSearchApp(
                         onBack = viewModel::openCurrentTerritory,
                         onOpenArea = viewModel::openArea,
                         onOpenObservationPoints = viewModel::openPoints,
-                        currentTerritoryId = settings.currentTerritoryId,
-                        physicalObjectRepository = application.container.physicalObjectRepository,
-                        onOpenPhysicalObject = viewModel::openPhysicalObjectDetail,
+                        onOpenHollows = { viewModel.openPhysicalObjectList(PhysicalObjectType.HOLLOW) },
+                        onOpenLogHives = { viewModel.openPhysicalObjectList(PhysicalObjectType.LOG_HIVE) },
+                    )
+                    is AppRoute.PhysicalObjectList -> PhysicalObjectListRoute(
+                        type = currentRoute.type,
+                        territoryId = settings.currentTerritoryId,
+                        repository = application.container.physicalObjectRepository,
+                        onOpen = { objectId -> viewModel.openPhysicalObjectDetail(objectId, currentRoute.type) },
+                        onBack = viewModel::closePhysicalObjectList,
                     )
                     is AppRoute.CreatePhysicalObject -> PhysicalObjectCreationRoute(
                         target = currentRoute.target,
@@ -223,7 +231,9 @@ private fun BeeSearchApp(
                         mediaStore = application.container.physicalObjectMediaFileStore,
                         headingProvider = application.container.headingProvider,
                         onCancel = viewModel::closePhysicalObjectCreation,
-                        onCreated = viewModel::openPhysicalObjectDetail,
+                        onCreated = { objectId ->
+                            viewModel.openPhysicalObjectDetail(objectId, currentRoute.target.type)
+                        },
                     )
                     is AppRoute.PhysicalObjectDetail -> PhysicalObjectDetailRoute(
                         objectId = currentRoute.objectId,
@@ -300,7 +310,7 @@ private fun BeeSearchApp(
                         onBack = viewModel::returnToStartup,
                         onEditCoverageOnMap = viewModel::openMapWithCoverageEdit,
                     )
-                    AppRoute.CurrentTerritory -> CurrentTerritoryScreen(
+                    is AppRoute.CurrentTerritory -> CurrentTerritoryScreen(
                         territory = currentTerritory,
                         mapAreaStore = application.container.mapAreaStore,
                         mapPackageStore = application.container.mapPackageStore,
@@ -318,6 +328,7 @@ private fun BeeSearchApp(
                         onMapCenterRequestHandled = viewModel::consumeMapCenterRequest,
                         onConfirmPhysicalObjectLocation = viewModel::confirmPhysicalObjectLocation,
                         onCancelPhysicalObjectLocation = viewModel::cancelPhysicalObjectLocationSelection,
+                        onReturnToObjectCard = currentRoute.returnToObject?.let { { viewModel.returnFromPhysicalObjectMap() } },
                         onOpenObjects = viewModel::openObjects,
                         onOpenSettings = viewModel::openSettings,
                         onOpenOfflineMaps = viewModel::openOfflineMaps,
