@@ -2,117 +2,91 @@
 
 ## Current milestone
 
-The approved `objects-ui-approved-v1` redesign is implemented over the existing
-Objects V1 foundation. Create/edit forms use a compact directly editable
-azimuth with the production `HeadingProvider`, visual media thumbnails and
-adaptive whole-control stacking. Saved-object cards show a hero preview,
-characteristics, provenance and map actions. Coordinate correction reuses the
-existing map-centre flow through one narrow repository/DAO update that changes
-only latitude/longitude for Hollow and LogHive. Room remains v9 and Complete
-Backup remains v4.
+Safe physical object deletion, monotonic numbering and an explicit numbering
+reset are implemented over the approved Objects UI and accepted by the owner,
+who also verified them manually on the phone.
+
+Last functional commit: `50c75b2e` `feat: add safe physical object deletion and
+numbering reset`. This handoff refresh is the only commit after it.
+
+What is in place:
+
+- Objects V1 UI is implemented: `+ -> Дупло / Колода`, crosshair coordinates,
+  live/manual azimuth, media, saved-object cards, characteristic editing and
+  coordinate correction.
+- The browser hierarchy is corrected: `Объекты` shows the categories
+  `Ареал`, `Точки наблюдения`, `Дупла`, `Колоды`; a row is `Дупло N` / `Колода N`
+  without repeating the type; Back goes card -> its list -> `Объекты`.
+- `карточка -> Показать на карте -> Back` returns to the same card, and an
+  ordinary map opening never inherits that return target.
+- An unused Hollow or LogHive can be deleted from its card after confirmation
+  (`Удалить объект`); the object, its subtype row, its media rows and its
+  app-owned media files are removed, and the deletion returns to the typed list.
+- Deleting a protected object is blocked: a `Bee -> object` reference (and any
+  future `Inspection` reference) refuses the deletion with a readable message
+  and keeps the card open.
+- Persistent numbering high-water mark (`physical_object_sequences`, scope
+  `Territory + object_type`) is allocated inside the create transaction as
+  `max(last_issued, live MAX) + 1`; a failed creation consumes no number.
+- Ordinary deletion never frees a number: deleting `Дупло 4` still gives the
+  next created object `Дупло 5`.
+- An explicit, fail-closed reset restarts one scope from 1, only while that
+  scope provably holds no objects, no dependent rows and no references; it is
+  offered in the empty typed list and re-checked in the repository. The stable
+  UUID remains the object identity: a repeated designation is a new object.
+- Room schema v10 (`MIGRATION_9_10` backfills `last_issued = MAX(sequence_number)`).
+- Complete Backup V5 carries `physical-object-sequences`; the reader still
+  accepts V1-V4 and bootstraps those from stored numbers.
+- D090 (ACCEPTED) records the semantics; D088 §2/§3/§4 were updated consistently
+  and D088 §14's open question is closed. Next free durable decision: D091.
+- The RESTRICT invariant has an automatic test: `PhysicalObjectReferenceRestrictTest`
+  reads the foreign keys of the live database and fails if any reference to
+  `physical_objects` is not `ON DELETE RESTRICT`.
 
 ## Verification status
 
-The full JVM unit suite, debug build and debug/androidTest assembly pass. A
-preserving Samsung SM-S938B run reports `OK (25 tests)` for object UI,
-repository invariants and one-shot coordinate navigation; a focused map/create
-suite reports `OK (6 tests)`. At the device's real `font_scale=1.7`, manual
-checks covered `+ -> Дупло/Колода`, live physical compass fixation, manual
-azimuth, validation, camera, two Photo Picker items, visual thumbnails and
-corner removal affordances, create/detail/edit, coordinate correction,
-Objects browser and persistence after restart. Screenshots were compared with
-the approved mockup. DEV data was preserved; Stable and Beta were not touched.
-Picking an actual video on the device remains unverified; video preview/marker
-behavior is covered by Compose instrumentation.
+JVM unit suite `390 tests / 0 failures`; `assembleDebug` and
+`assembleDebugAndroidTest` pass; `lintDebug` passes with no new findings;
+`git diff --check` clean.
+
+Preserving Samsung SM-S938B instrumentation: the full connected suite reports
+`386 tests, 12 skipped, 0 failed`, and a focused run of the numbering, deletion,
+media, RESTRICT, backup, migration, browser and reset classes reports
+`105/105 PASS`. Device walk on `org.beesearch.app.dev` covered create -> delete
+(confirmation, return to `Дупла`, absence after restart), no reuse of the
+deleted number, LogHive deletion with its own confirmation text, and a reset in
+a disposable Territory (counter 2 -> next object `Дупло 1`) that was then
+removed again. Pre-existing DEV objects were preserved
+(`ceDataInode=438163`, `deDataInode=424656` unchanged); DEV was updated in
+place without clearing data.
+
+The owner additionally checked deletion, number non-reuse and the explicit
+reset manually on the phone and confirmed that the behaviour matches the intent.
+
+## Unverified / known residue (no action required for the accepted feature)
+
+- Media deletion was not exercised through the real camera / system picker UI;
+  file ownership and cleanup are covered by device instrumentation instead.
+- Deleting a protected object was not exercised through real Bee-history UI; the
+  blocking path is covered by repository, integration and schema tests.
+- The new delete/reset UI was not separately inspected at a large system font
+  scale (it is text-button based and the system scale was left untouched).
+- A restore rollback warning does not exist: the application has no restore
+  flow at all (only export), so there is nowhere to compare the current and the
+  incoming numbering state. Restore semantics are documented in D090.
 
 ## Next task
 
-Owner review of the local Objects UI commit. An optional follow-up device check
-may select a real video through the system picker. No push, Beta release or
-version change was made.
+No active functional task for Physical Objects. Beta `1.3.0-beta.3` stays the
+current test build until a separate release decision; no push, Beta/Stable
+release or version change was made. Continue from commit `50c75b2e` on `main`.
 
 ## Previous milestone
 
-Initial Setup V1 adds a non-blocking, four-step readiness checklist for the
-current Observer, Territory, Ареал and coverage-compatible offline map. The
-first incomplete launch opens it after local state loads unless an active
-ObservationPoint needs recovery. Settings provides repeat access. One
-device-local `initial_setup_offer_handled` flag suppresses repeat automatic
-offers; no readiness or Area-sent flags are persisted. The Ареал screen now
-keeps the send/load guidance visible until a suitable map is Ready.
-
-## Verification status
-
-Focused JVM tests, debug/androidTest Kotlin compilation, lint and debug build
-passed. Preserving Samsung SM-S938B instrumentation passed for checklist UI,
-DataStore settings, Settings navigation, Ареал guidance and map loading. The
-DEV package was updated in place without clearing data; Beta was not touched.
-Independent luna-verifier was launched but hit a usage limit before a verdict;
-root performed a separate self-review.
-
-## Next task
-
-Owner review of the local Initial Setup commit and manual in-app acceptance on
-Samsung; no push or Beta release was performed for this milestone.
-
-## Previous milestone
-
-D088 physical object data foundation is implemented. Room schema v8 adds an
-internal `physical_objects` identity table, an `apiaries` subtype table, and
-nullable `bees.source_object_id`. Concrete domain types are Hollow, LogHive and
-Apiary. Sequence numbers are allocated transactionally within Territory and
-type; records are retained and no object deletion API exists. Linked deletion
-is restricted. Complete backup v3 preserves both new collections and the Bee
-link; v1/v2 readers remain supported. D086 single-point export v1 is unchanged.
-
-## Verification status
-
-JVM unit tests, lint and debug/androidTest compilation passed. The preserving
-Samsung SM-S938B workflow reported `OK (34 tests)` for migration, backup and
-repository checks before a small Apiary name pass-through adjustment, then
-`OK (25 tests)` for backup and repository after that adjustment. The DEV
-package remained installed; Beta was not touched.
-
-## Next task
-
-The next implementation stage is Objects V1 UI, after owner review of this
-foundation. Inspection and research tooling remain separate future work.
-
-## Previous milestone
-
-ObservationPoint creation now treats description and photos as properties of
-the unsaved preparation draft. Both ordinary creation and `NO_BEES_FOUND`
-creation commit them together with the point; cancelling preparation removes
-the app-owned draft photo directory and persists nothing.
-
-Draft photos live under
-`files/observation-attachments-staging/<draftSessionId>/<attachmentId>`. On
-successful creation they move to the existing permanent
-`files/observation-attachments/<pointId>/<attachmentId>` layout before Room
-atomically inserts the point, pending weather row and attachment metadata. A
-failed Room operation rolls the files back to the draft.
-
-Room remains v7 and backup remains v2. Existing attachment metadata,
-FileProvider paths, Open-Meteo/WorkManager behavior, Area DataStore and PMTiles
-storage contracts are unchanged.
-
-## Verification status
-
-Offline debug Kotlin compilation, the full unit suite, androidTest compilation,
-lint, debug APK assembly and debug androidTest APK assembly pass. The focused
-preserving Samsung SM-S938B run reports `OK (37 tests)` for preparation UI,
-properties Room behavior, historical Properties, point/file deletion and
-backup v2.
-
-Manual Samsung checks at `font_scale=1.7` covered picker and camera cancellation,
-draft cleanup on creation cancellation, ordinary creation with description and
-photo, `NO_BEES_FOUND` creation with photo, historical/active Properties reopen
-and photo deletion. DataStore, the installed PMTiles file and its manifest kept
-their pre-test SHA-256 values. Area still reports two sections / 4.8 km² and the
-offline map as loaded.
-
-## Next task
-
-No follow-up is required for this iteration. Continue new functional work from
-the updated `main`; do not revive the pre-integration source worktrees as a
-development baseline.
+The approved `objects-ui-approved-v1` redesign was implemented over the Objects
+V1 foundation: compact directly editable azimuth with the production
+`HeadingProvider`, visual media thumbnails, adaptive control stacking, saved
+cards with hero preview, characteristics and provenance, and coordinate
+correction through one narrow repository/DAO update that changes only
+latitude/longitude for Hollow and LogHive. Room was v9 and Complete Backup v4 at
+that point; both were superseded by the current milestone.
