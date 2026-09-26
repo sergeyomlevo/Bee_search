@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performScrollToNode
 import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
 import org.beesearch.app.ui.settings.SettingsScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -28,7 +29,12 @@ class HelpScreenTest {
 
     private val exchangeStorage = BeeSearchExchangeStorage(File("Download"), "Beta")
 
-    private fun sections() = helpSections(exchangeStorage)
+    private fun sections() = helpSections(exchangeStorage.userVisiblePath())
+
+    private fun sectionIndex(title: String) = sections().indexOfFirst { it.title == title }
+
+    /** Items of the help list before the first section: the intro title, its blocks and a header. */
+    private fun headerItems() = 2 + helpIntro.blocks.size
 
     @Test
     fun settingsOpensHelpAndHelpContainsCurrentGuidance() {
@@ -58,124 +64,106 @@ class HelpScreenTest {
         composeRule.runOnIdle { assertTrue(helpOpened.value) }
 
         composeRule.onNodeWithText("Краткий старт").assertIsDisplayed()
+        composeRule.onNodeWithTag("help-screen").performScrollToNode(hasText("Подробная помощь"))
         composeRule.onNodeWithText("Подробная помощь").assertIsDisplayed()
         composeRule.onNodeWithTag("help-screen")
-            .performScrollToIndex(FIRST_SECTION_INDEX + PREPARATION_SECTION_INDEX)
-        composeRule.onNodeWithTag("help-section-$PREPARATION_SECTION_INDEX").performClick()
-        val firstFlightGuidance = "Если первый вылет отмечен ошибочно, отмените его в карточке пчелы: " +
-            "пчела и её цикл будут удалены, а метка снова станет доступным вариантом. После " +
-            "зарегистрированного возврата такая отмена недоступна."
-        composeRule.onNodeWithTag("help-screen").performScrollToNode(hasText(firstFlightGuidance))
-        composeRule.onNodeWithText(firstFlightGuidance).assertIsDisplayed()
-        composeRule.onNodeWithText(
-            "В первом цикле полёт длительностью менее одной минуты при анализе не учитывается.",
-        ).assertDoesNotExist()
-        composeRule.onNodeWithText(
-            "Первый выпуск запускается одновременно для всей подготовленной группы.",
-        ).assertDoesNotExist()
+            .performScrollToNode(hasText("Создать запись здесь", substring = true))
+        composeRule.onNodeWithText("Создать запись здесь", substring = true).assertIsDisplayed()
     }
 
     @Test
-    fun helpSectionHeadersShowOnlyTheTopicAndKeepExpandSemantics() {
+    fun everySectionIsReachableAndKeepsItsTopicAsItsName() {
         composeRule.setContent { Bee_searchTheme { HelpScreen(exchangeStorage = exchangeStorage, onBack = {}) } }
 
-        // A representative spread instead of every section: the exhaustive title contract is asserted
-        // in HelpContentTest, and scrolling the whole list while querying semantics on each step
-        // destabilises Compose's own semantics invalidation once the topic list grows.
-        val allSections = sections()
-        listOf(0, allSections.size / 2, allSections.size - 1).forEach { index ->
-            composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX + index)
-            // The exact topic is the header's text value: a service prefix would make this fail.
-            composeRule.onNodeWithText(allSections[index].title).assertExists()
-            composeRule.onNodeWithText("Развернуть: ${allSections[index].title}").assertDoesNotExist()
-            composeRule.onNodeWithText("Свернуть: ${allSections[index].title}").assertDoesNotExist()
+        sections().forEachIndexed { index, section ->
+            composeRule.onNodeWithTag("help-screen").performScrollToIndex(headerItems() + index)
+            composeRule.onNodeWithText(section.title).assertExists()
+            composeRule.onNodeWithText("Развернуть: ${section.title}").assertDoesNotExist()
+            composeRule.onNodeWithText("Свернуть: ${section.title}").assertDoesNotExist()
             composeRule.onNodeWithTag("help-section-$index")
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-                .assert(
-                    SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, COLLAPSED_STATE),
-                )
         }
+    }
 
-        composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX)
-        composeRule.onNodeWithTag("help-section-0").performClick()
-        composeRule.onNodeWithText(sections()[0].title).assertExists()
-        composeRule.onNodeWithTag("help-section-0")
+    @Test
+    fun expandingASectionShowsItsStepsAndNotes() {
+        val index = sectionIndex("Дупла и колоды")
+        assertTrue("the object workflow section must exist", index > 0)
+        composeRule.setContent { Bee_searchTheme { HelpScreen(exchangeStorage = exchangeStorage, onBack = {}) } }
+
+        composeRule.onNodeWithTag("help-screen").performScrollToIndex(headerItems() + index)
+        composeRule.onNodeWithTag("help-section-$index").performClick()
+
+        composeRule.onNodeWithTag("help-screen").performScrollToNode(hasText("Зафиксировать с компаса", substring = true))
+        composeRule.onNodeWithText("Зафиксировать с компаса", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("help-section-$index")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, EXPANDED_STATE))
     }
 
     @Test
-    fun helpExposesDataAndMapSections() {
+    fun objectsNumberingAndResetAreExplainedInTheWorkflowOrder() {
+        val titles = sections().filter { it.level == 1 }.map { it.title }
+
+        listOf(
+            "Что находится в разделе «Объекты»",
+            "Дупла и колоды",
+            "Удаление объекта и правило номера",
+            "Сброс нумерации",
+        ).forEach { title ->
+            assertTrue("help must contain the section «$title»", titles.contains(title))
+        }
+        assertTrue(
+            "objects must be explained before deletion",
+            titles.indexOf("Дупла и колоды") < titles.indexOf("Удаление объекта и правило номера"),
+        )
+    }
+
+    @Test
+    fun aDeclaredImageSlotWithoutAResourceLeavesNoGap() {
+        val index = sectionIndex("Главный экран: карта")
+        assertTrue("the main screen section must exist", index > 0)
         composeRule.setContent { Bee_searchTheme { HelpScreen(exchangeStorage = exchangeStorage, onBack = {}) } }
 
-        val dataSectionIndex = sections().indexOfFirst { it.title == "Экспорт и удаление данных" }
-        val mapSectionIndex = sections().indexOfFirst { it.title == "Карты" }
+        composeRule.onNodeWithTag("help-screen").performScrollToIndex(headerItems() + index)
+        composeRule.onNodeWithTag("help-section-$index").performClick()
 
+        // The canonical source declares an image slot here, but no drawable is shipped yet: the help
+        // shows the text and must not compose an image node for the missing resource.
+        val visualBlock = sections()[index].blocks.indexOfFirst { it is HelpBlock.Visual }
+        assertTrue("the canonical source must declare an image slot", visualBlock >= 0)
         composeRule.onNodeWithTag("help-screen")
-            .performScrollToIndex(FIRST_SECTION_INDEX + dataSectionIndex)
-        composeRule.onNodeWithText("Экспорт и удаление данных").assertIsDisplayed()
-        composeRule.onNodeWithTag("help-screen")
-            .performScrollToIndex(FIRST_SECTION_INDEX + mapSectionIndex)
-        composeRule.onNodeWithText("Карты").assertIsDisplayed()
+            .performScrollToNode(hasText("не подписаны текстом", substring = true))
+        composeRule.onNodeWithText("не подписаны текстом", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("help-section-$index-block-$visualBlock").assertDoesNotExist()
     }
 
     @Test
-    fun helpExposesPointsAndPointScreenSections() {
+    fun exchangeSectionNamesTheFolderOfThisVariant() {
+        val index = sectionIndex("Где находятся файлы Bee Search")
+        assertTrue("the exchange section must exist", index > 0)
         composeRule.setContent { Bee_searchTheme { HelpScreen(exchangeStorage = exchangeStorage, onBack = {}) } }
 
-        val pointsIndex = sections().indexOfFirst { it.title == "Точки" }
-        val pointIndex = sections().indexOfFirst { it.title == "Точка наблюдения: просмотр" }
-        assertTrue("both point sections must exist", pointsIndex > 0 && pointIndex > pointsIndex)
-
-        composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX + pointsIndex)
-        composeRule.onNodeWithText("Точки").assertIsDisplayed()
-        composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX + pointIndex)
-        composeRule.onNodeWithText("Точка наблюдения: просмотр").assertIsDisplayed()
-        composeRule.onNodeWithText("Свойства точки").assertDoesNotExist()
-    }
-
-    @Test
-    fun helpExposesCoverageCreationAndMapLoadingSections() {
-        composeRule.setContent { Bee_searchTheme { HelpScreen(exchangeStorage = exchangeStorage, onBack = {}) } }
-
-        val coverageIndex = sections().indexOfFirst { it.title == "Создание участка офлайн-карты" }
-        val loadingIndex = sections().indexOfFirst { it.title == "Загрузка офлайн-карты" }
-        assertTrue("both offline-map sections must exist", coverageIndex > 0 && loadingIndex > coverageIndex)
-
-        composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX + coverageIndex)
-        composeRule.onNodeWithText("Создание участка офлайн-карты").assertIsDisplayed()
-        composeRule.onNodeWithTag("help-section-$coverageIndex").performClick()
-        composeRule.onNodeWithTag("help-screen").performScrollToNode(hasText(DONE_SAVES_FRAGMENT, substring = true))
-        composeRule.onNodeWithText(DONE_SAVES_FRAGMENT, substring = true).assertIsDisplayed()
-
-        composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX + loadingIndex)
-        composeRule.onNodeWithText("Загрузка офлайн-карты").assertIsDisplayed()
-        composeRule.onNodeWithTag("help-section-$loadingIndex").performClick()
-        composeRule.onNodeWithTag("help-screen").performScrollToNode(hasText(FILE_PAIR_FRAGMENT, substring = true))
-        composeRule.onNodeWithText(FILE_PAIR_FRAGMENT, substring = true).assertIsDisplayed()
-    }
-
-    @Test
-    fun helpExposesTheExchangeFolderOfThisVariant() {
-        composeRule.setContent { Bee_searchTheme { HelpScreen(exchangeStorage = exchangeStorage, onBack = {}) } }
-
-        val exchangeIndex = sections().indexOfFirst { it.title == EXCHANGE_HELP_TITLE }
-        assertTrue("the exchange section must exist", exchangeIndex > 0)
-
-        composeRule.onNodeWithTag("help-screen").performScrollToIndex(FIRST_SECTION_INDEX + exchangeIndex)
-        composeRule.onNodeWithText(EXCHANGE_HELP_TITLE).assertIsDisplayed()
-        composeRule.onNodeWithTag("help-section-$exchangeIndex").performClick()
+        composeRule.onNodeWithTag("help-screen").performScrollToIndex(headerItems() + index)
+        composeRule.onNodeWithTag("help-section-$index").performClick()
         composeRule.onNodeWithTag("help-screen").performScrollToNode(hasText(EXCHANGE_PATH_FRAGMENT))
         composeRule.onNodeWithText(EXCHANGE_PATH_FRAGMENT).assertIsDisplayed()
     }
 
+    @Test
+    fun sectionsReflectTheCanonicalSourceOrder() {
+        composeRule.setContent { Bee_searchTheme { HelpScreen(exchangeStorage = exchangeStorage, onBack = {}) } }
+
+        val titles = sections().map { it.title }
+        listOf(titles.first(), titles[TITLES_MIDDLE_INDEX], titles.last()).forEach { title ->
+            composeRule.onNodeWithTag("help-screen").performScrollToNode(hasText(title))
+            composeRule.onNodeWithText(title).assertIsDisplayed()
+        }
+        assertEquals("Удаление объекта и правило номера", titles[TITLES_MIDDLE_INDEX])
+    }
+
     private companion object {
-        /** LazyColumn index of `detailedHelpSections[0]`: two headings plus the three quick steps. */
-        const val FIRST_SECTION_INDEX = 5
-        const val PREPARATION_SECTION_INDEX = 3
-        const val COLLAPSED_STATE = "Свёрнуто"
         const val EXPANDED_STATE = "Развёрнуто"
-        const val DONE_SAVES_FRAGMENT = "сохраняет выбранные участки и завершает редактирование"
-        const val FILE_PAIR_FRAGMENT = "*.pmtiles.manifest.json"
         const val EXCHANGE_PATH_FRAGMENT = "Download/BeeSearch/Beta/Exchange"
+        const val TITLES_MIDDLE_INDEX = 12
     }
 }
