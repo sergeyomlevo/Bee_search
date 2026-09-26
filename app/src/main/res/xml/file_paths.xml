@@ -6,6 +6,9 @@
     <cache-path
         name="physical_object_media_capture"
         path="physical-object-media-staging/" />
+    <files-path
+        name="physical_object_media"
+        path="physical-object-media/" />
     <cache-path
         name="area_share"
         path="area-share/" />

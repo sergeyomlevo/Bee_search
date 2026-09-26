@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.beesearch.app.domain.heading.HeadingAccuracy
 import org.beesearch.app.domain.heading.HeadingProvider
 import org.beesearch.app.domain.heading.HeadingState
@@ -25,6 +26,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Instant
+import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class PhysicalObjectEditorTest {
@@ -47,7 +49,7 @@ class PhysicalObjectEditorTest {
         }
 
         composeRule.onNodeWithTag("physical-object-live-azimuth")
-            .assertTextContains("123° · ЮВ")
+            .assertTextContains("Текущее: 123° · ЮВ")
         composeRule.onNodeWithText("Направьте верх телефона в сторону летка").assertIsDisplayed()
         composeRule.onNodeWithText("Точность компаса низкая").assertIsDisplayed()
         composeRule.onNodeWithTag("physical-object-fix-azimuth").performClick()
@@ -59,6 +61,57 @@ class PhysicalObjectEditorTest {
         composeRule.onNodeWithTag("physical-object-create").performScrollTo().performClick()
 
         composeRule.runOnIdle { assertEquals(321, submitted?.entranceAzimuthDeg) }
+    }
+
+    @Test
+    fun laterLiveHeadingDoesNotOverwriteManualAzimuth() {
+        val headings = MutableStateFlow<HeadingState>(
+            HeadingState.Available(15, HeadingAccuracy.HIGH, Instant.EPOCH),
+        )
+        composeRule.setContent {
+            Bee_searchTheme {
+                HollowForm(
+                    headingProvider = HeadingProvider { headings },
+                    onSubmit = { _, _ -> },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("physical-object-fix-azimuth").performClick()
+        composeRule.onNodeWithTag("physical-object-manual-azimuth").performTextReplacement("271")
+        composeRule.runOnIdle {
+            headings.value = HeadingState.Available(180, HeadingAccuracy.HIGH, Instant.EPOCH)
+        }
+
+        composeRule.onNodeWithTag("physical-object-manual-azimuth").assertTextContains("271")
+        composeRule.onNodeWithTag("physical-object-entered-azimuth-sector").assertTextContains("З")
+        composeRule.onNodeWithTag("physical-object-live-azimuth").assertTextContains("Текущее: 180° · Ю")
+    }
+
+    @Test
+    fun mediaUsesThumbnailsAndRemovesTheSelectedItemFromCornerAction() {
+        val firstId = UUID.randomUUID()
+        val secondId = UUID.randomUUID()
+        var removed: UUID? = null
+        composeRule.setContent {
+            Bee_searchTheme {
+                HollowForm(
+                    media = listOf(
+                        PhysicalObjectMediaDraft(firstId, "one.jpg", isVideo = false),
+                        PhysicalObjectMediaDraft(secondId, "two.mp4", isVideo = true),
+                    ),
+                    onRemoveMedia = { removed = it },
+                    onSubmit = { _, _ -> },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("physical-object-media-thumbnails").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("physical-object-media-preview-$firstId").assertIsDisplayed()
+        composeRule.onNodeWithTag("physical-object-media-preview-$secondId").assertIsDisplayed()
+        composeRule.onNodeWithTag("physical-object-remove-media-$secondId").performClick()
+
+        composeRule.runOnIdle { assertEquals(secondId, removed) }
     }
 
     @Test

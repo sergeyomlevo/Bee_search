@@ -86,22 +86,45 @@ sealed interface AppRoute {
     data object OfflineMapManagement : AppRoute
     data object CurrentTerritory : AppRoute
     data class CreatePhysicalObject(val target: PhysicalObjectCreationTarget) : AppRoute
-    data class PhysicalObjectDetail(val objectId: UUID) : AppRoute
+    data class PhysicalObjectDetail(
+        val objectId: UUID,
+        val coordinateUpdate: PhysicalObjectCoordinateUpdate? = null,
+    ) : AppRoute
     data object PrepareObservationPoint : AppRoute
     data class ResumeObservation(val point: ObservationPoint) : AppRoute
 }
 
-internal data class PhysicalObjectLocationSelection(
-    val type: PhysicalObjectType,
-    val territoryId: UUID,
-    val observerId: UUID,
-) {
-    val label: String get() = when (type) {
-        PhysicalObjectType.HOLLOW -> "Дупло"
-        PhysicalObjectType.LOG_HIVE -> "Колода"
-        PhysicalObjectType.APIARY -> error("Apiary creation is not part of this flow")
+internal sealed interface PhysicalObjectLocationSelection {
+    val label: String
+
+    data class Create(
+        val type: PhysicalObjectType,
+        val territoryId: UUID,
+        val observerId: UUID,
+    ) : PhysicalObjectLocationSelection {
+        override val label: String get() = when (type) {
+            PhysicalObjectType.HOLLOW -> "Дупло"
+            PhysicalObjectType.LOG_HIVE -> "Колода"
+            PhysicalObjectType.APIARY -> error("Apiary creation is not part of this flow")
+        }
     }
+
+    data class Edit(
+        val objectId: UUID,
+        override val label: String,
+    ) : PhysicalObjectLocationSelection
 }
+
+data class PhysicalObjectCoordinateUpdate(
+    val requestId: UUID,
+    val latitude: Double,
+    val longitude: Double,
+)
+
+internal data class MapCenterRequest(
+    val requestId: UUID,
+    val target: MapTarget,
+)
 
 data class PhysicalObjectCreationTarget(
     val requestId: UUID,
@@ -224,6 +247,7 @@ internal class MainViewModel(
     private val _observationPointDraft = MutableStateFlow<ObservationPointCreationDraft?>(null)
     private val _physicalObjectLocationSelection =
         MutableStateFlow<PhysicalObjectLocationSelection?>(null)
+    private val _mapCenterRequest = MutableStateFlow<MapCenterRequest?>(null)
     private val _observationPointPreparationDraft = MutableStateFlow<ObservationPointPreparationDraft?>(null)
     private val _completingObservationPointId = MutableStateFlow<UUID?>(null)
     private val _beeMutationInProgress = MutableStateFlow(false)
@@ -241,6 +265,7 @@ internal class MainViewModel(
         _observationPointDraft.asStateFlow()
     val physicalObjectLocationSelection: StateFlow<PhysicalObjectLocationSelection?> =
         _physicalObjectLocationSelection.asStateFlow()
+    internal val mapCenterRequest: StateFlow<MapCenterRequest?> = _mapCenterRequest.asStateFlow()
     val observationPointPreparationDraft: StateFlow<ObservationPointPreparationDraft?> =
         _observationPointPreparationDraft.asStateFlow()
     val completingObservationPointId: StateFlow<UUID?> = _completingObservationPointId.asStateFlow()
@@ -341,6 +366,7 @@ internal class MainViewModel(
 
     fun openSettings() {
         _physicalObjectLocationSelection.value = null
+        _mapCenterRequest.value = null
         setupReturnPending = false
         _setupSettingsSection.value = null
         manualRoute.value = AppRoute.Settings
@@ -359,6 +385,7 @@ internal class MainViewModel(
 
     fun openObjects() {
         _physicalObjectLocationSelection.value = null
+        _mapCenterRequest.value = null
         setupReturnPending = false
         manualRoute.value = AppRoute.Objects
         clearFeedback()
@@ -670,7 +697,7 @@ internal class MainViewModel(
     private fun startPhysicalObjectLocationSelection(type: PhysicalObjectType) {
         val draft = _observationPointDraft.value ?: return
         _observationPointDraft.value = null
-        _physicalObjectLocationSelection.value = PhysicalObjectLocationSelection(
+        _physicalObjectLocationSelection.value = PhysicalObjectLocationSelection.Create(
             type = type,
             territoryId = draft.territoryId,
             observerId = draft.observerId,
@@ -683,22 +710,69 @@ internal class MainViewModel(
         if (!latitude.isFinite() || latitude !in -90.0..90.0) return
         if (!longitude.isFinite() || longitude !in -180.0..180.0) return
         _physicalObjectLocationSelection.value = null
-        manualRoute.value = AppRoute.CreatePhysicalObject(
-            PhysicalObjectCreationTarget(
-                requestId = UUID.randomUUID(),
-                type = selection.type,
-                territoryId = selection.territoryId,
-                observerId = selection.observerId,
-                latitude = latitude,
-                longitude = longitude,
-            ),
-        )
+        manualRoute.value = when (selection) {
+            is PhysicalObjectLocationSelection.Create -> AppRoute.CreatePhysicalObject(
+                PhysicalObjectCreationTarget(
+                    requestId = UUID.randomUUID(),
+                    type = selection.type,
+                    territoryId = selection.territoryId,
+                    observerId = selection.observerId,
+                    latitude = latitude,
+                    longitude = longitude,
+                ),
+            )
+            is PhysicalObjectLocationSelection.Edit -> AppRoute.PhysicalObjectDetail(
+                objectId = selection.objectId,
+                coordinateUpdate = PhysicalObjectCoordinateUpdate(
+                    requestId = UUID.randomUUID(),
+                    latitude = latitude,
+                    longitude = longitude,
+                ),
+            )
+        }
         clearFeedback()
     }
 
     fun cancelPhysicalObjectLocationSelection() {
+        val selection = _physicalObjectLocationSelection.value
         _physicalObjectLocationSelection.value = null
+        _mapCenterRequest.value = null
+        if (selection is PhysicalObjectLocationSelection.Edit) {
+            manualRoute.value = AppRoute.PhysicalObjectDetail(selection.objectId)
+        }
         clearFeedback()
+    }
+
+    fun editPhysicalObjectCoordinates(objectId: UUID, designation: String, latitude: Double, longitude: Double) {
+        if (!latitude.isFinite() || latitude !in -90.0..90.0) return
+        if (!longitude.isFinite() || longitude !in -180.0..180.0) return
+        _physicalObjectLocationSelection.value = PhysicalObjectLocationSelection.Edit(
+            objectId = objectId,
+            label = designation,
+        )
+        _mapCenterRequest.value = MapCenterRequest(UUID.randomUUID(), MapTarget(latitude, longitude))
+        manualRoute.value = AppRoute.CurrentTerritory
+        clearFeedback()
+    }
+
+    fun showPhysicalObjectOnMap(latitude: Double, longitude: Double) {
+        if (!latitude.isFinite() || latitude !in -90.0..90.0) return
+        if (!longitude.isFinite() || longitude !in -180.0..180.0) return
+        _physicalObjectLocationSelection.value = null
+        _mapCenterRequest.value = MapCenterRequest(UUID.randomUUID(), MapTarget(latitude, longitude))
+        manualRoute.value = AppRoute.CurrentTerritory
+        clearFeedback()
+    }
+
+    fun consumeMapCenterRequest(requestId: UUID) {
+        if (_mapCenterRequest.value?.requestId == requestId) _mapCenterRequest.value = null
+    }
+
+    fun consumePhysicalObjectCoordinateUpdate(requestId: UUID) {
+        val route = manualRoute.value as? AppRoute.PhysicalObjectDetail ?: return
+        if (route.coordinateUpdate?.requestId == requestId) {
+            manualRoute.value = AppRoute.PhysicalObjectDetail(route.objectId)
+        }
     }
 
     fun closePhysicalObjectCreation() {

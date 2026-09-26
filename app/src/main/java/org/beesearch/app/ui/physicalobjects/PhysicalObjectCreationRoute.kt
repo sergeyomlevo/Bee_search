@@ -76,6 +76,7 @@ internal fun PhysicalObjectCreationRoute(
             id = item.id,
             label = item.originalFileName ?: if (item.type == PhysicalObjectMediaType.VIDEO) "Видео" else "Фото",
             isVideo = item.type == PhysicalObjectMediaType.VIDEO,
+            previewFile = mediaStore.resolveDraft(item.relativePath),
         )
     }
     val pick = {

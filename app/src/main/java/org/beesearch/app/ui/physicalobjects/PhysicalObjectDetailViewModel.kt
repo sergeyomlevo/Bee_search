@@ -39,17 +39,18 @@ internal class PhysicalObjectDetailViewModel(
 
     private fun reload() {
         viewModelScope.launch {
-            runCatching {
-                repository.getHollow(objectId)?.let(PhysicalObjectDetailValue::HollowValue)
-                    ?: repository.getLogHive(objectId)?.let(PhysicalObjectDetailValue::LogHiveValue)
-                    ?: error("Объект не найден")
-            }.onSuccess { value ->
+            runCatching { loadValue() }.onSuccess { value ->
                 _state.value = _state.value.copy(value = value, isWorking = false, error = null)
             }.onFailure { error ->
                 _state.value = _state.value.copy(isWorking = false, error = error.message ?: "Не удалось открыть объект")
             }
         }
     }
+
+    private suspend fun loadValue(): PhysicalObjectDetailValue =
+        repository.getHollow(objectId)?.let(PhysicalObjectDetailValue::HollowValue)
+            ?: repository.getLogHive(objectId)?.let(PhysicalObjectDetailValue::LogHiveValue)
+            ?: error("Объект не найден")
 
     fun startEditing() {
         val value = _state.value.value ?: return
@@ -74,6 +75,24 @@ internal class PhysicalObjectDetailViewModel(
 
     fun saveLogHive(properties: LogHiveProperties) = save {
         PhysicalObjectDetailValue.LogHiveValue(repository.updateLogHive(objectId, properties))
+    }
+
+    fun updateCoordinates(latitude: Double, longitude: Double) {
+        if (_state.value.isWorking) return
+        _state.value = _state.value.copy(isWorking = true, error = null)
+        viewModelScope.launch {
+            runCatching {
+                repository.updateCoordinates(objectId, latitude, longitude)
+                loadValue()
+            }.onSuccess { value ->
+                _state.value = _state.value.copy(value = value, isWorking = false, error = null)
+            }.onFailure { error ->
+                _state.value = _state.value.copy(
+                    isWorking = false,
+                    error = error.message ?: "Не удалось сохранить координаты",
+                )
+            }
+        }
     }
 
     private fun save(update: suspend () -> PhysicalObjectDetailValue) {

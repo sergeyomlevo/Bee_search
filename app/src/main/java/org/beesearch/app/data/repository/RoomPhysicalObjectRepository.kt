@@ -159,6 +159,19 @@ internal class RoomPhysicalObjectRepository(
         identity.toLogHive(properties.toEntity(id), objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
     }
 
+    override suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double) =
+        database.withTransaction {
+            require(latitude.isFinite() && latitude in -90.0..90.0) { "Latitude is out of range" }
+            require(longitude.isFinite() && longitude in -180.0..180.0) { "Longitude is out of range" }
+            val identity = objectDao.getById(id) ?: throw EntityNotFoundException("PhysicalObject")
+            require(identity.objectType == PhysicalObjectType.HOLLOW || identity.objectType == PhysicalObjectType.LOG_HIVE) {
+                "Coordinates can only be edited for Hollow or LogHive"
+            }
+            if (objectDao.updateCoordinates(id, latitude, longitude) != 1) {
+                throw EntityNotFoundException("PhysicalObject")
+            }
+        }
+
     override suspend fun setBeeSourceObject(beeId: UUID, sourceObjectId: UUID?) = database.withTransaction {
         val bee = beeDao.getById(beeId) ?: throw EntityNotFoundException("Bee")
         if (sourceObjectId != null && objectDao.getById(sourceObjectId) == null) {

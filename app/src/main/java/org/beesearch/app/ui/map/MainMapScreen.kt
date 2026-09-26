@@ -40,6 +40,7 @@ import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.model.Territory
 import java.util.UUID
 import org.beesearch.app.formatMapMeasurement
+import org.beesearch.app.MapCenterRequest
 
 @Composable
 internal fun CurrentTerritoryScreen(
@@ -56,6 +57,8 @@ internal fun CurrentTerritoryScreen(
     onCreateHollow: () -> Unit,
     onCreateLogHive: () -> Unit,
     physicalObjectLocationLabel: String? = null,
+    mapCenterRequest: MapCenterRequest? = null,
+    onMapCenterRequestHandled: (UUID) -> Unit = {},
     onConfirmPhysicalObjectLocation: (Double, Double) -> Unit = { _, _ -> },
     onCancelPhysicalObjectLocation: () -> Unit = {},
     onOpenObjects: () -> Unit,
@@ -83,6 +86,8 @@ internal fun CurrentTerritoryScreen(
                     onRequestLocationPermission = onRequestLocationPermission,
                     onRequestCreateRecord = onRequestCreateRecord,
                     locationSelectionLabel = physicalObjectLocationLabel,
+                    mapCenterRequest = mapCenterRequest,
+                    onMapCenterRequestHandled = onMapCenterRequestHandled,
                     onConfirmLocationSelection = onConfirmPhysicalObjectLocation,
                     onCancelLocationSelection = onCancelPhysicalObjectLocation,
                     onCoverageTerritoryMissing = onOpenSettings,

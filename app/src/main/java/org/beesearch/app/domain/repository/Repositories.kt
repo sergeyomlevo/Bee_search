@@ -72,6 +72,7 @@ interface PhysicalObjectRepository {
     suspend fun listForTerritory(territoryId: UUID): TerritoryPhysicalObjects
     suspend fun updateHollow(id: UUID, properties: HollowProperties): Hollow
     suspend fun updateLogHive(id: UUID, properties: LogHiveProperties): LogHive
+    suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double)
 
     suspend fun setBeeSourceObject(beeId: UUID, sourceObjectId: UUID?): Bee
     suspend fun getBeeSourceObjectId(beeId: UUID): UUID?

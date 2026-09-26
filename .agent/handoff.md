@@ -2,30 +2,34 @@
 
 ## Current milestone
 
-Objects V1 extends the accepted D088 foundation with creation, storage,
-viewing and correction of Hollow and LogHive records. Creation starts from the
-main-map `+` chooser, reuses the map-centre location confirmation and production
-`HeadingProvider`, and persists only after a valid form is confirmed. Room v9
-adds immutable creator provenance, subtype tables and normalized 1:N object
-media; Complete Backup v4 covers the new data while v1-v3 remain readable.
+The approved `objects-ui-approved-v1` redesign is implemented over the existing
+Objects V1 foundation. Create/edit forms use a compact directly editable
+azimuth with the production `HeadingProvider`, visual media thumbnails and
+adaptive whole-control stacking. Saved-object cards show a hero preview,
+characteristics, provenance and map actions. Coordinate correction reuses the
+existing map-centre flow through one narrow repository/DAO update that changes
+only latitude/longitude for Hollow and LogHive. Room remains v9 and Complete
+Backup remains v4.
 
 ## Verification status
 
 The full JVM unit suite, debug build and debug/androidTest assembly pass. A
-preserving Samsung SM-S938B run reports `OK (55 tests)` across backup,
-migration, repository, map/create navigation, object forms and Objects browser.
-The DEV package remained installed and its data was not cleared; Stable and
-Beta were not touched. Manual Samsung checks opened the Objects browser and
-confirmed it survives app restart. A live create flow, physical compass
-measurement and camera/photo-picker interaction remain unverified because the
-device had no GPS fix; system location was restored to its original disabled
-state after the check.
+preserving Samsung SM-S938B run reports `OK (25 tests)` for object UI,
+repository invariants and one-shot coordinate navigation; a focused map/create
+suite reports `OK (6 tests)`. At the device's real `font_scale=1.7`, manual
+checks covered `+ -> Дупло/Колода`, live physical compass fixation, manual
+azimuth, validation, camera, two Photo Picker items, visual thumbnails and
+corner removal affordances, create/detail/edit, coordinate correction,
+Objects browser and persistence after restart. Screenshots were compared with
+the approved mockup. DEV data was preserved; Stable and Beta were not touched.
+Picking an actual video on the device remains unverified; video preview/marker
+behavior is covered by Compose instrumentation.
 
 ## Next task
 
-Owner review and real-field acceptance with a GPS fix: create/edit both object
-types, exercise the physical compass, camera and multi-item picker, then confirm
-persistence after restart. No push, Beta release or version change was made.
+Owner review of the local Objects UI commit. An optional follow-up device check
+may select a real video through the system picker. No push, Beta release or
+version change was made.
 
 ## Previous milestone
 

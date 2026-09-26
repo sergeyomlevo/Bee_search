@@ -2,6 +2,9 @@
 
 package org.beesearch.app.ui.physicalobjects
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,11 +15,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.beesearch.app.PhysicalObjectCoordinateUpdate
+import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
 import org.beesearch.app.domain.heading.HeadingProvider
 import org.beesearch.app.domain.heading.HeadingReference
 import org.beesearch.app.domain.model.Observer
@@ -30,23 +42,45 @@ import java.util.UUID
 internal fun PhysicalObjectDetailRoute(
     objectId: UUID,
     repository: PhysicalObjectRepository,
+    mediaStore: PhysicalObjectMediaFileStore,
     territories: List<Territory>,
     observers: List<Observer>,
     headingProvider: HeadingProvider,
+    coordinateUpdate: PhysicalObjectCoordinateUpdate? = null,
+    onCoordinateUpdateHandled: (UUID) -> Unit = {},
+    onEditCoordinates: (UUID, String, Double, Double) -> Unit = { _, _, _, _ -> },
+    onShowOnMap: (Double, Double) -> Unit = { _, _ -> },
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     val model: PhysicalObjectDetailViewModel = viewModel(
         key = "physical-object-detail-$objectId",
         factory = PhysicalObjectDetailViewModel.factory(objectId, repository),
     )
     val state by model.state.collectAsStateWithLifecycle()
+    LaunchedEffect(coordinateUpdate?.requestId, state.isWorking) {
+        val request = coordinateUpdate ?: return@LaunchedEffect
+        if (state.isWorking) return@LaunchedEffect
+        onCoordinateUpdateHandled(request.requestId)
+        model.updateCoordinates(request.latitude, request.longitude)
+    }
     val back = { if (state.editing) model.cancelEditing() else onBack() }
     BackHandler(onBack = back)
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (state.editing) "Редактирование" else "Объект") },
-                navigationIcon = { TextButton(onClick = back) { Text("Назад") } },
+                title = {
+                    Text(
+                        if (state.editing) "Редактирование"
+                        else state.value?.designation() ?: "Объект",
+                    )
+                },
+                navigationIcon = {
+                    TextButton(
+                        onClick = back,
+                        modifier = Modifier.size(48.dp).semantics { contentDescription = "Назад" },
+                    ) { Text("←") }
+                },
             )
         },
     ) { padding ->
@@ -55,14 +89,41 @@ internal fun PhysicalObjectDetailRoute(
             when {
                 value == null && state.isWorking -> CircularProgressIndicator()
                 value == null -> Text(state.error ?: "Объект не найден")
-                state.editing -> PhysicalObjectEditForm(value, state, model, headingProvider)
+                state.editing -> PhysicalObjectEditForm(value, state, model, headingProvider, mediaStore)
                 else -> PhysicalObjectDetails(
                     value = value,
                     territoryLabel = territories.firstOrNull { it.id == value.territoryId() }
                         ?.let { "${it.code} · ${it.name}" } ?: "Не найдена",
                     creatorLabel = observers.firstOrNull { it.id == value.creatorId() }
                         ?.let { "${it.code} · ${it.displayName}" } ?: "Не указан",
+                    mediaStore = mediaStore,
                     onEdit = model::startEditing,
+                    onEditCoordinates = {
+                        onEditCoordinates(value.id, value.designation(), value.latitude(), value.longitude())
+                    },
+                    onShowOnMap = { onShowOnMap(value.latitude(), value.longitude()) },
+                    onOpenMedia = { media ->
+                        val file = mediaStore.resolve(media.relativePath)
+                        val uri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file,
+                        )
+                        val mimeType = media.mimeType ?: if (media.type == PhysicalObjectMediaType.VIDEO) {
+                            "video/*"
+                        } else {
+                            "image/*"
+                        }
+                        try {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW)
+                                    .setDataAndType(uri, mimeType)
+                                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                            )
+                        } catch (_: ActivityNotFoundException) {
+                            Toast.makeText(context, "Нет приложения для просмотра медиа", Toast.LENGTH_LONG).show()
+                        }
+                    },
                 )
             }
         }
@@ -74,12 +135,26 @@ private fun PhysicalObjectDetails(
     value: PhysicalObjectDetailValue,
     territoryLabel: String,
     creatorLabel: String,
+    mediaStore: PhysicalObjectMediaFileStore,
     onEdit: () -> Unit,
+    onEditCoordinates: () -> Unit,
+    onShowOnMap: () -> Unit,
+    onOpenMedia: (PhysicalObjectMedia) -> Unit,
 ) = when (value) {
     is PhysicalObjectDetailValue.HollowValue ->
-        HollowCard(value.value, territoryLabel, creatorLabel, onEdit)
+        HollowCard(
+            value.value, territoryLabel, creatorLabel, onEdit,
+            onEditCoordinates, onShowOnMap,
+            mediaFile = { mediaStore.resolve(it.relativePath) },
+            onOpenMedia = onOpenMedia,
+        )
     is PhysicalObjectDetailValue.LogHiveValue ->
-        LogHiveCard(value.value, territoryLabel, creatorLabel, onEdit)
+        LogHiveCard(
+            value.value, territoryLabel, creatorLabel, onEdit,
+            onEditCoordinates, onShowOnMap,
+            mediaFile = { mediaStore.resolve(it.relativePath) },
+            onOpenMedia = onOpenMedia,
+        )
 }
 
 @Composable
@@ -88,8 +163,9 @@ private fun PhysicalObjectEditForm(
     state: PhysicalObjectDetailUiState,
     model: PhysicalObjectDetailViewModel,
     headingProvider: HeadingProvider,
+    mediaStore: PhysicalObjectMediaFileStore,
 ) {
-    val media = value.media().map(PhysicalObjectMedia::toDraft)
+    val media = value.media().map { item -> item.toDraft(mediaStore.resolve(item.relativePath)) }
     val reference = HeadingReference(value.latitude(), value.longitude())
     when (value) {
         is PhysicalObjectDetailValue.HollowValue -> HollowForm(
@@ -101,6 +177,7 @@ private fun PhysicalObjectEditForm(
             media = media,
             onStateChange = model::updateForm,
             showMediaActions = false,
+            showHeader = false,
             isWorking = state.isWorking,
             message = state.error,
             onSubmit = { properties, _ -> model.saveHollow(properties) },
@@ -115,6 +192,7 @@ private fun PhysicalObjectEditForm(
             media = media,
             onStateChange = model::updateForm,
             showMediaActions = false,
+            showHeader = false,
             isWorking = state.isWorking,
             message = state.error,
             onSubmit = { properties, _ -> model.saveLogHive(properties) },
@@ -123,10 +201,11 @@ private fun PhysicalObjectEditForm(
     }
 }
 
-private fun PhysicalObjectMedia.toDraft() = PhysicalObjectMediaDraft(
+private fun PhysicalObjectMedia.toDraft(file: java.io.File) = PhysicalObjectMediaDraft(
     id = id,
     label = originalFileName ?: if (type == PhysicalObjectMediaType.VIDEO) "Видео" else "Фото",
     isVideo = type == PhysicalObjectMediaType.VIDEO,
+    previewFile = file,
 )
 
 private fun PhysicalObjectDetailValue.territoryId(): UUID = when (this) {
@@ -152,4 +231,9 @@ private fun PhysicalObjectDetailValue.longitude(): Double = when (this) {
 private fun PhysicalObjectDetailValue.media(): List<PhysicalObjectMedia> = when (this) {
     is PhysicalObjectDetailValue.HollowValue -> value.media
     is PhysicalObjectDetailValue.LogHiveValue -> value.media
+}
+
+private fun PhysicalObjectDetailValue.designation(): String = when (this) {
+    is PhysicalObjectDetailValue.HollowValue -> value.designation
+    is PhysicalObjectDetailValue.LogHiveValue -> value.designation
 }

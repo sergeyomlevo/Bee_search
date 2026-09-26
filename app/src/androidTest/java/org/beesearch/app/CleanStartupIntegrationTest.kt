@@ -137,6 +137,31 @@ class CleanStartupIntegrationTest {
     }
 
     @Test
+    fun physicalObjectCoordinateEditUsesMapCenterAndReturnsOneShotUpdateForSameIdentity() = runBlocking {
+        val viewModel = newViewModel()
+        val objectId = UUID.randomUUID()
+
+        viewModel.editPhysicalObjectCoordinates(objectId, "Дупло 7", 56.1, 42.7)
+
+        assertEquals(objectId, (viewModel.physicalObjectLocationSelection.value as PhysicalObjectLocationSelection.Edit).objectId)
+        assertEquals(MapTarget(56.1, 42.7), viewModel.mapCenterRequest.value?.target)
+        awaitRoute(viewModel, AppRoute.CurrentTerritory)
+
+        viewModel.confirmPhysicalObjectLocation(56.2, 42.8)
+        val detail = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+            viewModel.route.first {
+                it is AppRoute.PhysicalObjectDetail && it.coordinateUpdate != null
+            }
+        } as AppRoute.PhysicalObjectDetail
+        assertEquals(objectId, detail.objectId)
+        assertEquals(56.2, requireNotNull(detail.coordinateUpdate).latitude, 0.0)
+        assertEquals(42.8, requireNotNull(detail.coordinateUpdate).longitude, 0.0)
+
+        viewModel.consumePhysicalObjectCoordinateUpdate(requireNotNull(detail.coordinateUpdate).requestId)
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(objectId))
+    }
+
+    @Test
     fun cleanInstallationStartsInInitialSetupAndKeepsIt() = runBlocking {
         val viewModel = newViewModel()
         val activity = mirrorActivityStartup(viewModel)

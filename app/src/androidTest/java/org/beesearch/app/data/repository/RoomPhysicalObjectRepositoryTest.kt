@@ -112,6 +112,48 @@ class RoomPhysicalObjectRepositoryTest {
     }
 
     @Test
+    fun coordinateEditChangesOnlyCoordinatesAndPreservesIdentityFacts() = runBlocking {
+        val hollowId = UUID.randomUUID()
+        val media = PhysicalObjectMedia(
+            UUID.randomUUID(), hollowId, PhysicalObjectMediaType.IMAGE,
+            "p/coordinate.jpg", "coordinate.jpg", "image/jpeg", 10, "c".repeat(64), NOW,
+        )
+        val hollow = repository.createHollow(
+            NewHollow(hollowId, territory1, creatorObserverId, 56.1, 42.7, hollowProperties(), listOf(media)),
+        )
+        val logHive = repository.createLogHive(
+            NewLogHive(UUID.randomUUID(), territory1, creatorObserverId, 56.2, 42.8, logHiveProperties()),
+        )
+
+        repository.updateCoordinates(hollow.id, 57.123456, 43.654321)
+        repository.updateCoordinates(logHive.id, 57.223456, 43.754321)
+
+        assertEquals(hollow.copy(latitude = 57.123456, longitude = 43.654321), repository.getHollow(hollow.id))
+        assertEquals(logHive.copy(latitude = 57.223456, longitude = 43.754321), repository.getLogHive(logHive.id))
+    }
+
+    @Test
+    fun coordinateEditRejectsInvalidCoordinatesAndNonEditableObjectTypes() = runBlocking {
+        val hollow = repository.createHollow(
+            NewHollow(UUID.randomUUID(), territory1, creatorObserverId, 56.1, 42.7, hollowProperties()),
+        )
+        val apiary = repository.createApiary(territory1, 56.2, 42.8, "Пасека")
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.updateCoordinates(hollow.id, 91.0, 42.7) }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.updateCoordinates(hollow.id, 56.1, Double.NaN) }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.updateCoordinates(apiary.id, 57.0, 43.0) }
+        }
+
+        assertEquals(hollow, repository.getHollow(hollow.id))
+        assertEquals(apiary, repository.getApiary(apiary.id))
+    }
+
+    @Test
     fun creatorObserverCannotBeDeletedWhilePhysicalObjectKeepsProvenance() = runBlocking {
         repository.createHollow(
             NewHollow(UUID.randomUUID(), territory1, creatorObserverId, 56.1, 42.7, hollowProperties()),

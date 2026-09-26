@@ -133,6 +133,7 @@ private fun BeeSearchApp(
     val observationPointDraft by viewModel.observationPointDraft.collectAsStateWithLifecycle()
     val physicalObjectLocationSelection by
         viewModel.physicalObjectLocationSelection.collectAsStateWithLifecycle()
+    val mapCenterRequest by viewModel.mapCenterRequest.collectAsStateWithLifecycle()
     val observationPointPreparationDraft by viewModel.observationPointPreparationDraft.collectAsStateWithLifecycle()
     val completingObservationPointId by viewModel.completingObservationPointId.collectAsStateWithLifecycle()
     val beePreparation by viewModel.beePreparation.collectAsStateWithLifecycle()
@@ -227,9 +228,14 @@ private fun BeeSearchApp(
                     is AppRoute.PhysicalObjectDetail -> PhysicalObjectDetailRoute(
                         objectId = currentRoute.objectId,
                         repository = application.container.physicalObjectRepository,
+                        mediaStore = application.container.physicalObjectMediaFileStore,
                         territories = territories,
                         observers = observers,
                         headingProvider = application.container.headingProvider,
+                        coordinateUpdate = currentRoute.coordinateUpdate,
+                        onCoordinateUpdateHandled = viewModel::consumePhysicalObjectCoordinateUpdate,
+                        onEditCoordinates = viewModel::editPhysicalObjectCoordinates,
+                        onShowOnMap = viewModel::showPhysicalObjectOnMap,
                         onBack = viewModel::closePhysicalObjectDetail,
                     )
                     AppRoute.Area -> AreaRoute(
@@ -308,6 +314,8 @@ private fun BeeSearchApp(
                         onCreateHollow = viewModel::createHollowFromChooser,
                         onCreateLogHive = viewModel::createLogHiveFromChooser,
                         physicalObjectLocationLabel = physicalObjectLocationSelection?.label,
+                        mapCenterRequest = mapCenterRequest,
+                        onMapCenterRequestHandled = viewModel::consumeMapCenterRequest,
                         onConfirmPhysicalObjectLocation = viewModel::confirmPhysicalObjectLocation,
                         onCancelPhysicalObjectLocation = viewModel::cancelPhysicalObjectLocationSelection,
                         onOpenObjects = viewModel::openObjects,

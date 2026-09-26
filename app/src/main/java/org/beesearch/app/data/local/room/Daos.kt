@@ -147,6 +147,9 @@ internal interface PhysicalObjectDao {
     @Query("UPDATE log_hives SET tree = :tree, entrance_height_cm = :entranceHeightCm, entrance_azimuth_deg = :entranceAzimuthDeg, outer_diameter_cm = :outerDiameterCm, material = :material, internal_diameter_cm = :internalDiameterCm, internal_height_cm = :internalHeightCm, notes = :notes WHERE physical_object_id = :id")
     suspend fun updateLogHive(id: UUID, tree: String, entranceHeightCm: Double, entranceAzimuthDeg: Int, outerDiameterCm: Double, material: String, internalDiameterCm: Double, internalHeightCm: Double, notes: String?): Int
 
+    @Query("UPDATE physical_objects SET latitude = :latitude, longitude = :longitude WHERE id = :id AND object_type IN ('HOLLOW', 'LOG_HIVE')")
+    suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double): Int
+
     @Query("SELECT * FROM apiaries WHERE physical_object_id IN (:ids) ORDER BY physical_object_id")
     suspend fun getApiaries(ids: Collection<UUID>): List<ApiaryEntity>
 

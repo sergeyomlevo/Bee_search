@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 import org.beesearch.app.MapCenterTarget
 import org.beesearch.app.MapGpsMarker
 import org.beesearch.app.MapTarget
+import org.beesearch.app.MapCenterRequest
 import org.beesearch.app.beeSearchFieldMapProfile
 import org.beesearch.app.beeSearchActivePmtilesMapProfile
 import org.beesearch.app.domain.location.LocationUiState
@@ -89,6 +90,8 @@ internal fun BeeMap(
     onRequestCreateRecord: (Double, Double) -> Unit,
     /** Reuses the map-centre target to confirm a physical object's position. */
     locationSelectionLabel: String? = null,
+    mapCenterRequest: MapCenterRequest? = null,
+    onMapCenterRequestHandled: (UUID) -> Unit = {},
     onConfirmLocationSelection: (Double, Double) -> Unit = { _, _ -> },
     onCancelLocationSelection: () -> Unit = {},
     onCoverageTerritoryMissing: () -> Unit = {},
@@ -468,6 +471,22 @@ internal fun BeeMap(
                     ),
                 )
             }
+        }
+
+        LaunchedEffect(map, mapCenterRequest?.requestId) {
+            val request = mapCenterRequest ?: return@LaunchedEffect
+            val mapInstance = map ?: return@LaunchedEffect
+            firstFixCentered = true
+            initialGpsCenterEstablished = true
+            recenteredUntilNextGesture = true
+            mapInstance.moveCamera(
+                CameraUpdateFactory.newLatLngZoom(
+                    LatLng(request.target.latitude, request.target.longitude),
+                    mapInstance.cameraPosition.zoom.coerceAtLeast(15.0),
+                ),
+            )
+            mapCenter = request.target
+            onMapCenterRequestHandled(request.requestId)
         }
 
         // Entering the Ареал view frames the whole saved Ареал once. The outer extent is camera
