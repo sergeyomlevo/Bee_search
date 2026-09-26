@@ -224,6 +224,7 @@ private fun BeeSearchApp(
                         repository = application.container.physicalObjectRepository,
                         onOpen = { objectId -> viewModel.openPhysicalObjectDetail(objectId, currentRoute.type) },
                         onBack = viewModel::closePhysicalObjectList,
+                        onResetSequence = viewModel::resetPhysicalObjectSequence,
                     )
                     is AppRoute.CreatePhysicalObject -> PhysicalObjectCreationRoute(
                         target = currentRoute.target,
@@ -246,6 +247,7 @@ private fun BeeSearchApp(
                         onCoordinateUpdateHandled = viewModel::consumePhysicalObjectCoordinateUpdate,
                         onEditCoordinates = viewModel::editPhysicalObjectCoordinates,
                         onShowOnMap = viewModel::showPhysicalObjectOnMap,
+                        onDelete = { viewModel.deletePhysicalObject(currentRoute.objectId, currentRoute.listType) },
                         onBack = viewModel::closePhysicalObjectDetail,
                     )
                     AppRoute.Area -> AreaRoute(

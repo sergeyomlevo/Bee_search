@@ -50,6 +50,7 @@ internal fun PhysicalObjectDetailRoute(
     onCoordinateUpdateHandled: (UUID) -> Unit = {},
     onEditCoordinates: (UUID, String, Double, Double) -> Unit = { _, _, _, _ -> },
     onShowOnMap: (Double, Double) -> Unit = { _, _ -> },
+    onDelete: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -102,6 +103,7 @@ internal fun PhysicalObjectDetailRoute(
                         onEditCoordinates(value.id, value.designation(), value.latitude(), value.longitude())
                     },
                     onShowOnMap = { onShowOnMap(value.latitude(), value.longitude()) },
+                    onDelete = onDelete,
                     onOpenMedia = { media ->
                         val file = mediaStore.resolve(media.relativePath)
                         val uri = FileProvider.getUriForFile(
@@ -139,19 +141,20 @@ private fun PhysicalObjectDetails(
     onEdit: () -> Unit,
     onEditCoordinates: () -> Unit,
     onShowOnMap: () -> Unit,
+    onDelete: () -> Unit,
     onOpenMedia: (PhysicalObjectMedia) -> Unit,
 ) = when (value) {
     is PhysicalObjectDetailValue.HollowValue ->
         HollowCard(
             value.value, territoryLabel, creatorLabel, onEdit,
-            onEditCoordinates, onShowOnMap,
+            onEditCoordinates, onShowOnMap, onDelete,
             mediaFile = { mediaStore.resolve(it.relativePath) },
             onOpenMedia = onOpenMedia,
         )
     is PhysicalObjectDetailValue.LogHiveValue ->
         LogHiveCard(
             value.value, territoryLabel, creatorLabel, onEdit,
-            onEditCoordinates, onShowOnMap,
+            onEditCoordinates, onShowOnMap, onDelete,
             mediaFile = { mediaStore.resolve(it.relativePath) },
             onOpenMedia = onOpenMedia,
         )

@@ -67,7 +67,7 @@ class RoomPersistenceTest {
             .allowMainThreadQueries()
             .build()
         clock = MutableClock(Instant.parse("2026-08-26T06:34:12Z"))
-        territoryRepository = RoomTerritoryRepository(database.territoryDao(), clock)
+        territoryRepository = RoomTerritoryRepository(database, database.territoryDao(), clock)
         val observerRepository = RoomObserverRepository(database.observerDao(), clock)
         observationRepository = RoomObservationRepository(
             database = database,

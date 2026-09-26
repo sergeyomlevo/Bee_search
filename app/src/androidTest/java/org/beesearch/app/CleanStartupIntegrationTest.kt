@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import java.time.Clock
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CoroutineScope
@@ -21,15 +22,24 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.beesearch.app.data.local.room.BeeEntity
 import org.beesearch.app.data.local.room.BeeSearchDatabase
+import org.beesearch.app.data.local.room.ObservationPointEntity
 import org.beesearch.app.data.local.settings.DataStoreMapAreaStore
 import org.beesearch.app.data.local.settings.DataStoreMapPackageStore
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.location.AndroidLocationProvider
+import org.beesearch.app.data.media.FileAwarePhysicalObjectDeletion
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
+import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
 import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomObserverRepository
+import org.beesearch.app.data.repository.RoomPhysicalObjectRepository
 import org.beesearch.app.data.repository.RoomTerritoryRepository
+import org.beesearch.app.domain.model.BeePresenceResult
+import org.beesearch.app.domain.model.HollowProperties
+import org.beesearch.app.domain.model.MarkPosition
+import org.beesearch.app.domain.model.NewHollow
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.usecase.CreateObservationPoint
@@ -41,6 +51,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -76,7 +87,7 @@ class CleanStartupIntegrationTest {
         produceFile = { installStateFile },
     )
     private val settingsRepository = DataStoreSettingsRepository(dataStore, installStateDataStore)
-    private val territoryRepository = RoomTerritoryRepository(database.territoryDao(), Clock.systemUTC())
+    private val territoryRepository = RoomTerritoryRepository(database, database.territoryDao(), Clock.systemUTC())
     private val observerRepository = RoomObserverRepository(database.observerDao(), Clock.systemUTC())
     private val observationRepository = RoomObservationRepository(
         database = database,
@@ -90,6 +101,16 @@ class CleanStartupIntegrationTest {
         clock = Clock.systemUTC(),
     )
     private val areaStore = DataStoreMapAreaStore(dataStore)
+    private val physicalObjectMediaStore = PhysicalObjectMediaFileStore(context.filesDir, context.cacheDir)
+    private val physicalObjectRepository = RoomPhysicalObjectRepository(
+        database = database,
+        objectDao = database.physicalObjectDao(),
+        sequenceDao = database.physicalObjectSequenceDao(),
+        territoryDao = database.territoryDao(),
+        observerDao = database.observerDao(),
+        beeDao = database.beeDao(),
+        clock = Clock.systemUTC(),
+    )
     private val renderedRoutes = CopyOnWriteArrayList<AppRoute>()
 
     @After
@@ -115,6 +136,8 @@ class CleanStartupIntegrationTest {
         territoryCoverageDeletion = TerritoryCoverageDeletion(territoryRepository, areaStore),
         mapAreaStore = areaStore,
         mapPackageStore = DataStoreMapPackageStore(context.contentResolver, context.filesDir, dataStore),
+        physicalObjectRepository = physicalObjectRepository,
+        physicalObjectDeletion = FileAwarePhysicalObjectDeletion(physicalObjectRepository, physicalObjectMediaStore),
     )
 
     /**
@@ -296,6 +319,76 @@ class CleanStartupIntegrationTest {
 
         // A restart does not restore the transient navigation context.
         assertEquals(AppRoute.InitialSetup, firstUserRoute(newViewModel()))
+    }
+
+    @Test
+    fun deletingAnObjectFromItsCardReturnsToItsListAndDoesNotReuseTheNumber() = runBlocking {
+        val territory = territoryRepository.createTerritory("DEL", "Территория", "Область", "Район")
+        val observer = observerRepository.createObserver("DELOBS", "Иванов", "Иван", null, null)
+        settingsRepository.setCurrentTerritoryId(territory.id)
+        settingsRepository.setCurrentObserverId(observer.id)
+        val viewModel = newViewModel()
+        val first = physicalObjectRepository.createHollow(
+            NewHollow(UUID.randomUUID(), territory.id, observer.id, 56.1, 42.7, HollowProperties("дуб", 180.0, 123, 40.0, null, null)),
+        )
+        val second = physicalObjectRepository.createHollow(
+            NewHollow(UUID.randomUUID(), territory.id, observer.id, 56.2, 42.8, HollowProperties("дуб", 180.0, 123, 40.0, null, null)),
+        )
+
+        viewModel.openPhysicalObjectList(PhysicalObjectType.HOLLOW)
+        awaitRoute(viewModel, AppRoute.PhysicalObjectList(PhysicalObjectType.HOLLOW))
+        viewModel.openPhysicalObjectDetail(second.id, PhysicalObjectType.HOLLOW)
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(second.id, PhysicalObjectType.HOLLOW))
+
+        viewModel.deletePhysicalObject(second.id, PhysicalObjectType.HOLLOW)
+
+        awaitRoute(viewModel, AppRoute.PhysicalObjectList(PhysicalObjectType.HOLLOW))
+        assertNull(physicalObjectRepository.getHollow(second.id))
+        assertEquals("Объект удалён", viewModel.feedback.value?.message)
+        val third = physicalObjectRepository.createHollow(
+            NewHollow(UUID.randomUUID(), territory.id, observer.id, 56.3, 42.9, HollowProperties("дуб", 180.0, 123, 40.0, null, null)),
+        )
+        assertEquals(1, first.sequenceNumber)
+        assertEquals(3, third.sequenceNumber)
+    }
+
+    @Test
+    fun deletingAnObjectUsedByObservationDataIsRefusedAndKeepsTheCardOpen() = runBlocking {
+        val territory = territoryRepository.createTerritory("KEEP", "Территория", "Область", "Район")
+        val observer = observerRepository.createObserver("KEEPOBS", "Иванов", "Иван", null, null)
+        settingsRepository.setCurrentTerritoryId(territory.id)
+        settingsRepository.setCurrentObserverId(observer.id)
+        val hollow = physicalObjectRepository.createHollow(
+            NewHollow(UUID.randomUUID(), territory.id, observer.id, 56.1, 42.7, HollowProperties("дуб", 180.0, 123, 40.0, null, null)),
+        )
+        val pointId = UUID.randomUUID()
+        val beeId = UUID.randomUUID()
+        database.backupDao().insertObservationPoints(
+            listOf(
+                ObservationPointEntity(
+                    pointId, territory.id, observer.id, 2026, 1, BeePresenceResult.BEES_FOUND,
+                    null, 56.0, 42.0, null, null, null, Instant.parse("2026-09-24T08:00:00Z"), null, null,
+                ),
+            ),
+        )
+        database.backupDao().insertBees(
+            listOf(BeeEntity(beeId, pointId, "WHITE", MarkPosition.THORAX, Instant.parse("2026-09-24T08:00:00Z"), null)),
+        )
+        physicalObjectRepository.setBeeSourceObject(beeId, hollow.id)
+        val viewModel = newViewModel()
+        viewModel.openPhysicalObjectDetail(hollow.id, PhysicalObjectType.HOLLOW)
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(hollow.id, PhysicalObjectType.HOLLOW))
+
+        viewModel.deletePhysicalObject(hollow.id, PhysicalObjectType.HOLLOW)
+
+        withTimeout(ROUTE_TIMEOUT_MILLIS) { viewModel.feedback.first { it != null } }
+        assertEquals(
+            "Объект используется в данных наблюдений и не может быть удалён",
+            viewModel.feedback.value?.message,
+        )
+        assertEquals(AppRoute.PhysicalObjectDetail(hollow.id, PhysicalObjectType.HOLLOW), viewModel.route.value)
+        assertNotNull(physicalObjectRepository.getHollow(hollow.id))
+        assertEquals(hollow.id, physicalObjectRepository.getBeeSourceObjectId(beeId))
     }
 
     @Test

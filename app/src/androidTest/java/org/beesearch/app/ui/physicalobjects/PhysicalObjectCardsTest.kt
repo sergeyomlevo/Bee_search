@@ -130,6 +130,127 @@ class PhysicalObjectCardsTest {
         composeRule.onNodeWithTag("physical-objects-empty").assertIsDisplayed()
         composeRule.onNodeWithText("В этой территории пока нет дупел.").assertIsDisplayed()
         composeRule.onNodeWithTag("physical-objects-list").assertDoesNotExist()
+        composeRule.onNodeWithTag("physical-objects-reset").assertDoesNotExist()
+    }
+
+    @Test
+    fun emptyCategoryOffersTheNumberingResetOnlyWhenTheCallerSupportsIt() {
+        var reset = false
+        composeRule.setContent { Bee_searchTheme {
+            PhysicalObjectsBrowser(
+                type = PhysicalObjectType.HOLLOW,
+                hollows = emptyList(),
+                logHives = emptyList(),
+                onOpen = {},
+                onResetSequence = { reset = true },
+            )
+        } }
+
+        composeRule.onNodeWithTag("physical-objects-reset").assertIsDisplayed()
+        composeRule.onNodeWithText("Сбросить нумерацию").assertIsDisplayed()
+        composeRule.onNodeWithTag("physical-objects-reset").performClick()
+        composeRule.runOnIdle { assertTrue(reset) }
+    }
+
+    @Test
+    fun nonEmptyCategoryDoesNotOfferTheNumberingReset() {
+        composeRule.setContent { Bee_searchTheme {
+            PhysicalObjectsBrowser(
+                type = PhysicalObjectType.HOLLOW,
+                hollows = listOf(hollow(1)),
+                logHives = emptyList(),
+                onOpen = {},
+                onResetSequence = {},
+            )
+        } }
+
+        composeRule.onNodeWithTag("physical-objects-reset").assertDoesNotExist()
+        composeRule.onNodeWithTag("physical-objects-list").assertIsDisplayed()
+    }
+
+    @Test
+    fun deleteActionIsOnTheCardAndRequiresConfirmation() {
+        var deleted = false
+        composeRule.setContent { Bee_searchTheme {
+            HollowCard(
+                value = Hollow(
+                    id = UUID.randomUUID(),
+                    territoryId = UUID.randomUUID(),
+                    sequenceNumber = 4,
+                    latitude = 56.19,
+                    longitude = 42.74,
+                    createdAt = Instant.EPOCH,
+                    creatorObserverId = null,
+                    properties = HollowProperties("ель", 450.0, 127, 32.0, null, null),
+                    media = emptyList(),
+                ),
+                territoryLabel = "DEV-BENCH2 · DEV Territory",
+                creatorLabel = "DEV-OBS1 · Tester",
+                onDelete = { deleted = true },
+            )
+        } }
+
+        composeRule.onNodeWithTag("physical-object-delete").performScrollTo().performClick()
+        composeRule.onNodeWithText("Удалить Дупло 4?").assertIsDisplayed()
+        composeRule.onNodeWithText("Объект будет удалён. Восстановить его нельзя.").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("physical-object-delete-cancel").performClick()
+        composeRule.runOnIdle { assertTrue(!deleted) }
+        composeRule.onNodeWithText("Удалить Дупло 4?").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("physical-object-delete").performScrollTo().performClick()
+        composeRule.onNodeWithTag("physical-object-delete-confirm").performClick()
+        composeRule.runOnIdle { assertTrue(deleted) }
+    }
+
+    @Test
+    fun deleteConfirmationOfAnObjectWithMediaMentionsTheMedia() {
+        val objectId = UUID.randomUUID()
+        composeRule.setContent { Bee_searchTheme {
+            HollowCard(
+                value = Hollow(
+                    id = objectId,
+                    territoryId = UUID.randomUUID(),
+                    sequenceNumber = 1,
+                    latitude = 56.19,
+                    longitude = 42.74,
+                    createdAt = Instant.EPOCH,
+                    creatorObserverId = null,
+                    properties = HollowProperties("ель", 450.0, 127, 32.0, null, null),
+                    media = listOf(media(objectId, PhysicalObjectMediaType.IMAGE, "one.jpg")),
+                ),
+                territoryLabel = "T",
+                creatorLabel = "O",
+            )
+        } }
+
+        composeRule.onNodeWithTag("physical-object-delete").performScrollTo().performClick()
+
+        composeRule.onNodeWithText("Объект и его медиа будут удалены. Восстановить их нельзя.").assertIsDisplayed()
+    }
+
+    @Test
+    fun logHiveDeleteConfirmationNamesTheLogHive() {
+        composeRule.setContent { Bee_searchTheme {
+            LogHiveCard(
+                value = LogHive(
+                    id = UUID.randomUUID(),
+                    territoryId = UUID.randomUUID(),
+                    sequenceNumber = 2,
+                    latitude = 56.19,
+                    longitude = 42.74,
+                    createdAt = Instant.EPOCH,
+                    creatorObserverId = null,
+                    properties = LogHiveProperties("сосна", 120.0, 90, 40.0, "сосна", 30.0, 200.0, null),
+                ),
+                territoryLabel = "T",
+                creatorLabel = "O",
+            )
+        } }
+
+        composeRule.onNodeWithTag("physical-object-delete").performScrollTo().performClick()
+
+        composeRule.onNodeWithText("Удалить Колоду 2?").assertIsDisplayed()
     }
 
     private fun hollow(sequence: Int) = Hollow(

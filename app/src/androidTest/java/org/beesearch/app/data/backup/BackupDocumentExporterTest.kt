@@ -39,7 +39,7 @@ class BackupDocumentExporterTest {
             .allowMainThreadQueries()
             .build()
         val clock = Clock.fixed(Instant.parse("2026-09-10T08:00:00Z"), ZoneOffset.UTC)
-        val territoryRepository = RoomTerritoryRepository(database.territoryDao(), clock)
+        val territoryRepository = RoomTerritoryRepository(database, database.territoryDao(), clock)
         val observerRepository = RoomObserverRepository(database.observerDao(), clock)
         observationRepository = RoomObservationRepository(
             database,

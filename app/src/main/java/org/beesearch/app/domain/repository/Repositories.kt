@@ -27,6 +27,7 @@ import org.beesearch.app.domain.model.ObservationPointWeather
 import org.beesearch.app.domain.model.PendingWeatherRequest
 import org.beesearch.app.domain.model.ObservationPointSummary
 import org.beesearch.app.domain.model.ObservationPointDetail
+import org.beesearch.app.domain.model.PhysicalObjectType
 import java.util.UUID
 
 interface SettingsRepository {
@@ -74,9 +75,42 @@ interface PhysicalObjectRepository {
     suspend fun updateLogHive(id: UUID, properties: LogHiveProperties): LogHive
     suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double)
 
+    /**
+     * Removes one unused Hollow from the database.
+     *
+     * The deletion is refused when working or historical data still references the object, so a
+     * `Bee → object` link can never be destroyed silently. The returned [PhysicalObjectDeletion]
+     * carries the app-owned media paths that belonged to the object; removing those files is the
+     * responsibility of the file-aware deletion layer, after the database transaction committed.
+     */
+    suspend fun deleteHollow(id: UUID): PhysicalObjectDeletion
+
+    /** Removes one unused LogHive; see [deleteHollow] for the contract. */
+    suspend fun deleteLogHive(id: UUID): PhysicalObjectDeletion
+
+    /**
+     * Starts a new numbering line for one `Territory + object_type` scope.
+     *
+     * This is the explicit, fail-closed exception to "a designation is never issued twice": it is
+     * permitted only while the scope holds no objects, no dependent rows and no references, and it
+     * never touches another type, another Territory, files or backups.
+     */
+    suspend fun resetSequence(territoryId: UUID, objectType: PhysicalObjectType)
+
     suspend fun setBeeSourceObject(beeId: UUID, sourceObjectId: UUID?): Bee
     suspend fun getBeeSourceObjectId(beeId: UUID): UUID?
 }
+
+/**
+ * The database part of a physical object deletion.
+ *
+ * The database is the authoritative state; the paths are handed to the file-aware layer so it can
+ * remove the app-owned bytes after the commit. The object identity row itself is gone by then.
+ */
+data class PhysicalObjectDeletion(val id: UUID, val mediaRelativePaths: List<String>)
+
+/** Whether the app-owned media of a deleted object could be cleaned up completely. */
+data class PhysicalObjectDeletionOutcome(val fileCleanupComplete: Boolean)
 
 interface ObservationPointCreator {
     suspend fun createObservationPoint(

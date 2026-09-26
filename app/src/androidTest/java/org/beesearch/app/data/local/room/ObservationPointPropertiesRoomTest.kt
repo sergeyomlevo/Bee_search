@@ -36,7 +36,7 @@ class ObservationPointPropertiesRoomTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         database = Room.inMemoryDatabaseBuilder(context, BeeSearchDatabase::class.java).allowMainThreadQueries().build()
         val clock = Clock.fixed(Instant.parse("2026-09-12T10:15:00Z"), ZoneOffset.UTC)
-        val territory = RoomTerritoryRepository(database.territoryDao(), clock).createTerritory("T", "Territory", "R", "D")
+        val territory = RoomTerritoryRepository(database, database.territoryDao(), clock).createTerritory("T", "Territory", "R", "D")
         val observer = RoomObserverRepository(database.observerDao(), clock).createObserver("O", "Last", "First", null, null)
         territoryId = territory.id
         observerId = observer.id

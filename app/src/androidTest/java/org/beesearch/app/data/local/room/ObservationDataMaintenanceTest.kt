@@ -56,7 +56,7 @@ class ObservationDataMaintenanceTest {
             .allowMainThreadQueries()
             .build()
         val clock = Clock.fixed(Instant.parse("2026-09-10T08:00:00Z"), ZoneOffset.UTC)
-        territoryRepository = RoomTerritoryRepository(database.territoryDao(), clock)
+        territoryRepository = RoomTerritoryRepository(database, database.territoryDao(), clock)
         observerRepository = RoomObserverRepository(database.observerDao(), clock)
         observationRepository = RoomObservationRepository(
             database = database,

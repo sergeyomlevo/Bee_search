@@ -10,6 +10,8 @@ import org.beesearch.app.data.local.room.ObserverDao
 import org.beesearch.app.data.local.room.PhysicalObjectDao
 import org.beesearch.app.data.local.room.PhysicalObjectEntity
 import org.beesearch.app.data.local.room.PhysicalObjectMediaEntity
+import org.beesearch.app.data.local.room.PhysicalObjectSequenceDao
+import org.beesearch.app.data.local.room.PhysicalObjectSequenceEntity
 import org.beesearch.app.data.local.room.TerritoryDao
 import org.beesearch.app.data.local.room.toDomain
 import org.beesearch.app.domain.model.Apiary
@@ -20,9 +22,12 @@ import org.beesearch.app.domain.model.LogHive
 import org.beesearch.app.domain.model.LogHiveProperties
 import org.beesearch.app.domain.model.NewHollow
 import org.beesearch.app.domain.model.NewLogHive
+import org.beesearch.app.domain.model.PhysicalObjectInUseException
 import org.beesearch.app.domain.model.PhysicalObjectMedia
+import org.beesearch.app.domain.model.PhysicalObjectSequenceResetBlockedException
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.model.TerritoryPhysicalObjects
+import org.beesearch.app.domain.repository.PhysicalObjectDeletion
 import org.beesearch.app.domain.repository.PhysicalObjectRepository
 import java.time.Clock
 import java.util.UUID
@@ -30,6 +35,7 @@ import java.util.UUID
 internal class RoomPhysicalObjectRepository(
     private val database: BeeSearchDatabase,
     private val objectDao: PhysicalObjectDao,
+    private val sequenceDao: PhysicalObjectSequenceDao,
     private val territoryDao: TerritoryDao,
     private val observerDao: ObserverDao,
     private val beeDao: BeeDao,
@@ -184,6 +190,65 @@ internal class RoomPhysicalObjectRepository(
     override suspend fun getBeeSourceObjectId(beeId: UUID): UUID? =
         (beeDao.getById(beeId) ?: throw EntityNotFoundException("Bee")).sourceObjectId
 
+    override suspend fun deleteHollow(id: UUID): PhysicalObjectDeletion = deleteObject(
+        id = id,
+        type = PhysicalObjectType.HOLLOW,
+        deleteSubtype = objectDao::deleteHollow,
+    )
+
+    override suspend fun deleteLogHive(id: UUID): PhysicalObjectDeletion = deleteObject(
+        id = id,
+        type = PhysicalObjectType.LOG_HIVE,
+        deleteSubtype = objectDao::deleteLogHive,
+    )
+
+    override suspend fun resetSequence(territoryId: UUID, objectType: PhysicalObjectType) =
+        database.withTransaction {
+            if (territoryDao.getById(territoryId) == null) {
+                throw PhysicalObjectSequenceResetBlockedException("Territory does not exist")
+            }
+            if (objectDao.countInScope(territoryId, objectType) != 0) {
+                throw PhysicalObjectSequenceResetBlockedException("Scope still contains objects")
+            }
+            if (objectDao.countReferencesInScope(territoryId, objectType) != 0) {
+                throw PhysicalObjectSequenceResetBlockedException("Scope still has references")
+            }
+            if (objectDao.countDependentRowsInScope(territoryId, objectType) != 0) {
+                throw PhysicalObjectSequenceResetBlockedException("Scope still has dependent rows")
+            }
+            val lastIssued = sequenceDao.getLastIssued(territoryId, objectType) ?: return@withTransaction
+            val liveMax = objectDao.getMaxSequenceNumber(territoryId, objectType)
+            if (lastIssued < 0 || lastIssued < liveMax) {
+                throw PhysicalObjectSequenceResetBlockedException("Sequence state contradicts stored data")
+            }
+            if (sequenceDao.setLastIssued(territoryId, objectType, 0) != 1) {
+                throw PhysicalObjectSequenceResetBlockedException("Sequence scope disappeared")
+            }
+        }
+
+    /**
+     * Deletes one object and its owned rows inside a single transaction.
+     *
+     * Working or historical references are checked first and block the deletion, so a Bee link is
+     * never destroyed silently; the `RESTRICT` foreign keys remain the second, structural line of
+     * defence. The numbering high-water mark is deliberately not touched: an ordinary deletion never
+     * frees a number.
+     */
+    private suspend fun deleteObject(
+        id: UUID,
+        type: PhysicalObjectType,
+        deleteSubtype: suspend (UUID) -> Int,
+    ): PhysicalObjectDeletion = database.withTransaction {
+        val identity = objectDao.getById(id)?.takeIf { it.objectType == type }
+            ?: throw EntityNotFoundException(type.entityLabel())
+        if (objectDao.countBeeReferences(id) != 0) throw PhysicalObjectInUseException()
+        val mediaPaths = objectDao.getMedia(id).map { it.relativePath }
+        objectDao.deleteMediaForObject(id)
+        if (deleteSubtype(id) != 1) throw EntityNotFoundException(type.entityLabel())
+        if (objectDao.deleteIdentity(id, type) != 1) throw EntityNotFoundException(type.entityLabel())
+        PhysicalObjectDeletion(id, mediaPaths)
+    }
+
     private suspend fun newIdentity(
         id: UUID,
         territoryId: UUID,
@@ -202,13 +267,44 @@ internal class RoomPhysicalObjectRepository(
             id = id,
             territoryId = territoryId,
             objectType = type,
-            sequenceNumber = objectDao.getNextSequenceNumber(territoryId, type),
+            sequenceNumber = allocateSequenceNumber(territoryId, type),
             latitude = latitude,
             longitude = longitude,
             createdAt = clock.instant(),
             creatorObserverId = creatorObserverId,
         )
     }
+
+    /**
+     * Allocates the next number of one `Territory + object_type` scope.
+     *
+     * Runs inside the caller's creation transaction, so the counter update and the object insert
+     * commit or roll back together: a failed creation does not consume a number, and two concurrent
+     * creations cannot read the same value and produce the same designation.
+     *
+     * The next number is `max(last issued, highest live number) + 1`. The high-water mark is what
+     * guarantees that an ordinary deletion never frees a number; the live maximum is kept as a floor
+     * for data written before the high-water mark existed (an archive restored from format ≤4, or a
+     * database where the counter was never created).
+     */
+    private suspend fun allocateSequenceNumber(territoryId: UUID, type: PhysicalObjectType): Int {
+        sequenceDao.insertScope(PhysicalObjectSequenceEntity(territoryId, type, 0))
+        val lastIssued = sequenceDao.getLastIssued(territoryId, type)
+            ?: error("Physical object sequence scope is missing")
+        val liveMax = objectDao.getMaxSequenceNumber(territoryId, type)
+        require(lastIssued >= 0 && liveMax >= 0) { "Physical object sequence must not be negative" }
+        val next = maxOf(lastIssued, liveMax) + 1
+        if (sequenceDao.setLastIssued(territoryId, type, next) != 1) {
+            error("Physical object sequence scope is missing")
+        }
+        return next
+    }
+}
+
+private fun PhysicalObjectType.entityLabel(): String = when (this) {
+    PhysicalObjectType.HOLLOW -> "Hollow"
+    PhysicalObjectType.LOG_HIVE -> "LogHive"
+    PhysicalObjectType.APIARY -> "Apiary"
 }
 
 private fun validateMedia(objectId: UUID, media: List<PhysicalObjectMedia>) {

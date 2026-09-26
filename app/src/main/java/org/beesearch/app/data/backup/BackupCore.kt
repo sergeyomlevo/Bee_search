@@ -108,7 +108,7 @@ internal class BackupService(
         validateGraph(graph)
         val portable = settings.snapshot()
         validateSettings(portable, graph)
-        val blobs = blobsV4(graph, portable, attachmentStore, objectMediaStore)
+        val blobs = blobsV5(graph, portable, attachmentStore, objectMediaStore)
         val id = UUID.randomUUID()
         output.parentFile?.mkdirs()
         ZipOutputStream(BufferedOutputStream(FileOutputStream(output))).use { zip ->
@@ -139,6 +139,7 @@ internal class BackupService(
                 val dao = database.backupDao()
                 if (dao.totalCount() != 0) throw BackupDestinationNotEmpty("research database is not empty")
                 dao.insertTerritories(parsed.graph.territories); checkpoint.afterCollection("territories")
+                dao.insertPhysicalObjectSequences(parsed.graph.sequences); checkpoint.afterCollection("physical-object-sequences")
                 dao.insertObservers(parsed.graph.observers); checkpoint.afterCollection("observers")
                 dao.insertPhysicalObjects(parsed.graph.physicalObjects); checkpoint.afterCollection("physical-objects")
                 dao.insertHollows(parsed.graph.hollows); dao.insertLogHives(parsed.graph.logHives)
@@ -252,6 +253,7 @@ private data class Graph(
     val physicalObjects: List<PhysicalObjectEntity> = emptyList(), val apiaries: List<ApiaryEntity> = emptyList(),
     val hollows: List<HollowEntity> = emptyList(), val logHives: List<LogHiveEntity> = emptyList(),
     val objectMedia: List<PhysicalObjectMediaEntity> = emptyList(),
+    val sequences: List<PhysicalObjectSequenceEntity> = emptyList(),
     val points: List<ObservationPointEntity>, val bees: List<BeeEntity>, val cycles: List<FlightCycleEntity>,
     val weather: List<ObservationPointWeatherEntity> = emptyList(),
     val attachments: List<ObservationPointAttachmentEntity> = emptyList(),
@@ -261,6 +263,7 @@ private data class Parsed(val archiveId: UUID, val graph: Graph, val settings: P
 private suspend fun BackupDao.snapshot() = Graph(
     territories = territories(), observers = observers(), physicalObjects = physicalObjects(), apiaries = apiaries(),
     hollows = hollows(), logHives = logHives(), objectMedia = physicalObjectMedia(),
+    sequences = physicalObjectSequences(),
     points = observationPoints(), bees = bees(), cycles = flightCycles(),
     weather = observationPointWeather(), attachments = observationPointAttachments(),
 )
@@ -335,7 +338,7 @@ private fun blobsV3(
     return result
 }
 
-private fun blobsV4(
+private fun blobsV5(
     graph: Graph,
     settings: PortableSettingsSnapshot,
     attachmentStore: ObservationAttachmentFileStore?,
@@ -343,7 +346,7 @@ private fun blobsV4(
 ): List<Blob> {
     fun rows(name: String, values: List<String>): Blob {
         val text = values.joinToString("\n", postfix = if (values.isEmpty()) "" else "\n")
-        return Blob(name, BackupContractV4.collections.getValue(name), text.toByteArray(StandardCharsets.UTF_8), values.size)
+        return Blob(name, BackupContractV5.collections.getValue(name), text.toByteArray(StandardCharsets.UTF_8), values.size)
     }
     val weatherByPoint = graph.weather.associateBy { it.observationPointId }
     val weatherRows = graph.points.map { point -> weatherByPoint[point.id] ?: ObservationPointWeatherEntity(point.id, WeatherStatus.PENDING, null, null, null, null, null, null) }
@@ -355,6 +358,7 @@ private fun blobsV4(
         rows("log-hives", graph.logHives.sortedBy { it.physicalObjectId.toString() }.map { it.json() }),
         rows("physical-object-media", graph.objectMedia.sortedBy { it.id.toString() }.map { it.json() }),
         rows("apiaries", graph.apiaries.sortedBy { it.physicalObjectId.toString() }.map { it.json() }),
+        rows("physical-object-sequences", graph.sequences.sortedBy { it.territoryId.toString() + it.objectType.name }.map { it.json() }),
         rows("observation-points", graph.points.sortedBy { it.id.toString() }.map { it.jsonV2() }),
         rows("bees", graph.bees.sortedBy { it.id.toString() }.map { it.jsonV3() }),
         rows("flight-cycles", graph.cycles.sortedBy { it.id.toString() }.map { it.json() }),
@@ -383,9 +387,9 @@ private fun blobsV4(
 }
 
 private fun manifest(id: UUID, created: Instant, appVersion: String, blobs: List<Blob>) = obj(
-    "backupFormatVersion" to "4", "archiveSchemaVersion" to "4", "archiveId" to j(id),
+    "backupFormatVersion" to "5", "archiveSchemaVersion" to "5", "archiveId" to j(id),
     "createdAt" to created.toEpochMilli().toString(), "sourceAppVersion" to j(appVersion),
-    "roomSchemaVersion" to "9", "profile" to j(BackupContractV4.PROFILE),
+    "roomSchemaVersion" to "10", "profile" to j(BackupContractV5.PROFILE),
     "collections" to blobs.joinToString(",", "[", "]") { obj(
         "name" to j(it.name), "path" to j(it.path), "collectionSchemaVersion" to "1", "required" to "true",
         "recordCount" to it.count.toString(), "byteLength" to it.bytes.size.toString(), "sha256" to j(sha256(it.bytes)),
@@ -396,13 +400,14 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
     val manifest = objectFrom(entries[MANIFEST] ?: throw MissingBackupCollection(MANIFEST), "manifest")
     val format = manifest.int("backupFormatVersion")
     val schema = manifest.int("archiveSchemaVersion")
-    if (format !in 1..4) throw UnsupportedBackupFormat("unsupported backup format")
+    if (format !in 1..5) throw UnsupportedBackupFormat("unsupported backup format")
     if (schema != format) throw UnsupportedArchiveSchema("unsupported archive schema")
     val contract = when (format) {
         1 -> BackupContractV1.collections
         2 -> BackupContractV2.collections
         3 -> BackupContractV3.collections
-        else -> BackupContractV4.collections
+        4 -> BackupContractV4.collections
+        else -> BackupContractV5.collections
     }
     val archiveId = manifest.uuid("archiveId"); manifest.long("createdAt")
     if (manifest.string("sourceAppVersion").isBlank()) throw MalformedBackup("blank sourceAppVersion")
@@ -419,9 +424,9 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
         if (!describedNames.add(name)) throw MalformedBackup("duplicate collection $name")
         val required = item.bool("required")
         if (name !in contract) {
-            if ((format >= 2 && name.startsWith("attachment-file:")) || (format == 4 && name.startsWith("object-media-file:"))) {
+            if ((format >= 2 && name.startsWith("attachment-file:")) || (format >= 4 && name.startsWith("object-media-file:"))) {
                 val path = item.string("path")
-                val validPrefix = if (name.startsWith("object-media-file:")) BackupContractV4.OBJECT_MEDIA_PREFIX else BackupContractV2.ATTACHMENT_PREFIX
+                val validPrefix = if (name.startsWith("object-media-file:")) BackupContractV5.OBJECT_MEDIA_PREFIX else BackupContractV2.ATTACHMENT_PREFIX
                 if (!path.startsWith(validPrefix)) throw MalformedBackup("unsafe attachment path")
                 validatePathName(path)
                 if (!describedPaths.add(path)) throw MalformedBackup("duplicate collection path $path")
@@ -463,10 +468,11 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
     val graph = Graph(
         territories = objects("territories").map(::territory),
         observers = objects("observers").map(::observer),
-        physicalObjects = if (format >= 3) objects("physical-objects").map { if (format == 4) physicalObjectV4(it) else physicalObject(it) } else emptyList(),
-        hollows = if (format == 4) objects("hollows").map(::hollow) else emptyList(),
-        logHives = if (format == 4) objects("log-hives").map(::logHive) else emptyList(),
-        objectMedia = if (format == 4) objects("physical-object-media").map(::objectMedia) else emptyList(),
+        physicalObjects = if (format >= 3) objects("physical-objects").map { if (format >= 4) physicalObjectV4(it) else physicalObject(it) } else emptyList(),
+        hollows = if (format >= 4) objects("hollows").map(::hollow) else emptyList(),
+        logHives = if (format >= 4) objects("log-hives").map(::logHive) else emptyList(),
+        objectMedia = if (format >= 4) objects("physical-object-media").map(::objectMedia) else emptyList(),
+        sequences = if (format >= 5) objects("physical-object-sequences").map(::sequence) else emptyList(),
         apiaries = if (format >= 3) objects("apiaries").map(::apiary) else emptyList(),
         points = objects("observation-points").map { if (format == 1) point(it) else pointV2(it) },
         bees = objects("bees").map { if (format >= 3) beeV3(it) else bee(it) },
@@ -492,7 +498,7 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
     val settings = PortableSettingsSnapshot(portable.optionalUuid("currentTerritoryId"), portable.optionalUuid("currentObserverId"), coverage)
     validateGraph(graphWithHistoricalSubtypes); validateSettings(settings, graphWithHistoricalSubtypes)
     if (format >= 2) validateAttachments(graphWithHistoricalSubtypes, known)
-    if (format == 4) validateObjectMedia(graphWithHistoricalSubtypes, known)
+    if (format >= 4) validateObjectMedia(graphWithHistoricalSubtypes, known)
     return Parsed(archiveId, graphWithHistoricalSubtypes, settings, known.values.toList())
 }
 
@@ -588,7 +594,7 @@ private fun validateObjectMedia(graph: Graph, blobs: Map<String, Blob>) {
         domain(media.byteSize > 0 && media.byteSize <= MAX_ENTRY_BYTES, "invalid object media size")
         domain(media.sha256.matches(Regex("[0-9a-f]{64}")), "invalid object media hash")
         val blob = blobs["object-media-file:${media.id}"] ?: throw MissingBackupCollection("object media file ${media.id}")
-        val expectedPath = "${BackupContractV4.OBJECT_MEDIA_PREFIX}${media.physicalObjectId}/${media.id}"
+        val expectedPath = "${BackupContractV5.OBJECT_MEDIA_PREFIX}${media.physicalObjectId}/${media.id}"
         if (blob.path != expectedPath || blob.bytes.size.toLong() != media.byteSize || sha256(blob.bytes) != media.sha256) throw BackupIntegrityMismatch("object media metadata/file mismatch")
     }
     blobs.keys.filter { it.startsWith("object-media-file:") }.forEach { if (it !in ids.map { id -> "object-media-file:$id" }) throw MalformedBackup("unlisted object media file") }
@@ -607,6 +613,15 @@ private fun validateGraph(g: Graph) {
         if (value.creatorObserverId != null && value.creatorObserverId !in observers) throw BrokenBackupForeignKey("physical object ${value.id} creator missing")
         domain(value.sequenceNumber > 0, "invalid physical object sequence")
         coordinate(value.latitude, -90.0, 90.0); coordinate(value.longitude, -180.0, 180.0)
+    }
+    unique(g.sequences, "physical object sequence scope") { it.territoryId to it.objectType }
+    g.sequences.forEach { row ->
+        if (row.territoryId !in territories) throw BrokenBackupForeignKey("physical object sequence territory missing")
+        domain(row.lastIssued >= 0, "negative physical object sequence")
+        val liveMax = g.physicalObjects
+            .filter { it.territoryId == row.territoryId && it.objectType == row.objectType }
+            .maxOfOrNull { it.sequenceNumber } ?: 0
+        domain(row.lastIssued >= liveMax, "physical object sequence is below stored numbers")
     }
     val physicalObjects = g.physicalObjects.associateBy { it.id }
     val apiaryIds = hashSetOf<UUID>()
@@ -702,6 +717,7 @@ private fun hollow(o: JsonObject) = HollowEntity(o.uuid("physicalObjectId"), o.o
 private fun logHive(o: JsonObject) = LogHiveEntity(o.uuid("physicalObjectId"), o.optionalString("tree"), nullablePositive(o, "entranceHeightCm"), o.field("entranceAzimuthDeg").let { if (it is JsonNull) null else o.int("entranceAzimuthDeg") }, nullablePositive(o, "outerDiameterCm"), o.optionalString("material"), nullablePositive(o, "internalDiameterCm"), nullablePositive(o, "internalHeightCm"), o.optionalString("notes"))
 private fun objectMedia(o: JsonObject) = PhysicalObjectMediaEntity(o.uuid("id"), o.uuid("physicalObjectId"), o.enum("type"), o.string("relativePath"), o.optionalString("originalFileName"), o.optionalString("mimeType"), o.long("byteSize"), o.string("sha256"), o.instant("createdAt"))
 private fun apiary(o: JsonObject) = ApiaryEntity(o.uuid("physicalObjectId"), o.optionalString("name"))
+private fun sequence(o: JsonObject) = PhysicalObjectSequenceEntity(o.uuid("territoryId"), o.enum("objectType"), o.int("lastIssued"))
 private fun point(o: JsonObject) = ObservationPointEntity(o.uuid("id"), o.uuid("territoryId"), o.uuid("observerId"), o.int("observationYear"), o.int("pointNumber"), o.optionalEnum<BeePresenceResult>("beePresenceResult"), o.optionalString("code"), o.double("latitude"), o.double("longitude"), o.optionalDouble("gpsLatitude"), o.optionalDouble("gpsLongitude"), o.optionalDouble("gpsAccuracyM"), o.instant("createdAt"), o.optionalInstant("initialGroupReleaseAt"), o.optionalInstant("completedAt"))
 private fun pointV2(o: JsonObject) = ObservationPointEntity(o.uuid("id"), o.uuid("territoryId"), o.uuid("observerId"), o.int("observationYear"), o.int("pointNumber"), o.optionalEnum<BeePresenceResult>("beePresenceResult"), o.optionalString("code"), o.double("latitude"), o.double("longitude"), o.optionalDouble("gpsLatitude"), o.optionalDouble("gpsLongitude"), o.optionalDouble("gpsAccuracyM"), o.instant("createdAt"), o.optionalInstant("initialGroupReleaseAt"), o.optionalInstant("completedAt"), o.optionalString("description"))
 private fun weather(o: JsonObject) = ObservationPointWeatherEntity(o.uuid("observationPointId"), o.enum<WeatherStatus>("status"), o.optionalDouble("temperatureC"), o.optionalDouble("windSpeedMps"), o.optionalDouble("windDirectionDeg"), o.optionalInstant("sampleAt"), o.optionalInstant("fetchedAt"), o.optionalString("source"))
@@ -747,6 +763,7 @@ private fun HollowEntity.json() = obj("physicalObjectId" to j(physicalObjectId),
 private fun LogHiveEntity.json() = obj("physicalObjectId" to j(physicalObjectId), "tree" to j(tree), "entranceHeightCm" to (entranceHeightCm?.toString() ?: "null"), "entranceAzimuthDeg" to (entranceAzimuthDeg?.toString() ?: "null"), "outerDiameterCm" to (outerDiameterCm?.toString() ?: "null"), "material" to j(material), "internalDiameterCm" to (internalDiameterCm?.toString() ?: "null"), "internalHeightCm" to (internalHeightCm?.toString() ?: "null"), "notes" to j(notes))
 private fun PhysicalObjectMediaEntity.json() = obj("id" to j(id), "physicalObjectId" to j(physicalObjectId), "type" to j(type.name), "relativePath" to j(relativePath), "originalFileName" to j(originalFileName), "mimeType" to j(mimeType), "byteSize" to byteSize.toString(), "sha256" to j(sha256), "createdAt" to j(createdAt))
 private fun ApiaryEntity.json() = obj("physicalObjectId" to j(physicalObjectId), "name" to j(name))
+private fun PhysicalObjectSequenceEntity.json() = obj("territoryId" to j(territoryId), "objectType" to j(objectType.name), "lastIssued" to lastIssued.toString())
 private fun ObservationPointEntity.json() = obj("id" to j(id), "territoryId" to j(territoryId), "observerId" to j(observerId), "observationYear" to observationYear.toString(), "pointNumber" to pointNumber.toString(), "beePresenceResult" to j(beePresenceResult?.name), "code" to j(code), "latitude" to latitude.toString(), "longitude" to longitude.toString(), "gpsLatitude" to (gpsLatitude?.toString() ?: "null"), "gpsLongitude" to (gpsLongitude?.toString() ?: "null"), "gpsAccuracyM" to (gpsAccuracyM?.toString() ?: "null"), "createdAt" to j(createdAt), "initialGroupReleaseAt" to j(initialGroupReleaseAt), "completedAt" to j(completedAt))
 private fun ObservationPointEntity.jsonV2() = obj("id" to j(id), "territoryId" to j(territoryId), "observerId" to j(observerId), "observationYear" to observationYear.toString(), "pointNumber" to pointNumber.toString(), "beePresenceResult" to j(beePresenceResult?.name), "code" to j(code), "latitude" to latitude.toString(), "longitude" to longitude.toString(), "gpsLatitude" to (gpsLatitude?.toString() ?: "null"), "gpsLongitude" to (gpsLongitude?.toString() ?: "null"), "gpsAccuracyM" to (gpsAccuracyM?.toString() ?: "null"), "createdAt" to j(createdAt), "initialGroupReleaseAt" to j(initialGroupReleaseAt), "completedAt" to j(completedAt), "description" to j(description))
 private fun ObservationPointWeatherEntity.json() = obj("observationPointId" to j(observationPointId), "status" to j(status.name), "temperatureC" to (temperatureC?.toString() ?: "null"), "windSpeedMps" to (windSpeedMps?.toString() ?: "null"), "windDirectionDeg" to (windDirectionDeg?.toString() ?: "null"), "sampleAt" to j(sampleAt), "fetchedAt" to j(fetchedAt), "source" to j(source))

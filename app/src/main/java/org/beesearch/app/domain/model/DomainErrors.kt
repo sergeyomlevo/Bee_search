@@ -77,3 +77,20 @@ class AzimuthCaptureAlreadyConsumedException : IllegalStateException(
 class NoReversibleBeeActionException : IllegalStateException(
     "The bee has no last reversible action in the active observation workflow.",
 )
+
+/**
+ * A Physical Object is still referenced by working or historical data.
+ *
+ * The reference is a `RESTRICT` foreign key, so the database would refuse the deletion anyway; the
+ * check exists so the user gets a readable reason instead of a constraint failure.
+ */
+class PhysicalObjectInUseException : IllegalStateException("Physical object is used by bee data")
+
+/**
+ * A numbering reset was refused because its fail-closed preconditions are not satisfied.
+ *
+ * `reason` is diagnostic: the user-facing text is chosen by the UI, and the scope is guaranteed
+ * untouched whenever this exception is thrown.
+ */
+class PhysicalObjectSequenceResetBlockedException(reason: String) :
+    IllegalStateException("Physical object numbering reset is blocked: $reason")

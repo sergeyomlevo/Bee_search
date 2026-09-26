@@ -1831,11 +1831,12 @@ ObservationPoint 2
 
 ---
 
-# 71.1. Долговечные физические объекты — Room schema v9
+# 71.1. Долговечные физические объекты — Room schema v9 / v10
 
-Принято решением D088 и уточнено D089. Room schema v9 реализует эту границу таблицами
-`physical_objects`, `apiaries`, `hollows`, `log_hives` и `physical_object_media`, а также
-nullable FK `bees.source_object_id`.
+Принято решением D088, уточнено D089, дополнено D090. Room schema v9 реализует эту границу
+таблицами `physical_objects`, `apiaries`, `hollows`, `log_hives` и `physical_object_media`, а
+также nullable FK `bees.source_object_id`. Room schema v10 добавляет таблицу
+`physical_object_sequences` — persistent high-water mark нумерации каждого scope.
 
 ## Общая внутренняя identity-запись
 
@@ -1902,6 +1903,24 @@ Migration `v8 → v9` добавляет nullable creator FK, subtype tables и 
 существующих Hollow/LogHive создаются subtype rows с null-характеристиками: migration не
 выдумывает обязательные значения и сохраняет UUID, designation, координаты и Bee links.
 
+Migration `v9 → v10` создаёт `physical_object_sequences` и заполняет каждый существующий scope
+значением `MAX(sequence_number)`:
+
+```text
+INSERT INTO physical_object_sequences (territory_id, object_type, last_issued)
+SELECT territory_id, object_type, MAX(sequence_number)
+FROM physical_objects
+GROUP BY territory_id, object_type
+```
+
+Bootstrap `last_issued = MAX(sequence_number)` корректен, потому что до v10 ни один путь кода не
+удалял строки физических объектов: операции удаления не существовало, удаление Territory с
+объектами блокировалось, restore выполняется только в пустую research-базу, а миграции строк
+объектов не удаляют. Живые строки и когда-либо созданные строки совпадали, поэтому максимум
+живых строк — максимальный когда-либо выданный номер. Scope без объектов строка не получает
+(эквивалент `last_issued = 0`), существующие identity, обозначения, координаты и связи не
+меняются.
+
 ## Связь Bee → объект
 
 ```text
@@ -1912,14 +1931,68 @@ bees.source_object_id   UUID   nullable, FK → physical_objects.id (RESTRICT)
 ссылается на identity физического объекта, а не на subtype-строку. Будущий Осмотр ссылается на
 ту же identity (`1 → N`).
 
-## Непереиспользование обозначения
+## Непереиспользование обозначения и состояние нумерации (v10)
 
-Обозначение и `sequence_number` **никогда не выдаются повторно** другому физическому объекту в
-том же scope (D088, раздел 4). Это отдельный инвариант, а не следствие способа выделения
-номера. В v8 строки физических объектов сохраняются исторически: операция их удаления
-не предоставляется, удаление Territory с объектами блокируется, а следующий номер
-выделяется как `MAX(sequence_number) + 1` внутри одной Room-транзакции. Любая будущая
-возможность физического удаления обязана отдельно сохранить непереиспользование номера.
+Обозначение и `sequence_number` не выдаются повторно внутри одной линии состояния scope
+`Territory + object_type` (D088, раздел 4, уточнённый D090). Обычное физическое удаление объекта
+номера не освобождает. Номер может быть выдан повторно только при осознанном переходе на новую
+линию состояния: явный безопасный сброс нумерации или восстановление старого backup.
+
+Механизм — persistent high-water mark:
+
+```text
+physical_object_sequences
+territory_id  UUID  NOT NULL   FK → territories.id (RESTRICT)
+object_type   enum  NOT NULL
+last_issued   Int   NOT NULL   >= 0, последний выданный номер scope
+
+PRIMARY KEY(territory_id, object_type)
+```
+
+Строка принадлежит scope и существует независимо от живых объектов: после удаления последнего
+объекта она сохраняет значение, а после сброса содержит 0. Неотрицательность защищается кодом и
+валидацией backup; DDL CHECK не вводится, потому что Room schema validation его не представляет.
+
+Выделение номера выполняется в одной транзакции с созданием объекта:
+
+```text
+INSERT OR IGNORE scope с last_issued = 0
+next = max(last_issued, MAX(sequence_number живых объектов scope)) + 1
+UPDATE last_issued = next
+INSERT physical object с sequence_number = next
+```
+
+Живой максимум сохраняется как нижняя граница для данных, записанных до появления счётчика
+(архив формата ≤4). Проваленная транзакция не расходует номер: счётчик откатывается вместе с
+объектом. UNIQUE `(territory_id, object_type, sequence_number)` сохраняется.
+
+## Удаление физического объекта
+
+```text
+DELETE physical_object_media WHERE physical_object_id = id
+DELETE subtype row (hollows | log_hives) WHERE physical_object_id = id
+DELETE physical_objects WHERE id = id AND object_type = type
+```
+
+Всё в одной транзакции, после проверки, что на объект не ссылается рабочая или историческая
+запись. Owned-данными объекта являются его subtype-строка, строки `physical_object_media` и
+принадлежащие приложению media-файлы; они удаляются вместе с объектом, причём файлы — только
+после успешного commit БД. `bees.source_object_id` — защищённая ссылка: она блокирует удаление.
+Счётчик не изменяется.
+
+## Инвариант ссылок и сброс нумерации
+
+Любой persisted FK на `physical_objects` объявлен `ON DELETE RESTRICT`, поэтому ни одна строка
+не может пережить объект, на который ссылается. Этот инвариант закреплён автоматическим тестом
+схемы, который читает FK всех таблиц живой базы и падает, если у любой ссылки на
+`physical_objects` стоит cascade или SET NULL.
+
+Сброс нумерации (`last_issued = 0` только для `Territory + object_type`) разрешён, только если в
+scope нет объектов, нет зависимых строк и ссылок, счётчик не противоречит хранимым данным
+(`last_issued >= MAX(sequence_number)`) и Territory существует. Все проверки и запись выполняются
+в одной транзакции; при нарушении условия состояние не меняется (fail closed). Отсутствие строки
+счётчика делает сброс успешным no-op. Удаление Territory удаляет строки счётчиков своих scope в
+той же транзакции.
 
 ---
 

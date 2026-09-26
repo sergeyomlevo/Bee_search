@@ -37,6 +37,8 @@ import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
 import org.beesearch.app.domain.model.Observer
+import org.beesearch.app.domain.model.PhysicalObjectInUseException
+import org.beesearch.app.domain.model.PhysicalObjectSequenceResetBlockedException
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.model.ObserverRequiredException
 import org.beesearch.app.domain.model.RequiredFieldException
@@ -65,8 +67,10 @@ import java.util.UUID
 import java.io.InputStream
 import java.time.Clock
 import java.time.Instant
+import org.beesearch.app.data.media.FileAwarePhysicalObjectDeletion
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
 import org.beesearch.app.data.media.StagedObservationPointPhoto
+import org.beesearch.app.domain.repository.PhysicalObjectRepository
 
 sealed interface AppRoute {
     data object Loading : AppRoute
@@ -246,6 +250,8 @@ internal class MainViewModel(
     private val territoryCoverageDeletion: TerritoryCoverageDeletion,
     private val mapAreaStore: MapAreaStore,
     private val mapPackageStore: MapPackageStore,
+    private val physicalObjectRepository: PhysicalObjectRepository,
+    private val physicalObjectDeletion: FileAwarePhysicalObjectDeletion,
     private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
     private val manualRoute = MutableStateFlow<AppRoute?>(null)
@@ -846,6 +852,62 @@ internal class MainViewModel(
     private fun physicalObjectCardOnScreen(): AppRoute.PhysicalObjectDetail? =
         manualRoute.value as? AppRoute.PhysicalObjectDetail
 
+    /**
+     * Deletes one unused Physical Object and returns to the typed list it was opened from.
+     *
+     * The object is removed from the database first and its app-owned media afterwards; a reference
+     * from working data blocks the deletion and keeps the card open with a readable message. The
+     * numbering high-water mark is not touched, so the number of the deleted object is never issued
+     * again.
+     */
+    fun deletePhysicalObject(objectId: UUID, listType: PhysicalObjectType) {
+        if (listType == PhysicalObjectType.APIARY) return
+        viewModelScope.launch {
+            try {
+                val outcome = when (listType) {
+                    PhysicalObjectType.HOLLOW -> physicalObjectDeletion.deleteHollow(objectId)
+                    PhysicalObjectType.LOG_HIVE -> physicalObjectDeletion.deleteLogHive(objectId)
+                    PhysicalObjectType.APIARY -> return@launch
+                }
+                _physicalObjectLocationSelection.value = null
+                manualRoute.value = AppRoute.PhysicalObjectList(listType)
+                if (outcome.fileCleanupComplete) {
+                    showSuccessFeedback("Объект удалён")
+                } else {
+                    showPersistentFeedback("Объект удалён, но не все файлы медиа удалось удалить")
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: PhysicalObjectInUseException) {
+                showPersistentFeedback("Объект используется в данных наблюдений и не может быть удалён")
+            } catch (error: Exception) {
+                showPersistentFeedback(userMessageFor(error, "Не удалось удалить объект"))
+            }
+        }
+    }
+
+    /**
+     * Starts a new numbering line for one scope after the user explicitly confirmed it.
+     *
+     * Availability in the empty list is only convenience: the repository re-checks every
+     * precondition inside one transaction and refuses without writing anything when the scope is no
+     * longer safe to reset.
+     */
+    fun resetPhysicalObjectSequence(territoryId: UUID, objectType: PhysicalObjectType) {
+        viewModelScope.launch {
+            try {
+                physicalObjectRepository.resetSequence(territoryId, objectType)
+                showSuccessFeedback(objectType.sequenceResetMessage())
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: PhysicalObjectSequenceResetBlockedException) {
+                showPersistentFeedback("Сбросить нумерацию нельзя: в этой категории ещё есть объекты")
+            } catch (error: Exception) {
+                showPersistentFeedback(userMessageFor(error, "Не удалось сбросить нумерацию"))
+            }
+        }
+    }
+
     fun abortObservationPointPreparation() {
         val draft = _observationPointPreparationDraft.value ?: return
         if (draft.isSaving || draft.isPhotoSaving) return
@@ -1269,10 +1331,19 @@ internal class MainViewModel(
                         ),
                         mapAreaStore = application.container.mapAreaStore,
                         mapPackageStore = application.container.mapPackageStore,
+                        physicalObjectRepository = application.container.physicalObjectRepository,
+                        physicalObjectDeletion = application.container.physicalObjectDeletion,
                     ) as T
                 }
             }
     }
+}
+
+/** The confirmation message of a successful numbering reset, named by the concrete type. */
+internal fun PhysicalObjectType.sequenceResetMessage(): String = when (this) {
+    PhysicalObjectType.HOLLOW -> "Нумерация дупел сброшена. Следующее дупло получит номер 1"
+    PhysicalObjectType.LOG_HIVE -> "Нумерация колод сброшена. Следующая колода получит номер 1"
+    PhysicalObjectType.APIARY -> "Нумерация пасек сброшена"
 }
 
 internal fun userMessageFor(error: Throwable, fallback: String): String = when (error) {

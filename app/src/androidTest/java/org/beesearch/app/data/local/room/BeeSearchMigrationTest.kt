@@ -626,6 +626,103 @@ class BeeSearchMigrationTest {
         migrated.close()
     }
 
+    @Test
+    fun migrationFromNineToTenBackfillsOneSequenceRowPerScope() {
+        val databaseName = "$DATABASE_NAME-9-10"
+        val territoryA = UUID.randomUUID().toString()
+        val territoryB = UUID.randomUUID().toString()
+        val timestamp = Instant.parse("2026-09-24T08:00:00Z").toEpochMilli()
+        migrationHelper.createDatabase(databaseName, 9).apply {
+            execSQL("INSERT INTO territories VALUES (?, 'TA', 'A', 'R', 'D', ?, ?)", arrayOf<Any>(territoryA, timestamp, timestamp))
+            execSQL("INSERT INTO territories VALUES (?, 'TB', 'B', 'R', 'D', ?, ?)", arrayOf<Any>(territoryB, timestamp, timestamp))
+            insertObject(territoryA, "HOLLOW", 1, timestamp)
+            insertObject(territoryA, "HOLLOW", 2, timestamp)
+            insertObject(territoryA, "HOLLOW", 3, timestamp)
+            insertObject(territoryA, "LOG_HIVE", 5, timestamp)
+            insertObject(territoryA, "APIARY", 2, timestamp)
+            insertObject(territoryB, "HOLLOW", 4, timestamp)
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(databaseName, 10, true, MIGRATION_9_10)
+
+        val rows = linkedMapOf<String, Int>()
+        migrated.query("SELECT territory_id, object_type, last_issued FROM physical_object_sequences").use { cursor ->
+            while (cursor.moveToNext()) rows[cursor.getString(0) + "/" + cursor.getString(1)] = cursor.getInt(2)
+        }
+        assertEquals(4, rows.size)
+        assertEquals(3, rows["$territoryA/HOLLOW"])
+        assertEquals(5, rows["$territoryA/LOG_HIVE"])
+        assertEquals(2, rows["$territoryA/APIARY"])
+        assertEquals(4, rows["$territoryB/HOLLOW"])
+        migrated.close()
+    }
+
+    @Test
+    fun migrationFromNineToTenKeepsObjectsUnchangedAndSkipsEmptyScopes() {
+        val databaseName = "$DATABASE_NAME-9-10-empty"
+        val territoryWithObjects = UUID.randomUUID().toString()
+        val emptyTerritory = UUID.randomUUID().toString()
+        val objectId = UUID.randomUUID().toString()
+        val timestamp = Instant.parse("2026-09-24T08:10:00Z").toEpochMilli()
+        migrationHelper.createDatabase(databaseName, 9).apply {
+            execSQL("INSERT INTO territories VALUES (?, 'TA', 'A', 'R', 'D', ?, ?)", arrayOf<Any>(territoryWithObjects, timestamp, timestamp))
+            execSQL("INSERT INTO territories VALUES (?, 'TB', 'B', 'R', 'D', ?, ?)", arrayOf<Any>(emptyTerritory, timestamp, timestamp))
+            execSQL(
+                "INSERT INTO physical_objects VALUES (?, ?, 'HOLLOW', 7, 56.1, 42.7, ?, NULL)",
+                arrayOf<Any>(objectId, territoryWithObjects, timestamp),
+            )
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(databaseName, 10, true, MIGRATION_9_10)
+
+        migrated.query(
+            "SELECT territory_id, object_type, sequence_number, latitude, longitude, created_at, creator_observer_id FROM physical_objects WHERE id = ?",
+            arrayOf(objectId),
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(territoryWithObjects, cursor.getString(0))
+            assertEquals("HOLLOW", cursor.getString(1))
+            assertEquals(7, cursor.getInt(2))
+            assertEquals(56.1, cursor.getDouble(3), 0.0)
+            assertEquals(42.7, cursor.getDouble(4), 0.0)
+            assertEquals(timestamp, cursor.getLong(5))
+            assertTrue(cursor.isNull(6))
+        }
+        migrated.query("SELECT COUNT(*) FROM physical_object_sequences").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+        migrated.query(
+            "SELECT last_issued FROM physical_object_sequences WHERE territory_id = ? AND object_type = 'HOLLOW'",
+            arrayOf(territoryWithObjects),
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(7, cursor.getInt(0))
+        }
+        migrated.query(
+            "SELECT COUNT(*) FROM physical_object_sequences WHERE territory_id = ?",
+            arrayOf(emptyTerritory),
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+        migrated.close()
+    }
+
+    private fun androidx.sqlite.db.SupportSQLiteDatabase.insertObject(
+        territoryId: String,
+        objectType: String,
+        sequenceNumber: Int,
+        createdAt: Long,
+    ) {
+        execSQL(
+            "INSERT INTO physical_objects VALUES (?, ?, ?, ?, 56.1, 42.7, ?, NULL)",
+            arrayOf<Any>(UUID.randomUUID().toString(), territoryId, objectType, sequenceNumber, createdAt),
+        )
+    }
+
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertLegacyPoint(
         id: String,
         territoryId: String,

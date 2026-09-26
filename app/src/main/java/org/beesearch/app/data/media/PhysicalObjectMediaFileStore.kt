@@ -151,6 +151,23 @@ internal class PhysicalObjectMediaFileStore(
         !file.exists() || file.delete()
     }
 
+    /**
+     * Removes the managed directory of one object after its media files are gone.
+     *
+     * Only the expected directory of that object id is considered, through the same path-safety
+     * check as every managed path, and it is deleted only when it is an empty directory: anything
+     * unexpected stays on disk instead of being removed recursively.
+     */
+    suspend fun deleteObjectDirectory(physicalObjectId: UUID): Boolean = withContext(Dispatchers.IO) {
+        val directory = requireSafeFile(
+            root = mediaRoot,
+            base = mediaRoot,
+            relativePath = physicalObjectId.toString(),
+            description = "object media directory",
+        )
+        !directory.exists() || (directory.isDirectory && directory.listFiles().orEmpty().isEmpty() && directory.delete())
+    }
+
     fun cameraCaptureFile(captureId: UUID): File = File(stagingRoot, "camera-$captureId.jpg").also {
         it.parentFile?.mkdirs()
     }

@@ -59,6 +59,7 @@ class RoomPhysicalObjectRepositoryTest {
         repository = RoomPhysicalObjectRepository(
             database,
             database.physicalObjectDao(),
+            database.physicalObjectSequenceDao(),
             database.territoryDao(),
             database.observerDao(),
             database.beeDao(),

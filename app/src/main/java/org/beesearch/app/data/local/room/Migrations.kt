@@ -433,6 +433,43 @@ internal val MIGRATION_8_9 = object : Migration(8, 9) {
     }
 }
 
+/**
+ * v9 → v10: the persistent sequence high-water mark of every numbering scope.
+ *
+ * The backfill seeds each existing scope with the highest sequence number it currently holds.
+ * That value is the highest number ever issued in that scope: before this version no code path
+ * could delete a `physical_objects` row (there is no delete API, Territory deletion is blocked
+ * while objects exist, and a restore only runs into an empty research database), so live rows and
+ * ever-created rows were the same set. Scopes without objects get no row; the first allocation
+ * creates it with `last_issued = 0`.
+ */
+internal val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS physical_object_sequences (
+                territory_id TEXT NOT NULL,
+                object_type TEXT NOT NULL,
+                last_issued INTEGER NOT NULL,
+                PRIMARY KEY(territory_id, object_type),
+                FOREIGN KEY(territory_id) REFERENCES territories(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_physical_object_sequences_territory_id ON physical_object_sequences(territory_id)",
+        )
+        db.execSQL(
+            """
+            INSERT INTO physical_object_sequences (territory_id, object_type, last_issued)
+            SELECT territory_id, object_type, MAX(sequence_number)
+            FROM physical_objects
+            GROUP BY territory_id, object_type
+            """.trimIndent(),
+        )
+    }
+}
+
 private data class LegacyObservationPoint(
     val id: String,
     val territoryId: String,

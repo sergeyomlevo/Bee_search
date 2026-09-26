@@ -20,7 +20,11 @@ import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
 import org.beesearch.app.domain.backup.*
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.BeePresenceResult
+import org.beesearch.app.domain.model.HollowProperties
+import org.beesearch.app.domain.model.LogHiveProperties
 import org.beesearch.app.domain.model.MarkPosition
+import org.beesearch.app.domain.model.NewHollow
+import org.beesearch.app.domain.model.NewLogHive
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.model.PhysicalObjectMediaType
 import org.beesearch.app.domain.model.WeatherStatus
@@ -185,13 +189,16 @@ class BackupServiceTest {
         assertFailure<MalformedBackup>(mutate(base) { it["attachments/../escape"] = byteArrayOf(1) })
     }
 
-    @Test fun manifestContainsAllV4RequiredCollections() = runBlocking {
+    @Test fun manifestContainsAllV5RequiredCollections() = runBlocking {
         seed(source); service(source, sourceStore).export(archive)
         val manifest = String(zipEntries(archive).getValue("manifest.json"))
-        BackupContractV4.collections.forEach { (name, path) ->
+        BackupContractV5.collections.forEach { (name, path) ->
             assertTrue(manifest.contains("\"name\":\"$name\"")); assertTrue(manifest.contains("\"path\":\"$path\""))
         }
-        assertEquals(14, "\"collectionSchemaVersion\":1".toRegex().findAll(manifest).count())
+        assertEquals(15, "\"collectionSchemaVersion\":1".toRegex().findAll(manifest).count())
+        assertTrue(manifest.contains("\"backupFormatVersion\":5"))
+        assertTrue(manifest.contains("\"archiveSchemaVersion\":5"))
+        assertTrue(manifest.contains("\"roomSchemaVersion\":10"))
     }
 
     @Test fun v3RoundTripPreservesPhysicalObjectsApiaryAndBeeAssociation() = runBlocking {
@@ -249,7 +256,7 @@ class BackupServiceTest {
         val objectTargetStore = PhysicalObjectMediaFileStore(temp("object-target-files"), temp("object-target-cache"))
         service(source, sourceStore, objectMediaStore = mediaStore).export(archive)
         val manifest = String(zipEntries(archive).getValue("manifest.json"))
-        assertTrue(manifest.contains("\"backupFormatVersion\":4"))
+        assertTrue(manifest.contains("\"backupFormatVersion\":5"))
         service(target, targetStore, objectMediaStore = objectTargetStore).restore(archive)
         assertEquals(source.backupDao().physicalObjects(), target.backupDao().physicalObjects())
         assertEquals(source.backupDao().hollows(), target.backupDao().hollows())
@@ -258,6 +265,79 @@ class BackupServiceTest {
         assertEquals(hollowId, target.backupDao().bees().single { it.id == bee.id }.sourceObjectId)
         assertEquals(imageBytes.toList(), objectTargetStore.resolve(image.relativePath).readBytes().toList())
         assertEquals(videoBytes.toList(), objectTargetStore.resolve(video.relativePath).readBytes().toList())
+    }
+
+    @Test fun v5RoundTripPreservesNumberingStateOfEmptyAndDeletedScopes() = runBlocking {
+        val ids = seed(source)
+        val hollowId = UUID.randomUUID()
+        source.backupDao().insertPhysicalObjects(
+            listOf(PhysicalObjectEntity(hollowId, ids.territory2, PhysicalObjectType.HOLLOW, 5, 56.3, 42.9, NOW, ids.observer2)),
+        )
+        source.backupDao().insertHollows(listOf(HollowEntity(hollowId, "дуб", 180.0, 123, 40.0, 25.0, null)))
+        // The counter stands above the highest stored object, and one scope was already reset.
+        source.backupDao().insertPhysicalObjectSequences(
+            listOf(
+                PhysicalObjectSequenceEntity(ids.territory2, PhysicalObjectType.HOLLOW, 9),
+                PhysicalObjectSequenceEntity(ids.territory2, PhysicalObjectType.LOG_HIVE, 0),
+            ),
+        )
+
+        service(source, sourceStore).export(archive)
+        service(target, targetStore).restore(archive)
+
+        assertEquals(source.backupDao().physicalObjectSequences(), target.backupDao().physicalObjectSequences())
+        assertEquals(9, target.backupDao().physicalObjectSequences().single {
+            it.objectType == PhysicalObjectType.HOLLOW
+        }.lastIssued)
+        val repository = objectRepository(target, ids.territory2)
+        assertEquals(10, repository.createHollow(NewHollow(UUID.randomUUID(), ids.territory2, ids.observer2, 56.6, 43.2, HollowProperties("дуб", 1.0, 0, 1.0, null, null))).sequenceNumber)
+        assertEquals(1, repository.createLogHive(NewLogHive(UUID.randomUUID(), ids.territory2, ids.observer2, 56.7, 43.3, LogHiveProperties("сосна", 1.0, 0, 1.0, "липа", 1.0, 1.0, null))).sequenceNumber)
+    }
+
+    @Test fun v4ArchiveWithoutSequenceStateBootstrapsFromStoredNumbers() = runBlocking {
+        val ids = seed(source)
+        val hollowId = UUID.randomUUID()
+        source.backupDao().insertPhysicalObjects(
+            listOf(PhysicalObjectEntity(hollowId, ids.territory2, PhysicalObjectType.HOLLOW, 3, 56.3, 42.9, NOW, ids.observer2)),
+        )
+        source.backupDao().insertHollows(listOf(HollowEntity(hollowId, "дуб", 180.0, 123, 40.0, 25.0, null)))
+        source.backupDao().insertPhysicalObjectSequences(
+            listOf(PhysicalObjectSequenceEntity(ids.territory2, PhysicalObjectType.HOLLOW, 7)),
+        )
+
+        service(source, sourceStore).export(archive)
+        service(target, targetStore).restore(convertV5ToV4(zipEntries(archive)))
+
+        assertTrue(target.backupDao().physicalObjectSequences().isEmpty())
+        assertEquals(3, target.backupDao().physicalObjects().single { it.id == hollowId }.sequenceNumber)
+        val repository = objectRepository(target, ids.territory2)
+        assertEquals(4, repository.createHollow(NewHollow(UUID.randomUUID(), ids.territory2, ids.observer2, 56.6, 43.2, HollowProperties("дуб", 1.0, 0, 1.0, null, null))).sequenceNumber)
+    }
+
+    @Test fun sequenceValidationRejectsUnsafeArchiveState() = runBlocking {
+        val ids = seed(source)
+        val hollowId = UUID.randomUUID()
+        source.backupDao().insertPhysicalObjects(
+            listOf(PhysicalObjectEntity(hollowId, ids.territory2, PhysicalObjectType.HOLLOW, 4, 56.3, 42.9, NOW, ids.observer2)),
+        )
+        source.backupDao().insertHollows(listOf(HollowEntity(hollowId, "дуб", 180.0, 123, 40.0, 25.0, null)))
+        source.backupDao().insertPhysicalObjectSequences(
+            listOf(PhysicalObjectSequenceEntity(ids.territory2, PhysicalObjectType.HOLLOW, 4)),
+        )
+        service(source, sourceStore).export(archive)
+        val base = zipEntries(archive)
+        val row = String(base.getValue(BackupContractV5.collections.getValue("physical-object-sequences"))).trim()
+
+        assertFailure<DuplicateBackupIdentity>(replaceCollection(base, "physical-object-sequences", "$row\n$row"))
+        assertFailure<BackupDomainInvariantViolation>(
+            replaceCollection(base, "physical-object-sequences", row.replace("\"lastIssued\":4", "\"lastIssued\":-1")),
+        )
+        assertFailure<BackupDomainInvariantViolation>(
+            replaceCollection(base, "physical-object-sequences", row.replace("\"lastIssued\":4", "\"lastIssued\":3")),
+        )
+        assertFailure<BrokenBackupForeignKey>(
+            replaceCollection(base, "physical-object-sequences", row.replace(ids.territory2.toString(), UUID.randomUUID().toString())),
+        )
     }
 
     @Test fun v3RestoreSynthesizesHistoricalNullSubtypePropertiesAndNullCreator() = runBlocking {
@@ -435,8 +515,8 @@ class BackupServiceTest {
 
     @Test fun formatEvolutionFailuresAreExplicit() = runBlocking {
         seed(source); service(source, sourceStore).export(archive); val base = zipEntries(archive)
-        assertFailure<UnsupportedBackupFormat>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"backupFormatVersion\":4", "\"backupFormatVersion\":5").toByteArray() })
-        assertFailure<UnsupportedArchiveSchema>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"archiveSchemaVersion\":4", "\"archiveSchemaVersion\":5").toByteArray() })
+        assertFailure<UnsupportedBackupFormat>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"backupFormatVersion\":5", "\"backupFormatVersion\":6").toByteArray() })
+        assertFailure<UnsupportedArchiveSchema>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"archiveSchemaVersion\":5", "\"archiveSchemaVersion\":7").toByteArray() })
         assertFailure<MissingBackupCollection>(mutate(base) { it.remove("research/bees.json") })
         assertFailure<UnknownRequiredBackupCollection>(mutate(base) {
             val text = String(it.getValue("manifest.json")); val descriptor = "{\"name\":\"future\",\"path\":\"future.json\",\"collectionSchemaVersion\":1,\"required\":true,\"recordCount\":0,\"byteLength\":0,\"sha256\":\"${"0".repeat(64)}\"}"
@@ -528,6 +608,16 @@ class BackupServiceTest {
     }
 
     private fun database() = Room.inMemoryDatabaseBuilder(context, BeeSearchDatabase::class.java).allowMainThreadQueries().build()
+    private fun objectRepository(target: BeeSearchDatabase, territoryId: UUID) =
+        org.beesearch.app.data.repository.RoomPhysicalObjectRepository(
+            target,
+            target.physicalObjectDao(),
+            target.physicalObjectSequenceDao(),
+            target.territoryDao(),
+            target.observerDao(),
+            target.beeDao(),
+            Clock.fixed(NOW, ZoneOffset.UTC),
+        )
     private fun dataStore(file: File) = PreferenceDataStoreFactory.create(scope = scope, produceFile = { file })
     private fun temp(suffix: String) = File(context.cacheDir, "${UUID.randomUUID()}-$suffix")
     private fun service(
@@ -557,9 +647,34 @@ class BackupServiceTest {
         }
         val manifest = String(base.getValue("manifest.json"))
         copy["manifest.json"] = (manifest.substringBefore("\"collections\":")
-            .replace("\"backupFormatVersion\":4", "\"backupFormatVersion\":3")
-            .replace("\"archiveSchemaVersion\":4", "\"archiveSchemaVersion\":3")
-            .replace("\"roomSchemaVersion\":9", "\"roomSchemaVersion\":8") +
+            .replace("\"backupFormatVersion\":5", "\"backupFormatVersion\":3")
+            .replace("\"archiveSchemaVersion\":5", "\"archiveSchemaVersion\":3")
+            .replace("\"roomSchemaVersion\":10", "\"roomSchemaVersion\":8") +
+            "\"collections\":" + descriptors + "}").toByteArray()
+        return write(copy)
+    }
+
+    /**
+     * Rewrites an exported V5 archive as the format the release before this feature wrote.
+     *
+     * The naming scope of an archive is not part of that format, so the sequence collection is
+     * removed and the allocation falls back to the highest stored number after such a restore.
+     */
+    private fun convertV5ToV4(base: Map<String, ByteArray>): File {
+        val copy = LinkedHashMap<String, ByteArray>()
+        BackupContractV4.collections.values.forEach { path -> copy[path] = base.getValue(path) }
+        val descriptors = BackupContractV4.collections.entries.joinToString(",", "[", "]") { (name, path) ->
+            val bytes = copy.getValue(path)
+            val count = String(bytes).lineSequence().count(String::isNotBlank)
+            val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+            "{\"name\":\"$name\",\"path\":\"$path\",\"collectionSchemaVersion\":1," +
+                "\"required\":true,\"recordCount\":$count,\"byteLength\":${bytes.size},\"sha256\":\"$hash\"}"
+        }
+        val manifest = String(base.getValue("manifest.json"))
+        copy["manifest.json"] = (manifest.substringBefore("\"collections\":")
+            .replace("\"backupFormatVersion\":5", "\"backupFormatVersion\":4")
+            .replace("\"archiveSchemaVersion\":5", "\"archiveSchemaVersion\":4")
+            .replace("\"roomSchemaVersion\":10", "\"roomSchemaVersion\":9") +
             "\"collections\":" + descriptors + "}").toByteArray()
         return write(copy)
     }
@@ -582,9 +697,9 @@ class BackupServiceTest {
         }
         val manifest = String(base.getValue("manifest.json"))
         copy["manifest.json"] = (manifest.substringBefore("\"collections\":")
-            .replace("\"backupFormatVersion\":4", "\"backupFormatVersion\":2")
-            .replace("\"archiveSchemaVersion\":4", "\"archiveSchemaVersion\":2")
-            .replace("\"roomSchemaVersion\":9", "\"roomSchemaVersion\":7") +
+            .replace("\"backupFormatVersion\":5", "\"backupFormatVersion\":2")
+            .replace("\"archiveSchemaVersion\":5", "\"archiveSchemaVersion\":2")
+            .replace("\"roomSchemaVersion\":10", "\"roomSchemaVersion\":7") +
             "\"collections\":" + descriptors + "}").toByteArray()
         return copy
     }
@@ -610,10 +725,11 @@ class BackupServiceTest {
         copy["manifest.json"] = v1Manifest.toByteArray()
         return write(copy)
     }
+
     private inline fun <reified T : Throwable> assertFailure(file: File) { assertThrows(T::class.java) { service(target, targetStore).validate(file) } }
     private fun zipEntries(file: File): LinkedHashMap<String, ByteArray> { val out = linkedMapOf<String, ByteArray>(); ZipInputStream(file.inputStream()).use { z -> while (true) { val e=z.nextEntry?:break; out[e.name]=z.readBytes() } }; return out }
     private fun replaceCollection(base: Map<String, ByteArray>, name: String, text: String): File {
-        val copy = LinkedHashMap(base); val bytes = text.toByteArray(); val path = BackupContractV3.collections.getValue(name); copy[path] = bytes
+        val copy = LinkedHashMap(base); val bytes = text.toByteArray(); val path = BackupContractV5.collections.getValue(name); copy[path] = bytes
         val manifest = String(copy.getValue("manifest.json")); val start = manifest.indexOf("{\"name\":\"$name\"")
         check(start >= 0); val end = manifest.indexOf('}', start) + 1; val old = manifest.substring(start, end)
         val count = text.lineSequence().count(String::isNotBlank); val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

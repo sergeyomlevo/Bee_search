@@ -18,12 +18,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,11 +65,15 @@ private data class LogHiveItem(val value: LogHive) : PhysicalObjectListItem {
  *
  * A row shows the designation only: `Дупло N` / `Колода N` already carries the type, and the list
  * itself states the category, so a second line repeating the type is not shown.
+ *
+ * When the list is empty and the caller supports it, the empty state also offers the numbering
+ * reset. That placement is convenience only: the operation itself re-checks its preconditions.
  */
 @Composable
 fun PhysicalObjectsBrowser(
     type: PhysicalObjectType,
     hollows: List<Hollow>, logHives: List<LogHive>, onOpen: (java.util.UUID) -> Unit,
+    onResetSequence: (() -> Unit)? = null,
 ) {
     val items = when (type) {
         PhysicalObjectType.HOLLOW -> hollows.map(::HollowItem)
@@ -75,10 +81,15 @@ fun PhysicalObjectsBrowser(
         PhysicalObjectType.APIARY -> emptyList()
     }
     if (items.isEmpty()) {
-        Text(
-            type.emptyListMessage(),
-            modifier = Modifier.padding(16.dp).testTag("physical-objects-empty"),
-        )
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(type.emptyListMessage(), modifier = Modifier.testTag("physical-objects-empty"))
+            if (onResetSequence != null) {
+                TextButton(
+                    onClick = onResetSequence,
+                    modifier = Modifier.testTag("physical-objects-reset"),
+                ) { Text("Сбросить нумерацию") }
+            }
+        }
         return
     }
     LazyColumn(modifier = Modifier.testTag("physical-objects-list")) {
@@ -95,44 +106,47 @@ fun PhysicalObjectsBrowser(
 @Composable
 fun HollowCard(
     value: Hollow, territoryLabel: String, creatorLabel: String, onEdit: () -> Unit = {},
-    onEditCoordinates: () -> Unit = {}, onShowOnMap: () -> Unit = {},
+    onEditCoordinates: () -> Unit = {}, onShowOnMap: () -> Unit = {}, onDelete: () -> Unit = {},
     mediaFile: (PhysicalObjectMedia) -> File? = { null },
     onOpenMedia: (PhysicalObjectMedia) -> Unit = {},
 ) = PhysicalObjectCard(
     typeLabel = "Дупло", territoryLabel = territoryLabel,
+    deleteTitle = PhysicalObjectType.HOLLOW.deleteConfirmationTitle(value.sequenceNumber),
     creatorLabel = creatorLabel, createdAt = value.createdAt.displayDateTime(), latitude = value.latitude,
     longitude = value.longitude, properties = value.properties?.let {
             listOf("Дерево" to it.tree, "Высота летка" to "${it.entranceHeightCm.displayMeasurement()} см", "Азимут" to "${it.entranceAzimuthDeg}° · ${azimuthSector(it.entranceAzimuthDeg)}", "Наружный диаметр" to "${it.outerDiameterCm.displayMeasurement()} см") +
             listOfNotNull(it.internalDiameterCm?.let { d -> "Внутренний диаметр" to "${d.displayMeasurement()} см" }, it.notes?.let { n -> "Дополнительно" to n })
     } ?: emptyList(), media = value.media, onEdit = onEdit,
-    onEditCoordinates = onEditCoordinates, onShowOnMap = onShowOnMap,
+    onEditCoordinates = onEditCoordinates, onShowOnMap = onShowOnMap, onDelete = onDelete,
     mediaFile = mediaFile, onOpenMedia = onOpenMedia,
 )
 
 @Composable
 fun LogHiveCard(
     value: LogHive, territoryLabel: String, creatorLabel: String, onEdit: () -> Unit = {},
-    onEditCoordinates: () -> Unit = {}, onShowOnMap: () -> Unit = {},
+    onEditCoordinates: () -> Unit = {}, onShowOnMap: () -> Unit = {}, onDelete: () -> Unit = {},
     mediaFile: (PhysicalObjectMedia) -> File? = { null },
     onOpenMedia: (PhysicalObjectMedia) -> Unit = {},
 ) = PhysicalObjectCard(
     typeLabel = "Колода", territoryLabel = territoryLabel,
+    deleteTitle = PhysicalObjectType.LOG_HIVE.deleteConfirmationTitle(value.sequenceNumber),
     creatorLabel = creatorLabel, createdAt = value.createdAt.displayDateTime(), latitude = value.latitude,
     longitude = value.longitude, properties = value.properties?.let {
             listOf("Дерево" to it.tree, "Высота летка" to "${it.entranceHeightCm.displayMeasurement()} см", "Азимут" to "${it.entranceAzimuthDeg}° · ${azimuthSector(it.entranceAzimuthDeg)}", "Наружный диаметр" to "${it.outerDiameterCm.displayMeasurement()} см", "Материал" to it.material, "Внутренний диаметр" to "${it.internalDiameterCm.displayMeasurement()} см", "Высота внутреннего объёма" to "${it.internalHeightCm.displayMeasurement()} см") + listOfNotNull(it.notes?.let { n -> "Дополнительно" to n })
     } ?: emptyList(), media = value.media, onEdit = onEdit,
-    onEditCoordinates = onEditCoordinates, onShowOnMap = onShowOnMap,
+    onEditCoordinates = onEditCoordinates, onShowOnMap = onShowOnMap, onDelete = onDelete,
     mediaFile = mediaFile, onOpenMedia = onOpenMedia,
 )
 
 @Composable
 private fun PhysicalObjectCard(
-    typeLabel: String, territoryLabel: String, creatorLabel: String,
+    typeLabel: String, territoryLabel: String, creatorLabel: String, deleteTitle: String,
     createdAt: String, latitude: Double, longitude: Double, properties: List<Pair<String, String>>,
     media: List<PhysicalObjectMedia>, onEdit: () -> Unit,
-    onEditCoordinates: () -> Unit, onShowOnMap: () -> Unit,
+    onEditCoordinates: () -> Unit, onShowOnMap: () -> Unit, onDelete: () -> Unit,
     mediaFile: (PhysicalObjectMedia) -> File?, onOpenMedia: (PhysicalObjectMedia) -> Unit,
 ) {
+    var confirmDelete by remember(deleteTitle) { mutableStateOf(false) }
     Column(
         Modifier.padding(16.dp).verticalScroll(rememberScrollState()).testTag("physical-object-detail"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -208,6 +222,37 @@ private fun PhysicalObjectCard(
             }
         }
         OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth().testTag("physical-object-edit")) { Text("Редактировать характеристики") }
+        OutlinedButton(
+            onClick = { confirmDelete = true },
+            modifier = Modifier.fillMaxWidth().testTag("physical-object-delete"),
+        ) { Text("Удалить объект") }
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(deleteTitle) },
+            text = {
+                Text(
+                    if (media.isEmpty()) {
+                        "Объект будет удалён. Восстановить его нельзя."
+                    } else {
+                        "Объект и его медиа будут удалены. Восстановить их нельзя."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { confirmDelete = false; onDelete() },
+                    modifier = Modifier.testTag("physical-object-delete-confirm"),
+                ) { Text("Удалить") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { confirmDelete = false },
+                    modifier = Modifier.testTag("physical-object-delete-cancel"),
+                ) { Text("Отмена") }
+            },
+        )
     }
 }
 
@@ -250,6 +295,19 @@ private fun AdaptiveDetailActions(
 
 private fun java.time.Instant.displayDateTime(): String = atZone(ZoneId.systemDefault())
     .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+
+/**
+ * The delete confirmation title in the grammatical form the phrase needs.
+ *
+ * The designation itself is nominative (`Дупло 4`, `Колода 2`), while the phrase requires the
+ * accusative for Колода and Пасека, so the title is built from the type instead of the stored
+ * designation string.
+ */
+private fun PhysicalObjectType.deleteConfirmationTitle(sequenceNumber: Int): String = when (this) {
+    PhysicalObjectType.HOLLOW -> "Удалить Дупло $sequenceNumber?"
+    PhysicalObjectType.LOG_HIVE -> "Удалить Колоду $sequenceNumber?"
+    PhysicalObjectType.APIARY -> "Удалить Пасеку $sequenceNumber?"
+}
 
 private fun azimuthSector(deg: Int): String = listOf("С", "СВ", "В", "ЮВ", "Ю", "ЮЗ", "З", "СЗ")[(deg + 22) / 45 % 8]
 

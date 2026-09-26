@@ -21,6 +21,7 @@ import org.beesearch.app.data.location.AndroidLocationProvider
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
 import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
 import org.beesearch.app.data.media.FileAwareObservationDataMaintenance
+import org.beesearch.app.data.media.FileAwarePhysicalObjectDeletion
 import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.local.settings.settingsDataStore
@@ -95,6 +96,7 @@ internal class AppContainer(context: Context) {
         dataStore = context.settingsDataStore,
     )
     val territoryRepository: TerritoryRepository = RoomTerritoryRepository(
+        database = database,
         territoryDao = database.territoryDao(),
         clock = clock,
     )
@@ -134,10 +136,15 @@ internal class AppContainer(context: Context) {
     val physicalObjectRepository: PhysicalObjectRepository = RoomPhysicalObjectRepository(
         database = database,
         objectDao = database.physicalObjectDao(),
+        sequenceDao = database.physicalObjectSequenceDao(),
         territoryDao = database.territoryDao(),
         observerDao = database.observerDao(),
         beeDao = database.beeDao(),
         clock = clock,
+    )
+    val physicalObjectDeletion = FileAwarePhysicalObjectDeletion(
+        repository = physicalObjectRepository,
+        fileStore = physicalObjectMediaFileStore,
     )
     val observationPointDocumentExporter: ObservationPointDocumentExporter =
         SafObservationPointDocumentExporter(

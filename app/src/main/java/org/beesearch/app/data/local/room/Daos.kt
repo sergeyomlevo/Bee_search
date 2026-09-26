@@ -48,6 +48,7 @@ internal abstract class BackupDao {
     @Query("SELECT * FROM hollows ORDER BY physical_object_id") abstract suspend fun hollows(): List<HollowEntity>
     @Query("SELECT * FROM log_hives ORDER BY physical_object_id") abstract suspend fun logHives(): List<LogHiveEntity>
     @Query("SELECT * FROM physical_object_media ORDER BY id") abstract suspend fun physicalObjectMedia(): List<PhysicalObjectMediaEntity>
+    @Query("SELECT * FROM physical_object_sequences ORDER BY territory_id, object_type") abstract suspend fun physicalObjectSequences(): List<PhysicalObjectSequenceEntity>
     @Query("SELECT * FROM apiaries ORDER BY physical_object_id") abstract suspend fun apiaries(): List<ApiaryEntity>
     @Query("SELECT * FROM bees ORDER BY id") abstract suspend fun bees(): List<BeeEntity>
     @Query("SELECT * FROM flight_cycles ORDER BY id") abstract suspend fun flightCycles(): List<FlightCycleEntity>
@@ -66,6 +67,7 @@ internal abstract class BackupDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertHollows(value: List<HollowEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertLogHives(value: List<LogHiveEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertPhysicalObjectMedia(value: List<PhysicalObjectMediaEntity>)
+    @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertPhysicalObjectSequences(value: List<PhysicalObjectSequenceEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertApiaries(value: List<ApiaryEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertBees(value: List<BeeEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) abstract suspend fun insertFlightCycles(value: List<FlightCycleEntity>)
@@ -155,12 +157,104 @@ internal interface PhysicalObjectDao {
 
     @Query(
         """
-        SELECT COALESCE(MAX(sequence_number), 0) + 1
+        SELECT COALESCE(MAX(sequence_number), 0)
         FROM physical_objects
         WHERE territory_id = :territoryId AND object_type = :objectType
         """,
     )
-    suspend fun getNextSequenceNumber(territoryId: UUID, objectType: org.beesearch.app.domain.model.PhysicalObjectType): Int
+    suspend fun getMaxSequenceNumber(territoryId: UUID, objectType: org.beesearch.app.domain.model.PhysicalObjectType): Int
+
+    @Query("SELECT COUNT(*) FROM physical_objects WHERE territory_id = :territoryId AND object_type = :objectType")
+    suspend fun countInScope(territoryId: UUID, objectType: org.beesearch.app.domain.model.PhysicalObjectType): Int
+
+    /**
+     * Rows that belong to the object itself and disappear with it.
+     *
+     * The count is only non-zero when the identity rows of the scope still exist, because every
+     * dependent row is held by a `RESTRICT` foreign key; it is checked before a numbering reset as
+     * an executable statement of the "no dependent rows left" invariant.
+     */
+    @Query(
+        """
+        SELECT (SELECT COUNT(*) FROM hollows AS h
+                    INNER JOIN physical_objects AS o ON h.physical_object_id = o.id
+                    WHERE o.territory_id = :territoryId AND o.object_type = :objectType)
+             + (SELECT COUNT(*) FROM log_hives AS l
+                    INNER JOIN physical_objects AS o ON l.physical_object_id = o.id
+                    WHERE o.territory_id = :territoryId AND o.object_type = :objectType)
+             + (SELECT COUNT(*) FROM apiaries AS a
+                    INNER JOIN physical_objects AS o ON a.physical_object_id = o.id
+                    WHERE o.territory_id = :territoryId AND o.object_type = :objectType)
+             + (SELECT COUNT(*) FROM physical_object_media AS m
+                    INNER JOIN physical_objects AS o ON m.physical_object_id = o.id
+                    WHERE o.territory_id = :territoryId AND o.object_type = :objectType)
+        """,
+    )
+    suspend fun countDependentRowsInScope(
+        territoryId: UUID,
+        objectType: org.beesearch.app.domain.model.PhysicalObjectType,
+    ): Int
+
+    /**
+     * Working/historical references to objects of one scope.
+     *
+     * Today this can only be non-zero while the objects still exist (the `bees.source_object_id`
+     * foreign key is `RESTRICT`), so the reset precondition that blocks on it is redundant by
+     * construction. It is kept as an explicit, executable invariant statement: a future reference
+     * table that could survive its object must be added here as well.
+     */
+    @Query(
+        """
+        SELECT COUNT(*) FROM bees AS b
+        INNER JOIN physical_objects AS o ON b.source_object_id = o.id
+        WHERE o.territory_id = :territoryId AND o.object_type = :objectType
+        """,
+    )
+    suspend fun countReferencesInScope(
+        territoryId: UUID,
+        objectType: org.beesearch.app.domain.model.PhysicalObjectType,
+    ): Int
+
+    @Query("SELECT COUNT(*) FROM bees WHERE source_object_id = :objectId")
+    suspend fun countBeeReferences(objectId: UUID): Int
+
+    @Query("DELETE FROM physical_object_media WHERE physical_object_id = :id")
+    suspend fun deleteMediaForObject(id: UUID): Int
+
+    @Query("DELETE FROM hollows WHERE physical_object_id = :id")
+    suspend fun deleteHollow(id: UUID): Int
+
+    @Query("DELETE FROM log_hives WHERE physical_object_id = :id")
+    suspend fun deleteLogHive(id: UUID): Int
+
+    @Query("DELETE FROM physical_objects WHERE id = :id AND object_type = :objectType")
+    suspend fun deleteIdentity(id: UUID, objectType: org.beesearch.app.domain.model.PhysicalObjectType): Int
+}
+
+/**
+ * The persistent high-water mark of one numbering scope, keyed by `Territory + object_type`.
+ *
+ * It is owned by two repositories: creation allocates through it, and Territory deletion removes
+ * the rows of the deleted Territory inside the same transaction (the foreign key would otherwise
+ * block that deletion).
+ */
+@Dao
+internal interface PhysicalObjectSequenceDao {
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertScope(row: PhysicalObjectSequenceEntity)
+
+    @Query("SELECT last_issued FROM physical_object_sequences WHERE territory_id = :territoryId AND object_type = :objectType")
+    suspend fun getLastIssued(territoryId: UUID, objectType: org.beesearch.app.domain.model.PhysicalObjectType): Int?
+
+    @Query("UPDATE physical_object_sequences SET last_issued = :lastIssued WHERE territory_id = :territoryId AND object_type = :objectType")
+    suspend fun setLastIssued(
+        territoryId: UUID,
+        objectType: org.beesearch.app.domain.model.PhysicalObjectType,
+        lastIssued: Int,
+    ): Int
+
+    @Query("DELETE FROM physical_object_sequences WHERE territory_id = :territoryId")
+    suspend fun deleteForTerritory(territoryId: UUID): Int
 }
 
 @Dao

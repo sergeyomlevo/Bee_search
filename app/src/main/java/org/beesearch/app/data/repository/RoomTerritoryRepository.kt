@@ -1,8 +1,10 @@
 package org.beesearch.app.data.repository
 
 import android.database.sqlite.SQLiteConstraintException
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.room.TerritoryDao
 import org.beesearch.app.data.local.room.TerritoryEntity
 import org.beesearch.app.data.local.room.toDomain
@@ -14,6 +16,7 @@ import java.time.Clock
 import java.util.UUID
 
 internal class RoomTerritoryRepository(
+    private val database: BeeSearchDatabase,
     private val territoryDao: TerritoryDao,
     private val clock: Clock,
 ) : TerritoryRepository {
@@ -73,8 +76,16 @@ internal class RoomTerritoryRepository(
         }
     }
 
-    override suspend fun deleteTerritory(id: UUID) {
+    /**
+     * Deletes an unused Territory together with the numbering state of its scopes.
+     *
+     * The sequence rows belong to the Territory by a `RESTRICT` foreign key, so they must be
+     * removed in the same transaction; leaving one behind would make an otherwise deletable
+     * Territory undeletable. Existing blockers (observation points, physical objects) are unchanged.
+     */
+    override suspend fun deleteTerritory(id: UUID) = database.withTransaction {
         ensureTerritoryCanBeDeleted(id)
+        database.physicalObjectSequenceDao().deleteForTerritory(id)
         if (territoryDao.deleteById(id) != 1) throw org.beesearch.app.domain.model.EntityNotFoundException("Territory")
     }
 

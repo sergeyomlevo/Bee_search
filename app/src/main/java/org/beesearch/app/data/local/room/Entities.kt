@@ -78,6 +78,33 @@ internal data class PhysicalObjectEntity(
     @ColumnInfo(name = "creator_observer_id") val creatorObserverId: UUID? = null,
 )
 
+/**
+ * The last sequence number issued in one numbering scope.
+ *
+ * The scope is `Territory + object_type`, so every concrete type numbers its objects independently
+ * inside every Territory. The row is persistent domain state, not a cache: it is the record that
+ * numbers `1..last_issued` were issued, and it survives the physical deletion of the objects that
+ * carried them. A scope without objects keeps its row, and `last_issued = 0` means "the next object
+ * gets 1" after an explicit reset. The row is created lazily by the first allocation.
+ */
+@Entity(
+    tableName = "physical_object_sequences",
+    foreignKeys = [ForeignKey(
+        entity = TerritoryEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["territory_id"],
+        onDelete = ForeignKey.RESTRICT,
+        onUpdate = ForeignKey.NO_ACTION,
+    )],
+    indices = [Index(value = ["territory_id"])],
+    primaryKeys = ["territory_id", "object_type"],
+)
+internal data class PhysicalObjectSequenceEntity(
+    @ColumnInfo(name = "territory_id") val territoryId: UUID,
+    @ColumnInfo(name = "object_type") val objectType: PhysicalObjectType,
+    @ColumnInfo(name = "last_issued") val lastIssued: Int,
+)
+
 @Entity(
     tableName = "hollows",
     foreignKeys = [ForeignKey(
