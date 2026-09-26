@@ -1,5 +1,34 @@
 # Bee Search handoff
 
+## Current release
+
+Beta `1.3.0-beta.4` (versionCode 7) was published locally from commit
+`434e319b` on clean `main` with the canonical workflow
+`tools/beta-release/beta_release.py`:
+
+- artifact: `C:\App\Bee_search_beta_releases\1.3.0-beta.4\bee-search-1.3.0-beta.4-434e319.apk`
+- SHA-256: `a1f6d88a5191472762e5722a7fab659eab1de4f8db4be24ae6da16ec5f9e9dcb`
+- package `org.beesearch.app.beta`, signing certificate unchanged
+  (`2fd4f10a…b654`), Stable and Dev were not touched, nothing was pushed.
+
+The Beta packages the help rework from `bdfbb340` `feat: rebuild the in-app help
+around user workflows`: the in-app help is now workflow-oriented and generated
+from `docs/ui/help/help-v2.md`. Its purpose is tester feedback on the help, so
+the declared image slots are deliberately still empty: no screenshots were added
+and no PDF exists.
+
+Release validation for this Beta: `:app:testDebugUnitTest` `375 tests / 0
+failures` (this includes the help source-drift check), `:app:assembleBeta` and
+`:app:lintBeta` pass (32 warnings, 0 errors), `beta_release.py --check-only`
+reports `PASS`, and the published APK was verified with `aapt` and `apksigner`
+(package, versionCode, versionName and certificate). No device installation was
+performed: the workflow verifies the artifact metadata itself, so the Beta is
+handed to testers as the archived APK.
+
+Next step: collect tester feedback about the help — where it does not say what
+to do, where it says too much, and where finding a control is hard without an
+image. Choose screenshots only after that feedback, then prepare the next Beta.
+
 ## Current milestone
 
 Safe physical object deletion, monotonic numbering and an explicit numbering
@@ -7,7 +36,8 @@ reset are implemented over the approved Objects UI and accepted by the owner,
 who also verified them manually on the phone.
 
 Last functional commit: `50c75b2e` `feat: add safe physical object deletion and
-numbering reset`. This handoff refresh is the only commit after it.
+numbering reset`; the help rework followed in `bdfbb340`, and `434e319b` only
+bumps the Beta version metadata.
 
 What is in place:
 
@@ -77,16 +107,18 @@ reset manually on the phone and confirmed that the behaviour matches the intent.
 
 ## Next task
 
-No active functional task for Physical Objects. Beta `1.3.0-beta.3` stays the
-current test build until a separate release decision; no push, Beta/Stable
-release or version change was made. Continue from commit `50c75b2e` on `main`.
+No active functional task. Beta `1.3.0-beta.4` (versionCode 7) is the current
+test build and its only purpose is the tester feedback round on the help, see
+«Current release» above. Continue from commit `434e319b` on `main`. Nothing was
+pushed, no release beyond this local Beta artifact was made, the product version
+`1.3.0` is unchanged and Stable was not touched.
 
 ## Previous milestone
 
-The approved `objects-ui-approved-v1` redesign was implemented over the Objects
-V1 foundation: compact directly editable azimuth with the production
-`HeadingProvider`, visual media thumbnails, adaptive control stacking, saved
-cards with hero preview, characteristics and provenance, and coordinate
-correction through one narrow repository/DAO update that changes only
-latitude/longitude for Hollow and LogHive. Room was v9 and Complete Backup v4 at
-that point; both were superseded by the current milestone.
+The in-app help was rebuilt around user workflows in `bdfbb340`: the canonical
+text lives in `docs/ui/help/help-v2.md`, the in-app content is generated from it
+and checked by a drift test, and the help now explains the first launch, the main
+map screen, the observation workflow, `Объекты`, дупла and колоды, the object
+card, deletion with the number rule, the numbering reset, offline against online
+behaviour and export. Before that, safe physical object deletion, monotonic
+numbering and the explicit numbering reset were implemented in `50c75b2e`.
