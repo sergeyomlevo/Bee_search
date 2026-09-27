@@ -470,6 +470,14 @@ internal val MIGRATION_9_10 = object : Migration(9, 10) {
     }
 }
 
+/** Adds an optional user-facing name to the Hollow and LogHive subtype records. */
+internal val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE hollows ADD COLUMN name TEXT")
+        db.execSQL("ALTER TABLE log_hives ADD COLUMN name TEXT")
+    }
+}
+
 private data class LegacyObservationPoint(
     val id: String,
     val territoryId: String,

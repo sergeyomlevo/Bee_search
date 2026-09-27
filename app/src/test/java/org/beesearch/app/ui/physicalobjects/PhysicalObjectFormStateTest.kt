@@ -26,6 +26,22 @@ class PhysicalObjectFormStateTest {
         ).validateHollow()
         assertTrue(result.isValid)
         assertNull(result.hollow!!.internalDiameterCm)
+        assertNull(result.name)
+    }
+
+    @Test
+    fun `optional name is trimmed and blank name becomes null`() {
+        val named = PhysicalObjectFormState(
+            name = "  У старого дуба  ", tree = "дуб", entranceHeightCm = "120",
+            azimuthDeg = "0", outerDiameterCm = "42",
+        ).validateHollow()
+        val unnamed = PhysicalObjectFormState(
+            name = "   ", tree = "дуб", entranceHeightCm = "120",
+            azimuthDeg = "0", outerDiameterCm = "42",
+        ).validateHollow()
+
+        assertEquals("У старого дуба", named.name)
+        assertNull(unnamed.name)
     }
 
     @Test
@@ -49,5 +65,6 @@ class PhysicalObjectFormStateTest {
         assertEquals("осина", result.logHive!!.tree)
         assertEquals("липа", result.logHive.material)
         assertEquals("заметка", result.logHive.notes)
+        assertNull(result.name)
     }
 }

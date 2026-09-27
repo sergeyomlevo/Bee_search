@@ -106,15 +106,16 @@ internal class PhysicalObjectCreationViewModel(
         }
     }
 
-    fun createHollow(properties: HollowProperties, onCreated: (UUID) -> Unit) =
-        create(properties, null, onCreated)
+    fun createHollow(properties: HollowProperties, name: String?, onCreated: (UUID) -> Unit) =
+        create(properties, null, name, onCreated)
 
-    fun createLogHive(properties: LogHiveProperties, onCreated: (UUID) -> Unit) =
-        create(null, properties, onCreated)
+    fun createLogHive(properties: LogHiveProperties, name: String?, onCreated: (UUID) -> Unit) =
+        create(null, properties, name, onCreated)
 
     private fun create(
         hollow: HollowProperties?,
         logHive: LogHiveProperties?,
+        name: String?,
         onCreated: (UUID) -> Unit,
     ) {
         if (_state.value.isWorking) return
@@ -139,6 +140,7 @@ internal class PhysicalObjectCreationViewModel(
                             longitude = target.longitude,
                             properties = requireNotNull(hollow),
                             media = media,
+                            name = name,
                         ),
                     )
                     PhysicalObjectType.LOG_HIVE -> repository.createLogHive(
@@ -150,6 +152,7 @@ internal class PhysicalObjectCreationViewModel(
                             longitude = target.longitude,
                             properties = requireNotNull(logHive),
                             media = media,
+                            name = name,
                         ),
                     )
                     PhysicalObjectType.APIARY -> error("Apiary creation is not part of this flow")

@@ -2707,7 +2707,7 @@ alias обозначения; cross-Territory identity и дедупликаци
 обычное удаление номера не освобождает, явный сброс нумерации и restore начинают новую линию
 состояния).
 
-Следующий свободный номер durable decision: **D091**.
+Следующий свободный номер durable decision: **D092**.
 
 ---
 
@@ -2740,6 +2740,9 @@ D086 semantics, version metadata и identity scope не меняются.
 Обновлено решением D090: Room v10 и Complete Backup v5 добавляют sequence state нумерации;
 reader поддерживает v1–v5. Identity, designation-правила и scope нумерации этого решения не
 меняются.
+
+Обновлено решением D091: Hollow/LogHive получают optional user `name`; Room v11 и Complete
+Backup v6 сохраняют его, reader поддерживает v1–v6. Name не меняет identity/designation.
 
 ---
 
@@ -2821,6 +2824,28 @@ Sequence state входит в Complete Backup как отдельная кол�
 только экспорт backup: отдельного restore flow, в котором можно было бы сравнить текущее и
 восстанавливаемое состояние нумерации и предупредить пользователя, нет, поэтому предупреждение
 не реализовано и добавляется вместе с будущим restore flow.
+
+---
+
+# D091 — Пользовательское название Дупла и Колоды
+
+**Статус:** ACCEPTED
+**Уточняет:** D088–D090 без изменения identity и numbering boundaries.
+
+`Hollow` и `LogHive` имеют nullable редактируемое пользовательское `name`. Оно хранится в
+соответствующей subtype-строке, не является identity, FK или designation, не обязано быть
+уникальным и может быть очищено. UUID и выводимое из `object_type + sequence_number`
+системное обозначение остаются независимыми и неизменяемыми; create, delete, high-water и
+явный reset нумерации не зависят от name.
+
+В списке и карточке заполненное name служит основной человеческой подписью, а designation
+остаётся видимым второй строкой. Без name показывается только designation. Отдельная naming
+entity, alias registry и история переименований не вводятся.
+
+Room schema v11 добавляет nullable `name TEXT` в `hollows` и `log_hives` миграцией v10→v11.
+Complete Backup v6 переносит эти поля; reader продолжает принимать V1–V5, где name считается
+отсутствующим. Повышение backup format не позволяет старому V5 writer молча потерять новое
+поле при повторном экспорте.
 
 ---
 

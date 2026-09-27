@@ -5,6 +5,7 @@ import org.beesearch.app.domain.model.LogHiveProperties
 
 /** Editable strings deliberately remain separate from persisted numeric values. */
 data class PhysicalObjectFormState(
+    val name: String = "",
     val tree: String = "",
     val entranceHeightCm: String = "",
     val azimuthDeg: String = "",
@@ -19,6 +20,7 @@ data class PhysicalObjectFormState(
 
 data class PhysicalObjectFormValidation(
     val errors: Map<String, String>,
+    val name: String? = null,
     val hollow: HollowProperties? = null,
     val logHive: LogHiveProperties? = null,
 ) {
@@ -36,6 +38,7 @@ fun PhysicalObjectFormState.validateHollow(): PhysicalObjectFormValidation {
     if (errors.isNotEmpty()) return PhysicalObjectFormValidation(errors)
     return PhysicalObjectFormValidation(
         errors = emptyMap(),
+        name = name.trim().ifEmpty { null },
         hollow = HollowProperties(treeValue, height!!, azimuth!!, outer!!, inner, notes.trim().ifEmpty { null }),
     )
 }
@@ -54,6 +57,7 @@ fun PhysicalObjectFormState.validateLogHive(): PhysicalObjectFormValidation {
     if (errors.isNotEmpty()) return PhysicalObjectFormValidation(errors)
     return PhysicalObjectFormValidation(
         errors = emptyMap(),
+        name = name.trim().ifEmpty { null },
         logHive = LogHiveProperties(
             treeValue, height!!, azimuth!!, outer!!, materialValue, inner!!, innerHeight!!,
             notes.trim().ifEmpty { null },

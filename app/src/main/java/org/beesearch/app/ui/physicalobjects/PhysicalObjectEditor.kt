@@ -75,7 +75,7 @@ fun HollowForm(
     showHeader: Boolean = true,
     isWorking: Boolean = false,
     message: String? = null,
-    onSubmit: (HollowProperties, List<PhysicalObjectMediaDraft>) -> Unit,
+    onSubmit: (HollowProperties, String?, List<PhysicalObjectMediaDraft>) -> Unit,
     onCancel: () -> Unit = {},
 ) = PhysicalObjectForm(
     title = title, submitLabel = submitLabel, state = initial, isLogHive = false,
@@ -84,7 +84,7 @@ fun HollowForm(
     onTakePhoto = onTakePhoto, onRemoveMedia = onRemoveMedia,
     showMediaActions = showMediaActions, showHeader = showHeader,
     isWorking = isWorking, message = message,
-    onSubmit = { result, items -> result.hollow?.let { onSubmit(it, items) } }, onCancel = onCancel,
+    onSubmit = { result, items -> result.hollow?.let { onSubmit(it, result.name, items) } }, onCancel = onCancel,
 )
 
 @Composable
@@ -103,7 +103,7 @@ fun LogHiveForm(
     showHeader: Boolean = true,
     isWorking: Boolean = false,
     message: String? = null,
-    onSubmit: (LogHiveProperties, List<PhysicalObjectMediaDraft>) -> Unit,
+    onSubmit: (LogHiveProperties, String?, List<PhysicalObjectMediaDraft>) -> Unit,
     onCancel: () -> Unit = {},
 ) = PhysicalObjectForm(
     title = title, submitLabel = submitLabel, state = initial, isLogHive = true,
@@ -112,7 +112,7 @@ fun LogHiveForm(
     onTakePhoto = onTakePhoto, onRemoveMedia = onRemoveMedia,
     showMediaActions = showMediaActions, showHeader = showHeader,
     isWorking = isWorking, message = message,
-    onSubmit = { result, items -> result.logHive?.let { onSubmit(it, items) } }, onCancel = onCancel,
+    onSubmit = { result, items -> result.logHive?.let { onSubmit(it, result.name, items) } }, onCancel = onCancel,
 )
 
 @Composable
@@ -158,6 +158,7 @@ private fun PhysicalObjectForm(
                 }
             }
         }
+        Field("Название", draft.name, "name", update, enabled = !isWorking) { draft.copy(name = it) }
         Field("Дерево", draft.tree, "tree", update, error = draft.errors["tree"], enabled = !isWorking) { draft.copy(tree = it) }
         HeadingField(heading, draft, update, enabled = !isWorking)
         Field("Высота летка над землёй, см", draft.entranceHeightCm, "entranceHeightCm", update, enabled = !isWorking, numeric = true, error = draft.errors["entranceHeightCm"]) { draft.copy(entranceHeightCm = it) }
@@ -233,7 +234,7 @@ private fun HeadingField(
     val display = live?.let { "$it° · ${azimuthSector(it)}" } ?: "Нет текущего азимута"
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Направление летка", style = MaterialTheme.typography.titleMedium)
-        Text("Направьте верх телефона в сторону летка", style = MaterialTheme.typography.bodySmall)
+        Text("Направьте верх телефона в ту сторону, куда направлен леток", style = MaterialTheme.typography.bodySmall)
         (heading as? HeadingState.Unavailable)?.let { Text(it.message) }
         if (accuracy == HeadingAccuracy.LOW || accuracy == HeadingAccuracy.UNRELIABLE) {
             Text("Точность компаса низкая", color = MaterialTheme.colorScheme.error)

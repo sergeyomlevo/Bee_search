@@ -1831,12 +1831,13 @@ ObservationPoint 2
 
 ---
 
-# 71.1. Долговечные физические объекты — Room schema v9 / v10
+# 71.1. Долговечные физические объекты — Room schema v9 / v10 / v11
 
-Принято решением D088, уточнено D089, дополнено D090. Room schema v9 реализует эту границу
+Принято решением D088, уточнено D089, дополнено D090 и D091. Room schema v9 реализует эту границу
 таблицами `physical_objects`, `apiaries`, `hollows`, `log_hives` и `physical_object_media`, а
 также nullable FK `bees.source_object_id`. Room schema v10 добавляет таблицу
-`physical_object_sequences` — persistent high-water mark нумерации каждого scope.
+`physical_object_sequences` — persistent high-water mark нумерации каждого scope. Room schema
+v11 добавляет nullable пользовательское `name` в subtype-таблицы Дупла и Колоды.
 
 ## Общая внутренняя identity-запись
 
@@ -1879,16 +1880,17 @@ name        String nullable
 
 `hollows.physical_object_id` — PK/FK → `physical_objects.id` (RESTRICT). Поля `tree`,
 `entrance_height_cm`, `entrance_azimuth_deg`, `outer_diameter_cm`, `internal_diameter_cm` и
-`notes` nullable на storage-уровне для сохранения исторических foundation rows; новый create
+`notes` и `name` nullable на storage-уровне для сохранения исторических foundation rows; новый create
 flow требует все общие обязательные поля, а internal diameter остаётся nullable.
+`name` — необязательная неуникальная пользовательская подпись, не identity и не designation.
 
 ## Subtype-таблица Колоды
 
 `log_hives.physical_object_id` — PK/FK → `physical_objects.id` (RESTRICT). Поля `tree`,
 `entrance_height_cm`, `entrance_azimuth_deg`, `outer_diameter_cm`, `material`,
-`internal_diameter_cm`, `internal_height_cm` и `notes` nullable на storage-уровне для
+`internal_diameter_cm`, `internal_height_cm`, `notes` и `name` nullable на storage-уровне для
 исторических rows; новый create flow требует все перечисленные конструктивные поля, кроме
-optional notes.
+optional notes и name. `name` не является identity, designation или unique key.
 
 ## Медиа физического объекта
 
@@ -1920,6 +1922,10 @@ Bootstrap `last_issued = MAX(sequence_number)` корректен, потому 
 живых строк — максимальный когда-либо выданный номер. Scope без объектов строка не получает
 (эквивалент `last_issued = 0`), существующие identity, обозначения, координаты и связи не
 меняются.
+
+Migration `v10 → v11` добавляет nullable `name TEXT` в `hollows` и `log_hives`. Существующие
+строки получают `null`; таблицы identity и sequence state не перестраиваются, поэтому UUID,
+designation, provenance и high-water marks сохраняются без изменений.
 
 ## Связь Bee → объект
 

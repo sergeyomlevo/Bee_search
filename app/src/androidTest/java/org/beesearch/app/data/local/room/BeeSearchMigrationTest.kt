@@ -711,6 +711,61 @@ class BeeSearchMigrationTest {
         migrated.close()
     }
 
+    @Test
+    fun migrationFromTenToElevenAddsNullNamesAndPreservesIdentityAndSequenceState() {
+        val databaseName = "$DATABASE_NAME-10-11"
+        val territoryId = UUID.randomUUID().toString()
+        val observerId = UUID.randomUUID().toString()
+        val hollowId = UUID.randomUUID().toString()
+        val logHiveId = UUID.randomUUID().toString()
+        val timestamp = Instant.parse("2026-09-27T08:00:00Z").toEpochMilli()
+        migrationHelper.createDatabase(databaseName, 10).apply {
+            execSQL("INSERT INTO territories VALUES (?, 'TA', 'A', 'R', 'D', ?, ?)", arrayOf<Any>(territoryId, timestamp, timestamp))
+            execSQL("INSERT INTO observers VALUES (?, 'OBS', 'Last', 'First', NULL, NULL, ?, ?)", arrayOf<Any>(observerId, timestamp, timestamp))
+            execSQL(
+                "INSERT INTO physical_objects VALUES (?, ?, 'HOLLOW', 7, 56.1, 42.7, ?, ?)",
+                arrayOf<Any>(hollowId, territoryId, timestamp, observerId),
+            )
+            execSQL(
+                "INSERT INTO physical_objects VALUES (?, ?, 'LOG_HIVE', 4, 56.2, 42.8, ?, ?)",
+                arrayOf<Any>(logHiveId, territoryId, timestamp, observerId),
+            )
+            execSQL("INSERT INTO hollows VALUES (?, 'дуб', 180.0, 123, 40.0, 25.0, 'note')", arrayOf<Any>(hollowId))
+            execSQL("INSERT INTO log_hives VALUES (?, 'сосна', 150.0, 90, 50.0, 'липа', 30.0, 80.0, 'note')", arrayOf<Any>(logHiveId))
+            execSQL("INSERT INTO physical_object_sequences VALUES (?, 'HOLLOW', 9)", arrayOf<Any>(territoryId))
+            execSQL("INSERT INTO physical_object_sequences VALUES (?, 'LOG_HIVE', 6)", arrayOf<Any>(territoryId))
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(databaseName, 11, true, MIGRATION_10_11)
+
+        migrated.query("SELECT name, tree FROM hollows WHERE physical_object_id = ?", arrayOf(hollowId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue(cursor.isNull(0))
+            assertEquals("дуб", cursor.getString(1))
+        }
+        migrated.query("SELECT name, material FROM log_hives WHERE physical_object_id = ?", arrayOf(logHiveId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue(cursor.isNull(0))
+            assertEquals("липа", cursor.getString(1))
+        }
+        migrated.query("SELECT object_type, sequence_number, creator_observer_id FROM physical_objects ORDER BY sequence_number DESC").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("HOLLOW", cursor.getString(0))
+            assertEquals(7, cursor.getInt(1))
+            assertEquals(observerId, cursor.getString(2))
+            assertTrue(cursor.moveToNext())
+            assertEquals("LOG_HIVE", cursor.getString(0))
+            assertEquals(4, cursor.getInt(1))
+            assertEquals(observerId, cursor.getString(2))
+        }
+        migrated.query("SELECT SUM(last_issued) FROM physical_object_sequences").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(15, cursor.getInt(0))
+        }
+        migrated.close()
+    }
+
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertObject(
         territoryId: String,
         objectType: String,

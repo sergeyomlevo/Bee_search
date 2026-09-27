@@ -108,7 +108,7 @@ internal class BackupService(
         validateGraph(graph)
         val portable = settings.snapshot()
         validateSettings(portable, graph)
-        val blobs = blobsV5(graph, portable, attachmentStore, objectMediaStore)
+        val blobs = blobsV6(graph, portable, attachmentStore, objectMediaStore)
         val id = UUID.randomUUID()
         output.parentFile?.mkdirs()
         ZipOutputStream(BufferedOutputStream(FileOutputStream(output))).use { zip ->
@@ -338,7 +338,7 @@ private fun blobsV3(
     return result
 }
 
-private fun blobsV5(
+private fun blobsV6(
     graph: Graph,
     settings: PortableSettingsSnapshot,
     attachmentStore: ObservationAttachmentFileStore?,
@@ -346,7 +346,7 @@ private fun blobsV5(
 ): List<Blob> {
     fun rows(name: String, values: List<String>): Blob {
         val text = values.joinToString("\n", postfix = if (values.isEmpty()) "" else "\n")
-        return Blob(name, BackupContractV5.collections.getValue(name), text.toByteArray(StandardCharsets.UTF_8), values.size)
+        return Blob(name, BackupContractV6.collections.getValue(name), text.toByteArray(StandardCharsets.UTF_8), values.size)
     }
     val weatherByPoint = graph.weather.associateBy { it.observationPointId }
     val weatherRows = graph.points.map { point -> weatherByPoint[point.id] ?: ObservationPointWeatherEntity(point.id, WeatherStatus.PENDING, null, null, null, null, null, null) }
@@ -354,8 +354,8 @@ private fun blobsV5(
         rows("territories", graph.territories.sortedBy { it.id.toString() }.map { it.json() }),
         rows("observers", graph.observers.sortedBy { it.id.toString() }.map { it.json() }),
         rows("physical-objects", graph.physicalObjects.sortedBy { it.id.toString() }.map { it.jsonV4() }),
-        rows("hollows", graph.hollows.sortedBy { it.physicalObjectId.toString() }.map { it.json() }),
-        rows("log-hives", graph.logHives.sortedBy { it.physicalObjectId.toString() }.map { it.json() }),
+        rows("hollows", graph.hollows.sortedBy { it.physicalObjectId.toString() }.map { it.jsonV6() }),
+        rows("log-hives", graph.logHives.sortedBy { it.physicalObjectId.toString() }.map { it.jsonV6() }),
         rows("physical-object-media", graph.objectMedia.sortedBy { it.id.toString() }.map { it.json() }),
         rows("apiaries", graph.apiaries.sortedBy { it.physicalObjectId.toString() }.map { it.json() }),
         rows("physical-object-sequences", graph.sequences.sortedBy { it.territoryId.toString() + it.objectType.name }.map { it.json() }),
@@ -371,7 +371,7 @@ private fun blobsV5(
         val store = attachmentStore ?: throw MalformedBackup("attachment storage is not configured")
         val file = store.resolve(attachment.relativePath)
         if (!file.isFile || file.length() != attachment.byteSize || sha256(file) != attachment.sha256) throw BackupIntegrityMismatch("attachment file mismatch")
-        val path = "${BackupContractV4.ATTACHMENT_PREFIX}${attachment.observationPointId}/${attachment.id}"
+        val path = "${BackupContractV6.ATTACHMENT_PREFIX}${attachment.observationPointId}/${attachment.id}"
         result += Blob("attachment-file:${attachment.id}", path, file.readBytes(), 1)
     }
     graph.objectMedia.sortedBy { it.id.toString() }.forEach { media ->
@@ -380,16 +380,16 @@ private fun blobsV5(
         validatePathName(media.relativePath)
         domain(media.relativePath == PhysicalObjectMediaFileStore.relativePath(media.physicalObjectId, media.id), "object media path is not deterministic")
         if (!file.isFile || file.length() != media.byteSize || sha256(file) != media.sha256) throw BackupIntegrityMismatch("object media file mismatch")
-        val path = "${BackupContractV4.OBJECT_MEDIA_PREFIX}${media.physicalObjectId}/${media.id}"
+        val path = "${BackupContractV6.OBJECT_MEDIA_PREFIX}${media.physicalObjectId}/${media.id}"
         result += Blob("object-media-file:${media.id}", path, file.readBytes(), 1)
     }
     return result
 }
 
 private fun manifest(id: UUID, created: Instant, appVersion: String, blobs: List<Blob>) = obj(
-    "backupFormatVersion" to "5", "archiveSchemaVersion" to "5", "archiveId" to j(id),
+    "backupFormatVersion" to "6", "archiveSchemaVersion" to "6", "archiveId" to j(id),
     "createdAt" to created.toEpochMilli().toString(), "sourceAppVersion" to j(appVersion),
-    "roomSchemaVersion" to "10", "profile" to j(BackupContractV5.PROFILE),
+    "roomSchemaVersion" to "11", "profile" to j(BackupContractV6.PROFILE),
     "collections" to blobs.joinToString(",", "[", "]") { obj(
         "name" to j(it.name), "path" to j(it.path), "collectionSchemaVersion" to "1", "required" to "true",
         "recordCount" to it.count.toString(), "byteLength" to it.bytes.size.toString(), "sha256" to j(sha256(it.bytes)),
@@ -400,14 +400,15 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
     val manifest = objectFrom(entries[MANIFEST] ?: throw MissingBackupCollection(MANIFEST), "manifest")
     val format = manifest.int("backupFormatVersion")
     val schema = manifest.int("archiveSchemaVersion")
-    if (format !in 1..5) throw UnsupportedBackupFormat("unsupported backup format")
+    if (format !in 1..6) throw UnsupportedBackupFormat("unsupported backup format")
     if (schema != format) throw UnsupportedArchiveSchema("unsupported archive schema")
     val contract = when (format) {
         1 -> BackupContractV1.collections
         2 -> BackupContractV2.collections
         3 -> BackupContractV3.collections
         4 -> BackupContractV4.collections
-        else -> BackupContractV5.collections
+        5 -> BackupContractV5.collections
+        else -> BackupContractV6.collections
     }
     val archiveId = manifest.uuid("archiveId"); manifest.long("createdAt")
     if (manifest.string("sourceAppVersion").isBlank()) throw MalformedBackup("blank sourceAppVersion")
@@ -426,7 +427,7 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
         if (name !in contract) {
             if ((format >= 2 && name.startsWith("attachment-file:")) || (format >= 4 && name.startsWith("object-media-file:"))) {
                 val path = item.string("path")
-                val validPrefix = if (name.startsWith("object-media-file:")) BackupContractV5.OBJECT_MEDIA_PREFIX else BackupContractV2.ATTACHMENT_PREFIX
+                val validPrefix = if (name.startsWith("object-media-file:")) BackupContractV6.OBJECT_MEDIA_PREFIX else BackupContractV2.ATTACHMENT_PREFIX
                 if (!path.startsWith(validPrefix)) throw MalformedBackup("unsafe attachment path")
                 validatePathName(path)
                 if (!describedPaths.add(path)) throw MalformedBackup("duplicate collection path $path")
@@ -469,8 +470,8 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
         territories = objects("territories").map(::territory),
         observers = objects("observers").map(::observer),
         physicalObjects = if (format >= 3) objects("physical-objects").map { if (format >= 4) physicalObjectV4(it) else physicalObject(it) } else emptyList(),
-        hollows = if (format >= 4) objects("hollows").map(::hollow) else emptyList(),
-        logHives = if (format >= 4) objects("log-hives").map(::logHive) else emptyList(),
+        hollows = if (format >= 4) objects("hollows").map { hollow(it, format >= 6) } else emptyList(),
+        logHives = if (format >= 4) objects("log-hives").map { logHive(it, format >= 6) } else emptyList(),
         objectMedia = if (format >= 4) objects("physical-object-media").map(::objectMedia) else emptyList(),
         sequences = if (format >= 5) objects("physical-object-sequences").map(::sequence) else emptyList(),
         apiaries = if (format >= 3) objects("apiaries").map(::apiary) else emptyList(),
@@ -713,8 +714,8 @@ private fun observer(o: JsonObject) = ObserverEntity(o.uuid("id"), o.string("cod
 private fun physicalObject(o: JsonObject) = PhysicalObjectEntity(o.uuid("id"), o.uuid("territoryId"), o.enum("objectType"), o.int("sequenceNumber"), o.double("latitude"), o.double("longitude"), o.instant("createdAt"))
 private fun physicalObjectV4(o: JsonObject) = PhysicalObjectEntity(o.uuid("id"), o.uuid("territoryId"), o.enum("objectType"), o.int("sequenceNumber"), o.double("latitude"), o.double("longitude"), o.instant("createdAt"), o.optionalUuid("creatorObserverId"))
 private fun nullablePositive(o: JsonObject, name: String): Double? = o.optionalDouble(name)
-private fun hollow(o: JsonObject) = HollowEntity(o.uuid("physicalObjectId"), o.optionalString("tree"), nullablePositive(o, "entranceHeightCm"), o.field("entranceAzimuthDeg").let { if (it is JsonNull) null else o.int("entranceAzimuthDeg") }, nullablePositive(o, "outerDiameterCm"), nullablePositive(o, "internalDiameterCm"), o.optionalString("notes"))
-private fun logHive(o: JsonObject) = LogHiveEntity(o.uuid("physicalObjectId"), o.optionalString("tree"), nullablePositive(o, "entranceHeightCm"), o.field("entranceAzimuthDeg").let { if (it is JsonNull) null else o.int("entranceAzimuthDeg") }, nullablePositive(o, "outerDiameterCm"), o.optionalString("material"), nullablePositive(o, "internalDiameterCm"), nullablePositive(o, "internalHeightCm"), o.optionalString("notes"))
+private fun hollow(o: JsonObject, hasName: Boolean) = HollowEntity(o.uuid("physicalObjectId"), o.optionalString("tree"), nullablePositive(o, "entranceHeightCm"), o.field("entranceAzimuthDeg").let { if (it is JsonNull) null else o.int("entranceAzimuthDeg") }, nullablePositive(o, "outerDiameterCm"), nullablePositive(o, "internalDiameterCm"), o.optionalString("notes"), if (hasName) o.optionalString("name") else null)
+private fun logHive(o: JsonObject, hasName: Boolean) = LogHiveEntity(o.uuid("physicalObjectId"), o.optionalString("tree"), nullablePositive(o, "entranceHeightCm"), o.field("entranceAzimuthDeg").let { if (it is JsonNull) null else o.int("entranceAzimuthDeg") }, nullablePositive(o, "outerDiameterCm"), o.optionalString("material"), nullablePositive(o, "internalDiameterCm"), nullablePositive(o, "internalHeightCm"), o.optionalString("notes"), if (hasName) o.optionalString("name") else null)
 private fun objectMedia(o: JsonObject) = PhysicalObjectMediaEntity(o.uuid("id"), o.uuid("physicalObjectId"), o.enum("type"), o.string("relativePath"), o.optionalString("originalFileName"), o.optionalString("mimeType"), o.long("byteSize"), o.string("sha256"), o.instant("createdAt"))
 private fun apiary(o: JsonObject) = ApiaryEntity(o.uuid("physicalObjectId"), o.optionalString("name"))
 private fun sequence(o: JsonObject) = PhysicalObjectSequenceEntity(o.uuid("territoryId"), o.enum("objectType"), o.int("lastIssued"))
@@ -759,8 +760,8 @@ private fun TerritoryEntity.json() = obj("id" to j(id), "code" to j(code), "name
 private fun ObserverEntity.json() = obj("id" to j(id), "code" to j(code), "lastName" to j(lastName), "firstName" to j(firstName), "middleName" to j(middleName), "contact" to j(contact), "createdAt" to j(createdAt), "updatedAt" to j(updatedAt))
 private fun PhysicalObjectEntity.json() = obj("id" to j(id), "territoryId" to j(territoryId), "objectType" to j(objectType.name), "sequenceNumber" to sequenceNumber.toString(), "latitude" to latitude.toString(), "longitude" to longitude.toString(), "createdAt" to j(createdAt))
 private fun PhysicalObjectEntity.jsonV4() = obj("id" to j(id), "territoryId" to j(territoryId), "objectType" to j(objectType.name), "sequenceNumber" to sequenceNumber.toString(), "latitude" to latitude.toString(), "longitude" to longitude.toString(), "createdAt" to j(createdAt), "creatorObserverId" to j(creatorObserverId))
-private fun HollowEntity.json() = obj("physicalObjectId" to j(physicalObjectId), "tree" to j(tree), "entranceHeightCm" to (entranceHeightCm?.toString() ?: "null"), "entranceAzimuthDeg" to (entranceAzimuthDeg?.toString() ?: "null"), "outerDiameterCm" to (outerDiameterCm?.toString() ?: "null"), "internalDiameterCm" to (internalDiameterCm?.toString() ?: "null"), "notes" to j(notes))
-private fun LogHiveEntity.json() = obj("physicalObjectId" to j(physicalObjectId), "tree" to j(tree), "entranceHeightCm" to (entranceHeightCm?.toString() ?: "null"), "entranceAzimuthDeg" to (entranceAzimuthDeg?.toString() ?: "null"), "outerDiameterCm" to (outerDiameterCm?.toString() ?: "null"), "material" to j(material), "internalDiameterCm" to (internalDiameterCm?.toString() ?: "null"), "internalHeightCm" to (internalHeightCm?.toString() ?: "null"), "notes" to j(notes))
+private fun HollowEntity.jsonV6() = obj("physicalObjectId" to j(physicalObjectId), "tree" to j(tree), "entranceHeightCm" to (entranceHeightCm?.toString() ?: "null"), "entranceAzimuthDeg" to (entranceAzimuthDeg?.toString() ?: "null"), "outerDiameterCm" to (outerDiameterCm?.toString() ?: "null"), "internalDiameterCm" to (internalDiameterCm?.toString() ?: "null"), "notes" to j(notes), "name" to j(name))
+private fun LogHiveEntity.jsonV6() = obj("physicalObjectId" to j(physicalObjectId), "tree" to j(tree), "entranceHeightCm" to (entranceHeightCm?.toString() ?: "null"), "entranceAzimuthDeg" to (entranceAzimuthDeg?.toString() ?: "null"), "outerDiameterCm" to (outerDiameterCm?.toString() ?: "null"), "material" to j(material), "internalDiameterCm" to (internalDiameterCm?.toString() ?: "null"), "internalHeightCm" to (internalHeightCm?.toString() ?: "null"), "notes" to j(notes), "name" to j(name))
 private fun PhysicalObjectMediaEntity.json() = obj("id" to j(id), "physicalObjectId" to j(physicalObjectId), "type" to j(type.name), "relativePath" to j(relativePath), "originalFileName" to j(originalFileName), "mimeType" to j(mimeType), "byteSize" to byteSize.toString(), "sha256" to j(sha256), "createdAt" to j(createdAt))
 private fun ApiaryEntity.json() = obj("physicalObjectId" to j(physicalObjectId), "name" to j(name))
 private fun PhysicalObjectSequenceEntity.json() = obj("territoryId" to j(territoryId), "objectType" to j(objectType.name), "lastIssued" to lastIssued.toString())

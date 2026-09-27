@@ -69,12 +69,12 @@ internal class PhysicalObjectDetailViewModel(
         if (!_state.value.isWorking) _state.value = _state.value.copy(form = form, error = null)
     }
 
-    fun saveHollow(properties: HollowProperties) = save {
-        PhysicalObjectDetailValue.HollowValue(repository.updateHollow(objectId, properties))
+    fun saveHollow(properties: HollowProperties, name: String?) = save {
+        PhysicalObjectDetailValue.HollowValue(repository.updateHollow(objectId, properties, name))
     }
 
-    fun saveLogHive(properties: LogHiveProperties) = save {
-        PhysicalObjectDetailValue.LogHiveValue(repository.updateLogHive(objectId, properties))
+    fun saveLogHive(properties: LogHiveProperties, name: String?) = save {
+        PhysicalObjectDetailValue.LogHiveValue(repository.updateLogHive(objectId, properties, name))
     }
 
     fun updateCoordinates(latitude: Double, longitude: Double) {
@@ -129,6 +129,7 @@ internal class PhysicalObjectDetailViewModel(
 private fun PhysicalObjectDetailValue.toFormState(): PhysicalObjectFormState = when (this) {
     is PhysicalObjectDetailValue.HollowValue -> value.properties?.let { properties ->
         PhysicalObjectFormState(
+            name = value.name.orEmpty(),
             tree = properties.tree,
             entranceHeightCm = properties.entranceHeightCm.toInput(),
             azimuthDeg = properties.entranceAzimuthDeg.toString(),
@@ -139,6 +140,7 @@ private fun PhysicalObjectDetailValue.toFormState(): PhysicalObjectFormState = w
     } ?: PhysicalObjectFormState()
     is PhysicalObjectDetailValue.LogHiveValue -> value.properties?.let { properties ->
         PhysicalObjectFormState(
+            name = value.name.orEmpty(),
             tree = properties.tree,
             entranceHeightCm = properties.entranceHeightCm.toInput(),
             azimuthDeg = properties.entranceAzimuthDeg.toString(),

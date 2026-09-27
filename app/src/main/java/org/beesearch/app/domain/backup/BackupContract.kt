@@ -115,6 +115,17 @@ internal object BackupContractV5 {
     const val ATTACHMENT_PREFIX = BackupContractV4.ATTACHMENT_PREFIX
     const val OBJECT_MEDIA_PREFIX = BackupContractV4.OBJECT_MEDIA_PREFIX
 }
+
+/** Complete backup schema carrying optional user names for Hollow and LogHive records. */
+internal object BackupContractV6 {
+    const val FORMAT = 6
+    const val SCHEMA = 6
+    const val PROFILE = BackupContractV1.PROFILE
+    val collections = BackupContractV5.collections
+
+    const val ATTACHMENT_PREFIX = BackupContractV5.ATTACHMENT_PREFIX
+    const val OBJECT_MEDIA_PREFIX = BackupContractV5.OBJECT_MEDIA_PREFIX
+}
 internal sealed class BackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
 internal class UnsupportedBackupFormat(message: String) : BackupException(message)
 internal class UnsupportedArchiveSchema(message: String) : BackupException(message)

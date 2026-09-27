@@ -123,6 +123,7 @@ internal data class HollowEntity(
     @ColumnInfo(name = "outer_diameter_cm") val outerDiameterCm: Double?,
     @ColumnInfo(name = "internal_diameter_cm") val internalDiameterCm: Double?,
     val notes: String?,
+    val name: String? = null,
 )
 
 @Entity(
@@ -145,6 +146,7 @@ internal data class LogHiveEntity(
     @ColumnInfo(name = "internal_diameter_cm") val internalDiameterCm: Double?,
     @ColumnInfo(name = "internal_height_cm") val internalHeightCm: Double?,
     val notes: String?,
+    val name: String? = null,
 )
 
 @Entity(

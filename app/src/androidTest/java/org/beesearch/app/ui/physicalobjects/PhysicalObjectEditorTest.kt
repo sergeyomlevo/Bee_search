@@ -36,6 +36,7 @@ class PhysicalObjectEditorTest {
     @Test
     fun hollowShowsLiveCompassFixesHeadingAndAllowsManualReplacement() {
         var submitted: HollowProperties? = null
+        var submittedName: String? = null
         val heading = HeadingProvider {
             flowOf(HeadingState.Available(123, HeadingAccuracy.LOW, Instant.EPOCH))
         }
@@ -43,24 +44,28 @@ class PhysicalObjectEditorTest {
             Bee_searchTheme {
                 HollowForm(
                     headingProvider = heading,
-                    onSubmit = { properties, _ -> submitted = properties },
+                    onSubmit = { properties, name, _ -> submitted = properties; submittedName = name },
                 )
             }
         }
 
         composeRule.onNodeWithTag("physical-object-live-azimuth")
             .assertTextContains("Текущее: 123° · ЮВ")
-        composeRule.onNodeWithText("Направьте верх телефона в сторону летка").assertIsDisplayed()
+        composeRule.onNodeWithText("Направьте верх телефона в ту сторону, куда направлен леток").assertIsDisplayed()
         composeRule.onNodeWithText("Точность компаса низкая").assertIsDisplayed()
         composeRule.onNodeWithTag("physical-object-fix-azimuth").performClick()
         composeRule.onNodeWithTag("physical-object-manual-azimuth")
             .performTextReplacement("321")
+        composeRule.onNodeWithTag("physical-object-field-name").performTextInput("  У старого дуба  ")
         composeRule.onNodeWithTag("physical-object-field-tree").performTextInput("дуб")
         composeRule.onNodeWithTag("physical-object-field-entranceHeightCm").performTextInput("180")
         composeRule.onNodeWithTag("physical-object-field-outerDiameterCm").performTextInput("40")
         composeRule.onNodeWithTag("physical-object-create").performScrollTo().performClick()
 
-        composeRule.runOnIdle { assertEquals(321, submitted?.entranceAzimuthDeg) }
+        composeRule.runOnIdle {
+            assertEquals(321, submitted?.entranceAzimuthDeg)
+            assertEquals("У старого дуба", submittedName)
+        }
     }
 
     @Test
@@ -72,7 +77,7 @@ class PhysicalObjectEditorTest {
             Bee_searchTheme {
                 HollowForm(
                     headingProvider = HeadingProvider { headings },
-                    onSubmit = { _, _ -> },
+                    onSubmit = { _, _, _ -> },
                 )
             }
         }
@@ -101,7 +106,7 @@ class PhysicalObjectEditorTest {
                         PhysicalObjectMediaDraft(secondId, "two.mp4", isVideo = true),
                     ),
                     onRemoveMedia = { removed = it },
-                    onSubmit = { _, _ -> },
+                    onSubmit = { _, _, _ -> },
                 )
             }
         }
@@ -119,7 +124,7 @@ class PhysicalObjectEditorTest {
         var submitCount = 0
         composeRule.setContent {
             Bee_searchTheme {
-                HollowForm(onSubmit = { _, _ -> submitCount++ })
+                HollowForm(onSubmit = { _, _, _ -> submitCount++ })
             }
         }
 
@@ -135,7 +140,7 @@ class PhysicalObjectEditorTest {
         var submitted: LogHiveProperties? = null
         composeRule.setContent {
             Bee_searchTheme {
-                LogHiveForm(onSubmit = { properties, _ -> submitted = properties })
+                LogHiveForm(onSubmit = { properties, _, _ -> submitted = properties })
             }
         }
 
@@ -165,7 +170,7 @@ class PhysicalObjectEditorTest {
         composeRule.setContent {
             Bee_searchTheme {
                 HollowForm(
-                    onSubmit = { _, _ -> submitted = true },
+                    onSubmit = { _, _, _ -> submitted = true },
                     onCancel = { cancelled = true },
                 )
             }

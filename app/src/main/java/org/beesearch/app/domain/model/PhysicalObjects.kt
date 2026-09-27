@@ -77,6 +77,7 @@ data class NewHollow(
     val longitude: Double,
     val properties: HollowProperties,
     val media: List<PhysicalObjectMedia> = emptyList(),
+    val name: String? = null,
 )
 
 data class NewLogHive(
@@ -87,6 +88,7 @@ data class NewLogHive(
     val longitude: Double,
     val properties: LogHiveProperties,
     val media: List<PhysicalObjectMedia> = emptyList(),
+    val name: String? = null,
 )
 
 data class Hollow(
@@ -99,6 +101,7 @@ data class Hollow(
     val creatorObserverId: UUID?,
     val properties: HollowProperties?,
     val media: List<PhysicalObjectMedia> = emptyList(),
+    val name: String? = null,
 ) {
     val designation: String get() = PhysicalObjectType.HOLLOW.designation(sequenceNumber)
 }
@@ -113,6 +116,7 @@ data class LogHive(
     val creatorObserverId: UUID?,
     val properties: LogHiveProperties?,
     val media: List<PhysicalObjectMedia> = emptyList(),
+    val name: String? = null,
 ) {
     val designation: String get() = PhysicalObjectType.LOG_HIVE.designation(sequenceNumber)
 }

@@ -2091,8 +2091,10 @@ nullable creator. Creation media хранятся нормализованно �
 app-owned files, типом image/video, размером и hash. Это отдельная граница от будущей
 Inspection media.
 
-Room schema v9 и Complete Backup v4 переносят subtype, creator и object media, при этом
-backup reader сохраняет поддержку v1–v3. Track/GPX и Inspection остаются deferred.
+Room schema v11 хранит optional user `name` прямо в subtype-строках Hollow/LogHive; migration
+из v10 добавляет только nullable columns. Complete Backup v6 переносит эти имена и сохраняет
+чтение v1–v5. Identity, sequence state и media architecture не меняются. Track/GPX и
+Inspection остаются deferred.
 
 # 74. Критерий правильности архитектуры
 

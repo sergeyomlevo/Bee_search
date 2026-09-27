@@ -71,8 +71,8 @@ interface PhysicalObjectRepository {
     suspend fun getLogHive(id: UUID): LogHive?
     suspend fun getApiary(id: UUID): Apiary?
     suspend fun listForTerritory(territoryId: UUID): TerritoryPhysicalObjects
-    suspend fun updateHollow(id: UUID, properties: HollowProperties): Hollow
-    suspend fun updateLogHive(id: UUID, properties: LogHiveProperties): LogHive
+    suspend fun updateHollow(id: UUID, properties: HollowProperties, name: String? = null): Hollow
+    suspend fun updateLogHive(id: UUID, properties: LogHiveProperties, name: String? = null): LogHive
     suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double)
 
     /**

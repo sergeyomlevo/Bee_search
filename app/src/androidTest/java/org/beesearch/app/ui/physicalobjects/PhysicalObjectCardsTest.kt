@@ -99,6 +99,24 @@ class PhysicalObjectCardsTest {
     }
 
     @Test
+    fun namedObjectUsesNameAndKeepsDesignationWhileUnnamedUsesDesignationOnly() {
+        val named = hollow(1).copy(name = "У старого дуба")
+        val unnamed = hollow(2)
+        composeRule.setContent { Bee_searchTheme {
+            PhysicalObjectsBrowser(
+                type = PhysicalObjectType.HOLLOW,
+                hollows = listOf(named, unnamed),
+                logHives = emptyList(),
+                onOpen = {},
+            )
+        } }
+
+        composeRule.onNodeWithText("У старого дуба").assertIsDisplayed()
+        composeRule.onNodeWithText("Дупло 1").assertIsDisplayed()
+        composeRule.onNodeWithText("Дупло 2").assertIsDisplayed()
+    }
+
+    @Test
     fun logHivesListShowsOnlyLogHivesAndNoRepeatedTypeLine() {
         val hollow = hollow(1)
         val logHive = logHive(1)

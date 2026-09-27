@@ -113,6 +113,53 @@ class RoomPhysicalObjectRepositoryTest {
     }
 
     @Test
+    fun hollowNameIsOptionalEditableNonUniqueAndDoesNotChangeIdentity() = runBlocking {
+        val first = repository.createHollow(
+            NewHollow(UUID.randomUUID(), territory1, creatorObserverId, 56.1, 42.7, hollowProperties(), name = "У дороги"),
+        )
+        val second = repository.createHollow(
+            NewHollow(UUID.randomUUID(), territory1, creatorObserverId, 56.2, 42.8, hollowProperties(), name = "У дороги"),
+        )
+        val unnamed = repository.createHollow(
+            NewHollow(UUID.randomUUID(), territory1, creatorObserverId, 56.3, 42.9, hollowProperties()),
+        )
+
+        assertEquals("У дороги", first.name)
+        assertEquals(first.name, second.name)
+        assertNull(unnamed.name)
+        val renamed = repository.updateHollow(first.id, first.properties!!, "  У старого дуба  ")
+        assertEquals("У старого дуба", renamed.name)
+        assertEquals(first.copy(name = "У старого дуба"), renamed)
+        val cleared = repository.updateHollow(first.id, first.properties, "   ")
+        assertNull(cleared.name)
+        assertEquals(first.id, cleared.id)
+        assertEquals(first.designation, cleared.designation)
+    }
+
+    @Test
+    fun logHiveNameIsOptionalEditableNonUniqueAndDoesNotChangeIdentity() = runBlocking {
+        val first = repository.createLogHive(
+            NewLogHive(UUID.randomUUID(), territory1, creatorObserverId, 56.1, 42.7, logHiveProperties(), name = "У дороги"),
+        )
+        val second = repository.createLogHive(
+            NewLogHive(UUID.randomUUID(), territory1, creatorObserverId, 56.2, 42.8, logHiveProperties(), name = "У дороги"),
+        )
+        val unnamed = repository.createLogHive(
+            NewLogHive(UUID.randomUUID(), territory1, creatorObserverId, 56.3, 42.9, logHiveProperties()),
+        )
+
+        assertEquals(first.name, second.name)
+        assertNull(unnamed.name)
+        val renamed = repository.updateLogHive(first.id, first.properties!!, "Новая колода")
+        assertEquals("Новая колода", renamed.name)
+        assertEquals(first.copy(name = "Новая колода"), renamed)
+        val cleared = repository.updateLogHive(first.id, first.properties, null)
+        assertNull(cleared.name)
+        assertEquals(first.id, cleared.id)
+        assertEquals(first.designation, cleared.designation)
+    }
+
+    @Test
     fun coordinateEditChangesOnlyCoordinatesAndPreservesIdentityFacts() = runBlocking {
         val hollowId = UUID.randomUUID()
         val media = PhysicalObjectMedia(

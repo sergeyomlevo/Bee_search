@@ -45,7 +45,7 @@ internal class RoomPhysicalObjectRepository(
     override suspend fun createHollow(value: NewHollow): Hollow = database.withTransaction {
         validateMedia(value.id, value.media)
         val identity = newIdentity(value.id, value.territoryId, value.creatorObserverId, PhysicalObjectType.HOLLOW, value.latitude, value.longitude)
-        val subtype = value.properties.toEntity(value.id)
+        val subtype = value.properties.toEntity(value.id, normalizeName(value.name))
         objectDao.insertObject(identity)
         objectDao.insertHollow(subtype)
         objectDao.insertMedia(value.media.map(PhysicalObjectMedia::toEntity))
@@ -55,7 +55,7 @@ internal class RoomPhysicalObjectRepository(
     override suspend fun createLogHive(value: NewLogHive): LogHive = database.withTransaction {
         validateMedia(value.id, value.media)
         val identity = newIdentity(value.id, value.territoryId, value.creatorObserverId, PhysicalObjectType.LOG_HIVE, value.latitude, value.longitude)
-        val subtype = value.properties.toEntity(value.id)
+        val subtype = value.properties.toEntity(value.id, normalizeName(value.name))
         objectDao.insertObject(identity)
         objectDao.insertLogHive(subtype)
         objectDao.insertMedia(value.media.map(PhysicalObjectMedia::toEntity))
@@ -131,9 +131,10 @@ internal class RoomPhysicalObjectRepository(
         )
     }
 
-    override suspend fun updateHollow(id: UUID, properties: HollowProperties): Hollow = database.withTransaction {
+    override suspend fun updateHollow(id: UUID, properties: HollowProperties, name: String?): Hollow = database.withTransaction {
         val identity = objectDao.getById(id)?.takeIf { it.objectType == PhysicalObjectType.HOLLOW }
             ?: throw EntityNotFoundException("Hollow")
+        val normalizedName = normalizeName(name)
         val changed = objectDao.updateHollow(
             id = id,
             tree = properties.tree,
@@ -142,14 +143,16 @@ internal class RoomPhysicalObjectRepository(
             outerDiameterCm = properties.outerDiameterCm,
             internalDiameterCm = properties.internalDiameterCm,
             notes = properties.notes,
+            name = normalizedName,
         )
         if (changed != 1) throw EntityNotFoundException("Hollow")
-        identity.toHollow(properties.toEntity(id), objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
+        identity.toHollow(properties.toEntity(id, normalizedName), objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
     }
 
-    override suspend fun updateLogHive(id: UUID, properties: LogHiveProperties): LogHive = database.withTransaction {
+    override suspend fun updateLogHive(id: UUID, properties: LogHiveProperties, name: String?): LogHive = database.withTransaction {
         val identity = objectDao.getById(id)?.takeIf { it.objectType == PhysicalObjectType.LOG_HIVE }
             ?: throw EntityNotFoundException("LogHive")
+        val normalizedName = normalizeName(name)
         val changed = objectDao.updateLogHive(
             id = id,
             tree = properties.tree,
@@ -160,9 +163,10 @@ internal class RoomPhysicalObjectRepository(
             internalDiameterCm = properties.internalDiameterCm,
             internalHeightCm = properties.internalHeightCm,
             notes = properties.notes,
+            name = normalizedName,
         )
         if (changed != 1) throw EntityNotFoundException("LogHive")
-        identity.toLogHive(properties.toEntity(id), objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
+        identity.toLogHive(properties.toEntity(id, normalizedName), objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
     }
 
     override suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double) =
@@ -317,13 +321,13 @@ private fun validateMedia(objectId: UUID, media: List<PhysicalObjectMedia>) {
     }
 }
 
-private fun HollowProperties.toEntity(id: UUID) = HollowEntity(
-    id, tree, entranceHeightCm, entranceAzimuthDeg, outerDiameterCm, internalDiameterCm, notes,
+private fun HollowProperties.toEntity(id: UUID, name: String?) = HollowEntity(
+    id, tree, entranceHeightCm, entranceAzimuthDeg, outerDiameterCm, internalDiameterCm, notes, name,
 )
 
-private fun LogHiveProperties.toEntity(id: UUID) = LogHiveEntity(
+private fun LogHiveProperties.toEntity(id: UUID, name: String?) = LogHiveEntity(
     id, tree, entranceHeightCm, entranceAzimuthDeg, outerDiameterCm, material,
-    internalDiameterCm, internalHeightCm, notes,
+    internalDiameterCm, internalHeightCm, notes, name,
 )
 
 private fun PhysicalObjectMedia.toEntity() = PhysicalObjectMediaEntity(
@@ -356,10 +360,12 @@ private fun LogHiveEntity.toProperties(): LogHiveProperties? {
 }
 
 private fun PhysicalObjectEntity.toHollow(subtype: HollowEntity, media: List<PhysicalObjectMedia>) =
-    Hollow(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media)
+    Hollow(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media, subtype.name)
 
 private fun PhysicalObjectEntity.toLogHive(subtype: LogHiveEntity, media: List<PhysicalObjectMedia>) =
-    LogHive(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media)
+    LogHive(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media, subtype.name)
 
 private fun PhysicalObjectEntity.toApiary(subtype: ApiaryEntity) =
     Apiary(id, territoryId, sequenceNumber, latitude, longitude, createdAt, subtype.name, creatorObserverId)
+
+private fun normalizeName(value: String?): String? = value?.trim()?.ifEmpty { null }

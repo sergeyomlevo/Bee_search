@@ -143,11 +143,11 @@ internal interface PhysicalObjectDao {
     @Query("SELECT * FROM physical_object_media WHERE physical_object_id IN (:ids) ORDER BY created_at, id")
     suspend fun getMediaForObjects(ids: Collection<UUID>): List<PhysicalObjectMediaEntity>
 
-    @Query("UPDATE hollows SET tree = :tree, entrance_height_cm = :entranceHeightCm, entrance_azimuth_deg = :entranceAzimuthDeg, outer_diameter_cm = :outerDiameterCm, internal_diameter_cm = :internalDiameterCm, notes = :notes WHERE physical_object_id = :id")
-    suspend fun updateHollow(id: UUID, tree: String, entranceHeightCm: Double, entranceAzimuthDeg: Int, outerDiameterCm: Double, internalDiameterCm: Double?, notes: String?): Int
+    @Query("UPDATE hollows SET tree = :tree, entrance_height_cm = :entranceHeightCm, entrance_azimuth_deg = :entranceAzimuthDeg, outer_diameter_cm = :outerDiameterCm, internal_diameter_cm = :internalDiameterCm, notes = :notes, name = :name WHERE physical_object_id = :id")
+    suspend fun updateHollow(id: UUID, tree: String, entranceHeightCm: Double, entranceAzimuthDeg: Int, outerDiameterCm: Double, internalDiameterCm: Double?, notes: String?, name: String?): Int
 
-    @Query("UPDATE log_hives SET tree = :tree, entrance_height_cm = :entranceHeightCm, entrance_azimuth_deg = :entranceAzimuthDeg, outer_diameter_cm = :outerDiameterCm, material = :material, internal_diameter_cm = :internalDiameterCm, internal_height_cm = :internalHeightCm, notes = :notes WHERE physical_object_id = :id")
-    suspend fun updateLogHive(id: UUID, tree: String, entranceHeightCm: Double, entranceAzimuthDeg: Int, outerDiameterCm: Double, material: String, internalDiameterCm: Double, internalHeightCm: Double, notes: String?): Int
+    @Query("UPDATE log_hives SET tree = :tree, entrance_height_cm = :entranceHeightCm, entrance_azimuth_deg = :entranceAzimuthDeg, outer_diameter_cm = :outerDiameterCm, material = :material, internal_diameter_cm = :internalDiameterCm, internal_height_cm = :internalHeightCm, notes = :notes, name = :name WHERE physical_object_id = :id")
+    suspend fun updateLogHive(id: UUID, tree: String, entranceHeightCm: Double, entranceAzimuthDeg: Int, outerDiameterCm: Double, material: String, internalDiameterCm: Double, internalHeightCm: Double, notes: String?, name: String?): Int
 
     @Query("UPDATE physical_objects SET latitude = :latitude, longitude = :longitude WHERE id = :id AND object_type IN ('HOLLOW', 'LOG_HIVE')")
     suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double): Int

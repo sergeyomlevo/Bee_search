@@ -48,23 +48,26 @@ import java.util.Locale
 sealed interface PhysicalObjectListItem {
     val id: java.util.UUID
     val designation: String
+    val name: String?
 }
 
 private data class HollowItem(val value: Hollow) : PhysicalObjectListItem {
     override val id get() = value.id
     override val designation get() = value.designation
+    override val name get() = value.name
 }
 
 private data class LogHiveItem(val value: LogHive) : PhysicalObjectListItem {
     override val id get() = value.id
     override val designation get() = value.designation
+    override val name get() = value.name
 }
 
 /**
  * The list of one Physical Object type.
  *
- * A row shows the designation only: `Дупло N` / `Колода N` already carries the type, and the list
- * itself states the category, so a second line repeating the type is not shown.
+ * A named object uses the user name as the compact headline and keeps its stable designation on
+ * the second line. An unnamed object continues to show only its designation.
  *
  * When the list is empty and the caller supports it, the empty state also offers the numbering
  * reset. That placement is convenience only: the operation itself re-checks its preconditions.
@@ -95,7 +98,8 @@ fun PhysicalObjectsBrowser(
     LazyColumn(modifier = Modifier.testTag("physical-objects-list")) {
         items(items, key = { it.id }) { item ->
             ListItem(
-                headlineContent = { Text(item.designation) },
+                headlineContent = { Text(item.name ?: item.designation) },
+                supportingContent = item.name?.let { { Text(item.designation) } },
                 modifier = Modifier.fillMaxWidth().clickable { onOpen(item.id) }.testTag("physical-object-${item.id}"),
             )
             HorizontalDivider()

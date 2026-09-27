@@ -7,9 +7,11 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -71,10 +73,15 @@ internal fun PhysicalObjectDetailRoute(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        if (state.editing) "Редактирование"
-                        else state.value?.designation() ?: "Объект",
-                    )
+                    if (state.editing) {
+                        Text("Редактирование")
+                    } else {
+                        val value = state.value
+                        Column {
+                            Text(value?.displayTitle() ?: "Объект")
+                            value?.name()?.let { Text(value.designation(), style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
                 },
                 navigationIcon = {
                     TextButton(
@@ -183,7 +190,7 @@ private fun PhysicalObjectEditForm(
             showHeader = false,
             isWorking = state.isWorking,
             message = state.error,
-            onSubmit = { properties, _ -> model.saveHollow(properties) },
+            onSubmit = { properties, name, _ -> model.saveHollow(properties, name) },
             onCancel = model::cancelEditing,
         )
         is PhysicalObjectDetailValue.LogHiveValue -> LogHiveForm(
@@ -198,7 +205,7 @@ private fun PhysicalObjectEditForm(
             showHeader = false,
             isWorking = state.isWorking,
             message = state.error,
-            onSubmit = { properties, _ -> model.saveLogHive(properties) },
+            onSubmit = { properties, name, _ -> model.saveLogHive(properties, name) },
             onCancel = model::cancelEditing,
         )
     }
@@ -240,3 +247,10 @@ private fun PhysicalObjectDetailValue.designation(): String = when (this) {
     is PhysicalObjectDetailValue.HollowValue -> value.designation
     is PhysicalObjectDetailValue.LogHiveValue -> value.designation
 }
+
+private fun PhysicalObjectDetailValue.name(): String? = when (this) {
+    is PhysicalObjectDetailValue.HollowValue -> value.name
+    is PhysicalObjectDetailValue.LogHiveValue -> value.name
+}
+
+private fun PhysicalObjectDetailValue.displayTitle(): String = name() ?: designation()

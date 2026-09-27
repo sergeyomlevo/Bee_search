@@ -100,7 +100,7 @@ internal fun PhysicalObjectCreationRoute(
             onRemoveMedia = model::removeMedia,
             isWorking = state.isWorking,
             message = state.error,
-            onSubmit = { properties, _ -> model.createHollow(properties, onCreated) },
+            onSubmit = { properties, name, _ -> model.createHollow(properties, name, onCreated) },
             onCancel = cancel,
         )
         PhysicalObjectType.LOG_HIVE -> LogHiveForm(
@@ -114,7 +114,7 @@ internal fun PhysicalObjectCreationRoute(
             onRemoveMedia = model::removeMedia,
             isWorking = state.isWorking,
             message = state.error,
-            onSubmit = { properties, _ -> model.createLogHive(properties, onCreated) },
+            onSubmit = { properties, name, _ -> model.createLogHive(properties, name, onCreated) },
             onCancel = cancel,
         )
         PhysicalObjectType.APIARY -> error("Apiary creation is not part of this flow")

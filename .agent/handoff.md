@@ -31,6 +31,23 @@ image. Choose screenshots only after that feedback, then prepare the next Beta.
 
 ## Current milestone
 
+Optional user names for Hollow/LogHive and the unambiguous entrance-direction instruction are
+implemented. `name` is nullable, editable and non-unique; it is stored in the concrete subtype
+row, shown above the unchanged `Дупло N` / `Колода N` designation, and does not affect UUID or
+numbering. The compass still persists the production true heading of the phone's top edge; only
+the instruction changed to `Направьте верх телефона в ту сторону, куда направлен леток`.
+
+Room schema v11 adds only nullable `name` columns to `hollows` and `log_hives`
+(`MIGRATION_10_11`). Complete Backup V6 carries the names and reads V1–V5 with null names.
+D091 records these boundaries; the next free durable decision is D092. The raster harness and
+the completed raster research commit remain unchanged.
+
+Verification for this increment: JVM `376/376 PASS`; debug APK, androidTest APK and lint pass;
+focused preserving Samsung instrumentation `93/93 PASS`. At real Samsung font scale 1.7, the
+Hollow flow was checked through create, card, rename, typed list and deletion; designation stayed
+`Дупло 2`. Manual LogHive completion was not finished after semantic automation left the form,
+although its create/update/name paths passed instrumentation. No DEV data reset occurred.
+
 Safe physical object deletion, monotonic numbering and an explicit numbering
 reset are implemented over the approved Objects UI and accepted by the owner,
 who also verified them manually on the phone.
@@ -64,11 +81,12 @@ What is in place:
   scope provably holds no objects, no dependent rows and no references; it is
   offered in the empty typed list and re-checked in the repository. The stable
   UUID remains the object identity: a repeated designation is a new object.
-- Room schema v10 (`MIGRATION_9_10` backfills `last_issued = MAX(sequence_number)`).
-- Complete Backup V5 carries `physical-object-sequences`; the reader still
-  accepts V1-V4 and bootstraps those from stored numbers.
-- D090 (ACCEPTED) records the semantics; D088 §2/§3/§4 were updated consistently
-  and D088 §14's open question is closed. Next free durable decision: D091.
+- Room schema v11 (`MIGRATION_9_10` backfills sequence state; `MIGRATION_10_11` adds nullable
+  Hollow/LogHive names without rebuilding identity tables).
+- Complete Backup V6 carries `physical-object-sequences` and Hollow/LogHive names; the reader
+  accepts V1-V5 and bootstraps archives without sequence state from stored numbers.
+- D090 (ACCEPTED) records numbering semantics; D091 records optional Hollow/LogHive names.
+  Next free durable decision: D092.
 - The RESTRICT invariant has an automatic test: `PhysicalObjectReferenceRestrictTest`
   reads the foreign keys of the live database and fails if any reference to
   `physical_objects` is not `ON DELETE RESTRICT`.
