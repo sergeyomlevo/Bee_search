@@ -108,6 +108,9 @@ class RasterBasemapPocDeviceTest {
     /** Fixed centre of the Sentinel-2 overview comparison near the working Bee Search territory. */
     private val sentinelCenter = 56.1914 to 42.7423
 
+    /** Centre of the whole-area Sentinel-2 overview package (the current area coverage rectangle). */
+    private val sentinelAreaCenter = 56.1002 to 42.6223
+
     @Test
     fun sentinelZoomReviewOnDevice() {
         assumeSentinelPoc()
@@ -150,6 +153,84 @@ class RasterBasemapPocDeviceTest {
         } finally {
             connectivity.setConnected(null)
             writeEvidence("sentinel-evidence.txt", evidence)
+        }
+    }
+
+    /**
+     * Whole-area Sentinel-2 overview: one offline raster PMTiles archive covering the entire
+     * existing Bee Search area (west 42.2056, south 55.7059, east 43.0389, north 56.4945, about
+     * 4512 km2), with real pyramid levels z10, z11, z12 and z13 built from the same 10 m source.
+     *
+     * Beyond the four zoom screenshots this checks the whole rectangle rather than its centre:
+     * the four inset corners, a reference place with forest, fields and a river, the package
+     * boundary, and a second independent open of the same offline archive.
+     */
+    @Test
+    fun sentinelAreaOverviewOnDevice() {
+        assumeSentinelAreaPoc()
+        val archive = prepareSentinelAreaFixture()
+        val connectivity = ConnectivityReceiver.instance(instrumentation.targetContext)
+        connectivity.setConnected(false)
+        val evidence = mutableListOf<String>()
+        try {
+            val firstOpenStarted = System.nanoTime()
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                val mapView = scenario.findMapView()
+                val map = mapView.awaitMap()
+                // The product map applies its one-time z15 recenter and reinstalls its own style when
+                // the first GPS reading arrives; wait for that state before installing the PoC style.
+                assertTrue(
+                    "GPS reading did not become available before the Sentinel area review",
+                    eventually(20_000) {
+                        findAccessibilityNode { it.text?.toString()?.startsWith("Точность ") == true } != null
+                    },
+                )
+                SystemClock.sleep(500)
+                applyRasterStyle(map, sentinelAreaRasterStyle(archive), RASTER_SOURCE)
+                evidence += "firstOpen styleSeconds=${seconds(firstOpenStarted)} archiveBytes=${archive.length()} " +
+                    "levels=10,11,12,13 tileType=png transport=pmtiles"
+                for (zoom in SENTINEL_AREA_ZOOMS) {
+                    val label = "sentinel-area-z${zoom.toInt()}"
+                    val drawn = measureSentinelArea(mapView, map, archive, sentinelAreaCenter, zoom, evidence, label)
+                    captureScreenshot(label)
+                    assertTrue("Sentinel overview not drawn at z$zoom (rasterPixels $drawn)", drawn >= SENTINEL_AREA_MIN)
+                }
+                for ((name, position) in SENTINEL_AREA_PROBES) {
+                    val label = "sentinel-area-$name"
+                    val drawn = measureSentinelArea(mapView, map, archive, position, 13.0, evidence, label)
+                    captureScreenshot(label)
+                    assertTrue("Sentinel overview missing at the $name corner (rasterPixels $drawn)", drawn >= SENTINEL_AREA_MIN)
+                }
+                val reference = measureSentinelArea(
+                    mapView, map, archive, SENTINEL_AREA_REFERENCE, 13.0, evidence, "sentinel-area-reference",
+                )
+                captureScreenshot("sentinel-area-reference")
+                assertTrue("Sentinel overview missing at the reference place ($reference)", reference >= SENTINEL_AREA_MIN)
+                val edge = measureSentinelArea(
+                    mapView, map, archive, SENTINEL_AREA_EDGE, 11.0, evidence, "sentinel-area-edge",
+                )
+                captureScreenshot("sentinel-area-edge")
+                evidence += "sentinel-area-edge drawn=$edge (the remaining part of this frame is the package boundary)"
+                val outside = measureSentinelArea(
+                    mapView, map, archive, SENTINEL_AREA_OUTSIDE, 13.0, evidence, "sentinel-area-outside",
+                )
+                captureScreenshot("sentinel-area-outside")
+                assertTrue("Sentinel imagery painted outside its own coverage ($outside)", outside <= RASTER_OUTSIDE_MAX)
+            }
+            val reopenStarted = System.nanoTime()
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                val mapView = scenario.findMapView()
+                val map = mapView.awaitMap()
+                val drawn = measureSentinelArea(
+                    mapView, map, archive, sentinelAreaCenter, 13.0, evidence, "sentinel-area-reopen-z13",
+                )
+                captureScreenshot("sentinel-area-reopen-z13")
+                evidence += "reopen styleSeconds=${seconds(reopenStarted)} rasterPixels=$drawn"
+                assertTrue("The Sentinel overview did not come back after a restart ($drawn)", drawn >= SENTINEL_AREA_MIN)
+            }
+        } finally {
+            connectivity.setConnected(null)
+            writeEvidence("sentinel-area-evidence.txt", evidence)
         }
     }
 
@@ -742,13 +823,83 @@ class RasterBasemapPocDeviceTest {
 
     /** Consumes the product map's one-shot first-fix recenter without weakening the final assertion. */
     private fun settleSentinelCamera(mapView: MapView, map: MapLibreMap, zoom: Double, label: String) {
+        settleCameraAt(mapView, map, sentinelCenter, zoom, label)
+    }
+
+    /** Moves the camera and retries while the product map's one-shot first-fix recenter is pending. */
+    private fun settleCameraAt(
+        mapView: MapView,
+        map: MapLibreMap,
+        position: Pair<Double, Double>,
+        zoom: Double,
+        label: String = "camera",
+    ) {
         repeat(3) {
-            moveTo(mapView, map, sentinelCenter, zoom)
+            moveTo(mapView, map, position, zoom)
             SystemClock.sleep(1_200)
-            if (abs(onMain { map.cameraPosition.zoom } - zoom) <= 0.05) return
+            val settled = onMain {
+                val camera = map.cameraPosition
+                val target = camera.target
+                abs(camera.zoom - zoom) <= 0.05 && target != null &&
+                    abs(target.latitude - position.first) < 0.00001 && abs(target.longitude - position.second) < 0.00001
+            }
+            if (settled) return
         }
         assertEquals("$label camera did not settle after first-fix recenter", zoom, onMain { map.cameraPosition.zoom }, 0.05)
     }
+
+    /**
+     * Settles the camera at [position]/[zoom] and reinstalls the PoC style right before measuring:
+     * the product screen may reinstall its own style while the camera is settling, and the
+     * measurement must observe the PoC style rather than a half-installed product one.
+     */
+    private fun measureSentinelArea(
+        mapView: MapView,
+        map: MapLibreMap,
+        archive: File,
+        position: Pair<Double, Double>,
+        zoom: Double,
+        evidence: MutableList<String>,
+        label: String,
+    ): Double {
+        settleCameraAt(mapView, map, position, zoom, label)
+        applyRasterStyle(map, sentinelAreaRasterStyle(archive), RASTER_SOURCE)
+        return measureRasterCoverage(mapView, map, position, zoom, evidence, label, SENTINEL_AREA_BACKGROUND)
+    }
+
+    // ------------------------------------------------------------------ Sentinel area fixture
+
+    /** Copies the whole-area Sentinel-2 raster PMTiles archive into the app-private PoC tree. */
+    private fun prepareSentinelAreaFixture(): File {
+        val input = File(requireNotNull(instrumentation.targetContext.getExternalFilesDir(null)), "poc-sentinel")
+        val source = File(input, "sentinel-area-z10-13.pmtiles")
+        assertTrue("Sentinel area PoC input is missing: $source", source.isFile)
+        val destination = File(instrumentation.targetContext.filesDir, "map-poc/sentinel-area-z10-13.pmtiles")
+        check(destination.parentFile?.mkdirs() != false || destination.parentFile!!.isDirectory)
+        source.copyTo(destination, overwrite = true)
+        return destination
+    }
+
+    private fun sentinelAreaRasterStyle(archive: File): String = """
+    {
+      "version": 8,
+      "name": "$POC_STYLE_NAME",
+      "sources": {
+        "$RASTER_SOURCE": {
+          "type": "raster",
+          "url": "pmtiles://file://${archive.absolutePath.replace('\\', '/')}",
+          "tileSize": 256,
+          "minzoom": 10,
+          "maxzoom": 13,
+          "attribution": "Contains modified Copernicus Sentinel data 2026"
+        }
+      },
+      "layers": [
+        { "id": "$BACKGROUND_LAYER", "type": "background", "paint": { "background-color": "$SENTINEL_AREA_BACKGROUND_HEX" } },
+        { "id": "$RASTER_LAYER", "type": "raster", "source": "$RASTER_SOURCE", "paint": { "raster-resampling": "linear" } }
+      ]
+    }
+    """.trimIndent()
 
     // ------------------------------------------------------------------ sharpness fixtures
 
@@ -917,6 +1068,7 @@ class RasterBasemapPocDeviceTest {
         zoom: Double,
         evidence: MutableList<String>,
         label: String,
+        background: Int = BACKGROUND_COLOR,
     ): Double {
         val started = System.nanoTime()
         val cameraStarted = System.nanoTime()
@@ -934,7 +1086,7 @@ class RasterBasemapPocDeviceTest {
             listOf(BACKGROUND_LAYER, RASTER_LAYER).sorted(),
             layerIds,
         )
-        val rasterPixels = backgroundDifferingFraction(stable, region)
+        val rasterPixels = backgroundDifferingFraction(stable, region, background)
         setRasterVisibility(map, false)
         SystemClock.sleep(900)
         val hidden = captureStable(region)
@@ -981,18 +1133,20 @@ class RasterBasemapPocDeviceTest {
     }
 
     /** Pixels of the sampled region that are not the PoC background colour. */
-    private fun backgroundDifferingFraction(bitmap: Bitmap, region: Rect): Double {
+    private fun backgroundDifferingFraction(bitmap: Bitmap, region: Rect, background: Int = BACKGROUND_COLOR): Double {
         var sampled = 0
         var painted = 0
-        var y = region.top
-        while (y < region.bottom - 1) {
-            var x = region.left
-            while (x < region.right - 1) {
+        val right = region.right.coerceAtMost(bitmap.width)
+        val bottom = region.bottom.coerceAtMost(bitmap.height)
+        var y = region.top.coerceIn(0, maxOf(0, bottom - 1))
+        while (y < bottom - 1) {
+            var x = region.left.coerceIn(0, maxOf(0, right - 1))
+            while (x < right - 1) {
                 val color = bitmap.getPixel(x, y)
                 if (
-                    abs((color and 0xFF) - (BACKGROUND_COLOR and 0xFF)) > 24 ||
-                    abs((color shr 8 and 0xFF) - (BACKGROUND_COLOR shr 8 and 0xFF)) > 24 ||
-                    abs((color shr 16 and 0xFF) - (BACKGROUND_COLOR shr 16 and 0xFF)) > 24
+                    abs((color and 0xFF) - (background and 0xFF)) > 24 ||
+                    abs((color shr 8 and 0xFF) - (background shr 8 and 0xFF)) > 24 ||
+                    abs((color shr 16 and 0xFF) - (background shr 16 and 0xFF)) > 24
                 ) {
                     painted++
                 }
@@ -1030,16 +1184,21 @@ class RasterBasemapPocDeviceTest {
     private fun differingFraction(first: Bitmap, second: Bitmap, region: Rect): Double {
         var sampled = 0
         var different = 0
-        var y = region.top
-        while (y < region.bottom - 1) {
-            var x = region.left
-            while (x < region.right - 1) {
+        // Screenshots taken in different device states can differ in size; never read outside either one.
+        val right = minOf(region.right, first.width, second.width)
+        val bottom = minOf(region.bottom, first.height, second.height)
+        val left0 = region.left.coerceIn(0, maxOf(0, right - 1))
+        val top0 = region.top.coerceIn(0, maxOf(0, bottom - 1))
+        var y = top0
+        while (y < bottom - 1) {
+            var x = left0
+            while (x < right - 1) {
                 val left = first.getPixel(x, y)
-                val right = second.getPixel(x, y)
+                val right1 = second.getPixel(x, y)
                 if (
-                    abs((left and 0xFF) - (right and 0xFF)) > 24 ||
-                    abs((left shr 8 and 0xFF) - (right shr 8 and 0xFF)) > 24 ||
-                    abs((left shr 16 and 0xFF) - (right shr 16 and 0xFF)) > 24
+                    abs((left and 0xFF) - (right1 and 0xFF)) > 24 ||
+                    abs((left shr 8 and 0xFF) - (right1 shr 8 and 0xFF)) > 24 ||
+                    abs((left shr 16 and 0xFF) - (right1 shr 16 and 0xFF)) > 24
                 ) {
                     different++
                 }
@@ -1230,6 +1389,12 @@ class RasterBasemapPocDeviceTest {
         assertTrue("Sentinel-2 PoC must run only in a debug build", BuildConfig.DEBUG)
     }
 
+    private fun assumeSentinelAreaPoc() {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beeSentinelAreaPoc") == "true")
+        assertEquals("org.beesearch.app.dev", instrumentation.targetContext.packageName)
+        assertTrue("Sentinel area PoC must run only in a debug build", BuildConfig.DEBUG)
+    }
+
     private companion object {
         const val RASTER_SOURCE = "poc-offline-raster"
         const val RASTER_LAYER = "poc-offline-raster-layer"
@@ -1262,6 +1427,33 @@ class RasterBasemapPocDeviceTest {
 
         /** Owner-review zooms; z18 exists only as a source level for the Samsung z+1 request. */
         val SENTINEL_DISPLAY_ZOOMS = listOf(13.0, 14.0, 15.0, 16.0, 17.0)
+
+        /** Whole-area Sentinel overview: real levels of the area package, no overzoom in this range. */
+        val SENTINEL_AREA_ZOOMS = listOf(10.0, 11.0, 12.0, 13.0)
+
+        /** A drawn basemap covers most of the sampled map area; the package has no transparency. */
+        const val SENTINEL_AREA_MIN = 0.50
+
+        /** Light background so the dark Sentinel imagery is unambiguous in the drawn-pixel metric. */
+        const val SENTINEL_AREA_BACKGROUND_HEX = "#f0f0f0"
+        const val SENTINEL_AREA_BACKGROUND = 0xFFF0F0F0.toInt()
+
+        /** Inset corners of the area rectangle: west 42.2056, south 55.7059, east 43.0389, north 56.4945. */
+        val SENTINEL_AREA_PROBES = listOf(
+            "nw" to (56.4645 to 42.2356),
+            "ne" to (56.4645 to 43.0089),
+            "sw" to (55.7359 to 42.2356),
+            "se" to (55.7359 to 43.0089),
+        )
+
+        /** Working field place with forest, fields, a river and a settlement, inside the area. */
+        val SENTINEL_AREA_REFERENCE = 56.1914 to 42.7423
+
+        /** Just inside the package boundary: the frame shows both imagery and the package edge. */
+        val SENTINEL_AREA_EDGE = 56.5200 to 42.6223
+
+        /** Well beyond the package boundary: no imagery may be painted here. */
+        val SENTINEL_AREA_OUTSIDE = 56.6600 to 42.6223
 
         /**
          * Sharpness diagnostic variants, all cut from the same 250 m window of the same NAIP source.
