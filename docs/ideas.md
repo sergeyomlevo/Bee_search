@@ -591,4 +591,65 @@ Use more than four corner points when the source permits it: well-distributed co
 
 **Dependencies / prerequisites:** Define one or more supported offline raster package formats, coverage metadata, import/activation lifecycle, storage/backup rules and map-layer ordering. The UI should support at least layer on/off and useful opacity/transparency control. Registration quality/error should be retained as metadata where available.
 
+**Raster / imagery PoC checkpoint (2026-09-27):** These are research results,
+not an accepted production raster architecture or a decision to ship Sentinel-2.
+
+**OBSERVED / proven by PoC:**
+
+- On Samsung SM-S938B, Bee Search DEV rendered local raster XYZ offline and
+  raster PMTiles v3 through source `url: pmtiles://file://...`. The diagnostic
+  templated tiles URL `pmtiles://.../{z}/{x}/{y}.png` did not work. The existing
+  vector PMTiles map still rendered after the experiments, and Bee Search
+  markers/overlays retained their geographic alignment. Raster PMTiles is the
+  preferred future transport candidate; local XYZ remains useful for diagnostics
+  and PoC work. This preference does not yet define a production package contract.
+- MapLibre on the target Samsung can request a physical source tile level one
+  level deeper than the visible badge zoom. If that source level is absent, the
+  renderer overzooms the last available tile and visibly degrades the image.
+  A future raster pipeline must therefore supply the physical source levels the
+  renderer needs instead of relying on stretching the final level. The exact
+  observed 2x render/density behaviour is not a current blocker and is not being
+  investigated further in this cycle.
+- A public USGS NAIP sample established the technical high-resolution reference:
+  real 0.30 m/px source information can provide useful detail at z18. The main
+  cause of the earlier blur was a missing finer source level and resulting
+  overzoom, with resampling also contributing; JPEG q90 was not the primary
+  cause. Artificial upscale, sharpening and AI enhancement were not needed.
+  NAIP was only a public technical sample and is not a source for Russian areas.
+- The real Sentinel experiment used product
+  `S2B_T38VLH_20260718T082107_L2A`, SAFE
+  `S2B_MSIL2A_20260718T081609_N0512_R121_T38VLH_20260718T121847.SAFE`,
+  acquired `2026-07-18T08:24:24.15Z`, Sentinel-2 L2A processing baseline
+  `05.12`, tile cloud cover `0.000374%`, and the 10 m bands B04/B03/B02 from
+  Earth Search `sentinel-2-c1-l2a` / Sentinel-2 Collection 1 L2A COG. The fixed
+  review centre was `56.1914 N, 42.7423 E`; WGS84 bbox was west
+  `42.5390625`, south `55.9983809554`, east `42.9345703125`, north
+  `56.3652501369`.
+- Sentinel display processing was exactly
+  `reflectance = DN * 0.0001 - 0.1`, RGB `B04/B03/B02`, then
+  `uint8(round(255 * clip(2.5 * reflectance, 0, 1)))`; reprojection was
+  `EPSG:32638 -> EPSG:3857` with bilinear resampling and lossless PNG. No
+  sharpening, AI or super-resolution was used. The physical XYZ pyramid held
+  135 tiles at z13 and 375 tiles at each of z14-z18 (2010 total); z18 existed
+  only so renderer requests for the z17 review would not cause accidental
+  overzoom. The z13-z17 sequence rendered offline on the Samsung.
+
+**OWNER JUDGMENT:**
+
+- Sentinel-2 RGB at native 10 m/px is useful in Bee Search only as a
+  small-scale overview. The practical upper limit is z13, where blur is already
+  beginning; z14 and above must not be treated as working Sentinel basemap
+  levels because further zoom adds no useful spatial information.
+- The real 0.30 m/px reference is sufficiently detailed at z18 for the intended
+  detailed map use. z19 brought no practical benefit and is not required.
+
+**OPEN:** A legal and operationally usable high-resolution source for real
+Russian territories, its licensing/access, the final production raster package
+contract and a standard high-zoom PMTiles packer remain undecided. It is also
+open whether Sentinel-2 will be shipped at all and how any intermediate scale
+between a Sentinel z13 overview and approximately 0.30 m/z18 detail would be
+covered. Possible future source research includes ЕЭКО/state orthophotos, open
+regional data, Roscosmos and other legally available or commercial sources; it
+is a separate task, not part of this checkpoint.
+
 **Notes:** Generalize this as a `user georeferenced raster layer` capability rather than a special-case old-paper-map feature. The original source/year and, when known, original CRS should remain provenance metadata. Bee Search research objects continue to use modern geographic coordinates independently of the raster source.

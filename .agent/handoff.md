@@ -93,6 +93,18 @@ place without clearing data.
 The owner additionally checked deletion, number non-reuse and the explicit
 reset manually on the phone and confirmed that the behaviour matches the intent.
 
+Raster/imagery research is paused with a reproducible checkpoint in I014. On
+Samsung SM-S938B, offline local XYZ and raster PMTiles both worked; raster
+PMTiles is the preferred future transport candidate and local XYZ remains a PoC
+tool. A real 0.30 m/px reference was useful at z18 and the owner found no value
+in z19. Real Sentinel-2 RGB 10 m/px was useful only as an overview through z13
+(already beginning to blur); z14+ is not a working field zoom. The opt-in,
+DEV-only `RasterBasemapPocDeviceTest` is now preserved in Git, while all large
+fixtures remain external. No production raster layer exists. The next separate
+mapping research task is finding a legal high-resolution source for real Russian
+territories; licensing, the production raster package contract, a high-zoom
+packer, possible Sentinel inclusion and intermediate-scale coverage remain open.
+
 ## Unverified / known residue (no action required for the accepted feature)
 
 - Media deletion was not exercised through the real camera / system picker UI;
@@ -112,6 +124,11 @@ test build and its only purpose is the tester feedback round on the help, see
 «Current release» above. Continue from commit `434e319b` on `main`. Nothing was
 pushed, no release beyond this local Beta artifact was made, the product version
 `1.3.0` is unchanged and Stable was not touched.
+
+The raster/imagery feasibility cycle is also closed for now. Do not repeat the
+offline transport, Sentinel zoom or 0.30 m reference experiments unless a new
+question requires it; the next mapping step is the separate source/licensing
+research described above, not production implementation.
 
 ## Previous milestone
 
