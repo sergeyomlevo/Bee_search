@@ -63,7 +63,9 @@ class PhysicalObjectCardsTest {
 
         composeRule.onNodeWithTag("physical-object-detail-media-hero").assertIsDisplayed()
         composeRule.onNodeWithTag("physical-object-detail-media-${media[1].id}").assertIsDisplayed()
+        composeRule.onNodeWithText("Направление летка").assertIsDisplayed()
         composeRule.onNodeWithText("127° · ЮВ").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Азимут").assertCountEquals(0)
         composeRule.onNodeWithTag("physical-object-coordinates").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("physical-object-show-map").performScrollTo().performClick()
         composeRule.onNodeWithTag("physical-object-edit-coordinates").performScrollTo().performClick()
@@ -245,6 +247,21 @@ class PhysicalObjectCardsTest {
         composeRule.onNodeWithTag("physical-object-delete").performScrollTo().performClick()
 
         composeRule.onNodeWithText("Объект и его медиа будут удалены. Восстановить их нельзя.").assertIsDisplayed()
+    }
+
+    @Test
+    fun logHiveCardLabelsTheEntranceDirection() {
+        composeRule.setContent { Bee_searchTheme {
+            LogHiveCard(
+                value = logHive(3),
+                territoryLabel = "T",
+                creatorLabel = "O",
+            )
+        } }
+
+        composeRule.onNodeWithText("Направление летка").assertIsDisplayed()
+        composeRule.onNodeWithText("90° · В").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Азимут").assertCountEquals(0)
     }
 
     @Test

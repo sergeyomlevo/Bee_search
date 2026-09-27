@@ -231,7 +231,7 @@ private fun HeadingField(
 ) {
     val live = (heading as? HeadingState.Available)?.trueHeadingDeg
     val accuracy = (heading as? HeadingState.Available)?.accuracy
-    val display = live?.let { "$it° · ${azimuthSector(it)}" } ?: "Нет текущего азимута"
+    val display = live?.let { "$it° · ${azimuthSector(it)}" } ?: "Нет текущего направления"
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Направление летка", style = MaterialTheme.typography.titleMedium)
         Text("Направьте верх телефона в ту сторону, куда направлен леток", style = MaterialTheme.typography.bodySmall)
@@ -246,7 +246,7 @@ private fun HeadingField(
                     OutlinedTextField(
                         value = state.azimuthDeg,
                         onValueChange = { update(state.copy(azimuthDeg = it, fixedAzimuthDeg = null)) },
-                        label = { Text("Азимут, °") },
+                        label = { Text("Направление летка, °") },
                         modifier = Modifier.fillMaxWidth().testTag("physical-object-manual-azimuth"),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

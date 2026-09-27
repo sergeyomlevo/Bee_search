@@ -118,7 +118,7 @@ fun HollowCard(
     deleteTitle = PhysicalObjectType.HOLLOW.deleteConfirmationTitle(value.sequenceNumber),
     creatorLabel = creatorLabel, createdAt = value.createdAt.displayDateTime(), latitude = value.latitude,
     longitude = value.longitude, properties = value.properties?.let {
-            listOf("Дерево" to it.tree, "Высота летка" to "${it.entranceHeightCm.displayMeasurement()} см", "Азимут" to "${it.entranceAzimuthDeg}° · ${azimuthSector(it.entranceAzimuthDeg)}", "Наружный диаметр" to "${it.outerDiameterCm.displayMeasurement()} см") +
+            listOf("Дерево" to it.tree, "Высота летка" to "${it.entranceHeightCm.displayMeasurement()} см", "Направление летка" to "${it.entranceAzimuthDeg}° · ${azimuthSector(it.entranceAzimuthDeg)}", "Наружный диаметр" to "${it.outerDiameterCm.displayMeasurement()} см") +
             listOfNotNull(it.internalDiameterCm?.let { d -> "Внутренний диаметр" to "${d.displayMeasurement()} см" }, it.notes?.let { n -> "Дополнительно" to n })
     } ?: emptyList(), media = value.media, onEdit = onEdit,
     onEditCoordinates = onEditCoordinates, onShowOnMap = onShowOnMap, onDelete = onDelete,
@@ -136,7 +136,7 @@ fun LogHiveCard(
     deleteTitle = PhysicalObjectType.LOG_HIVE.deleteConfirmationTitle(value.sequenceNumber),
     creatorLabel = creatorLabel, createdAt = value.createdAt.displayDateTime(), latitude = value.latitude,
     longitude = value.longitude, properties = value.properties?.let {
-            listOf("Дерево" to it.tree, "Высота летка" to "${it.entranceHeightCm.displayMeasurement()} см", "Азимут" to "${it.entranceAzimuthDeg}° · ${azimuthSector(it.entranceAzimuthDeg)}", "Наружный диаметр" to "${it.outerDiameterCm.displayMeasurement()} см", "Материал" to it.material, "Внутренний диаметр" to "${it.internalDiameterCm.displayMeasurement()} см", "Высота внутреннего объёма" to "${it.internalHeightCm.displayMeasurement()} см") + listOfNotNull(it.notes?.let { n -> "Дополнительно" to n })
+            listOf("Дерево" to it.tree, "Высота летка" to "${it.entranceHeightCm.displayMeasurement()} см", "Направление летка" to "${it.entranceAzimuthDeg}° · ${azimuthSector(it.entranceAzimuthDeg)}", "Наружный диаметр" to "${it.outerDiameterCm.displayMeasurement()} см", "Материал" to it.material, "Внутренний диаметр" to "${it.internalDiameterCm.displayMeasurement()} см", "Высота внутреннего объёма" to "${it.internalHeightCm.displayMeasurement()} см") + listOfNotNull(it.notes?.let { n -> "Дополнительно" to n })
     } ?: emptyList(), media = value.media, onEdit = onEdit,
     onEditCoordinates = onEditCoordinates, onShowOnMap = onShowOnMap, onDelete = onDelete,
     mediaFile = mediaFile, onOpenMedia = onOpenMedia,
