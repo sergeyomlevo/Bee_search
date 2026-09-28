@@ -25,6 +25,7 @@ import org.beesearch.app.ui.map.OBJECTS_DESCRIPTION
 import org.beesearch.app.ui.map.CompactMapStatus
 import org.beesearch.app.ui.map.MAIN_BOTTOM_PANEL_TAG
 import org.beesearch.app.ui.map.MAIN_MAP_VIEWPORT_TAG
+import org.beesearch.app.ui.map.MapBasemapSourceSelector
 import org.beesearch.app.ui.map.CreateRecordTypeChooserDialog
 import org.beesearch.app.ui.map.MapFirstScaffold
 import org.beesearch.app.ui.map.MapIdleControls
@@ -315,6 +316,118 @@ class MainMapScreenTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.runOnIdle { assertTrue(selectedTerritory.value == otherTerritory.id) }
+    }
+
+    /**
+     * The temporary DEV basemaps are extra items in the existing source selector. The hybrid is
+     * offered only when both packages are present, and each item switches only its own mode.
+     */
+    @Test
+    fun basemapSelectorOffersTheDevSentinelAndHybridEntriesWhenBothSourcesAreStaged() {
+        var sentinelSelected = false
+        var hybridSelected = false
+
+        composeRule.setContent {
+            Bee_searchTheme {
+                MapBasemapSourceSelector(
+                    modeLabel = "Онлайн карта",
+                    onSelectOnline = { },
+                    onSelectVectorMap = { },
+                    devSentinelAvailable = true,
+                    onSelectSentinel = { sentinelSelected = true },
+                    devHybridAvailable = true,
+                    onSelectHybrid = { hybridSelected = true },
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithContentDescription("Источник карты: Онлайн карта")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText("Онлайн карта").assertIsDisplayed()
+        composeRule.onNodeWithText("Векторная карта").assertIsDisplayed()
+        composeRule.onNodeWithText("Спутник Sentinel").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertTrue(sentinelSelected) }
+
+        composeRule
+            .onNodeWithContentDescription("Источник карты: Онлайн карта")
+            .performClick()
+        composeRule.onNodeWithText("Гибрид").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertTrue(hybridSelected) }
+    }
+
+    /** Without the vector package there is nothing to overlay, so the hybrid item is hidden. */
+    @Test
+    fun basemapSelectorHidesTheHybridEntryWithoutTheVectorPackage() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                MapBasemapSourceSelector(
+                    modeLabel = "Онлайн карта",
+                    onSelectOnline = { },
+                    onSelectVectorMap = { },
+                    devSentinelAvailable = true,
+                    onSelectSentinel = { },
+                    devHybridAvailable = false,
+                    onSelectHybrid = { },
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithContentDescription("Источник карты: Онлайн карта")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText("Спутник Sentinel").assertIsDisplayed()
+        composeRule.onNodeWithText("Гибрид").assertDoesNotExist()
+    }
+
+    /** Without the staged archive neither DEV entry is offered, and the two map sources remain. */
+    @Test
+    fun basemapSelectorHidesTheDevEntriesWithoutTheArchive() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                MapBasemapSourceSelector(
+                    modeLabel = "Онлайн карта",
+                    onSelectOnline = { },
+                    onSelectVectorMap = { },
+                    devSentinelAvailable = false,
+                    onSelectSentinel = { },
+                    devHybridAvailable = false,
+                    onSelectHybrid = { },
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithContentDescription("Источник карты: Онлайн карта")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText("Онлайн карта").assertIsDisplayed()
+        composeRule.onNodeWithText("Векторная карта").assertIsDisplayed()
+        composeRule.onNodeWithText("Спутник Sentinel").assertDoesNotExist()
+        composeRule.onNodeWithText("Гибрид").assertDoesNotExist()
+    }
+
+    /** The selected mode is what the selector shows in its own label. */
+    @Test
+    fun basemapSelectorShowsTheHybridModeLabel() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                MapBasemapSourceSelector(
+                    modeLabel = "Гибрид",
+                    onSelectOnline = { },
+                    onSelectVectorMap = { },
+                    devSentinelAvailable = true,
+                    onSelectSentinel = { },
+                    devHybridAvailable = true,
+                    onSelectHybrid = { },
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Источник карты: Гибрид").assertIsDisplayed()
+        composeRule.onNodeWithText("Гибрид ▾").assertIsDisplayed()
     }
 
     private companion object {

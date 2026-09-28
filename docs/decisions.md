@@ -2707,7 +2707,7 @@ alias обозначения; cross-Territory identity и дедупликаци
 обычное удаление номера не освобождает, явный сброс нумерации и restore начинают новую линию
 состояния).
 
-Следующий свободный номер durable decision: **D092**.
+Следующий свободный номер durable decision: **D093**.
 
 ---
 
@@ -2846,6 +2846,60 @@ Room schema v11 добавляет nullable `name TEXT` в `hollows` и `log_hiv
 Complete Backup v6 переносит эти поля; reader продолжает принимать V1–V5, где name считается
 отсутствующим. Повышение backup format не позволяет старому V5 writer молча потерять новое
 поле при повторном экспорте.
+
+---
+
+# D092 — Sentinel и Hybrid зафиксированы как принятые DEV research references
+
+**Статус:** ACCEPTED
+**Дополняет:** D008 и D063 только результатами PoC; production raster package
+architecture, D065 contract и vector generation pipeline не меняются.
+
+Sentinel-2 raster PoC и Sentinel + vector Hybrid PoC прошли owner review на
+Samsung SM-S938B в пределах проверенного DEV scope. Принят whole-area material
+от `2026-07-18` с source-direct linear rendering:
+
+```text
+reflectance = DN * 0.0001 - 0.1
+display = uint8(round(255 * clip(7.5 * reflectance, 0, 1)))
+```
+
+Финальный research artifact — raster PNG PMTiles v3
+`sentinel-area-z10-13-linear-b.pmtiles`, реальные уровни z10-z13, SHA-256
+`135246b8f2f5e99e50b2361fb63a0539dff1c071074a075982d125ee2c09daff`.
+Для Sentinel и основанного на нём Hybrid `uiMaxZoom = 13`: увеличение выше не
+добавляет полезной пространственной информации и заметно размывает изображение.
+Это предел конкретного 10 m/px raster source, а не общий предел Hybrid.
+
+Принятая композиция Hybrid:
+
+```text
+independent raster source
+→ selected independent vector lines and symbols
+→ Bee Search overlays
+```
+
+Roads, tracks/paths, rivers/streams, road labels и water/waterway labels в PoC
+улучшили ориентацию относительно bare Sentinel. Offline glyphs и кириллица
+работают; скудность place labels относится к данным текущего vector package.
+Raster и vector не запекаются друг в друга. Наличие cutlines и power lines в
+vector package не означает их автоматического включения в Hybrid: это отдельное
+будущее решение.
+
+Текущий vector package содержит настоящие уровни z8-z15; z16+ отображается
+MapLibre через overzoom z15. Pinned Planetiler 0.10.0 и `field-profile.yml`
+ограничены z15. Planetiler 0.10.2 поддерживает настоящий z16, но не z17-z18.
+Owner decision — сейчас не менять generator, profile или zoom contract. После
+появления качественного high-resolution raster сначала проверяется его Hybrid с
+существующим vector z15 overzoom; настоящий vector z16-z18 рассматривается
+только при доказанном недостатке detail.
+
+DEV Sentinel/Hybrid implementation сохраняется как research/reference
+capability. Production raster/Hybrid architecture, универсальный builder,
+manifest/lifecycle, import/download и source selector не реализованы. Следующий
+архитектурный этап — спроектировать source-neutral preparation/package workflow
+для Sentinel, high-resolution satellite, orthophoto и другой корректно
+геопривязанной imagery, не принимая заранее конкретный production contract.
 
 ---
 

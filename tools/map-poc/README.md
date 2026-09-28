@@ -307,6 +307,34 @@ normal network status. The test verifies style/profile identity, required
 rendered features at the three real areas, Russian labels, and z15 vector
 overscaling at UI zooms 17 and 20.
 
+## DEV Sentinel and Hybrid research reference
+
+The debug build preserves two temporary research basemaps in the existing
+selector: `Спутник Sentinel` and `Гибрид`. Beta and Stable cannot expose them.
+They use an external raster fixture and the current active D065 vector package;
+no raster binary or source imagery is stored in Git.
+
+The owner-accepted source artifact is
+`sentinel-area-z10-13-linear-b.pmtiles`, SHA-256
+`135246b8f2f5e99e50b2361fb63a0539dff1c071074a075982d125ee2c09daff`.
+On the device it is staged under the stable research name:
+
+```text
+/sdcard/Android/data/org.beesearch.app.dev/files/poc-sentinel/
+  sentinel-area-z10-13.pmtiles
+```
+
+The accepted staged file has the SHA-256 above. It is raster PNG PMTiles
+v3 with real z10-z13 levels. Both Sentinel and its Hybrid use `uiMaxZoom = 13`.
+Hybrid keeps the raster and vector archives as independent MapLibre sources and
+draws the selected vector lines and labels over the imagery; it does not alter
+the D065 package lifecycle or the Planetiler 0.10.0 / source-z15 pipeline.
+
+The relevant device checks are opt-in (`beeSentinelDevProfile=true` and
+`beeHybridDevProfile=true`) because they require those external fixtures. This
+is a visual/research reference, not a production raster package contract or a
+universal raster builder.
+
 ## Attribution and provenance
 
 - Map data: © OpenStreetMap contributors, ODbL 1.0.

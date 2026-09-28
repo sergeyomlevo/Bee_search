@@ -39,8 +39,8 @@ the instruction changed to `Направьте верх телефона в ту
 
 Room schema v11 adds only nullable `name` columns to `hollows` and `log_hives`
 (`MIGRATION_10_11`). Complete Backup V6 carries the names and reads V1–V5 with null names.
-D091 records these boundaries; the next free durable decision is D092. The raster harness and
-the completed raster research commit remain unchanged.
+D091 records these boundaries; D092 records the accepted Sentinel/Hybrid research reference.
+The next free durable decision is D093.
 
 Verification for this increment: JVM `376/376 PASS`; debug APK, androidTest APK and lint pass;
 focused preserving Samsung instrumentation `93/93 PASS`. At real Samsung font scale 1.7, the
@@ -85,8 +85,8 @@ What is in place:
   Hollow/LogHive names without rebuilding identity tables).
 - Complete Backup V6 carries `physical-object-sequences` and Hollow/LogHive names; the reader
   accepts V1-V5 and bootstraps archives without sequence state from stored numbers.
-- D090 (ACCEPTED) records numbering semantics; D091 records optional Hollow/LogHive names.
-  Next free durable decision: D092.
+- D090 (ACCEPTED) records numbering semantics; D091 records optional Hollow/LogHive names;
+  D092 records the accepted Sentinel/Hybrid research reference. Next free durable decision: D093.
 - The RESTRICT invariant has an automatic test: `PhysicalObjectReferenceRestrictTest`
   reads the foreign keys of the live database and fails if any reference to
   `physical_objects` is not `ON DELETE RESTRICT`.
@@ -111,17 +111,32 @@ place without clearing data.
 The owner additionally checked deletion, number non-reuse and the explicit
 reset manually on the phone and confirmed that the behaviour matches the intent.
 
-Raster/imagery research is paused with a reproducible checkpoint in I014. On
-Samsung SM-S938B, offline local XYZ and raster PMTiles both worked; raster
-PMTiles is the preferred future transport candidate and local XYZ remains a PoC
-tool. A real 0.30 m/px reference was useful at z18 and the owner found no value
-in z19. Real Sentinel-2 RGB 10 m/px was useful only as an overview through z13
-(already beginning to blur); z14+ is not a working field zoom. The opt-in,
-DEV-only `RasterBasemapPocDeviceTest` is now preserved in Git, while all large
-fixtures remain external. No production raster layer exists. The next separate
-mapping research task is finding a legal high-resolution source for real Russian
-territories; licensing, the production raster package contract, a high-zoom
-packer, possible Sentinel inclusion and intermediate-scale coverage remain open.
+Sentinel/Hybrid research is closed by D092. Owner review on Samsung SM-S938B
+accepted the 2026-07-18 source-direct linear-B rendering
+(`display = uint8(round(255 * clip(7.5 * reflectance, 0, 1)))`) in
+`sentinel-area-z10-13-linear-b.pmtiles`, SHA-256
+`135246b8f2f5e99e50b2361fb63a0539dff1c071074a075982d125ee2c09daff`.
+The raster has real z10-z13 and both the DEV Sentinel and Sentinel-based Hybrid
+stop at UI z13. Hybrid was more informative than bare Sentinel: independent
+vector roads, tracks/paths, waterways and offline labels sit above the raster,
+then Bee Search overlays. Sparse place labels are current package data, not a
+glyph failure. Cutlines and power lines exist in the vector package but are not
+enabled in this first Hybrid overlay.
+
+The accepted artifact remains external at
+`C:\App\Bee_search_test_maps\sentinel-area\sentinel-area-z10-13-linear-b.pmtiles`.
+The byte-identical DEV staged file is
+`/sdcard/Android/data/org.beesearch.app.dev/files/poc-sentinel/sentinel-area-z10-13.pmtiles`.
+The existing selector preserves four DEV modes: `Онлайн карта`, `Векторная
+карта`, `Спутник Sentinel`, `Гибрид`. Raster/vector stay independent; this is a
+research/reference capability and no production raster package lifecycle exists.
+
+The current vector package remains true z8-z15 with z16+ MapLibre overzoom.
+Planetiler stays pinned at 0.10.0 and `field-profile.yml` stays at maxzoom 15.
+Owner decision: do not update Planetiler or generate true vector z16-z18 now.
+When a quality high-resolution raster is available, first test it with the
+existing z15 vector overzoom and revisit vector generation only if field evidence
+shows insufficient detail.
 
 ## Unverified / known residue (no action required for the accepted feature)
 
@@ -137,16 +152,21 @@ packer, possible Sentinel inclusion and intermediate-scale coverage remain open.
 
 ## Next task
 
-No active functional task. Beta `1.3.0-beta.4` (versionCode 7) is the current
-test build and its only purpose is the tester feedback round on the help, see
-«Current release» above. Continue from commit `434e319b` on `main`. Nothing was
-pushed, no release beyond this local Beta artifact was made, the product version
-`1.3.0` is unchanged and Stable was not touched.
+No active functional implementation task remains after the Sentinel/Hybrid PoC
+closure. Continue from the current committed `main` HEAD. The current release
+context remains the local Beta `1.3.0-beta.4` (versionCode 7) described above;
+this PoC closure does not build or release Beta/Stable and does not change the
+product version.
 
-The raster/imagery feasibility cycle is also closed for now. Do not repeat the
-offline transport, Sentinel zoom or 0.30 m reference experiments unless a new
-question requires it; the next mapping step is the separate source/licensing
-research described above, not production implementation.
+The Sentinel/Hybrid feasibility cycle is closed. Do not repeat transport,
+brightness, Sentinel zoom or Hybrid composition experiments without a new
+question. The next architecture task is to design a source-neutral offline
+raster preparation/package workflow covering validation, reprojection/mosaic,
+real zoom pyramids, raster PMTiles, metadata/manifest and verification for both
+Sentinel and future high-resolution georeferenced imagery. Production
+import/acquisition/lifecycle is not implemented; legal high-resolution source
+and licensing research remains separate. Do not turn the preserved DEV profiles
+into a production architecture implicitly.
 
 ## Previous milestone
 

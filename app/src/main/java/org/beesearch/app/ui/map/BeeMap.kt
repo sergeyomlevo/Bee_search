@@ -53,6 +53,10 @@ import org.beesearch.app.MapTarget
 import org.beesearch.app.MapCenterRequest
 import org.beesearch.app.beeSearchFieldMapProfile
 import org.beesearch.app.beeSearchActivePmtilesMapProfile
+import org.beesearch.app.beeSearchDevHybridMapProfile
+import org.beesearch.app.beeSearchDevSentinelMapProfile
+import org.beesearch.app.devMapBasemapsEnabled
+import org.beesearch.app.devSentinelArchive
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.model.ObservationPointSummary
 import org.beesearch.app.visibleMapMeasurement
@@ -165,6 +169,14 @@ internal fun BeeMap(
         null
     }
     val appContext = LocalContext.current.applicationContext
+    // Temporary DEV-only Sentinel basemap: the staged archive is read straight from the app's
+    // external files directory, so nothing is copied and no package lifecycle is involved.
+    val sentinelArchive = remember(appContext) {
+        if (devMapBasemapsEnabled) devSentinelArchive(appContext) else null
+    }
+    val sentinelProfile = remember(sentinelArchive) {
+        sentinelArchive?.let(::beeSearchDevSentinelMapProfile)
+    }
     val latestTerritoryId by rememberUpdatedState(territoryId)
     val onlineMapProfile = remember { beeSearchFieldMapProfile() }
     val coroutineScope = rememberCoroutineScope()
@@ -199,7 +211,11 @@ internal fun BeeMap(
             packageAvailability = MapPackageAvailability.Missing
         } else {
             packageAvailability = packageStore.loadActive(territoryId, persistedCoverage)
-            if (developerBasemap == DeveloperBasemap.ACTIVE_VECTOR && packageAvailability !is MapPackageAvailability.Ready) {
+            if (
+                (developerBasemap == DeveloperBasemap.ACTIVE_VECTOR ||
+                    developerBasemap == DeveloperBasemap.HYBRID) &&
+                packageAvailability !is MapPackageAvailability.Ready
+            ) {
                 developerBasemap = DeveloperBasemap.ONLINE
             }
         }
@@ -245,6 +261,14 @@ internal fun BeeMap(
     }
     val activeMapPackage = (packageAvailability as? MapPackageAvailability.Ready)?.activePackage
     val activeVectorProfile = activeMapPackage?.let(::beeSearchActivePmtilesMapProfile)
+    // Temporary DEV-only hybrid: both packages must be present, and they stay independent sources.
+    val hybridProfile = remember(sentinelArchive, activeMapPackage?.pmtilesFile?.absolutePath) {
+        if (devMapBasemapsEnabled && sentinelArchive != null && activeMapPackage != null) {
+            beeSearchDevHybridMapProfile(sentinelArchive, activeMapPackage.pmtilesFile)
+        } else {
+            null
+        }
+    }
     // The editor has no unsaved work the moment it opens: the draft starts as the persisted
     // selection. Only a draft operation (add / undo last / clear all) makes it dirty.
     val coverageSelectionDirty = coverageSelectionMode &&
@@ -571,16 +595,35 @@ internal fun BeeMap(
 
         if (
             developerBasemap == DeveloperBasemap.ONLINE ||
-            developerBasemap == DeveloperBasemap.ACTIVE_VECTOR
+            developerBasemap == DeveloperBasemap.ACTIVE_VECTOR ||
+            developerBasemap == DeveloperBasemap.SENTINEL ||
+            developerBasemap == DeveloperBasemap.HYBRID
         ) {
             MapBasemapSourceSelector(
-                vectorMapSelected = developerBasemap == DeveloperBasemap.ACTIVE_VECTOR,
+                modeLabel = when (developerBasemap) {
+                    DeveloperBasemap.ONLINE -> "Онлайн карта"
+                    DeveloperBasemap.ACTIVE_VECTOR -> "Векторная карта"
+                    DeveloperBasemap.SENTINEL -> "Спутник Sentinel"
+                    DeveloperBasemap.HYBRID -> "Гибрид"
+                },
                 onSelectOnline = { developerBasemap = DeveloperBasemap.ONLINE },
                 onSelectVectorMap = {
                     if (packageAvailability is MapPackageAvailability.Ready) {
                         developerBasemap = DeveloperBasemap.ACTIVE_VECTOR
                     } else {
                         onOpenOfflineMaps()
+                    }
+                },
+                devSentinelAvailable = sentinelProfile != null,
+                onSelectSentinel = {
+                    if (sentinelProfile != null) {
+                        developerBasemap = DeveloperBasemap.SENTINEL
+                    }
+                },
+                devHybridAvailable = hybridProfile != null,
+                onSelectHybrid = {
+                    if (hybridProfile != null) {
+                        developerBasemap = DeveloperBasemap.HYBRID
                     }
                 },
                 modifier = Modifier
@@ -828,14 +871,21 @@ internal fun BeeMap(
         }
     }
 
-    LaunchedEffect(map, developerBasemap, activeMapPackage?.pmtilesFile?.absolutePath) {
+    LaunchedEffect(map, developerBasemap, activeMapPackage?.pmtilesFile?.absolutePath, sentinelArchive?.absolutePath) {
         val mapInstance = map ?: return@LaunchedEffect
         val profile = when (developerBasemap) {
             DeveloperBasemap.ONLINE -> onlineMapProfile
             DeveloperBasemap.ACTIVE_VECTOR -> activeVectorProfile ?: onlineMapProfile
+            DeveloperBasemap.SENTINEL -> sentinelProfile ?: onlineMapProfile
+            DeveloperBasemap.HYBRID -> hybridProfile ?: onlineMapProfile
         }
         Log.d("BeeMap", "style request mode=$developerBasemap profile=${profile.profileId} path=${profile.datasetVersion} hash=${profile.styleJson.hashCode()}")
         mapInstance.setMaxZoomPreference(profile.uiMaxZoom)
+        // Leaving a deeper mode only clamps the zoom: centre, bearing and tilt are preserved.
+        val camera = mapInstance.cameraPosition
+        if (camera.zoom > profile.uiMaxZoom) {
+            mapInstance.cameraPosition = CameraPosition.Builder(camera).zoom(profile.uiMaxZoom).build()
+        }
         mapInstance.setStyle(Style.Builder().fromJson(profile.styleJson)) {
             Log.d("BeeMap", "style loaded profile=${profile.profileId} center=${mapInstance.cameraPosition.target} zoom=${mapInstance.cameraPosition.zoom}")
         }
@@ -845,18 +895,27 @@ internal fun BeeMap(
 private enum class DeveloperBasemap {
     ONLINE,
     ACTIVE_VECTOR,
+
+    /** Temporary DEV-only Sentinel-2 raster package; never reachable outside the debug build. */
+    SENTINEL,
+
+    /** Temporary DEV-only Sentinel-2 raster with the offline vector overlay on top. */
+    HYBRID,
 }
 
 @Composable
-private fun MapBasemapSourceSelector(
-    vectorMapSelected: Boolean,
+internal fun MapBasemapSourceSelector(
+    modeLabel: String,
     onSelectOnline: () -> Unit,
     onSelectVectorMap: () -> Unit,
+    devSentinelAvailable: Boolean,
+    onSelectSentinel: () -> Unit,
+    devHybridAvailable: Boolean,
+    onSelectHybrid: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val developerControlFontSize = (14f / LocalDensity.current.fontScale).sp
     var menuExpanded by remember { mutableStateOf(false) }
-    val modeLabel = if (vectorMapSelected) "Векторная карта" else "Онлайн карта"
     Surface(
         modifier = modifier
             .testTag("map-basemap-source-selector")
@@ -882,6 +941,12 @@ private fun MapBasemapSourceSelector(
                     val itemPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     DropdownMenuItem(text = { Text("Онлайн карта", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectOnline() }, contentPadding = itemPadding, modifier = itemModifier)
                     DropdownMenuItem(text = { Text("Векторная карта", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectVectorMap() }, contentPadding = itemPadding, modifier = itemModifier)
+                    if (devMapBasemapsEnabled && devSentinelAvailable) {
+                        DropdownMenuItem(text = { Text("Спутник Sentinel", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectSentinel() }, contentPadding = itemPadding, modifier = itemModifier)
+                    }
+                    if (devMapBasemapsEnabled && devHybridAvailable) {
+                        DropdownMenuItem(text = { Text("Гибрид", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectHybrid() }, contentPadding = itemPadding, modifier = itemModifier)
+                    }
                 }
             }
         }

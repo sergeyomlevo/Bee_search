@@ -18,6 +18,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -383,6 +384,140 @@ class BeeMapPocDeviceTest {
         }
     }
 
+    /**
+     * The temporary DEV Sentinel basemap, exercised exactly as the map selector installs it:
+     * same profile factory, same style JSON, same archive path. This check pins the real raster
+     * levels z10..z13 and mirrors the owner-approved UI cap at the package maxzoom.
+     */
+    @Test
+    fun devSentinelSelectorProfileRendersWholeAreaLevels() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beeSentinelDevProfile") == "true")
+        assertEquals("org.beesearch.app.dev", instrumentation.targetContext.packageName)
+        assertTrue("The DEV Sentinel basemap must exist only in a debug build", BuildConfig.DEBUG)
+        val archive = devSentinelArchive(instrumentation.targetContext)
+        assumeTrue("The DEV Sentinel archive is not staged on this device", archive != null)
+        val profile = beeSearchDevSentinelMapProfile(requireNotNull(archive))
+        val evidence = mutableListOf<String>()
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val mapView = scenario.findMapView()
+            val map = mapView.awaitMap()
+            // The product map recenters to z15 over the device position when the first GPS fix
+            // arrives. Wait that out, otherwise the recenter would move the camera during the
+            // measurements below; with location disabled the wait simply expires.
+            eventually { map.cameraPosition.zoom >= 14.9 }
+            map.setStyleAndAwait(profile.styleJson)
+            assertEquals(13.0, profile.uiMaxZoom, 0.0)
+            onMain { map.setMaxZoomPreference(profile.uiMaxZoom) }
+            assertEquals(13.0, onMain { map.maxZoomLevel }, 0.0)
+            assertNotNull("The Sentinel raster source was not installed", onMain { map.style?.getSource("sentinel-area") })
+            assertNotNull("The Sentinel raster layer was not installed", onMain { map.style?.getLayer("sentinel-area-raster") })
+
+            for (zoom in listOf(10.0, 11.0, 12.0, 13.0)) {
+                map.moveAndAwait(latitude = 56.1002, longitude = 42.6223, zoom = zoom)
+                val covered = rasterCoveredFraction(mapView)
+                // A product-side recenter arriving mid-measurement would invalidate the reading.
+                assertTrue("The camera left z$zoom during the measurement", onMain { abs(map.cameraPosition.zoom - zoom) < 0.05 })
+                evidence += "z$zoom covered=$covered"
+                assertTrue(
+                    "The DEV Sentinel profile did not paint the package at z$zoom ($covered)",
+                    covered >= SENTINEL_DEVELOPER_COVERED_MIN,
+                )
+                captureScreenshot("dev-sentinel-z${zoom.toInt()}")
+            }
+        }
+
+        val directory = File(instrumentation.targetContext.getExternalFilesDir(null), "map-poc")
+        check(directory.mkdirs() || directory.isDirectory)
+        File(directory, "dev-sentinel-profile.txt").writeText(evidence.joinToString("\n") + "\n")
+    }
+
+    /**
+     * Temporary DEV-only hybrid: the accepted Sentinel raster package with the existing offline
+     * vector line and label layers on top, using the very profile the map selector installs.
+     *
+     * Reports per overlay class (roads, tracks, water lines, place/road labels) which layers
+     * actually render at several characteristic places, so the owner review has facts instead of
+     * a single pass/fail. Raster coverage is asserted; the overlay inventory is recorded because
+     * it depends on what the vector package contains at each place.
+     */
+    @Test
+    fun devHybridProfileRendersSentinelWithVectorOverlay() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assumeTrue(InstrumentationRegistry.getArguments().getString("beeHybridDevProfile") == "true")
+        assertEquals("org.beesearch.app.dev", instrumentation.targetContext.packageName)
+        assertTrue("The DEV hybrid must exist only in a debug build", BuildConfig.DEBUG)
+        val sentinel = devSentinelArchive(instrumentation.targetContext)
+        assumeTrue("The DEV Sentinel archive is not staged on this device", sentinel != null)
+        val activePackage = runBlocking {
+            val container = (instrumentation.targetContext.applicationContext as BeeSearchApplication).container
+            val territoryId = requireNotNull(container.settingsRepository.getSettings().currentTerritoryId)
+            val coverage = storedCoverage(container, territoryId)
+            val ready = container.mapPackageStore.loadActive(territoryId, coverage) as? MapPackageAvailability.Ready
+            requireNotNull(ready) { "No active compatible offline vector package" }.activePackage
+        }
+        val profile = beeSearchDevHybridMapProfile(requireNotNull(sentinel), activePackage.pmtilesFile)
+        val evidence = mutableListOf<String>()
+        evidence += "vectorPackage=${activePackage.manifest.packageId} path=${activePackage.pmtilesFile.name}"
+        evidence += "hybridProfile=${profile.profileId} uiMaxZoom=${profile.uiMaxZoom} sourceMaxZoom=${profile.sourceMaxZoom}"
+        evidence += "offline=true sources=raster+vector glyphs=asset"
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val mapView = scenario.findMapView()
+            val map = mapView.awaitMap()
+            eventually { map.cameraPosition.zoom >= 14.9 }
+            map.setStyleAndAwait(profile.styleJson)
+            // The map screen applies the profile zoom cap in its own style effect; mirror that
+            // here. The user-visible clamp (deep zoom -> 13) is verified on the real UI.
+            assertEquals(13.0, profile.uiMaxZoom, 0.0)
+            onMain { map.setMaxZoomPreference(profile.uiMaxZoom) }
+            assertEquals(13.0, onMain { map.maxZoomLevel }, 0.0)
+            assertNotNull("The Sentinel raster source was not installed", onMain { map.style?.getSource("sentinel-area") })
+            assertNotNull("The vector source was not installed", onMain { map.style?.getSource("bee-field") })
+            assertNotNull("The raster layer was not installed", onMain { map.style?.getLayer("sentinel-area-raster") })
+            assertNull("The hybrid must not carry the vector background", onMain { map.style?.getLayer("forest") })
+
+            val overlayClasses = listOf(
+                "roads", "tracks", "waterways",
+                "place-labels", "water-labels", "waterway-labels", "road-labels",
+            )
+            val places = listOf(
+                Triple("dev-territory", 56.1969, 42.7477),
+                Triple("west-settlement", 56.1960, 42.6900),
+                Triple("river-north", 56.1850, 42.6600),
+                Triple("package-centre", 56.1002, 42.6223),
+                Triple("river-south", 56.0200, 42.7000),
+            )
+            val problems = mutableListOf<String>()
+            for ((name, latitude, longitude) in places) {
+                map.moveAndAwait(latitude = latitude, longitude = longitude, zoom = 13.0)
+                val covered = settledRasterCoveredFraction(mapView)
+                captureScreenshot("dev-hybrid-$name")
+                if (covered < 0.5) problems += "$name raster=$covered"
+                val counts = overlayClasses.joinToString(" ") { layer ->
+                    "$layer=${onMain { renderedFeatureCount(mapView, map, layer) }}"
+                }
+                evidence += "$name lat=$latitude lon=$longitude raster=$covered $counts"
+            }
+
+            // The composite remains usable at the current raster ceiling.
+            map.moveAndAwait(latitude = 56.1969, longitude = 42.7477, zoom = 13.0)
+            evidence += "zoomClamp=${onMain { map.cameraPosition.zoom }} maxZoom=${onMain { map.maxZoomLevel }}"
+
+            val directory = File(instrumentation.targetContext.getExternalFilesDir(null), "map-poc")
+            check(directory.mkdirs() || directory.isDirectory)
+            File(directory, "dev-hybrid-profile.txt").writeText(evidence.joinToString("\n") + "\n")
+            assertTrue("The hybrid raster did not paint at $problems", problems.isEmpty())
+        }
+    }
+
+    private fun renderedFeatureCount(mapView: MapView, map: MapLibreMap, layer: String): Int =
+        map.queryRenderedFeatures(
+            RectF(0f, 0f, mapView.width.toFloat(), mapView.height.toFloat()),
+            layer,
+        ).size
+
     private fun ActivityScenario<MainActivity>.findMapView(): MapView {
         var result: MapView? = null
         assertTrue("The current persisted startup route did not contain BeeMap", eventually {
@@ -502,6 +637,53 @@ class BeeMapPocDeviceTest {
         onMain { mapView.removeOnDidFinishRenderingFrameListener(listener) }
     }
 
+    /**
+     * Coverage sampled only once the frame has settled: after a camera move MapLibre still has to
+     * fetch and decode the new tiles, and a single capture would report the empty background as a
+     * missing raster. Repeats until two consecutive readings agree.
+     */
+    private fun settledRasterCoveredFraction(mapView: MapView): Double {
+        var previous = rasterCoveredFraction(mapView)
+        repeat(8) {
+            Thread.sleep(400)
+            val current = rasterCoveredFraction(mapView)
+            if (abs(current - previous) < 0.01) return current
+            previous = current
+        }
+        return previous
+    }
+
+    /**
+     * Fraction of the map viewport that differs from the Sentinel profile's light background,
+     * sampled sparsely. A painted raster package reads near 1.0, an empty background near 0.0.
+     */
+    private fun rasterCoveredFraction(mapView: MapView): Double {
+        val screenshot = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        val location = IntArray(2)
+        onMain { mapView.getLocationOnScreen(location) }
+        val left = location[0] + mapView.width / 10
+        val right = location[0] + mapView.width - mapView.width / 10
+        val top = location[1] + mapView.height / 5
+        val bottom = location[1] + mapView.height - mapView.height / 5
+        var covered = 0
+        var total = 0
+        var y = top
+        while (y < bottom && y < screenshot.height) {
+            var x = left
+            while (x < right && x < screenshot.width) {
+                val pixel = screenshot.getPixel(x, y)
+                val differs = abs((pixel and 0xFF) - 0xF0) > 8 ||
+                    abs(((pixel shr 8) and 0xFF) - 0xF0) > 8 ||
+                    abs(((pixel shr 16) and 0xFF) - 0xF0) > 8
+                if (differs) covered++
+                total++
+                x += 6
+            }
+            y += 6
+        }
+        return if (total == 0) 0.0 else covered.toDouble() / total
+    }
+
     private fun captureScreenshot(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val directory = File(instrumentation.targetContext.getExternalFilesDir(null), "map-poc")
@@ -517,6 +699,9 @@ class BeeMapPocDeviceTest {
         return task.get()
     }
 }
+
+/** Minimum share of the sampled viewport the DEV Sentinel raster profile must paint. */
+private const val SENTINEL_DEVELOPER_COVERED_MIN = 0.5
 
 private fun View.findMapView(): MapView? {
     if (this is MapView) return this

@@ -865,7 +865,11 @@ Field extension сохраняет `man_made=cutline`, `power=line/minor_line`,
 
 Vector source и offline maxzoom равны `15`. UI может увеличивать карту до
 `20`, используя vector overscaling на z16–20. Actual source z16 допускается
-только после Samsung A/B PoC; z17–20 не генерируются в первый milestone.
+технически только после изменения pinned Planetiler/profile: текущий Planetiler
+0.10.0 и все feature definitions `field-profile.yml` ограничены z15. Owner
+decision D092 сохраняет этот pipeline без изменений. Будущий high-resolution
+raster сначала проверяется с существующим z15 vector overzoom; настоящий vector
+z16–18 рассматривается только при доказанном недостатке detail.
 
 Один versioned field MapProfile задаёт совместимость schema/profile, dataset
 snapshot, style/resources, zoom contract и attribution. Новая несовместимая
@@ -878,10 +882,19 @@ package с собственными bounds/zoom/profile/lifecycle. Satellite rea
 входит в readiness основной vector map. Формат и provider satellite package не
 выбраны. Contours, hillshade и DEM отложены.
 
-Runtime style может содержать Field, Satellite и Hybrid layer groups и менять
-их visibility без полной перезагрузки style. GPS,
-crosshair, ObservationPoints и будущие app-generated research overlays не
-зависят от выбранной base-map group.
+DEV PoC D092 подтвердил на Samsung независимую композицию Sentinel raster,
+выбранных vector lines/symbols и Bee Search overlays. Принятый research package
+имеет реальные raster levels z10-z13; Sentinel и этот Sentinel-based Hybrid
+ограничены UI z13. Это reference implementation, а не production package
+lifecycle. Raster и vector остаются отдельными sources: будущая imagery не
+должна запекать дороги и labels в PNG.
+
+Следующий отдельный architecture task — source-neutral preparation/package
+workflow для georeferenced raster imagery с validation, reprojection/mosaic,
+пирамидой реальных уровней согласно resolution, raster PMTiles и проверяемым
+metadata/manifest. Production import/acquisition, package management и final
+compatibility contract пока не определены. GPS, crosshair, ObservationPoints и
+app-generated research overlays не зависят от выбранной base-map composition.
 
 ---
 

@@ -591,8 +591,9 @@ Use more than four corner points when the source permits it: well-distributed co
 
 **Dependencies / prerequisites:** Define one or more supported offline raster package formats, coverage metadata, import/activation lifecycle, storage/backup rules and map-layer ordering. The UI should support at least layer on/off and useful opacity/transparency control. Registration quality/error should be retained as metadata where available.
 
-**Raster / imagery PoC checkpoint (2026-09-27):** These are research results,
-not an accepted production raster architecture or a decision to ship Sentinel-2.
+**Raster / imagery PoC checkpoint (2026-09-28):** These are accepted research
+results, not an accepted production raster architecture or a decision to ship
+Sentinel-2 in a production package.
 
 **OBSERVED / proven by PoC:**
 
@@ -633,23 +634,55 @@ not an accepted production raster architecture or a decision to ship Sentinel-2.
   135 tiles at z13 and 375 tiles at each of z14-z18 (2010 total); z18 existed
   only so renderer requests for the z17 review would not cause accidental
   overzoom. The z13-z17 sequence rendered offline on the Samsung.
+- The final whole-area package accepted by the owner uses the same 2026-07-18
+  source material and a source-direct linear display:
+  `uint8(round(255 * clip(7.5 * reflectance, 0, 1)))`, where `7.5 = 2.5 * 3.0`.
+  It contains real lossless-PNG levels z10-z13 in raster PMTiles v3. The
+  accepted external artifact is `sentinel-area-z10-13-linear-b.pmtiles`,
+  SHA-256 `135246b8f2f5e99e50b2361fb63a0539dff1c071074a075982d125ee2c09daff`.
+  The owner manually accepted this rendering on Samsung SM-S938B.
+- The DEV Hybrid PoC rendered that raster, selected independent vector line
+  and label layers, and Bee Search overlays in one MapLibre view. Roads,
+  tracks/paths, rivers/streams, road labels and water/waterway labels improved
+  orientation compared with the bare Sentinel raster. Offline glyphs and
+  Cyrillic labels worked; sparse place labels reflect the current vector
+  package content rather than a glyph/rendering failure.
 
 **OWNER JUDGMENT:**
 
 - Sentinel-2 RGB at native 10 m/px is useful in Bee Search only as a
-  small-scale overview. The practical upper limit is z13, where blur is already
-  beginning; z14 and above must not be treated as working Sentinel basemap
-  levels because further zoom adds no useful spatial information.
+  small-scale overview. The accepted package provides z10-z13 and both the
+  Sentinel and Sentinel-based Hybrid DEV modes stop at UI z13. Blur is already
+  beginning there; z14 and above must not be treated as working Sentinel
+  basemap levels because further zoom adds no useful spatial information.
+- Hybrid is more informative for field orientation than the bare Sentinel
+  raster. Raster and vector remain independent sources; roads or labels are not
+  baked into PNG tiles. Existing cutline and power-line vector data may be
+  evaluated later, but is not part of the accepted first Hybrid overlay.
 - The real 0.30 m/px reference is sufficiently detailed at z18 for the intended
   detailed map use. z19 brought no practical benefit and is not required.
 
-**OPEN:** A legal and operationally usable high-resolution source for real
-Russian territories, its licensing/access, the final production raster package
-contract and a standard high-zoom PMTiles packer remain undecided. It is also
-open whether Sentinel-2 will be shipped at all and how any intermediate scale
-between a Sentinel z13 overview and approximately 0.30 m/z18 detail would be
-covered. Possible future source research includes ЕЭКО/state orthophotos, open
-regional data, Roscosmos and other legally available or commercial sources; it
-is a separate task, not part of this checkpoint.
+**OPEN / next architecture task:** Design one source-neutral offline raster
+preparation/package workflow for Sentinel, higher-resolution satellite data,
+orthophotos and other properly georeferenced imagery:
+
+```text
+georeferenced source imagery
+→ validation
+→ reprojection/mosaic as needed
+→ real zoom pyramid appropriate to source resolution
+→ raster PMTiles
+→ metadata/manifest
+→ package verification
+→ independent raster basemap beneath a vector Hybrid overlay
+```
+
+Its production package lifecycle, import/acquisition UI and compatibility
+contract are not implemented or accepted yet. A legal high-resolution source
+for real Russian territories, licensing/access and intermediate-scale coverage
+also remain open. A future high-resolution raster must first be tested with the
+existing true-z15 vector package overzoomed above z15. True vector z16-z18 is
+revisited only if that practical test shows insufficient vector detail; the
+current Planetiler/profile pipeline remains unchanged.
 
 **Notes:** Generalize this as a `user georeferenced raster layer` capability rather than a special-case old-paper-map feature. The original source/year and, when known, original CRS should remain provenance metadata. Bee Search research objects continue to use modern geographic coordinates independently of the raster source.
