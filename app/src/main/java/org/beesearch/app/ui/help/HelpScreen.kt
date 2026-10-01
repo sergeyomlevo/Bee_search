@@ -88,6 +88,17 @@ internal fun HelpScreen(
 
 @Composable
 private fun HelpSectionCard(section: HelpSection, index: Int) {
+    if (section.blocks.isEmpty()) {
+        Text(
+            text = section.title,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = if (section.level > 1) 16.dp else 0.dp)
+                .testTag("help-section-header-$index"),
+            style = if (section.level > 1) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+        )
+        return
+    }
     var expanded by rememberSaveable(section.title) { mutableStateOf(false) }
     val subsection = section.level > 1
     Card(
@@ -174,9 +185,9 @@ private fun HelpBlockView(block: HelpBlock, tag: String, level: Int) {
 /**
  * Shows the image of a section when the drawable actually exists.
  *
- * Images are added to the help later, so a declared slot must stay invisible until then: the
- * resource is looked up by the name recorded in the canonical source, and a missing resource simply
- * leaves no gap. The description from the source is used as the accessible name.
+ * The resource is looked up by the name recorded in the canonical source. A deliberately empty
+ * slot stays invisible and leaves no gap, while the description from the source is used as the
+ * accessible name for an installed screenshot.
  */
 @Suppress("DiscouragedApi")
 @Composable

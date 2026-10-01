@@ -46,9 +46,11 @@ class HelpContentTest {
             listOf(
                 "О Bee Search",
                 "Первый запуск: Начальная настройка",
+                "Основная информация карты",
+                "Управление картой",
                 "Наблюдатель и территория",
-                "Главный экран: карта",
                 "Создание точки наблюдения",
+                "Экран активного наблюдения",
                 "Метки и первый вылет",
                 "Возврат и следующие вылеты",
                 "Азимут",
@@ -91,31 +93,72 @@ class HelpContentTest {
     }
 
     @Test
-    fun mainScreenExplainsWhereObjectsAndSettingsAre() {
-        val text = sectionText("Главный экран: карта")
+    fun mapInformationSeparatesGpsAccuracyFromTargetMeasurement() {
+        val text = sectionText("Основная информация карты")
 
-        assertTrue(text, text.contains("четыре квадрата"))
-        assertTrue(text, text.contains("шестерёнка"))
-        assertTrue(text, text.contains("Создать запись здесь"))
-        assertTrue(text, text.contains("Онлайн карта"))
-        assertTrue(text, text.contains("Векторная карта"))
+        listOf("Код территории", "Точность GPS", "Текущий зум", "Расстояние и направление", "Компас", "Пунктирная линия")
+            .forEach { assertTrue("map information must explain «$it»", text.contains(it)) }
+        assertTrue(text, text.contains("Это не точность GPS"))
+        assertTrue(text, text.contains("синей точки"))
+        assertTrue(text, text.contains("красной точки"))
+        assertTrue(text, text.contains("тёмным пунктиром со светлым контуром"))
         assertTrue(text, text.contains("Текущая территория не найдена"))
         assertTrue(text, text.contains("Выбрать территорию"))
     }
 
     @Test
+    fun mapControlsNameTheRealDestinationsAndConditionalBasemaps() {
+        val text = sectionText("Управление картой")
+
+        listOf(
+            "Онлайн карта",
+            "Векторная карта",
+            "Спутник Sentinel",
+            "Гибрид",
+            "Центрировать карту",
+            "Создать запись здесь",
+            "Объекты",
+            "Точки наблюдения",
+            "Настройки",
+            "Территории",
+        ).forEach { assertTrue("map controls must explain «$it»", text.contains(it)) }
+        assertTrue(text, text.contains("состав списка зависит"))
+        assertTrue(text, text.contains("не управляет набором независимых слоёв"))
+    }
+
+    @Test
     fun observationWorkflowDescribesTheRealSequence() {
         val creation = sectionText("Создание точки наблюдения")
+        val screen = sectionText("Экран активного наблюдения")
         val firstFlight = sectionText("Метки и первый вылет")
         val nextFlights = sectionText("Возврат и следующие вылеты")
 
         listOf("Создать запись здесь", "Что создать?", "Точка наблюдения", "Подготовка точки", "Добавить")
             .forEach { assertTrue("creation help must name «$it»", creation.contains(it)) }
         assertTrue(creation, creation.contains("Пчёлы отсутствуют"))
+        listOf("В полёте", "На точке", "Выбор", "ПРИЛЕТЕЛА", "УЛЕТЕЛА")
+            .forEach { assertTrue("observation screen must explain «$it»", screen.contains(it)) }
+        assertTrue(screen, screen.contains("с момента фактического вылета"))
+        assertTrue(screen, screen.contains("с момента последнего зафиксированного возвращения"))
+        assertTrue(screen, screen.contains("Отдельная пчела для этой метки ещё не сохранена"))
+        assertTrue(screen, screen.contains("цвет стрелки одинаков"))
+        assertTrue(screen, screen.contains("числовой азимут"))
         assertTrue(firstFlight, firstFlight.contains("УЛЕТЕЛА"))
         assertTrue(firstFlight, firstFlight.contains("не более 10 пчёл"))
         assertTrue(nextFlights, nextFlights.contains("ПРИЛЕТЕЛА"))
         assertTrue(nextFlights, nextFlights.contains("Завершить"))
+    }
+
+    @Test
+    fun illustratedSectionsDeclareOnlyTheThreeCurrentSamsungAssets() {
+        val visuals = sections().flatMap { section ->
+            section.blocks.filterIsInstance<HelpBlock.Visual>().map { it.visual.resourceName }
+        }
+
+        assertEquals(
+            listOf("help_map_info", "help_map_controls", "help_observation_screen"),
+            visuals,
+        )
     }
 
     @Test
@@ -135,10 +178,10 @@ class HelpContentTest {
 
         listOf(
             "Объекты",
-            "Дупла",
-            "Колоды",
+            "Дупло",
+            "Колода",
             "Создать запись здесь",
-            "Подтвердить",
+            "OK",
             "Дерево",
             "Направление летка",
             "Зафиксировать с компаса",

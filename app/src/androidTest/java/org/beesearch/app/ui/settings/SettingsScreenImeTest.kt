@@ -95,7 +95,7 @@ class SettingsScreenImeTest {
             }
         }
 
-        composeRule.onNodeWithText("+ Добавить территорию")
+        composeRule.onNodeWithText("Добавить территорию")
             .performScrollTo()
             .performClick()
         composeRule.onNodeWithTag("territory-code-field")

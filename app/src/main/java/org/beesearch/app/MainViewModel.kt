@@ -50,6 +50,7 @@ import org.beesearch.app.domain.model.OpenFlightCycleNotFoundException
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.location.LocationProvider
 import org.beesearch.app.domain.location.LocationUiState
+import org.beesearch.app.domain.location.awaitingNextFix
 import org.beesearch.app.domain.repository.ObservationRepository
 import org.beesearch.app.domain.repository.ObserverRepository
 import org.beesearch.app.domain.repository.SettingsRepository
@@ -1169,7 +1170,11 @@ internal class MainViewModel(
         }
     }
 
-    fun setLocationTracking(permissionGranted: Boolean, active: Boolean) {
+    fun setLocationTracking(
+        permissionGranted: Boolean,
+        active: Boolean,
+        preserveAvailableFix: Boolean = false,
+    ) {
         if (!permissionGranted) {
             stopLocationTracking()
             _locationState.value = LocationUiState.PermissionRequired
@@ -1177,11 +1182,11 @@ internal class MainViewModel(
         }
         if (!active) {
             stopLocationTracking()
-            _locationState.value = LocationUiState.WaitingForFix
+            _locationState.value = _locationState.value.awaitingNextFix(preserveAvailableFix)
             return
         }
         if (locationJob?.isActive == true) return
-        _locationState.value = LocationUiState.WaitingForFix
+        _locationState.value = _locationState.value.awaitingNextFix(preserveAvailable = true)
         locationJob = viewModelScope.launch {
             try {
                 locationProvider.updates().collect { reading ->

@@ -226,7 +226,7 @@ internal fun SettingsScreen(
                 TerritoryRow(territory, territory.id == currentTerritoryId, { onSelectTerritory(territory.id) }, { editingTerritory = territory; addingTerritory = false }, { deleteTerritory = territory })
             }
             TextButton(onClick = { addingTerritory = !addingTerritory }) {
-                Text(if (addingTerritory) "Скрыть форму территории" else "+ Добавить территорию")
+                Text(if (addingTerritory) "Скрыть форму территории" else "Добавить территорию")
             }
             if (addingTerritory || editingTerritory != null) {
                 val edit = editingTerritory

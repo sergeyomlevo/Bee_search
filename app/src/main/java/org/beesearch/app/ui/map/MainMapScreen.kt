@@ -91,6 +91,7 @@ internal fun CurrentTerritoryScreen(
             BeeMap(
                     territoryId = territory?.id,
                     territoryName = territory?.name,
+                    territoryCode = territory?.code,
                     areaStore = mapAreaStore,
                     packageStore = mapPackageStore,
                     locationState = locationState,
@@ -102,7 +103,6 @@ internal fun CurrentTerritoryScreen(
                     onMapCenterRequestHandled = onMapCenterRequestHandled,
                     onConfirmLocationSelection = onConfirmPhysicalObjectLocation,
                     onCancelLocationSelection = onCancelPhysicalObjectLocation,
-                    onCoverageTerritoryMissing = onOpenSettings,
                     onOpenOfflineMaps = onOpenOfflineMaps,
                     areaEditorRequest = areaEditorRequest,
                     onAreaEditorRequestHandled = onAreaEditorRequestHandled,
@@ -255,6 +255,8 @@ private fun SettingsGlyph(modifier: Modifier = Modifier) {
 internal fun CompactMapStatus(
     accuracyMeters: Double,
     measurement: MapMeasurement?,
+    territoryCode: String? = null,
+    zoom: Double? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -262,7 +264,14 @@ internal fun CompactMapStatus(
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        CompactGpsAccuracy(accuracyMeters = accuracyMeters)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            territoryCode?.takeIf(String::isNotBlank)?.let { TerritoryCodeBadge(it) }
+            CompactGpsAccuracy(accuracyMeters = accuracyMeters)
+            zoom?.let { MapZoomIndicator(zoom = it) }
+        }
         if (measurement != null) {
             MapMeasurementOverlay(measurement = measurement)
         }
@@ -303,7 +312,7 @@ internal fun CompactGpsAccuracy(
         shadowElevation = 1.dp,
     ) {
         Text(
-            text = "Точность ${accuracyMeters.formatMeters()} м",
+            text = "${accuracyMeters.formatMeters()} м",
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
             color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodySmall,
@@ -314,10 +323,8 @@ internal fun CompactGpsAccuracy(
 
 @Composable
 internal fun PhysicalObjectLocationControls(
-    label: String,
     canConfirm: Boolean,
     onConfirm: () -> Unit,
-    onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -325,20 +332,24 @@ internal fun PhysicalObjectLocationControls(
         shape = MaterialTheme.shapes.medium,
         tonalElevation = 4.dp,
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Row(
+            modifier = Modifier.padding(start = 12.dp, top = 6.dp, end = 6.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Положение: $label", style = MaterialTheme.typography.titleMedium)
-            Text("Переместите карту так, чтобы метка была на объекте")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onCancel) { Text("Отмена") }
-                Button(
-                    onClick = onConfirm,
-                    enabled = canConfirm,
-                    modifier = Modifier.testTag("confirm-physical-object-location"),
-                ) { Text("Подтвердить") }
-            }
+            Text(
+                text = "Подтвердите положение объекта",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(
+                onClick = onConfirm,
+                enabled = canConfirm,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                modifier = Modifier
+                    .height(48.dp)
+                    .testTag("confirm-physical-object-location"),
+            ) { Text("OK") }
         }
     }
 }

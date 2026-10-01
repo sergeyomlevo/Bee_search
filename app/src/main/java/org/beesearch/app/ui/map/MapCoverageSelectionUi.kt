@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -30,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 
-internal const val ENTER_COVERAGE_SELECTION_DESCRIPTION = "Сформировать offline coverage"
 internal const val ADD_COVERAGE_FRAGMENT_DESCRIPTION = "Добавить видимый участок карты"
 internal const val START_COVERAGE_FRAGMENT_DESCRIPTION = "Начать создание участка"
 internal const val CANCEL_COVERAGE_FRAGMENT_DESCRIPTION = "Отменить создание участка"
@@ -172,22 +170,6 @@ internal fun OfflineMapPackagePanel(
 }
 
 @Composable
-internal fun CoverageSelectionEntry(
-    onEnter: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    FilledTonalIconButton(
-        onClick = onEnter,
-        modifier = modifier
-            .size(48.dp)
-            .semantics { contentDescription = ENTER_COVERAGE_SELECTION_DESCRIPTION }
-            .testTag("enter-coverage-selection"),
-    ) {
-        CoverageGlyph()
-    }
-}
-
-@Composable
 internal fun MapCoverageSelectionControls(
     fragmentCount: Int,
     viewportSummary: MapAreaBoundsSummary?,
@@ -295,7 +277,6 @@ internal fun MapCoverageSelectionControls(
         }
     }
 }
-
 /** Compact controls shown while a new Ареал draft is being positioned on the map. */
 @Composable
 internal fun AreaCreationControls(
@@ -592,31 +573,5 @@ private fun MapCoverageFragment.toScreenPath(map: MapLibreMap): Path {
         moveTo(corners.first().x, corners.first().y)
         corners.drop(1).forEach { corner -> lineTo(corner.x, corner.y) }
         close()
-    }
-}
-
-@Composable
-private fun CoverageGlyph() {
-    val color = androidx.compose.material3.LocalContentColor.current
-    Canvas(Modifier.size(24.dp)) {
-        val inset = 3.dp.toPx()
-        drawRect(
-            color = color,
-            topLeft = Offset(inset, inset),
-            size = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2),
-            style = Stroke(width = 2.dp.toPx()),
-        )
-        drawLine(
-            color = color,
-            start = Offset(size.width / 2f, 7.dp.toPx()),
-            end = Offset(size.width / 2f, size.height - 7.dp.toPx()),
-            strokeWidth = 2.dp.toPx(),
-        )
-        drawLine(
-            color = color,
-            start = Offset(7.dp.toPx(), size.height / 2f),
-            end = Offset(size.width - 7.dp.toPx(), size.height / 2f),
-            strokeWidth = 2.dp.toPx(),
-        )
     }
 }

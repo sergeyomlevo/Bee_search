@@ -17,4 +17,29 @@ class LocationUiStateTest {
         assertEquals(LocationUiState.PermissionRequired, LocationUiState.PermissionRequired)
         assert(LocationUiState.PermissionRequired != LocationUiState.WaitingForFix)
     }
+
+    @Test
+    fun available_fix_remains_visible_while_foreground_tracking_restarts() {
+        val available = LocationUiState.Available(
+            LocationReading(55.75, 37.61, 8.5, Instant.ofEpochMilli(1234)),
+        )
+
+        assertEquals(available, available.awaitingNextFix(preserveAvailable = true))
+        assertEquals(
+            LocationUiState.WaitingForFix,
+            available.awaitingNextFix(preserveAvailable = false),
+        )
+    }
+
+    @Test
+    fun state_without_a_fix_waits_for_the_next_location_callback() {
+        assertEquals(
+            LocationUiState.WaitingForFix,
+            LocationUiState.PermissionRequired.awaitingNextFix(preserveAvailable = true),
+        )
+        assertEquals(
+            LocationUiState.WaitingForFix,
+            LocationUiState.Unavailable("GPS выключен").awaitingNextFix(preserveAvailable = true),
+        )
+    }
 }

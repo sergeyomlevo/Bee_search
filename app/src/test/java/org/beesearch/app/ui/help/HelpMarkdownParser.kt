@@ -156,7 +156,7 @@ internal fun renderHelpContent(parsed: ParsedHelp): String = buildString {
     appendLine("/**")
     appendLine(" * One optional image of a help section.")
     appendLine(" *")
-    appendLine(" * [resourceName] is the drawable name in `res/drawable-nodpi/help/`; the image is shown only when")
+    appendLine(" * [resourceName] is the drawable name in `res/drawable-nodpi/`; the image is shown only when")
     appendLine(" * such a resource actually exists, so a planned slot never leaves an empty gap.")
     appendLine(" * [contentDescription] describes the image for accessibility.")
     appendLine(" */")

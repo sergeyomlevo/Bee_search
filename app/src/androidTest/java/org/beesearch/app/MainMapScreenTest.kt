@@ -2,9 +2,12 @@ package org.beesearch.app
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHasClickAction
@@ -16,11 +19,13 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.Density
 import java.time.Instant
 import java.util.UUID
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.ui.map.CREATE_RECORD_DESCRIPTION
+import org.beesearch.app.ui.map.FieldMapGpsTargetGuide
 import org.beesearch.app.ui.map.OBJECTS_DESCRIPTION
 import org.beesearch.app.ui.map.CompactMapStatus
 import org.beesearch.app.ui.map.MAIN_BOTTOM_PANEL_TAG
@@ -32,6 +37,7 @@ import org.beesearch.app.ui.map.MapIdleControls
 import org.beesearch.app.ui.map.PhysicalObjectLocationControls
 import org.beesearch.app.ui.map.RECENTER_MAP_DESCRIPTION
 import org.beesearch.app.ui.map.SETTINGS_DESCRIPTION
+import org.beesearch.app.ui.map.TerritoryCodeBadge
 import org.beesearch.app.ui.settings.SettingsScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertTrue
@@ -57,7 +63,9 @@ class MainMapScreenTest {
                 ) { mapModifier ->
                     Box(mapModifier.testTag(MAIN_MAP_VIEWPORT_TAG)) {
                         CompactMapStatus(
+                            territoryCode = "DEV",
                             accuracyMeters = 3.8,
+                            zoom = 15.0,
                             measurement = null,
                             modifier = Modifier.align(Alignment.TopStart),
                         )
@@ -94,8 +102,10 @@ class MainMapScreenTest {
         composeRule.onNodeWithText("Смещение от GPS", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Управление территориями").assertDoesNotExist()
         composeRule.onNodeWithText("KLYAZMA — Клязьминско-Лухский заказник").assertDoesNotExist()
+        composeRule.onNodeWithText("DEV").assertIsDisplayed()
         composeRule.onNodeWithTag("gps-accuracy-overlay").assertIsDisplayed()
-        composeRule.onNodeWithText("Точность", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Точность", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("z 15").assertIsDisplayed()
         composeRule.onNodeWithTag("map-measurement-overlay").assertDoesNotExist()
         composeRule.onNodeWithText("0 м", substring = true).assertDoesNotExist()
         composeRule
@@ -253,28 +263,115 @@ class MainMapScreenTest {
     }
 
     @Test
-    fun physicalObjectLocationUsesMapCenterConfirmationAndCanBeCancelled() {
+    fun physicalObjectLocationUsesCompactMapCenterConfirmation() {
         var confirmed = false
-        var cancelled = false
         composeRule.setContent {
             Bee_searchTheme {
                 PhysicalObjectLocationControls(
-                    label = "Дупло",
                     canConfirm = true,
                     onConfirm = { confirmed = true },
-                    onCancel = { cancelled = true },
                 )
             }
         }
 
-        composeRule.onNodeWithText("Переместите карту так, чтобы метка была на объекте")
-            .assertIsDisplayed()
+        composeRule.onNodeWithText("Подтвердите положение объекта").assertIsDisplayed()
+        composeRule.onNodeWithText("Отмена").assertDoesNotExist()
+        composeRule.onNodeWithText("OK").assertIsDisplayed()
         composeRule.onNodeWithTag("confirm-physical-object-location").performClick()
-        composeRule.onNodeWithText("Отмена").performClick()
         composeRule.runOnIdle {
             assertTrue(confirmed)
-            assertTrue(cancelled)
         }
+    }
+
+    @Test
+    fun physicalObjectLocationConfirmationRemainsUsableAtLargeFontScale() {
+        val deviceDensity = composeRule.density.density
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(deviceDensity, fontScale = 1.7f)) {
+                Bee_searchTheme {
+                    Box(Modifier.fillMaxSize()) {
+                        PhysicalObjectLocationControls(
+                            canConfirm = true,
+                            onConfirm = {},
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Подтвердите положение объекта").assertIsDisplayed()
+        composeRule.onNodeWithText("OK").assertIsDisplayed().assertHasClickAction()
+    }
+
+    @Test
+    fun territoryCodeBadgeShowsOnlyTheCompactCode() {
+        composeRule.setContent {
+            Bee_searchTheme { TerritoryCodeBadge("KLYAZMA") }
+        }
+
+        composeRule.onNodeWithTag("current-territory-code").assertIsDisplayed()
+        composeRule.onNodeWithText("KLYAZMA").assertIsDisplayed()
+        composeRule.onNodeWithText("Клязьминско-Лухский заказник").assertDoesNotExist()
+    }
+
+    @Test
+    fun compactMapHeaderStaysOnOneLineAtLargeFontScale() {
+        val deviceDensity = composeRule.density.density
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(deviceDensity, fontScale = 1.7f)) {
+                Bee_searchTheme {
+                    Box(Modifier.fillMaxSize().testTag(MAIN_MAP_VIEWPORT_TAG)) {
+                        CompactMapStatus(
+                            territoryCode = "DEV",
+                            accuracyMeters = 5.7,
+                            zoom = 15.0,
+                            measurement = MapMeasurement(
+                                distanceMeters = 8.3,
+                                bearingDegrees = 323.0,
+                                directionAbbreviation = "СЗ",
+                            ),
+                            modifier = Modifier.align(Alignment.TopStart),
+                        )
+                    }
+                }
+            }
+        }
+
+        val code = composeRule.onNodeWithTag("current-territory-code").assertIsDisplayed()
+            .fetchSemanticsNode().boundsInRoot
+        val accuracy = composeRule.onNodeWithTag("gps-accuracy-overlay").assertIsDisplayed()
+            .fetchSemanticsNode().boundsInRoot
+        val zoom = composeRule.onNodeWithTag("map-zoom-indicator").assertIsDisplayed()
+            .fetchSemanticsNode().boundsInRoot
+        val measurement = composeRule.onNodeWithTag("map-measurement-overlay").assertIsDisplayed()
+            .fetchSemanticsNode().boundsInRoot
+        val viewport = composeRule.onNodeWithTag(MAIN_MAP_VIEWPORT_TAG).fetchSemanticsNode().boundsInRoot
+
+        assertTrue(kotlin.math.abs(code.center.y - accuracy.center.y) < code.height)
+        assertTrue(kotlin.math.abs(accuracy.center.y - zoom.center.y) < accuracy.height)
+        assertTrue(code.right <= accuracy.left && accuracy.right <= zoom.left)
+        assertTrue("Distance/bearing remains a separate row", measurement.top >= code.bottom)
+        assertTrue("Compact header must remain inside the map", zoom.right <= viewport.right)
+    }
+
+    @Test
+    fun mainMapShowsGpsTargetGuideWhenItsMeasurementIsVisible() {
+        composeRule.setContent {
+            Bee_searchTheme {
+                Box(Modifier.fillMaxSize()) {
+                    FieldMapGpsTargetGuide(
+                        gpsProjectedPosition = Offset(40f, 40f),
+                        isFieldMap = true,
+                        coverageSelectionActive = false,
+                        locationSelectionActive = false,
+                        measurementAvailable = true,
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(MAP_GPS_TARGET_GUIDE_TAG).assertIsDisplayed()
     }
 
     @Test
@@ -409,7 +506,7 @@ class MainMapScreenTest {
         composeRule.onNodeWithText("Гибрид").assertDoesNotExist()
     }
 
-    /** The selected mode is what the selector shows in its own label. */
+    /** The selected mode stays available to accessibility without occupying the map with text. */
     @Test
     fun basemapSelectorShowsTheHybridModeLabel() {
         composeRule.setContent {
@@ -426,8 +523,16 @@ class MainMapScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Источник карты: Гибрид").assertIsDisplayed()
-        composeRule.onNodeWithText("Гибрид ▾").assertIsDisplayed()
+        val selector = composeRule
+            .onNodeWithContentDescription("Источник карты: Гибрид")
+            .assertIsDisplayed()
+            .assertHasClickAction()
+        val minimumTouchTargetPx = with(composeRule.density) { 48f * density }
+        assertTrue(selector.fetchSemanticsNode().boundsInRoot.width >= minimumTouchTargetPx)
+        assertTrue(selector.fetchSemanticsNode().boundsInRoot.height >= minimumTouchTargetPx)
+        composeRule.onNodeWithText("Гибрид ▾").assertDoesNotExist()
+        selector.performClick()
+        composeRule.onNodeWithText("Гибрид").assertIsDisplayed()
     }
 
     private companion object {

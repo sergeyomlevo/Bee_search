@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -27,6 +30,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -43,9 +49,9 @@ import java.time.Instant
 import org.beesearch.app.BeeFieldState
 import org.beesearch.app.BeeLastReversibleAction
 import org.beesearch.app.BeeObservationCardModel
-import org.beesearch.app.formatAzimuthDegrees
 import org.beesearch.app.formatElapsedTime
 import org.beesearch.app.headingContentDescription
+import kotlin.math.roundToInt
 
 @Composable
 internal fun BeeObservationCard(
@@ -87,6 +93,15 @@ internal fun BeeObservationCard(
         liveHeading.accuracy != HeadingAccuracy.UNRELIABLE &&
         !isEventInProgress &&
         !isAzimuthInProgress
+    val liveDirectionDeg = liveHeading
+        ?.takeIf {
+            openCycle != null &&
+                !openCycle.azimuthCaptureConsumed &&
+                it.accuracy != HeadingAccuracy.UNRELIABLE
+        }
+        ?.trueHeadingDeg
+    val displayedDirectionDeg = latestCycle?.azimuthDeg ?: liveDirectionDeg?.toDouble()
+    val azimuthRotation = displayedDirectionDeg?.toFloat() ?: 0f
 
     val cardColors = when (state) {
         BeeFieldState.IN_FLIGHT -> CardDefaults.cardColors(
@@ -173,41 +188,29 @@ internal fun BeeObservationCard(
                                         },
                                     )
                                     .padding(horizontal = 6.dp)
-                                    .testTag("bee-azimuth-${card.bee.id}"),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = when {
-                                        isAzimuthInProgress -> "…°"
-                                        latestCycle?.azimuthDeg != null -> formatAzimuthDegrees(latestCycle.azimuthDeg)
-                                        openCycle == null -> "—°"
-                                        latestCycle?.azimuthCaptureConsumed == true -> "—°"
-                                        liveHeading != null && liveHeading.accuracy == HeadingAccuracy.UNRELIABLE -> "! —"
-                                        liveHeading != null && liveHeading.accuracy == HeadingAccuracy.LOW ->
-                                            "! ${liveHeading.trueHeadingDeg}°"
-                                        liveHeading != null -> "${liveHeading.trueHeadingDeg}°"
-                                        headingState is HeadingState.Initializing -> "…°"
-                                        else -> "нет"
-                                    },
-                                    color = when {
-                                        latestCycle?.azimuthDeg != null -> MaterialTheme.colorScheme.onSurface
-                                        liveHeading?.accuracy == HeadingAccuracy.LOW ||
-                                            liveHeading?.accuracy == HeadingAccuracy.UNRELIABLE ->
-                                            MaterialTheme.colorScheme.error
-                                        captureEnabled -> MaterialTheme.colorScheme.primary
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    },
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    modifier = Modifier.semantics {
+                                    .semantics {
                                         contentDescription = headingContentDescription(
                                             persistedAzimuth = latestCycle?.azimuthDeg,
                                             headingState = headingState,
                                             isInFlight = openCycle != null,
                                             captureConsumed = latestCycle?.azimuthCaptureConsumed == true,
                                         )
-                                    },
+                                        stateDescription = azimuthIndicatorStateDescription(
+                                            persistedAzimuth = latestCycle?.azimuthDeg,
+                                            liveDirectionDeg = liveDirectionDeg,
+                                            isInFlight = openCycle != null,
+                                            captureConsumed = latestCycle?.azimuthCaptureConsumed == true,
+                                            isCaptureInProgress = isAzimuthInProgress,
+                                            rotation = azimuthRotation,
+                                        )
+                                    }
+                                    .testTag("bee-azimuth-${card.bee.id}"),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                BeeDirectionIndicator(
+                                    directionDeg = displayedDirectionDeg,
+                                    isSaving = isAzimuthInProgress,
+                                    modifier = Modifier.testTag("bee-direction-visual-${card.bee.id}"),
                                 )
                             }
                         }
@@ -249,6 +252,76 @@ internal fun BeeObservationCard(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BeeDirectionIndicator(
+    directionDeg: Double?,
+    isSaving: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(DirectionIndicatorBackgroundSize)
+            .background(DirectionIndicatorBackground, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(
+            modifier = Modifier
+                .size(DirectionIndicatorVisualSize)
+                .graphicsLayer(rotationZ = directionDeg?.toFloat() ?: 0f),
+        ) {
+            val strokeWidth = 5.dp.toPx()
+            val centerX = size.width / 2f
+            val bottom = size.height - strokeWidth / 2f
+            val tip = Offset(centerX, strokeWidth / 2f)
+            val arrowHeadLength = 8.dp.toPx()
+            val arrowHeadSpread = 6.dp.toPx()
+            val strokeCap = StrokeCap.Round
+
+            when {
+                isSaving -> {
+                    drawCircle(
+                        color = DirectionIndicatorContent,
+                        radius = strokeWidth / 2f,
+                        center = Offset(centerX, size.height / 2f),
+                    )
+                }
+                directionDeg == null -> {
+                    drawLine(
+                        color = DirectionIndicatorContent,
+                        start = Offset(strokeWidth, size.height / 2f),
+                        end = Offset(size.width - strokeWidth, size.height / 2f),
+                        strokeWidth = strokeWidth,
+                        cap = strokeCap,
+                    )
+                }
+                else -> {
+                    drawLine(
+                        color = DirectionIndicatorContent,
+                        start = Offset(centerX, bottom),
+                        end = tip,
+                        strokeWidth = strokeWidth,
+                        cap = strokeCap,
+                    )
+                    drawLine(
+                        color = DirectionIndicatorContent,
+                        start = tip,
+                        end = Offset(tip.x - arrowHeadSpread, tip.y + arrowHeadLength),
+                        strokeWidth = strokeWidth,
+                        cap = strokeCap,
+                    )
+                    drawLine(
+                        color = DirectionIndicatorContent,
+                        start = tip,
+                        end = Offset(tip.x + arrowHeadSpread, tip.y + arrowHeadLength),
+                        strokeWidth = strokeWidth,
+                        cap = strokeCap,
+                    )
                 }
             }
         }
@@ -364,6 +437,8 @@ private fun BeeUndoIconButton(
 private val InFlightCardBackground = Color(0xFFDCEFFF)
 private val InFlightCardContent = Color(0xFF12324A)
 private val InFlightCardBorder = Color(0xFF176394)
+private val DirectionIndicatorBackground = Color(0xFFCBE7FA)
+private val DirectionIndicatorContent = Color(0xFF071D35)
 private val CorrectionActionContainer = Color(0xFFFFE1C6)
 private val CorrectionActionContent = Color(0xFF713B00)
 private val CorrectionActionBorder = Color(0xFF9A5200)
@@ -375,3 +450,28 @@ private val ChoiceCardContentDark = Color(0xFFEDEDED)
 private val ChoiceCardBorderDark = Color(0xFF9C9C9C)
 private val BeeAzimuthSlotWidth = 72.dp
 private val BeePrimaryActionWidth = 156.dp
+private val DirectionIndicatorBackgroundSize = 40.dp
+private val DirectionIndicatorVisualSize = 28.dp
+
+private fun azimuthIndicatorStateDescription(
+    persistedAzimuth: Double?,
+    liveDirectionDeg: Int?,
+    isInFlight: Boolean,
+    captureConsumed: Boolean,
+    isCaptureInProgress: Boolean,
+    rotation: Float,
+): String {
+    val source = when {
+        persistedAzimuth != null -> "Сохранённое направление"
+        !isInFlight -> "Направление не зафиксировано"
+        captureConsumed -> "Направление удалено; повторная фиксация недоступна"
+        isCaptureInProgress -> "Сохранение направления"
+        liveDirectionDeg != null -> "Текущее направление"
+        else -> "Направление недоступно"
+    }
+    return if (persistedAzimuth != null || liveDirectionDeg != null) {
+        "$source; поворот стрелки ${rotation.roundToInt()} градусов"
+    } else {
+        "$source; стрелка недоступна"
+    }
+}

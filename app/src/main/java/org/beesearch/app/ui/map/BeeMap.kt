@@ -2,6 +2,7 @@ package org.beesearch.app.ui.map
 
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
@@ -10,10 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,14 +45,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
-import java.util.Locale
 import java.util.UUID
+import kotlin.math.roundToInt
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
 import org.beesearch.app.MapCenterTarget
 import org.beesearch.app.MapGpsMarker
+import org.beesearch.app.MapGpsToTargetGuide
 import org.beesearch.app.MapTarget
 import org.beesearch.app.MapCenterRequest
 import org.beesearch.app.beeSearchFieldMapProfile
@@ -86,6 +91,7 @@ internal enum class BeeMapMode {
 internal fun BeeMap(
     territoryId: UUID?,
     territoryName: String?,
+    territoryCode: String? = null,
     areaStore: MapAreaStore,
     packageStore: MapPackageStore,
     locationState: LocationUiState,
@@ -98,7 +104,6 @@ internal fun BeeMap(
     onMapCenterRequestHandled: (UUID) -> Unit = {},
     onConfirmLocationSelection: (Double, Double) -> Unit = { _, _ -> },
     onCancelLocationSelection: () -> Unit = {},
-    onCoverageTerritoryMissing: () -> Unit = {},
     onOpenOfflineMaps: () -> Unit = {},
     /**
      * The pending request to open the участки editor; [AreaEditorRequest.NO_REQUEST] means nothing is
@@ -128,6 +133,7 @@ internal fun BeeMap(
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var gpsScreenPosition by remember { mutableStateOf<Offset?>(null) }
+    var gpsProjectedPosition by remember { mutableStateOf<Offset?>(null) }
     var firstFixCentered by remember { mutableStateOf(false) }
     var initialGpsCenterEstablished by remember { mutableStateOf(false) }
     var mapCenter by remember { mutableStateOf<MapTarget?>(null) }
@@ -449,11 +455,13 @@ internal fun BeeMap(
         LaunchedEffect(reading, map, mapView, mode) {
             if (mode != BeeMapMode.FIELD) {
                 gpsScreenPosition = null
+                gpsProjectedPosition = null
                 return@LaunchedEffect
             }
             val current = reading
             if (current == null) {
                 gpsScreenPosition = null
+                gpsProjectedPosition = null
                 return@LaunchedEffect
             }
             if (!firstFixCentered) {
@@ -470,7 +478,8 @@ internal fun BeeMap(
                     initialGpsCenterEstablished = true
                 }
             }
-            gpsScreenPosition = projectedMapPosition(map, mapView, gpsPosition)
+            gpsProjectedPosition = projectedMapPosition(map, mapView, gpsPosition)
+            gpsScreenPosition = gpsProjectedPosition?.takeIf { isMapPositionVisible(it, mapView) }
         }
 
         LaunchedEffect(map, mode, savedObjectMarkers.map(MapObjectMarker::id)) {
@@ -540,7 +549,10 @@ internal fun BeeMap(
                 onDispose { }
             } else {
                 val updateMapOverlays = {
-                    gpsScreenPosition = projectedMapPosition(mapInstance, currentMapView, gpsPosition)
+                    gpsProjectedPosition = projectedMapPosition(mapInstance, currentMapView, gpsPosition)
+                    gpsScreenPosition = gpsProjectedPosition?.takeIf {
+                        isMapPositionVisible(it, currentMapView)
+                    }
                     mapCameraRevision += 1
                     if (coverageSelectionMode) {
                         coverageViewportBounds = MapGeoBounds.fromMapLibre(
@@ -626,13 +638,28 @@ internal fun BeeMap(
                         developerBasemap = DeveloperBasemap.HYBRID
                     }
                 },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 60.dp, end = 16.dp)
-                    .zIndex(3f),
+                modifier = if (mode == BeeMapMode.FIELD && !coverageSelectionActive) {
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 16.dp, bottom = 28.dp)
+                        .zIndex(3f)
+                } else {
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 60.dp, end = 16.dp)
+                        .zIndex(3f)
+                },
             )
         }
 
+        FieldMapGpsTargetGuide(
+            gpsProjectedPosition = gpsProjectedPosition,
+            isFieldMap = mode == BeeMapMode.FIELD,
+            coverageSelectionActive = coverageSelectionActive,
+            locationSelectionActive = locationSelectionLabel != null,
+            measurementAvailable = measurement != null,
+            modifier = Modifier.fillMaxSize().zIndex(1f),
+        )
         gpsScreenPosition?.let { position ->
             MapGpsMarker(screenPosition = position, modifier = Modifier.zIndex(1f))
         }
@@ -648,17 +675,13 @@ internal fun BeeMap(
                 )
             }
         } else if (locationPermissionGranted && locationState is LocationUiState.Available) {
-            Row(
+            CompactMapStatus(
+                territoryCode = territoryCode,
+                accuracyMeters = locationState.reading.accuracyMeters,
+                zoom = mapZoom,
+                measurement = measurement,
                 modifier = Modifier.align(Alignment.TopStart).padding(8.dp).zIndex(3f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                CompactMapStatus(
-                    accuracyMeters = locationState.reading.accuracyMeters,
-                    measurement = measurement,
-                )
-                mapZoom?.let { zoom -> MapZoomIndicator(zoom = zoom) }
-            }
+            )
         } else {
             mapZoom?.let { zoom ->
                 MapZoomIndicator(
@@ -666,23 +689,27 @@ internal fun BeeMap(
                     modifier = Modifier.align(Alignment.TopCenter).padding(8.dp).zIndex(3f),
                 )
             }
-            Card(
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(12.dp)
+                    .padding(8.dp)
                     .zIndex(3f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    when {
-                        !locationPermissionGranted -> Button(onClick = onRequestLocationPermission) {
-                            Text("Разрешить доступ к местоположению")
+                territoryCode?.takeIf(String::isNotBlank)?.let { TerritoryCodeBadge(it) }
+                Card {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        when {
+                            !locationPermissionGranted -> Button(onClick = onRequestLocationPermission) {
+                                Text("Разрешить доступ к местоположению")
+                            }
+                            locationState is LocationUiState.Unavailable -> Text(locationState.message)
+                            else -> Text("Ожидание GPS…")
                         }
-                        locationState is LocationUiState.Unavailable -> Text(locationState.message)
-                        else -> Text("Ожидание GPS…")
                     }
                 }
             }
@@ -717,14 +744,12 @@ internal fun BeeMap(
 
         if (mode == BeeMapMode.FIELD && !coverageSelectionActive && locationSelectionLabel != null) {
             PhysicalObjectLocationControls(
-                label = locationSelectionLabel,
                 canConfirm = map?.cameraPosition?.target != null,
                 onConfirm = {
                     map?.cameraPosition?.target?.let { target ->
                         onConfirmLocationSelection(target.latitude, target.longitude)
                     }
                 },
-                onCancel = onCancelLocationSelection,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
@@ -793,29 +818,6 @@ internal fun BeeMap(
         } else if (mode == BeeMapMode.AREA_VIEW && territoryId != null) {
             AreaViewControls(
                 onEditSections = onEditAreaSections,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(16.dp)
-                    .zIndex(3f),
-            )
-        } else if (
-            mode == BeeMapMode.FIELD && territoryId != null && locationSelectionLabel == null
-        ) {
-            CoverageSelectionEntry(
-                onEnter = {
-                    if (!coverageLoading && coverageLoadedFor == territoryId) {
-                        // A damaged stored value is not silently replaced by an empty editor.
-                        if (persistedArea is MapAreaReadResult.Corrupt) {
-                            Toast.makeText(appContext, CORRUPT_AREA_MESSAGE, Toast.LENGTH_LONG).show()
-                        }
-                        editingTerritoryId = territoryId
-                        workingCoverage = persistedCoverage
-                        coverageSelectionMode = true
-                        coverageFragmentEditorVisible = true
-                    } else {
-                        onCoverageTerritoryMissing()
-                    }
-                },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(16.dp)
@@ -918,38 +920,73 @@ internal fun MapBasemapSourceSelector(
     var menuExpanded by remember { mutableStateOf(false) }
     Surface(
         modifier = modifier
-            .testTag("map-basemap-source-selector")
-            .semantics {
-                contentDescription = "Источник карты: $modeLabel"
-            },
+            .testTag("map-basemap-source-selector"),
         shape = MaterialTheme.shapes.small,
         tonalElevation = 2.dp,
         shadowElevation = 1.dp,
     ) {
-        Column {
-            Box {
-                TextButton(onClick = { menuExpanded = true }) {
-                    Text(
-                        "$modeLabel ▾",
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                        fontSize = developerControlFontSize,
-                    )
+        Box {
+            IconButton(
+                onClick = { menuExpanded = true },
+                modifier = Modifier
+                    .size(48.dp)
+                    .semantics { contentDescription = "Источник карты: $modeLabel" },
+            ) {
+                LayersGlyph(Modifier.size(26.dp))
+            }
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                val itemModifier = Modifier.height(48.dp)
+                val itemPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                DropdownMenuItem(text = { Text("Онлайн карта", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectOnline() }, contentPadding = itemPadding, modifier = itemModifier)
+                DropdownMenuItem(text = { Text("Векторная карта", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectVectorMap() }, contentPadding = itemPadding, modifier = itemModifier)
+                if (devMapBasemapsEnabled && devSentinelAvailable) {
+                    DropdownMenuItem(text = { Text("Спутник Sentinel", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectSentinel() }, contentPadding = itemPadding, modifier = itemModifier)
                 }
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    val itemModifier = Modifier.height(40.dp)
-                    val itemPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    DropdownMenuItem(text = { Text("Онлайн карта", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectOnline() }, contentPadding = itemPadding, modifier = itemModifier)
-                    DropdownMenuItem(text = { Text("Векторная карта", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectVectorMap() }, contentPadding = itemPadding, modifier = itemModifier)
-                    if (devMapBasemapsEnabled && devSentinelAvailable) {
-                        DropdownMenuItem(text = { Text("Спутник Sentinel", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectSentinel() }, contentPadding = itemPadding, modifier = itemModifier)
-                    }
-                    if (devMapBasemapsEnabled && devHybridAvailable) {
-                        DropdownMenuItem(text = { Text("Гибрид", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectHybrid() }, contentPadding = itemPadding, modifier = itemModifier)
-                    }
+                if (devMapBasemapsEnabled && devHybridAvailable) {
+                    DropdownMenuItem(text = { Text("Гибрид", fontSize = developerControlFontSize) }, onClick = { menuExpanded = false; onSelectHybrid() }, contentPadding = itemPadding, modifier = itemModifier)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LayersGlyph(modifier: Modifier = Modifier) {
+    val color = LocalContentColor.current
+    Canvas(modifier = modifier) {
+        val left = size.width * 0.12f
+        val right = size.width * 0.88f
+        val centerX = size.width / 2f
+        fun layer(top: Float) {
+            val path = androidx.compose.ui.graphics.Path().apply {
+                moveTo(centerX, top)
+                lineTo(right, top + size.height * 0.2f)
+                lineTo(centerX, top + size.height * 0.4f)
+                lineTo(left, top + size.height * 0.2f)
+                close()
+            }
+            drawPath(path, color = color, style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
+        }
+        layer(size.height * 0.04f)
+        layer(size.height * 0.3f)
+        layer(size.height * 0.56f)
+    }
+}
+
+@Composable
+internal fun TerritoryCodeBadge(code: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.testTag("current-territory-code"),
+        shape = MaterialTheme.shapes.small,
+        tonalElevation = 2.dp,
+        shadowElevation = 1.dp,
+    ) {
+        Text(
+            text = code,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+        )
     }
 }
 
@@ -992,7 +1029,41 @@ internal fun MapZoomIndicator(
 
 internal fun formatMapZoom(zoom: Double): String {
     require(zoom.isFinite())
-    return String.format(Locale.ROOT, "z %.1f", zoom)
+    return "z ${zoom.roundToInt()}"
+}
+
+internal fun shouldShowGpsTargetGuide(
+    isFieldMap: Boolean,
+    coverageSelectionActive: Boolean,
+    locationSelectionActive: Boolean,
+    measurementAvailable: Boolean,
+): Boolean = isFieldMap &&
+    !coverageSelectionActive &&
+    (locationSelectionActive || measurementAvailable)
+
+@Composable
+internal fun FieldMapGpsTargetGuide(
+    gpsProjectedPosition: Offset?,
+    isFieldMap: Boolean,
+    coverageSelectionActive: Boolean,
+    locationSelectionActive: Boolean,
+    measurementAvailable: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (
+        gpsProjectedPosition != null &&
+        shouldShowGpsTargetGuide(
+            isFieldMap = isFieldMap,
+            coverageSelectionActive = coverageSelectionActive,
+            locationSelectionActive = locationSelectionActive,
+            measurementAvailable = measurementAvailable,
+        )
+    ) {
+        MapGpsToTargetGuide(
+            gpsScreenPosition = gpsProjectedPosition,
+            modifier = modifier,
+        )
+    }
 }
 
 private fun projectedMapPosition(
@@ -1002,10 +1073,13 @@ private fun projectedMapPosition(
 ): Offset? {
     if (map == null || mapView == null || target == null || mapView.width <= 0 || mapView.height <= 0) return null
     val point = map.projection.toScreenLocation(LatLng(target.latitude, target.longitude))
-    return Offset(point.x, point.y).takeIf {
-        it.x in 0f..mapView.width.toFloat() && it.y in 0f..mapView.height.toFloat()
-    }
+    return Offset(point.x, point.y)
 }
+
+private fun isMapPositionVisible(position: Offset, mapView: MapView?): Boolean =
+    mapView != null &&
+        position.x in 0f..mapView.width.toFloat() &&
+        position.y in 0f..mapView.height.toFloat()
 
 private class MapViewLifecycleController {
     private var mapView: MapView? = null

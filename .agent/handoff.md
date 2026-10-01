@@ -1,5 +1,30 @@
 # Bee Search handoff
 
+## Active uncommitted milestone — Help V2 illustrations
+
+The owner-approved Help V2 illustration pass is complete in the current dirty
+worktree, based on baseline HEAD `28ebc00f9ebb2265b4e85ed6c9b059477320085c`.
+Do not discard the surrounding uncommitted UI/map/observation work and do not
+commit or push before owner review.
+
+`docs/ui/help/help-v2.md` remains the canonical source. It now declares exactly
+three real Samsung screenshot resources for `Основная информация карты`,
+`Управление картой` and `Экран активного наблюдения`; the generated
+`HelpContent.kt` is synchronized through the existing generator. The phone
+layout is intentionally vertical: full-width screenshot followed by native
+Help text, with normal vertical scrolling instead of a narrow two-column
+composition. After owner review, the detailed-help order is initial setup,
+map information, map controls, then observer and territory settings.
+
+Verification completed: Help generation and drift/content tests, Help Compose
+instrumentation (`8/8` on Samsung SM-S938B), `assembleDebug`,
+`compileDebugAndroidTestKotlin`, `lintDebug` and `git diff --check` pass. DEV
+was installed in place as `org.beesearch.app.dev`; no clear or uninstall was
+used. Manual device review at system `font_scale=1.7` confirmed all three
+screenshots and their native explanations remain readable, scroll correctly
+and do not overlap. The map controls, GPS-to-target guide, all three observation
+states and Bee direction arrows are visually distinguishable.
+
 ## Current release
 
 Beta `1.3.0-beta.4` (versionCode 7) was published locally from commit

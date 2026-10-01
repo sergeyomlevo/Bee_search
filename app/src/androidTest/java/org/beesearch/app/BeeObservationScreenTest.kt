@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.assertIsDisplayed
@@ -70,6 +71,31 @@ class BeeObservationScreenTest {
         color = "BLUE",
         position = MarkPosition.ABDOMEN,
     )
+
+    private fun assertAzimuthRotation(beeId: UUID, expectedDegrees: Int) {
+        val stateDescription = composeRule.onNodeWithTag("bee-azimuth-$beeId")
+            .fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
+        assertTrue(
+            "Expected azimuth arrow rotation $expectedDegrees, got $stateDescription",
+            stateDescription?.contains("поворот стрелки $expectedDegrees градусов") == true,
+        )
+    }
+
+    private fun assertAzimuthStateContains(beeId: UUID, expected: String) {
+        val stateDescription = composeRule.onNodeWithTag("bee-azimuth-$beeId")
+            .fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
+        assertTrue(
+            "Expected azimuth state to contain '$expected', got $stateDescription",
+            stateDescription?.contains(expected) == true,
+        )
+    }
+
+    private fun assertDirectionVisualSize(beeId: UUID) {
+        composeRule.onNodeWithTag("bee-azimuth-$beeId").assertIsDisplayed()
+        composeRule.onNodeWithTag("bee-direction-visual-$beeId", useUnmergedTree = true)
+            .assertWidthIsEqualTo(40.dp)
+            .assertHeightIsEqualTo(40.dp)
+    }
 
     @Test
     fun emptyObservationShowsDerivedMarkChoicesAndStartsSelectedMark() {
@@ -869,17 +895,17 @@ class BeeObservationScreenTest {
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
             .assertHeightIsAtLeast(48.dp)
             .assertIsEnabled()
-            .assertTextContains("247°")
             .performClick()
+        assertAzimuthRotation(flyingBee.id, 247)
         composeRule.onNodeWithTag("azimuth-undo-banner").assertDoesNotExist()
         composeRule.onNodeWithTag("bee-undo-${flyingBee.id}")
             .assertIsDisplayed()
             .assertHeightIsAtLeast(48.dp)
         composeRule.runOnIdle { heading.value = availableHeading(250) }
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
-            .assertTextContains("247°")
             .assertIsNotEnabled()
             .performTouchInput { click() }
+        assertAzimuthRotation(flyingBee.id, 247)
         composeRule.runOnIdle {
             assertEquals(selectedCycle.id, savedCycleId)
             assertEquals(247.0, savedAzimuth)
@@ -888,10 +914,11 @@ class BeeObservationScreenTest {
 
         composeRule.onNodeWithTag("bee-undo-${flyingBee.id}").performClick()
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
-            .assertTextContains("—°")
             .assertIsNotEnabled()
             .assertHeightIsAtLeast(48.dp)
             .performTouchInput { click() }
+        assertAzimuthStateContains(flyingBee.id, "повторная фиксация недоступна")
+        assertAzimuthStateContains(flyingBee.id, "стрелка недоступна")
         composeRule.runOnIdle {
             assertEquals(247.0, savedAzimuth)
             assertEquals(1, saveRequests)
@@ -921,14 +948,15 @@ class BeeObservationScreenTest {
         }
 
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
-            .assertTextContains("нет")
             .assertIsNotEnabled()
+        assertAzimuthStateContains(flyingBee.id, "Направление недоступно")
         composeRule.runOnIdle {
             heading.value = availableHeading(0, HeadingAccuracy.UNRELIABLE)
         }
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
-            .assertTextContains("! —")
             .assertIsNotEnabled()
+        assertAzimuthStateContains(flyingBee.id, "Направление недоступно")
+        assertAzimuthStateContains(flyingBee.id, "стрелка недоступна")
         composeRule.runOnIdle { assertEquals(0, saveRequests) }
     }
 
@@ -955,8 +983,8 @@ class BeeObservationScreenTest {
         }
 
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
-            .assertTextContains("90°")
             .assertIsNotEnabled()
+        assertAzimuthRotation(flyingBee.id, 90)
         composeRule.runOnIdle {
             cycles.value = listOf(
                 firstCycle,
@@ -964,8 +992,74 @@ class BeeObservationScreenTest {
             )
         }
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
-            .assertTextContains("250°")
             .assertIsEnabled()
+        assertAzimuthRotation(flyingBee.id, 250)
+    }
+
+    @Test
+    fun liveAzimuthArrowFollowsHeadingUntilCaptureThenStaysPersisted() {
+        val heading = MutableStateFlow(availableHeading(35))
+        val cycles = mutableStateOf(listOf(cycle(flyingBee, 1, releaseTime, null)))
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = listOf(flyingBee),
+                    flightCycles = cycles.value,
+                    beeEventInProgressIds = emptySet(),
+                    headingProvider = HeadingProvider { heading },
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onSetFlightAzimuth = { cycleId, value, onSuccess ->
+                        cycles.value = cycles.value.map { cycle ->
+                            if (cycle.id == cycleId) cycle.copy(azimuthDeg = value) else cycle
+                        }
+                        onSuccess()
+                    },
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        assertDirectionVisualSize(flyingBee.id)
+        assertAzimuthRotation(flyingBee.id, 35)
+        composeRule.runOnIdle { heading.value = availableHeading(48) }
+        assertAzimuthRotation(flyingBee.id, 48)
+        composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}").performClick()
+        assertAzimuthRotation(flyingBee.id, 48)
+        composeRule.runOnIdle { heading.value = availableHeading(70) }
+        assertAzimuthRotation(flyingBee.id, 48)
+    }
+
+    @Test
+    fun savedAzimuthArrowsRemainDistinguishableAcrossBeeCards() {
+        val first = flyingBee
+        val second = atPointBee
+        composeRule.setContent {
+            Bee_searchTheme {
+                BeeObservationScreen(
+                    point = point(),
+                    bees = listOf(first, second),
+                    flightCycles = listOf(
+                        cycle(first, 1, releaseTime, null, azimuthDeg = 42.0),
+                        cycle(second, 1, releaseTime, returnTime, azimuthDeg = 217.0),
+                    ),
+                    beeEventInProgressIds = emptySet(),
+                    isCompleting = false,
+                    onRegisterReturn = {},
+                    onStartNextFlight = {},
+                    onComplete = {},
+                    nowProvider = { now },
+                )
+            }
+        }
+
+        assertDirectionVisualSize(first.id)
+        assertDirectionVisualSize(second.id)
+        assertAzimuthRotation(first.id, 42)
+        assertAzimuthRotation(second.id, 217)
     }
 
     @Test
@@ -999,10 +1093,11 @@ class BeeObservationScreenTest {
         }
 
         composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
-            .assertTextContains("—°")
             .assertIsNotEnabled()
             .assertHeightIsAtLeast(48.dp)
             .performTouchInput { click() }
+        assertAzimuthStateContains(flyingBee.id, "повторная фиксация недоступна")
+        assertAzimuthStateContains(flyingBee.id, "стрелка недоступна")
         composeRule.runOnIdle { assertEquals(0, captureRequests) }
     }
 
@@ -1030,9 +1125,9 @@ class BeeObservationScreenTest {
 
         repeat(2) {
             composeRule.onNodeWithTag("bee-azimuth-${flyingBee.id}")
-                .assertTextContains("250°")
                 .assertIsEnabled()
                 .performClick()
+            assertAzimuthRotation(flyingBee.id, 250)
         }
         composeRule.onNodeWithTag("azimuth-undo-banner").assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(2, captureRequests) }
@@ -1121,11 +1216,11 @@ class BeeObservationScreenTest {
         }
 
         composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}")
-            .assertTextContains("132°")
             .assertIsNotEnabled()
             .performTouchInput { click() }
+        assertAzimuthRotation(atPointBee.id, 132)
         composeRule.runOnIdle { heading.value = availableHeading(280) }
-        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").assertTextContains("132°")
+        assertAzimuthRotation(atPointBee.id, 132)
         composeRule.runOnIdle { assertEquals(0, saveRequests) }
     }
 
@@ -1168,8 +1263,8 @@ class BeeObservationScreenTest {
         composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").assertIsDisplayed()
         composeRule.onNodeWithTag("bee-action-${atPointBee.id}").performClick()
         composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}")
-            .assertTextContains("269°")
             .assertIsEnabled()
+        assertAzimuthRotation(atPointBee.id, 269)
     }
 
     @Test
@@ -1422,10 +1517,11 @@ class BeeObservationScreenTest {
         composeRule.onNodeWithText("В полёте").assertIsDisplayed()
         composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").assertIsDisplayed()
         composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").performClick()
-        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").assertTextContains("269°")
+        assertAzimuthRotation(atPointBee.id, 269)
 
         composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").performClick()
-        composeRule.onNodeWithTag("bee-azimuth-${atPointBee.id}").assertTextContains("—°")
+        assertAzimuthStateContains(atPointBee.id, "повторная фиксация недоступна")
+        assertAzimuthStateContains(atPointBee.id, "стрелка недоступна")
         composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").assertIsDisplayed()
 
         composeRule.onNodeWithTag("bee-undo-${atPointBee.id}").performClick()

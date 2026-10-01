@@ -80,8 +80,13 @@ class HelpScreenTest {
             composeRule.onNodeWithText(section.title).assertExists()
             composeRule.onNodeWithText("Развернуть: ${section.title}").assertDoesNotExist()
             composeRule.onNodeWithText("Свернуть: ${section.title}").assertDoesNotExist()
-            composeRule.onNodeWithTag("help-section-$index")
-                .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            if (section.blocks.isEmpty()) {
+                composeRule.onNodeWithTag("help-section-header-$index").assertIsDisplayed()
+                composeRule.onNodeWithTag("help-section-$index").assertDoesNotExist()
+            } else {
+                composeRule.onNodeWithTag("help-section-$index")
+                    .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            }
         }
     }
 
@@ -119,22 +124,35 @@ class HelpScreenTest {
     }
 
     @Test
-    fun aDeclaredImageSlotWithoutAResourceLeavesNoGap() {
-        val index = sectionIndex("Главный экран: карта")
-        assertTrue("the main screen section must exist", index > 0)
+    fun currentSamsungScreenshotIsShownInTheExpandedSection() {
+        val index = sectionIndex("Основная информация карты")
+        assertTrue("the map information section must exist", index > 0)
         composeRule.setContent { Bee_searchTheme { HelpScreen(exchangeStorage = exchangeStorage, onBack = {}) } }
 
         composeRule.onNodeWithTag("help-screen").performScrollToIndex(headerItems() + index)
         composeRule.onNodeWithTag("help-section-$index").performClick()
 
-        // The canonical source declares an image slot here, but no drawable is shipped yet: the help
-        // shows the text and must not compose an image node for the missing resource.
         val visualBlock = sections()[index].blocks.indexOfFirst { it is HelpBlock.Visual }
         assertTrue("the canonical source must declare an image slot", visualBlock >= 0)
         composeRule.onNodeWithTag("help-screen")
-            .performScrollToNode(hasText("не подписаны текстом", substring = true))
-        composeRule.onNodeWithText("не подписаны текстом", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithTag("help-section-$index-block-$visualBlock").assertDoesNotExist()
+            .performScrollToNode(hasText("Код территории", substring = true))
+        composeRule.onNodeWithText("Код территории", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("help-section-$index-block-$visualBlock").assertExists()
+    }
+
+    @Test
+    fun everyDeclaredScreenshotHasAnAndroidDrawable() {
+        val resources = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.resources
+        val packageName = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.packageName
+        val visuals = sections().flatMap { section -> section.blocks.filterIsInstance<HelpBlock.Visual>() }
+
+        assertEquals(3, visuals.size)
+        visuals.forEach { block ->
+            assertTrue(
+                "missing drawable for ${block.visual.resourceName}",
+                resources.getIdentifier(block.visual.resourceName, "drawable", packageName) != 0,
+            )
+        }
     }
 
     @Test
@@ -164,6 +182,6 @@ class HelpScreenTest {
     private companion object {
         const val EXPANDED_STATE = "Развёрнуто"
         const val EXCHANGE_PATH_FRAGMENT = "Download/BeeSearch/Beta/Exchange"
-        const val TITLES_MIDDLE_INDEX = 12
+        const val TITLES_MIDDLE_INDEX = 14
     }
 }

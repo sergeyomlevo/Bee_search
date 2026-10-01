@@ -155,12 +155,19 @@ private fun BeeSearchApp(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val locationTrackingActive = route is AppRoute.CurrentTerritory &&
-        lifecycleState.isAtLeast(Lifecycle.State.STARTED)
-    LaunchedEffect(locationPermissionGranted, locationTrackingActive) {
+    val appStarted = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
+    val locationTrackingActive = route is AppRoute.CurrentTerritory && appStarted
+    val preserveAvailableFixDuringInternalNavigation = appStarted &&
+        route !is AppRoute.CurrentTerritory
+    LaunchedEffect(
+        locationPermissionGranted,
+        locationTrackingActive,
+        preserveAvailableFixDuringInternalNavigation,
+    ) {
         viewModel.setLocationTracking(
             permissionGranted = locationPermissionGranted,
             active = locationTrackingActive,
+            preserveAvailableFix = preserveAvailableFixDuringInternalNavigation,
         )
     }
 
