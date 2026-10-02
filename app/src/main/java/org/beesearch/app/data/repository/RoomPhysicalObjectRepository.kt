@@ -24,6 +24,8 @@ import org.beesearch.app.domain.model.NewHollow
 import org.beesearch.app.domain.model.NewLogHive
 import org.beesearch.app.domain.model.PhysicalObjectInUseException
 import org.beesearch.app.domain.model.PhysicalObjectMedia
+import org.beesearch.app.domain.model.PhysicalObjectReference
+import org.beesearch.app.domain.model.PhysicalObjectReferenceKind
 import org.beesearch.app.domain.model.PhysicalObjectSequenceResetBlockedException
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.model.TerritoryPhysicalObjects
@@ -233,10 +235,11 @@ internal class RoomPhysicalObjectRepository(
     /**
      * Deletes one object and its owned rows inside a single transaction.
      *
-     * Working or historical references are checked first and block the deletion, so a Bee link is
-     * never destroyed silently; the `RESTRICT` foreign keys remain the second, structural line of
-     * defence. The numbering high-water mark is deliberately not touched: an ordinary deletion never
-     * frees a number.
+     * Working or historical references are collected first and block the deletion, so a Bee link is
+     * never destroyed silently and the user learns which data is involved; the `RESTRICT` foreign keys
+     * remain the second, structural line of defence. While the deletion is blocked nothing is
+     * removed: no media row, no subtype row, no identity row and no file. The numbering high-water
+     * mark is deliberately not touched: an ordinary deletion never frees a number.
      */
     private suspend fun deleteObject(
         id: UUID,
@@ -245,12 +248,30 @@ internal class RoomPhysicalObjectRepository(
     ): PhysicalObjectDeletion = database.withTransaction {
         val identity = objectDao.getById(id)?.takeIf { it.objectType == type }
             ?: throw EntityNotFoundException(type.entityLabel())
-        if (objectDao.countBeeReferences(id) != 0) throw PhysicalObjectInUseException()
+        val blockers = deletionBlockers(id)
+        if (blockers.isNotEmpty()) throw PhysicalObjectInUseException(blockers)
         val mediaPaths = objectDao.getMedia(id).map { it.relativePath }
         objectDao.deleteMediaForObject(id)
         if (deleteSubtype(id) != 1) throw EntityNotFoundException(type.entityLabel())
         if (objectDao.deleteIdentity(id, type) != 1) throw EntityNotFoundException(type.entityLabel())
         PhysicalObjectDeletion(id, mediaPaths)
+    }
+
+    /**
+     * Every persisted reference that makes this object undeletable, in kind declaration order.
+     *
+     * The query of each kind is chosen exhaustively, so adding a
+     * [PhysicalObjectReferenceKind] without its reference count is a compile error rather than a
+     * silently ignored blocker.
+     */
+    private suspend fun deletionBlockers(objectId: UUID): List<PhysicalObjectReference> =
+        PhysicalObjectReferenceKind.entries.mapNotNull { kind ->
+            val count = countReferences(objectId, kind)
+            if (count == 0) null else PhysicalObjectReference(kind, count)
+        }
+
+    private suspend fun countReferences(objectId: UUID, kind: PhysicalObjectReferenceKind): Int = when (kind) {
+        PhysicalObjectReferenceKind.BEE -> objectDao.countBeeReferences(objectId)
     }
 
     private suspend fun newIdentity(

@@ -81,10 +81,20 @@ class NoReversibleBeeActionException : IllegalStateException(
 /**
  * A Physical Object is still referenced by working or historical data.
  *
- * The reference is a `RESTRICT` foreign key, so the database would refuse the deletion anyway; the
- * check exists so the user gets a readable reason instead of a constraint failure.
+ * The references are `RESTRICT` foreign keys, so the database would refuse the deletion anyway; the
+ * structured [references] exist so the user can be told which data blocks the deletion and how much
+ * of it, instead of receiving a constraint failure or a generic "in use" sentence. The message is
+ * diagnostic: the user-facing wording is chosen by the UI from the references themselves.
  */
-class PhysicalObjectInUseException : IllegalStateException("Physical object is used by bee data")
+class PhysicalObjectInUseException(val references: List<PhysicalObjectReference>) :
+    IllegalStateException(
+        if (references.isEmpty()) {
+            "Physical object deletion is blocked"
+        } else {
+            "Physical object deletion is blocked by " +
+                references.joinToString { "${it.kind.name.lowercase()}=${it.count}" }
+        },
+    )
 
 /**
  * A numbering reset was refused because its fail-closed preconditions are not satisfied.

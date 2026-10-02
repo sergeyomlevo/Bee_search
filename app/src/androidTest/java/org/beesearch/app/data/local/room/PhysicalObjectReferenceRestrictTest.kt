@@ -10,6 +10,7 @@ import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.MarkPosition
+import org.beesearch.app.domain.model.PhysicalObjectReferenceKind
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -130,6 +131,40 @@ class PhysicalObjectReferenceRestrictTest {
         // The same object is removable through the explicit deletion, which owns those rows.
         assertTrue(repository().deleteHollow(objectId).mediaRelativePaths.isNotEmpty())
         assertEquals(0, database.physicalObjectDao().countInScope(territoryId, org.beesearch.app.domain.model.PhysicalObjectType.HOLLOW))
+    }
+
+    /**
+     * No external reference may block a deletion without a user-readable reason.
+     *
+     * `RESTRICT` alone makes the database refuse the deletion, but a foreign key that nobody reports
+     * reaches the user as an unexplained failure. Every table that references `physical_objects` and
+     * is not an owned child of the object must therefore be represented by a blocking reference kind,
+     * so adding (for example) an `inspections` table forces an explicit new blocker instead of
+     * silently producing a failure with no message.
+     */
+    @Test
+    fun everyExternalReferenceIsReportedAsABlocker() {
+        val external = foreignKeys()
+            .filter { it.parentTable == "physical_objects" }
+            .map { it.table }
+            .filterNot { it in ownedPhysicalObjectTables }
+            .toSet()
+        val reported = PhysicalObjectReferenceKind.entries.map { it.blockingTable() }.toSet()
+
+        assertTrue(
+            "no external reference to physical_objects was found",
+            external.isNotEmpty(),
+        )
+        assertEquals(
+            "every external reference must be reported by a PhysicalObjectReferenceKind",
+            emptySet<String>(),
+            external - reported,
+        )
+        assertEquals(
+            "a reported blocker table must really reference physical_objects",
+            emptySet<String>(),
+            reported - external,
+        )
     }
 
     private suspend fun insertObject(): UUID {

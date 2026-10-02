@@ -1986,12 +1986,54 @@ DELETE physical_objects WHERE id = id AND object_type = type
 после успешного commit БД. `bees.source_object_id` — защищённая ссылка: она блокирует удаление.
 Счётчик не изменяется.
 
+Отказ удаления возвращает не сообщение и не scalar count, а структурированный результат: kind
+блокирующей ссылки и её количество (`PhysicalObjectReference`), внутри той же транзакции. При
+наличии blockers не удаляется ничего — ни subtype-строка, ни media rows, ни media-файлы, ни сам
+объект. Модель kind расширяется вместе с реально появившейся ссылкой; спекулятивные будущие
+значения не добавляются. Первый и пока единственный kind — `BEE` (`bees.source_object_id`).
+
+Cleanup owned media выполняется после commit и является best-effort: небезопасный или недоступный
+media path трактуется как неполный cleanup, а не как неудачное удаление, поскольку авторитетным
+состоянием является уже закоммиченное состояние БД. Path safety при этом не ослабляется:
+небезопасный путь не разрешается и не удаляется.
+
+## Экспорт одного физического объекта
+
+Экспорт одного объекта — отдельный переносимый профиль `SINGLE_PHYSICAL_OBJECT`
+`formatVersion = 1` (D093); полевая схема зафиксирована в `docs/physical-object-export-v1.md`.
+Пакет содержит object-owned данные (identity, subtype properties, media metadata и app-owned bytes)
+и минимальный read-only labelling/provenance snapshot Territory и creator Observer; внешние
+record-bearing сущности (Bee, FlightCycle, ObservationPoint, weather и attachments
+ObservationPoint) в пакет не входят. Наличие `bees.source_object_id` не препятствует экспорту.
+Экспорт не изменяет ни одной persisted записи, включая `physical_object_sequences`.
+
+## Экспорт коллекции физических объектов
+
+Экспорт всех Дупел или всех Колод текущей Territory использует отдельный профиль
+`PHYSICAL_OBJECT_COLLECTION`, `formatVersion = 1` (D093). Это read-only snapshot существующих
+строк, а не новая persisted сущность и не изменение Room schema. Пакет содержит только один
+concrete `object_type`, один Territory snapshot, дедуплицированные snapshots реально используемых
+creator Observer, persisted payload каждого объекта и принадлежащие ему media metadata/bytes.
+
+Все object rows обязаны иметь один `territory_id` и `object_type`, соответствующие manifest;
+media остаются однозначно привязаны к object UUID. `properties = null` и
+`creator_observer_id = null` сохраняются как фактическое состояние. Bee, FlightCycle,
+ObservationPoint и их owned data не читаются и не сериализуются; `bees.source_object_id` экспорт не
+блокирует. Collection export all-or-nothing и ничего не меняет в объекте, media, references или
+`physical_object_sequences`. Пустая коллекция package не создаёт.
+
 ## Инвариант ссылок и сброс нумерации
 
 Любой persisted FK на `physical_objects` объявлен `ON DELETE RESTRICT`, поэтому ни одна строка
 не может пережить объект, на который ссылается. Этот инвариант закреплён автоматическим тестом
 схемы, который читает FK всех таблиц живой базы и падает, если у любой ссылки на
 `physical_objects` стоит cascade или SET NULL.
+
+Дополнительно fail-closed тест сверяет blocker enumeration со схемой: каждая таблица с FK →
+`physical_objects`, не являющаяся известным owned child (`hollows`, `log_hives`, `apiaries`,
+`physical_object_media`), обязана быть представлена как `PhysicalObjectReferenceKind`. Иначе новая
+ссылка (например, будущая `inspections`) попала бы к пользователю как необъяснённый отказ FK вместо
+понятного сообщения о связанных данных.
 
 Сброс нумерации (`last_issued = 0` только для `Territory + object_type`) разрешён, только если в
 scope нет объектов, нет зависимых строк и ссылок, счётчик не противоречит хранимым данным

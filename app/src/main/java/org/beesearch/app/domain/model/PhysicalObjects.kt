@@ -141,6 +141,34 @@ data class TerritoryPhysicalObjects(
     val apiaries: List<Apiary>,
 )
 
+/**
+ * One kind of persisted reference that can block the physical deletion of an object.
+ *
+ * Only kinds that really exist are listed: speculative future references are not modelled in advance
+ * (AGENTS.md §16), and a new kind is added together with the reference that creates it. The kind is a
+ * user-facing fact, not a table name, so the UI can name the blocking data without learning how the
+ * reference is stored. [label] is the plural noun used in the blocked-deletion message.
+ */
+enum class PhysicalObjectReferenceKind(val label: String) {
+    /** A Bee that explicitly states it belongs to this physical object. */
+    BEE("Пчёлы"),
+}
+
+/**
+ * How many rows of one [PhysicalObjectReferenceKind] point at one Physical Object.
+ *
+ * The count is the user-facing quantity of the blocking data; it is deliberately not a Boolean, so
+ * the message can say how much data is involved. A reference is only reported when it exists.
+ */
+data class PhysicalObjectReference(
+    val kind: PhysicalObjectReferenceKind,
+    val count: Int,
+) {
+    init {
+        require(count > 0) { "A blocking reference is reported only when at least one row exists" }
+    }
+}
+
 private fun requirePositive(value: Double, field: String) {
     require(value.isFinite() && value > 0.0) { "$field must be positive" }
 }

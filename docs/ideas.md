@@ -686,3 +686,51 @@ revisited only if that practical test shows insufficient vector detail; the
 current Planetiler/profile pipeline remains unchanged.
 
 **Notes:** Generalize this as a `user georeferenced raster layer` capability rather than a special-case old-paper-map feature. The original source/year and, when known, original CRS should remain provenance metadata. Bee Search research objects continue to use modern geographic coordinates independently of the raster source.
+
+## I015 — Incremental Territory Sync
+
+**Status:** `idea`
+
+**Description:** В будущем Bee Search должен поддерживать основной механизм передачи полевых
+исследовательских данных с телефона на сервер и далее в настольные аналитические приложения. Это
+отдельная перспектива, а не текущий `PHYSICAL_OBJECT_COLLECTION` export и не часть его реализации.
+
+Нужно различать три сценария:
+
+1. `SINGLE_PHYSICAL_OBJECT` и другие `SINGLE_*` форматы предназначены прежде всего для обмена
+   отдельными записями или интересными случаями и потенциального будущего импорта.
+2. Collection export — ручная выгрузка набора данных, например всех Hollow или всех LogHive текущей
+   Territory.
+3. Incremental Territory Sync — будущий основной механизм регулярной передачи полной
+   исследовательской базы Territory на сервер.
+
+Первая синхронизация может передавать полный snapshot Territory. Последующие синхронизации должны
+передавать изменения после последнего подтверждённого sync checkpoint, а не повторять всю базу.
+Учитываются новые, изменённые и удалённые записи. В перспективе механизм охватывает связанные данные
+Territory: ObservationPoint, Bee, FlightCycle, PhysicalObject, object/observation media, будущие
+inspections и другие относящиеся к исследовательской базе сущности.
+
+Stable UUID используются как identity. Простой persisted flag вида `exported = true` не должен быть
+основой архитектуры синхронизации. Будущая модель должна предусматривать revisions/change tracking и
+способ представления удалений (например tombstone или change log), но конкретная схема сейчас не
+принимается. Sync state продвигается только после подтверждённого приёма сервером; повторная передача
+после сбоя должна проектироваться как безопасная и idempotent.
+
+Ручной file export и server sync остаются разными механизмами. Текущие `SINGLE_*` и collection
+package formats не объявляются будущим network sync protocol. Нынешняя реализация export не должна
+преждевременно добавлять `syncStatus`, `lastExportedAt`, tombstones, server IDs или другую
+sync-specific persistence.
+
+**Motivation / expected value:** В реальной длительной работе повторная выгрузка всей Territory после
+каждого полевого изменения будет избыточной. Сервер должен постепенно собирать долговременную
+исследовательскую базу, а настольные приложения — использовать её для более серьёзного анализа,
+объединения и обработки данных.
+
+**Dependencies / prerequisites:** Стабильная модель исследовательских сущностей; серверная
+архитектура; решение о revision/change tracking; semantics удаления и конфликтов; media
+synchronization; authentication/source provenance; protocol/versioning; отдельное архитектурное
+решение перед реализацией.
+
+**Notes:** Это IDEA, а не accepted requirement. Sync protocol не проектируется и не реализуется в
+текущей задаче Physical Object Collection Export. Текущая задача лишь не создаёт искусственных
+препятствий будущей синхронизации.

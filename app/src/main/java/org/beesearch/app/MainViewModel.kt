@@ -1,5 +1,6 @@
 package org.beesearch.app
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -38,6 +39,7 @@ import org.beesearch.app.domain.model.ObservationPointAlreadyActiveException
 import org.beesearch.app.domain.model.ObservationPointNotActiveException
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.PhysicalObjectInUseException
+import org.beesearch.app.domain.model.PhysicalObjectReference
 import org.beesearch.app.domain.model.PhysicalObjectSequenceResetBlockedException
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.model.ObserverRequiredException
@@ -71,6 +73,12 @@ import java.time.Instant
 import org.beesearch.app.data.media.FileAwarePhysicalObjectDeletion
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
 import org.beesearch.app.data.media.StagedObservationPointPhoto
+import org.beesearch.app.data.objectexport.PhysicalObjectDocumentExporter
+import org.beesearch.app.data.objectexport.EmptyPhysicalObjectCollectionExport
+import org.beesearch.app.data.objectexport.PhysicalObjectCollectionDocumentExporter
+import org.beesearch.app.data.objectexport.PhysicalObjectExportIntegrityError
+import org.beesearch.app.data.objectexport.PhysicalObjectExportSourceMissing
+import org.beesearch.app.data.objectexport.UnsupportedPhysicalObjectExportType
 import org.beesearch.app.domain.repository.PhysicalObjectRepository
 
 sealed interface AppRoute {
@@ -106,6 +114,14 @@ sealed interface AppRoute {
         /** The typed list this card was opened from, so Back returns to the right list. */
         val listType: PhysicalObjectType,
         val coordinateUpdate: PhysicalObjectCoordinateUpdate? = null,
+        /**
+         * Why a delete attempt was refused, delivered to the card as a one-shot request.
+         *
+         * It is a request with an explicit consume step, never a durable flag: the card shows the
+         * dialog until the user closes it and then consumes it, so returning to the card later cannot
+         * replay a message the user already handled.
+         */
+        val deletionBlockers: PhysicalObjectDeletionBlockers? = null,
     ) : AppRoute
     data object PrepareObservationPoint : AppRoute
     data class ResumeObservation(val point: ObservationPoint) : AppRoute
@@ -143,6 +159,18 @@ data class PhysicalObjectCoordinateUpdate(
     val requestId: UUID,
     val latitude: Double,
     val longitude: Double,
+)
+
+/**
+ * The structured reason a Physical Object could not be deleted.
+ *
+ * The references are the facts the repository read inside the refused transaction, so the card can
+ * name what blocks the deletion and how much of it without inventing anything or querying a second
+ * source that could already be stale.
+ */
+data class PhysicalObjectDeletionBlockers(
+    val requestId: UUID,
+    val references: List<PhysicalObjectReference>,
 )
 
 internal data class MapCenterRequest(
@@ -253,6 +281,8 @@ internal class MainViewModel(
     private val mapPackageStore: MapPackageStore,
     private val physicalObjectRepository: PhysicalObjectRepository,
     private val physicalObjectDeletion: FileAwarePhysicalObjectDeletion,
+    private val physicalObjectDocumentExporter: PhysicalObjectDocumentExporter,
+    private val physicalObjectCollectionDocumentExporter: PhysicalObjectCollectionDocumentExporter,
     private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
     private val manualRoute = MutableStateFlow<AppRoute?>(null)
@@ -857,9 +887,10 @@ internal class MainViewModel(
      * Deletes one unused Physical Object and returns to the typed list it was opened from.
      *
      * The object is removed from the database first and its app-owned media afterwards; a reference
-     * from working data blocks the deletion and keeps the card open with a readable message. The
-     * numbering high-water mark is not touched, so the number of the deleted object is never issued
-     * again.
+     * from working data blocks the deletion and keeps the card open. While the deletion is blocked
+     * nothing is removed - not the object, not its subtype row, not its media rows or files - and the
+     * user is told which data is involved. The numbering high-water mark is not touched, so the number
+     * of the deleted object is never issued again.
      */
     fun deletePhysicalObject(objectId: UUID, listType: PhysicalObjectType) {
         if (listType == PhysicalObjectType.APIARY) return
@@ -880,11 +911,94 @@ internal class MainViewModel(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: PhysicalObjectInUseException) {
-                showPersistentFeedback("Объект используется в данных наблюдений и не может быть удалён")
+                showDeletionBlockers(error.references)
             } catch (error: Exception) {
                 showPersistentFeedback(userMessageFor(error, "Не удалось удалить объект"))
             }
         }
+    }
+
+    /**
+     * Hands the blocking references to the card that is still on screen.
+     *
+     * The card owns the dialog, so the message survives neither a navigation nor a second delete
+     * attempt: it is consumed exactly once, either by closing the dialog or by leaving the card. When
+     * the card is gone the same facts are reported as a short banner instead of being dropped.
+     */
+    private fun showDeletionBlockers(references: List<PhysicalObjectReference>) {
+        val card = physicalObjectCardOnScreen()
+        if (card == null) {
+            showPersistentFeedback(blockedDeleteSummary(references))
+        } else {
+            manualRoute.value = card.copy(
+                deletionBlockers = PhysicalObjectDeletionBlockers(UUID.randomUUID(), references),
+            )
+        }
+    }
+
+    /** Consumes the blocked-deletion request of one card after the dialog was closed. */
+    fun consumePhysicalObjectDeletionBlockers(requestId: UUID) {
+        val route = manualRoute.value as? AppRoute.PhysicalObjectDetail ?: return
+        if (route.deletionBlockers?.requestId == requestId) {
+            manualRoute.value = route.copy(deletionBlockers = null)
+        }
+    }
+
+    /**
+     * Writes one Physical Object package into the document the user picked.
+     *
+     * Export is read-only and independent of the delete rules: an object that is referenced by working
+     * data still exports. Cancelling the system picker never reaches this method, so a cancelled
+     * choice changes nothing and reports nothing.
+     */
+    fun exportPhysicalObject(objectId: UUID, destination: Uri) {
+        viewModelScope.launch {
+            try {
+                physicalObjectDocumentExporter.export(objectId, destination)
+                showSuccessFeedback("Объект экспортирован")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: UnsupportedPhysicalObjectExportType) {
+                showPersistentFeedback(error.message ?: "Этот тип объекта пока нельзя экспортировать")
+            } catch (error: PhysicalObjectExportIntegrityError) {
+                showPersistentFeedback("Медиа объекта повреждено, экспорт невозможен")
+            } catch (error: PhysicalObjectExportSourceMissing) {
+                showPersistentFeedback(error.message ?: "Не удалось экспортировать объект")
+            } catch (error: Exception) {
+                showPersistentFeedback("Не удалось экспортировать объект")
+            }
+        }
+    }
+
+    /** Writes one all-or-nothing package of one Physical Object type in the current Territory. */
+    fun exportPhysicalObjectCollection(
+        territoryId: UUID,
+        type: PhysicalObjectType,
+        destination: Uri,
+    ) {
+        viewModelScope.launch {
+            try {
+                physicalObjectCollectionDocumentExporter.export(territoryId, type, destination)
+                showSuccessFeedback(type.collectionExportSuccessMessage())
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: EmptyPhysicalObjectCollectionExport) {
+                showPersistentFeedback(error.message ?: type.emptyCollectionExportMessage())
+            } catch (error: UnsupportedPhysicalObjectExportType) {
+                showPersistentFeedback(error.message ?: "Этот тип объектов пока нельзя экспортировать")
+            } catch (error: PhysicalObjectExportIntegrityError) {
+                showPersistentFeedback("Медиа одного из объектов повреждено, экспорт невозможен")
+            } catch (error: PhysicalObjectExportSourceMissing) {
+                showPersistentFeedback(error.message ?: "Не удалось экспортировать объекты")
+            } catch (error: Exception) {
+                showPersistentFeedback("Не удалось экспортировать объекты")
+            }
+        }
+    }
+
+    /** Empty lists stop before SAF, but use the same central feedback surface. */
+    fun reportEmptyPhysicalObjectCollection(type: PhysicalObjectType) {
+        showPersistentFeedback(type.emptyCollectionExportMessage())
     }
 
     /**
@@ -1338,6 +1452,9 @@ internal class MainViewModel(
                         mapPackageStore = application.container.mapPackageStore,
                         physicalObjectRepository = application.container.physicalObjectRepository,
                         physicalObjectDeletion = application.container.physicalObjectDeletion,
+                        physicalObjectDocumentExporter = application.container.physicalObjectDocumentExporter,
+                        physicalObjectCollectionDocumentExporter =
+                            application.container.physicalObjectCollectionDocumentExporter,
                     ) as T
                 }
             }
@@ -1349,6 +1466,33 @@ internal fun PhysicalObjectType.sequenceResetMessage(): String = when (this) {
     PhysicalObjectType.HOLLOW -> "Нумерация дупел сброшена. Следующее дупло получит номер 1"
     PhysicalObjectType.LOG_HIVE -> "Нумерация колод сброшена. Следующая колода получит номер 1"
     PhysicalObjectType.APIARY -> "Нумерация пасек сброшена"
+}
+
+internal fun PhysicalObjectType.emptyCollectionExportMessage(): String = when (this) {
+    PhysicalObjectType.HOLLOW -> "Нет дупел для экспорта"
+    PhysicalObjectType.LOG_HIVE -> "Нет колод для экспорта"
+    PhysicalObjectType.APIARY -> "Пасеки пока нельзя экспортировать"
+}
+
+private fun PhysicalObjectType.collectionExportSuccessMessage(): String = when (this) {
+    PhysicalObjectType.HOLLOW -> "Дупла экспортированы"
+    PhysicalObjectType.LOG_HIVE -> "Колоды экспортированы"
+    PhysicalObjectType.APIARY -> "Пасеки экспортированы"
+}
+
+/**
+ * The one-line form of a refused deletion: what is blocking the object and how much of it.
+ *
+ * It names the data the user knows (`Пчёлы — 3`), never a table, a foreign key or a raw exception,
+ * and it is only used where the structured dialog is not available.
+ */
+internal fun blockedDeleteSummary(references: List<PhysicalObjectReference>): String {
+    val detail = references.joinToString { "${it.kind.label} — ${it.count}" }
+    return if (detail.isEmpty()) {
+        "Объект нельзя удалить: с ним связаны данные наблюдений"
+    } else {
+        "Объект нельзя удалить: связаны $detail"
+    }
 }
 
 internal fun userMessageFor(error: Throwable, fallback: String): String = when (error) {

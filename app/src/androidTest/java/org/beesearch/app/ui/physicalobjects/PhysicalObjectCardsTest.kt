@@ -15,6 +15,8 @@ import org.beesearch.app.domain.model.LogHive
 import org.beesearch.app.domain.model.LogHiveProperties
 import org.beesearch.app.domain.model.PhysicalObjectMedia
 import org.beesearch.app.domain.model.PhysicalObjectMediaType
+import org.beesearch.app.domain.model.PhysicalObjectReference
+import org.beesearch.app.domain.model.PhysicalObjectReferenceKind
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertEquals
@@ -286,6 +288,84 @@ class PhysicalObjectCardsTest {
         composeRule.onNodeWithTag("physical-object-delete").performScrollTo().performClick()
 
         composeRule.onNodeWithText("Удалить Колоду 2?").assertIsDisplayed()
+    }
+
+    @Test
+    fun hollowCardOffersItsOwnExportAction() {
+        var exports = 0
+        composeRule.setContent { Bee_searchTheme {
+            HollowCard(
+                value = hollow(4),
+                territoryLabel = "T",
+                creatorLabel = "O",
+                onExport = { exports += 1 },
+            )
+        } }
+
+        composeRule.onNodeWithTag("physical-object-export").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("physical-object-export").performClick()
+
+        composeRule.runOnIdle { assertEquals(1, exports) }
+    }
+
+    @Test
+    fun logHiveCardOffersItsOwnExportAction() {
+        var exports = 0
+        composeRule.setContent { Bee_searchTheme {
+            LogHiveCard(
+                value = logHive(2),
+                territoryLabel = "T",
+                creatorLabel = "O",
+                onExport = { exports += 1 },
+            )
+        } }
+
+        composeRule.onNodeWithTag("physical-object-export").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("physical-object-export").performClick()
+
+        composeRule.runOnIdle { assertEquals(1, exports) }
+    }
+
+    @Test
+    fun blockedDeleteDialogNamesTheBlockingDataAndOffersNoForcedDeletion() {
+        var dismissed = 0
+        composeRule.setContent { Bee_searchTheme {
+            PhysicalObjectDeleteBlockedDialog(
+                references = listOf(PhysicalObjectReference(PhysicalObjectReferenceKind.BEE, 3)),
+                onDismiss = { dismissed += 1 },
+            )
+        } }
+
+        composeRule.onNodeWithText("Объект нельзя удалить").assertIsDisplayed()
+        composeRule.onNodeWithText("С этим объектом связаны данные, поэтому сейчас его удалить невозможно.")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("physical-object-blocker-BEE").assertIsDisplayed()
+        composeRule.onNodeWithText("Пчёлы — 3").assertIsDisplayed()
+        composeRule.onNodeWithText("Сначала удалите или измените связанные данные.").assertIsDisplayed()
+        // No forced deletion and no cascade: the dialog can only be closed.
+        listOf("Удалить", "Удалить всё равно", "Отвязать", "Сбросить связи").forEach { forbidden ->
+            composeRule.onAllNodesWithText(forbidden).assertCountEquals(0)
+        }
+
+        composeRule.onNodeWithTag("physical-object-blocked-close").performClick()
+
+        composeRule.runOnIdle { assertEquals(1, dismissed) }
+    }
+
+    @Test
+    fun blockedDeleteDialogShowsTheExactCountOfEveryBlockingKind() {
+        composeRule.setContent { Bee_searchTheme {
+            PhysicalObjectDeleteBlockedDialog(
+                references = listOf(
+                    PhysicalObjectReference(PhysicalObjectReferenceKind.BEE, 1),
+                    PhysicalObjectReference(PhysicalObjectReferenceKind.BEE, 12),
+                ),
+                onDismiss = {},
+            )
+        } }
+
+        composeRule.onNodeWithText("Пчёлы — 1").assertIsDisplayed()
+        composeRule.onNodeWithText("Пчёлы — 12").assertIsDisplayed()
     }
 
     private fun hollow(sequence: Int) = Hollow(

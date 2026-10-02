@@ -44,6 +44,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import org.beesearch.app.domain.model.PhysicalObjectType
+import org.beesearch.app.data.objectexport.physicalObjectCollectionExportFileName
 import org.beesearch.app.ui.map.CurrentTerritoryScreen
 import org.beesearch.app.ui.map.OfflineMapManagementScreen
 import org.beesearch.app.ui.area.AreaRoute
@@ -57,6 +58,7 @@ import org.beesearch.app.ui.physicalobjects.PhysicalObjectDetailRoute
 import org.beesearch.app.ui.physicalobjects.PhysicalObjectListRoute
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import kotlinx.coroutines.delay
+import java.time.Instant
 import org.beesearch.app.ui.observation.BeeObservationScreen
 import org.beesearch.app.ui.observation.ObservationPointPreparationScreen
 import org.beesearch.app.ui.settings.SettingsScreen
@@ -229,6 +231,22 @@ private fun BeeSearchApp(
                         type = currentRoute.type,
                         territoryId = settings.currentTerritoryId,
                         repository = application.container.physicalObjectRepository,
+                        exchangeStorage = application.container.exchangeStorage,
+                        collectionExportFileName = physicalObjectCollectionExportFileName(
+                            type = currentRoute.type,
+                            territoryCode = currentTerritory?.code.orEmpty(),
+                            exportedAt = Instant.now(),
+                        ),
+                        onExportCollection = { destination ->
+                            settings.currentTerritoryId?.let { territoryId ->
+                                viewModel.exportPhysicalObjectCollection(
+                                    territoryId,
+                                    currentRoute.type,
+                                    destination,
+                                )
+                            }
+                        },
+                        onEmptyCollection = viewModel::reportEmptyPhysicalObjectCollection,
                         onOpen = { objectId -> viewModel.openPhysicalObjectDetail(objectId, currentRoute.type) },
                         onBack = viewModel::closePhysicalObjectList,
                         onResetSequence = viewModel::resetPhysicalObjectSequence,
@@ -250,11 +268,17 @@ private fun BeeSearchApp(
                         territories = territories,
                         observers = observers,
                         headingProvider = application.container.headingProvider,
+                        exchangeStorage = application.container.exchangeStorage,
                         coordinateUpdate = currentRoute.coordinateUpdate,
                         onCoordinateUpdateHandled = viewModel::consumePhysicalObjectCoordinateUpdate,
+                        deletionBlockers = currentRoute.deletionBlockers,
+                        onDeletionBlockersHandled = viewModel::consumePhysicalObjectDeletionBlockers,
                         onEditCoordinates = viewModel::editPhysicalObjectCoordinates,
                         onShowOnMap = viewModel::showPhysicalObjectOnMap,
                         onDelete = { viewModel.deletePhysicalObject(currentRoute.objectId, currentRoute.listType) },
+                        onExport = { destination ->
+                            viewModel.exportPhysicalObject(currentRoute.objectId, destination)
+                        },
                         onBack = viewModel::closePhysicalObjectDetail,
                     )
                     AppRoute.Area -> AreaRoute(

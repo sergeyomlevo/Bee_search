@@ -32,6 +32,12 @@ import org.beesearch.app.data.location.AndroidLocationProvider
 import org.beesearch.app.data.media.FileAwarePhysicalObjectDeletion
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
 import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
+import org.beesearch.app.data.objectexport.PhysicalObjectExportService
+import org.beesearch.app.data.objectexport.RepositoryPhysicalObjectExportSource
+import org.beesearch.app.data.objectexport.SafPhysicalObjectDocumentExporter
+import org.beesearch.app.data.objectexport.PhysicalObjectCollectionExportService
+import org.beesearch.app.data.objectexport.RepositoryPhysicalObjectCollectionExportSource
+import org.beesearch.app.data.objectexport.SafPhysicalObjectCollectionDocumentExporter
 import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomObserverRepository
 import org.beesearch.app.data.repository.RoomPhysicalObjectRepository
@@ -138,6 +144,30 @@ class CleanStartupIntegrationTest {
         mapPackageStore = DataStoreMapPackageStore(context.contentResolver, context.filesDir, dataStore),
         physicalObjectRepository = physicalObjectRepository,
         physicalObjectDeletion = FileAwarePhysicalObjectDeletion(physicalObjectRepository, physicalObjectMediaStore),
+        physicalObjectDocumentExporter = SafPhysicalObjectDocumentExporter(
+            service = PhysicalObjectExportService(
+                source = RepositoryPhysicalObjectExportSource(
+                    objects = physicalObjectRepository,
+                    territories = territoryRepository,
+                    observers = observerRepository,
+                ),
+                mediaStore = physicalObjectMediaStore,
+            ),
+            contentResolver = context.contentResolver,
+            cacheDirectory = context.cacheDir,
+        ),
+        physicalObjectCollectionDocumentExporter = SafPhysicalObjectCollectionDocumentExporter(
+            service = PhysicalObjectCollectionExportService(
+                source = RepositoryPhysicalObjectCollectionExportSource(
+                    objects = physicalObjectRepository,
+                    territories = territoryRepository,
+                    observers = observerRepository,
+                ),
+                mediaStore = physicalObjectMediaStore,
+            ),
+            contentResolver = context.contentResolver,
+            cacheDirectory = context.cacheDir,
+        ),
     )
 
     /**

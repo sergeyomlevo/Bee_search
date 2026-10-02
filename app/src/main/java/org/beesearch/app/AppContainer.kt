@@ -9,6 +9,14 @@ import org.beesearch.app.data.pointexport.ObservationPointExportService
 import org.beesearch.app.data.pointexport.ObservationPointDocumentExporter
 import org.beesearch.app.data.pointexport.RepositoryObservationPointExportSource
 import org.beesearch.app.data.pointexport.SafObservationPointDocumentExporter
+import org.beesearch.app.data.objectexport.PhysicalObjectDocumentExporter
+import org.beesearch.app.data.objectexport.PhysicalObjectExportService
+import org.beesearch.app.data.objectexport.RepositoryPhysicalObjectExportSource
+import org.beesearch.app.data.objectexport.SafPhysicalObjectDocumentExporter
+import org.beesearch.app.data.objectexport.PhysicalObjectCollectionDocumentExporter
+import org.beesearch.app.data.objectexport.PhysicalObjectCollectionExportService
+import org.beesearch.app.data.objectexport.RepositoryPhysicalObjectCollectionExportSource
+import org.beesearch.app.data.objectexport.SafPhysicalObjectCollectionDocumentExporter
 import org.beesearch.app.data.exchange.AndroidAreaMapDiscovery
 import org.beesearch.app.data.exchange.AndroidAreaShareTransport
 import org.beesearch.app.data.exchange.AreaExchangeMirror
@@ -146,6 +154,32 @@ internal class AppContainer(context: Context) {
         repository = physicalObjectRepository,
         fileStore = physicalObjectMediaFileStore,
     )
+    val physicalObjectDocumentExporter: PhysicalObjectDocumentExporter =
+        SafPhysicalObjectDocumentExporter(
+            service = PhysicalObjectExportService(
+                source = RepositoryPhysicalObjectExportSource(
+                    objects = physicalObjectRepository,
+                    territories = territoryRepository,
+                    observers = observerRepository,
+                ),
+                mediaStore = physicalObjectMediaFileStore,
+            ),
+            contentResolver = context.contentResolver,
+            cacheDirectory = context.cacheDir,
+        )
+    val physicalObjectCollectionDocumentExporter: PhysicalObjectCollectionDocumentExporter =
+        SafPhysicalObjectCollectionDocumentExporter(
+            service = PhysicalObjectCollectionExportService(
+                source = RepositoryPhysicalObjectCollectionExportSource(
+                    objects = physicalObjectRepository,
+                    territories = territoryRepository,
+                    observers = observerRepository,
+                ),
+                mediaStore = physicalObjectMediaFileStore,
+            ),
+            contentResolver = context.contentResolver,
+            cacheDirectory = context.cacheDir,
+        )
     val observationPointDocumentExporter: ObservationPointDocumentExporter =
         SafObservationPointDocumentExporter(
             service = ObservationPointExportService(

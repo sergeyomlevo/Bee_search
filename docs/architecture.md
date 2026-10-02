@@ -1701,6 +1701,33 @@ DataStore settings и map packages не входят в эту транзакц�
 отдельной offline presentation feature; MainActivity остаётся только app host и
 маршрутизатором существующего route mechanism.
 
+Single Physical Object export отделён от logical backup и от ObservationPoint export пакетом
+`data/objectexport` с собственным профилем `SINGLE_PHYSICAL_OBJECT` v1 (D093). Профиль
+реализован изолированно: ZIP/hash/JSON механика повторена локально, потому что ObservationPoint
+export уже проверен и общий export framework в это решение не входит. Source read возвращает
+объект, его subtype properties и его media из `PhysicalObjectRepository`, у которого нет пути чтения
+Bee, ObservationPoint и их attachments, поэтому «только object-owned данные» является свойством
+формы чтения, а не фильтром, который можно забыть. Territory и creator Observer читаются отдельно и
+попадают в пакет только как минимальный read-only labelling/provenance snapshot. Apiary
+отклоняется fail-closed, так как у него нет пользовательского жизненного цикла. Пакет собирается и
+проверяется в app cache, и в выбранный SAF destination копируется только целый архив. Field-level
+контракт — `docs/physical-object-export-v1.md`.
+
+Тот же изолированный feature boundary содержит отдельный collection-профиль
+`PHYSICAL_OBJECT_COLLECTION` v1 для всех Hollow либо всех LogHive текущей Territory. Collection
+source использует только `PhysicalObjectRepository.listForTerritory`, Territory/Observer
+repositories и object-owned `PhysicalObjectMediaFileStore`: Territory snapshot записывается один
+раз, используемые Observer snapshots дедуплицируются, а paths media включают object UUID. Codec
+детерминированно упорядочивает objects и media, строго проверяет manifest/entries/hash/size и
+отклоняет смешанный type/Territory. Service сначала собирает и декодирует временный package в app
+cache и лишь после полной проверки копирует его в единственный SAF destination. Ошибка любого
+объекта или media отменяет всю операцию; пустой список отсекается до SAF. ObservationPoint export,
+backup contract и Room schema от этого профиля не зависят.
+
+Заблокированное удаление объекта возвращает структурированный результат: kinds блокирующих ссылок и
+их количества. Repository собирает их внутри транзакции удаления, UI показывает их в dedicated
+dialog, а `RESTRICT` FK остаётся второй, fail-safe линией защиты.
+
 ObservationPoint properties v1 введены в Room schema v7; текущая schema v8
 добавляет физические объекты и nullable явную связь Bee с ними (D088).
 `description` остаётся полем ObservationPoint; attachment metadata и one-to-one weather snapshot имеют
@@ -2114,6 +2141,11 @@ Room schema v11 хранит optional user `name` прямо в subtype-стро
 из v10 добавляет только nullable columns. Complete Backup v6 переносит эти имена и сохраняет
 чтение v1–v5. Identity, sequence state и media architecture не меняются. Track/GPX и
 Inspection остаются deferred.
+
+Удаление и экспорт одного объекта реализованы для Дупло и Колоды (D093). `Apiary` остаётся
+persisted типом без пользовательского жизненного цикла: creation UI, категория, карточка, медиа,
+удаление и экспорт для него не реализуются, а экспорт отказывает для этого типа fail-closed. Это не
+создаёт отдельной архитектуры для Пасеки: решение потребуется вместе с её UI.
 
 # 74. Критерий правильности архитектуры
 

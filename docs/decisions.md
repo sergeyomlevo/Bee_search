@@ -2707,7 +2707,8 @@ alias обозначения; cross-Territory identity и дедупликаци
 обычное удаление номера не освобождает, явный сброс нумерации и restore начинают новую линию
 состояния).
 
-Следующий свободный номер durable decision: **D093**.
+Следующий свободный номер durable decision: **D093** (занят решением D093; актуальный свободный
+номер — D094).
 
 ---
 
@@ -2958,6 +2959,138 @@ attachments зафиксированы решениями D069–D072. Откр�
 ## O010 — Аналитика поиска гнезда
 
 Проектируется после накопления и проверки реальных данных.
+
+---
+
+# D093 — Physical Object Export/Delete V1: переносимые пакеты и структурированные блокировки удаления
+
+**Статус:** ACCEPTED
+**Дополняет:** D088 (долговечный объект, identity, обозначение и scope нумерации), D089 (Objects V1:
+Дупло и Колода), D090 (удаление объекта, high-water mark, RESTRICT как fail-safe), D091
+(пользовательское название), D086 (отдельный переносимый профиль как общий принцип, **без**
+переноса ObservationPoint-семантики).
+**Уточняет:** D088 §9 и D090 §2 в части того, что именно видит пользователь при заблокированном
+удалении. Identity, designation, scope нумерации, high-water mark и RESTRICT не меняются.
+
+## 1. Область V1
+
+Решение реализуется для двух конкретных типов: **Дупло** (`Hollow`) и **Колода** (`LogHive`).
+**Пасека** (`Apiary`) остаётся вне scope: у неё нет пользовательского жизненного цикла (создание,
+категория, карточка, медиа, удаление), поэтому и экспорт, и удаление для неё не реализуются, а
+экспорт fail-closed отказывает для этого типа вместо записи half-shaped пакета. Отдельного решения
+для Пасеки это не создаёт: оно потребуется, когда у Пасеки появится собственный UI.
+
+Каждый Physical Object остаётся самостоятельной сущностью. Удаляется только отдельный объект.
+Экспорт доступен как для отдельного объекта, так и для коллекции одного concrete type в текущей
+Territory; collection export не превращает категорию или Territory в новую domain-сущность.
+
+## 2. Экспорт одного объекта
+
+Экспорт одного объекта — отдельный переносимый контракт, а не вариант complete backup и не вариант
+ObservationPoint package. Профиль — `SINGLE_PHYSICAL_OBJECT`, `formatVersion = 1`; полная
+field-level schema зафиксирована отдельным документом `docs/physical-object-export-v1.md`.
+
+Пакет содержит:
+
+- данные самого объекта: UUID, concrete type, `sequence_number`, координаты, `created_at`,
+  `creator_observer_id`, пользовательское `name`;
+- subtype-specific persisted properties конкретного типа;
+- object-owned media: metadata и app-owned bytes;
+- минимальный read-only **labelling/provenance** snapshot Territory и creator Observer.
+
+Territory и Observer входят **только** как минимальный read-only snapshot для человекочитаемой
+идентификации объекта, provenance и понимания файла вне исходной базы. Это **не** экспорт Territory
+или Observer как самостоятельных сущностей и **не** object-owned entity graph: snapshot ограничен
+полями `id`/`code`/`name` у Territory и `id`/`code`/ФИО у Observer, отсутствующие поля не
+придумываются, а `creator_observer_id = null` даёт пакет без Observer snapshot и остаётся валидным.
+Другие объекты Territory, её observation points, её настройки и другие Observer records в пакет не
+входят.
+
+Внешние связанные сущности в экспорт не включаются: Bee, FlightCycle, ObservationPoint, weather
+ObservationPoint, attachments ObservationPoint и любые другие record-bearing entities. Наличие
+`Bee.sourceObjectId` или иных внешних ссылок **не препятствует** экспорту: экспорт read-only и не
+зависит от правил удаления.
+
+Экспорт экспортирует фактическое persisted state: если subtype properties отсутствуют (foundation
+rows после миграций), записывается `null`, и пакет остаётся валидным. Отсутствие пользовательских
+значений не выдумывается и не является причиной отказа.
+
+Экспорт не изменяет ничего: ни объект, ни media, ни Bee, ни sequence state, ни другие записи.
+
+### 2.1. Экспорт коллекции одного типа
+
+Списки `Дупла` и `Колоды` позволяют экспортировать все объекты открытого типа текущей Territory
+одной операцией. Это отдельный versioned профиль `PHYSICAL_OBJECT_COLLECTION`,
+`formatVersion = 1`, а не пакет `SINGLE_PHYSICAL_OBJECT` с изменённым смыслом. Одна операция создаёт
+один ZIP; вложенных ZIP отдельных объектов и нескольких SAF save dialogs нет.
+
+Один collection package содержит только `HOLLOW` или только `LOG_HIVE`. На верхнем уровне один раз
+записывается минимальный Territory snapshot, а snapshots только реально используемых creator
+Observer дедуплицируются по UUID; объект с `creatorObserverId = null` остаётся валидным. Для каждого
+объекта сохраняются его фактическое persisted state, subtype properties (включая допустимый `null`),
+media metadata и object-owned bytes. Каждый object и media entry имеет детерминированный путь,
+объявленный byte length и SHA-256; manifest фиксирует профиль, версию, Territory, concrete type и
+количество объектов.
+
+Границы те же, что у экспорта одного объекта: Bee, FlightCycle, ObservationPoint, weather,
+ObservationPoint attachments, другие типы и Territory не включаются, а внешние ссылки экспорту не
+препятствуют. Экспорт all-or-nothing: смешанный тип/Territory, повтор identity, несогласованный
+snapshot, отсутствующее или изменившееся media и любое нарушение strict validation отменяют весь
+package; повреждённый объект не пропускается. Пустая коллекция не создаёт ZIP и не открывает SAF.
+
+В V1 нет bulk delete, коллекции Apiary и multi-type package `Hollow + LogHive`. Точная field-level
+schema обоих export-профилей зафиксирована в `docs/physical-object-export-v1.md`.
+
+## 3. Удаление объекта и structured blockers
+
+Перед удалением проверяются входящие внешние связи внутри той же Room-транзакции, что и удаление.
+Проверка возвращает **structured** результат: kind блокирующей ссылки и её количество, а не scalar
+count и не Boolean. Первый реально существующий kind — `BEE` (связь `Bee → объект`). Модель
+расширяется добавлением нового kind вместе с реально появившейся ссылкой; спекулятивные будущие
+значения не добавляются.
+
+- Если blockers отсутствуют: показывается обычное подтверждение, затем внутри одной транзакции
+  удаляются object-owned media rows, subtype row и identity row; после успешного commit выполняется
+  cleanup object-owned media. Номер при этом не освобождается: sequence/high-water table не
+  изменяется.
+- Если blockers существуют: объект **не** удаляется, owned data и media не удаляются, а пользователь
+  получает dedicated dialog, который называет, какие именно сущности связаны с объектом и сколько их
+  (`Пчёлы — 3`). UUID, имена таблиц, FK-терминология, SQL и raw exception пользователю не
+  показываются.
+- В диалоге нет и не может быть force delete, cascade, SET NULL, автоматического перепривязывания,
+  обхода FK или действия «удалить всё равно»: единственное действие — закрыть диалог.
+
+Проверка blockers — не замена структурной защиты. Любая persisted-ссылка на `physical_objects`
+остаётся `ON DELETE RESTRICT` и является второй, fail-safe линией защиты (D090 §4). Fail-closed
+coverage закреплён тестом: каждая таблица с FK → `physical_objects`, не являющаяся известным owned
+child (`hollows`, `log_hives`, `apiaries`, `physical_object_media`), обязана быть представлена в
+blocker enumeration; иначе новая ссылка (например, будущий `inspections`) не сможет молча дойти до
+пользователя как необъяснённый отказ.
+
+## 4. Гарантия SAF-записи
+
+Пакет одного объекта или коллекции собирается и проверяется полностью в app cache, и только целый
+пакет копируется в выбранный пользователем SAF destination. Ошибка отсутствующего или повреждённого
+media не оставляет пользователю файл, выглядящий как успешно экспортированный пакет.
+
+Гарантия формулируется точно: «partial или повреждённый пакет не записывается». SAF создаёт
+destination document в момент подтверждения имени пользователем, поэтому при отказе до копирования
+там может остаться пустой документ; приложение не удаляет его, потому что это выбранный
+пользователем файл, а не app-owned storage. Отмена системного выбора ничего не меняет и не является
+ошибкой.
+
+## 5. Границы и совместимость
+
+- Semantics, профиль и ZIP-формат ObservationPoint export не меняются; общий export framework в этом
+  решении не вводится.
+- Формат backup, версия backup и Room schema не меняются: новых таблиц, колонок и миграций нет.
+- Apiary lifecycle, numbering policy, Bee/FlightCycle semantics, карта и basemap не меняются.
+- Collection export не вводит bulk delete, multi-type export или общий `Экспортировать все объекты`.
+- Post-commit media cleanup является best-effort: недоступный или небезопасный media path
+  трактуется как неполный cleanup (`Объект удалён, но не все файлы медиа удалось удалить`), а не как
+  неудачное удаление. Path safety при этом не ослабляется: небезопасный путь не разрешается и не
+  удаляется.
+- Следующий свободный номер durable decision: **D094**.
 
 ---
 

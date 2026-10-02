@@ -130,6 +130,45 @@ class FileAwarePhysicalObjectDeletionTest {
         assertTrue(File(managed, "blocker").isFile)
     }
 
+    /**
+     * An unsafe stored media path must not be reported as a failed deletion.
+     *
+     * The path safety check of the media store refuses to resolve a row that escapes the managed root;
+     * that refusal is a cleanup that could not be completed, not a deletion that did not happen. The
+     * database deletion stays authoritative, the escaping path is never used to touch the filesystem,
+     * and a file that happens to sit outside the managed root is left alone.
+     */
+    @Test
+    fun unsafeMediaPathIsIncompleteCleanupAndNeverAFailedDeletion() = runBlocking {
+        val hollowId = UUID.randomUUID()
+        val mediaId = UUID.randomUUID()
+        val outside = File(filesRoot, "outside-target").apply { writeText("must survive") }
+        val escaping = "../outside-target"
+        val media = PhysicalObjectMedia(
+            mediaId, hollowId, PhysicalObjectMediaType.IMAGE, escaping, "photo.jpg",
+            "image/jpeg", 10, "a".repeat(64), NOW,
+        )
+        val repository = RoomPhysicalObjectRepository(
+            database,
+            database.physicalObjectDao(),
+            database.physicalObjectSequenceDao(),
+            database.territoryDao(),
+            database.observerDao(),
+            database.beeDao(),
+            Clock.fixed(NOW, ZoneOffset.UTC),
+        )
+        repository.createHollow(
+            NewHollow(hollowId, territoryId, observerId, 56.1, 42.7, HollowProperties("дуб", 180.0, 123, 40.0, 25.0, null), listOf(media)),
+        )
+
+        val outcome = deletion.deleteHollow(hollowId)
+
+        assertFalse("an unavailable media path is incomplete cleanup", outcome.fileCleanupComplete)
+        assertNull("the database deletion stays authoritative", database.physicalObjectDao().getById(hollowId))
+        assertTrue("the escaping path must never be resolved", outside.isFile)
+        assertEquals("must survive", outside.readText())
+    }
+
     private suspend fun createHollowWithMedia(): Pair<UUID, UUID> {
         val hollowId = UUID.randomUUID()
         val mediaId = UUID.randomUUID()

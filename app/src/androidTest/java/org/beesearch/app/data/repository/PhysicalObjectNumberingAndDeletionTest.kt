@@ -27,6 +27,8 @@ import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewHollow
 import org.beesearch.app.domain.model.NewLogHive
 import org.beesearch.app.domain.model.PhysicalObjectInUseException
+import org.beesearch.app.domain.model.PhysicalObjectReference
+import org.beesearch.app.domain.model.PhysicalObjectReferenceKind
 import org.beesearch.app.domain.model.PhysicalObjectSequenceResetBlockedException
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.junit.After
@@ -295,10 +297,14 @@ class PhysicalObjectNumberingAndDeletionTest {
         repository.setBeeSourceObject(beeId, hollow.id)
         val before = repository.getHollow(hollow.id)
 
-        assertThrows(PhysicalObjectInUseException::class.java) {
+        val error = assertThrows(PhysicalObjectInUseException::class.java) {
             runBlocking { repository.deleteHollow(hollow.id) }
         }
 
+        assertEquals(
+            listOf(PhysicalObjectReference(PhysicalObjectReferenceKind.BEE, 1)),
+            error.references,
+        )
         assertEquals(before, repository.getHollow(hollow.id))
         assertEquals(hollow.id, repository.getBeeSourceObjectId(beeId))
         assertEquals(1, database.physicalObjectSequenceDao().getLastIssued(territoryA, PhysicalObjectType.HOLLOW))

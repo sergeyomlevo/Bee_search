@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import org.beesearch.app.domain.model.Hollow
 import org.beesearch.app.domain.model.LogHive
 import org.beesearch.app.domain.model.PhysicalObjectMedia
+import org.beesearch.app.domain.model.PhysicalObjectReference
 import org.beesearch.app.domain.model.PhysicalObjectType
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -111,6 +112,7 @@ fun PhysicalObjectsBrowser(
 fun HollowCard(
     value: Hollow, territoryLabel: String, creatorLabel: String, onEdit: () -> Unit = {},
     onEditCoordinates: () -> Unit = {}, onShowOnMap: () -> Unit = {}, onDelete: () -> Unit = {},
+    onExport: () -> Unit = {},
     mediaFile: (PhysicalObjectMedia) -> File? = { null },
     onOpenMedia: (PhysicalObjectMedia) -> Unit = {},
 ) = PhysicalObjectCard(
@@ -122,6 +124,7 @@ fun HollowCard(
             listOfNotNull(it.internalDiameterCm?.let { d -> "Внутренний диаметр" to "${d.displayMeasurement()} см" }, it.notes?.let { n -> "Дополнительно" to n })
     } ?: emptyList(), media = value.media, onEdit = onEdit,
     onEditCoordinates = onEditCoordinates, onShowOnMap = onShowOnMap, onDelete = onDelete,
+    onExport = onExport,
     mediaFile = mediaFile, onOpenMedia = onOpenMedia,
 )
 
@@ -129,6 +132,7 @@ fun HollowCard(
 fun LogHiveCard(
     value: LogHive, territoryLabel: String, creatorLabel: String, onEdit: () -> Unit = {},
     onEditCoordinates: () -> Unit = {}, onShowOnMap: () -> Unit = {}, onDelete: () -> Unit = {},
+    onExport: () -> Unit = {},
     mediaFile: (PhysicalObjectMedia) -> File? = { null },
     onOpenMedia: (PhysicalObjectMedia) -> Unit = {},
 ) = PhysicalObjectCard(
@@ -139,6 +143,7 @@ fun LogHiveCard(
             listOf("Дерево" to it.tree, "Высота летка" to "${it.entranceHeightCm.displayMeasurement()} см", "Направление летка" to "${it.entranceAzimuthDeg}° · ${azimuthSector(it.entranceAzimuthDeg)}", "Наружный диаметр" to "${it.outerDiameterCm.displayMeasurement()} см", "Материал" to it.material, "Внутренний диаметр" to "${it.internalDiameterCm.displayMeasurement()} см", "Высота внутреннего объёма" to "${it.internalHeightCm.displayMeasurement()} см") + listOfNotNull(it.notes?.let { n -> "Дополнительно" to n })
     } ?: emptyList(), media = value.media, onEdit = onEdit,
     onEditCoordinates = onEditCoordinates, onShowOnMap = onShowOnMap, onDelete = onDelete,
+    onExport = onExport,
     mediaFile = mediaFile, onOpenMedia = onOpenMedia,
 )
 
@@ -148,6 +153,7 @@ private fun PhysicalObjectCard(
     createdAt: String, latitude: Double, longitude: Double, properties: List<Pair<String, String>>,
     media: List<PhysicalObjectMedia>, onEdit: () -> Unit,
     onEditCoordinates: () -> Unit, onShowOnMap: () -> Unit, onDelete: () -> Unit,
+    onExport: () -> Unit,
     mediaFile: (PhysicalObjectMedia) -> File?, onOpenMedia: (PhysicalObjectMedia) -> Unit,
 ) {
     var confirmDelete by remember(deleteTitle) { mutableStateOf(false) }
@@ -227,6 +233,10 @@ private fun PhysicalObjectCard(
         }
         OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth().testTag("physical-object-edit")) { Text("Редактировать характеристики") }
         OutlinedButton(
+            onClick = onExport,
+            modifier = Modifier.fillMaxWidth().testTag("physical-object-export"),
+        ) { Text("Экспортировать объект") }
+        OutlinedButton(
             onClick = { confirmDelete = true },
             modifier = Modifier.fillMaxWidth().testTag("physical-object-delete"),
         ) { Text("Удалить объект") }
@@ -259,6 +269,47 @@ private fun PhysicalObjectCard(
         )
     }
 }
+
+/**
+ * Why this object cannot be deleted right now.
+ *
+ * The dialog is the whole message, so it carries the blocking data by name and amount and offers only
+ * a way to close it: there is no "delete anyway", no cascade and no forced deletion, because the
+ * working data that blocks the object belongs to the observation record and is not the card's to
+ * destroy. It names what the user knows (`Пчёлы — 3`) and never a table, a foreign key or an
+ * exception. The list may grow by kind, so the content scrolls instead of growing past the screen at
+ * a large system font scale.
+ */
+@Composable
+internal fun PhysicalObjectDeleteBlockedDialog(
+    references: List<PhysicalObjectReference>,
+    onDismiss: () -> Unit,
+) = AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Объект нельзя удалить") },
+    text = {
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("С этим объектом связаны данные, поэтому сейчас его удалить невозможно.")
+            references.forEach { reference ->
+                Text(
+                    "${reference.kind.label} — ${reference.count}",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.testTag("physical-object-blocker-${reference.kind.name}"),
+                )
+            }
+            Text("Сначала удалите или измените связанные данные.")
+        }
+    },
+    confirmButton = {
+        TextButton(
+            onClick = onDismiss,
+            modifier = Modifier.testTag("physical-object-blocked-close"),
+        ) { Text("Понятно") }
+    },
+)
 
 @Composable
 private fun PropertyRow(label: String, value: String) {

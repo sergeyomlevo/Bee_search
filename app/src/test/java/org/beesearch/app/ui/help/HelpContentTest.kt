@@ -225,9 +225,24 @@ class HelpContentTest {
     fun protectedObjectCannotBeDeletedAndHelpSaysSo() {
         val text = sectionText("Удаление объекта и правило номера")
 
-        assertTrue(text, text.contains("Объект используется в данных наблюдений и не может быть удалён"))
+        assertTrue(text, text.contains("Объект нельзя удалить"))
+        assertTrue("the help must show the blocking data by name and amount", text.contains("Пчёлы — 3"))
+        assertTrue(text, text.contains("Сначала удалите или измените связанные данные."))
+        assertTrue("the help must state that no forced deletion exists", text.contains("Принудительного удаления"))
         assertTrue(text, text.contains("Удалить Дупло N?"))
         assertTrue(text, text.contains("Удалить Колоду N?"))
+    }
+
+    @Test
+    fun objectExportIsExplainedAsOneObjectWithoutObservationData() {
+        val card = sectionText("Карточка объекта")
+        val export = sectionText("Экспорт данных")
+
+        assertTrue(card, card.contains("Экспортировать объект"))
+        assertTrue(card, card.contains("Пчёлы, вылеты и точки наблюдения в файл не входят"))
+        assertTrue(export, export.contains("Экспортировать объект"))
+        assertTrue(export, export.contains("Пчёлы, вылеты и точки наблюдения в файл объекта не входят"))
+        assertTrue("the help must say that observation links do not block the export", export.contains("не входят, даже если объект указан в наблюдениях"))
     }
 
     @Test

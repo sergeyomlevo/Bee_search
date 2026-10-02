@@ -1,6 +1,108 @@
 # Bee Search handoff
 
-## Active uncommitted milestone — Help V2 illustrations
+## Active uncommitted milestone — Physical Object Export/Delete V1
+
+Implemented on top of clean baseline `eb130c2764bdad99574f3b5190fd7f6a57477834` and left
+uncommitted for owner review. Do not commit or push before owner review.
+
+Scope: Дупло (`Hollow`) and Колода (`LogHive`). `Apiary` stays out of scope: it keeps no creation UI,
+no category, no card, no media and no delete path, and the new export refuses it fail-closed instead of
+writing a half-shaped package. Recorded as **D093**; next free durable decision is **D094**.
+
+Export: a new isolated package `data/objectexport` implements the portable
+`SINGLE_PHYSICAL_OBJECT` `formatVersion = 1` profile (field-level contract in
+`docs/physical-object-export-v1.md`). A package carries the object's own data (identity, subtype
+properties, owned media metadata and bytes) plus a minimal read-only labelling/provenance snapshot of
+the Territory (id/code/name) and the creator Observer (id/code/ФИО). Bee, FlightCycle, ObservationPoint,
+their weather and their attachments never enter a package, and an object referenced by a Bee still
+exports. The source read uses `PhysicalObjectRepository`, which has no read path to observation data at
+all. The ObservationPoint codec was deliberately not refactored into a shared framework; the ZIP/hash
+JSON mechanics are repeated locally so the verified point export keeps its regression surface.
+Robustness: strict reader (declared profile/version/type, declared entry set, declared JSON field set,
+size+SHA-256 for `object.json` and every media entry, deterministic media paths, entry/archive caps,
+`ZipEntry.time = 0`, canonical media order). SAF write is staged: the archive is built and verified in
+app cache and only a complete package is copied into the picked document, so a missing or damaged media
+file cannot leave a truncated package. The actual guarantee is "no partial or corrupt package is
+written"; the picker may already have created an empty destination document, which the app does not
+delete because it is the user's chosen file.
+
+Collection export extends the same uncommitted D093 with a separate
+`PHYSICAL_OBJECT_COLLECTION`, `formatVersion = 1` profile. The `Дупла` and `Колоды` list toolbars now
+have one `⋮` action — `Экспортировать все дупла` or `Экспортировать все колоды` — and explicitly no
+bulk delete. One action creates one ZIP for the current Territory and one concrete type; no nested
+single-object ZIPs, Apiary or mixed-type export. Entries are `manifest.json`, `territory.json`,
+`observers.json`, `objects/<object-id>.json` and `media/<object-id>/<media-id>`. Territory is stored
+once, used Observer snapshots are deduplicated, and object/media entries are canonical, size/hash
+declared and strict. The source uses `listForTerritory`, selects only the requested concrete type and
+loads only its owned media. Empty collections return a typed result before SAF; one damaged object or
+media aborts the whole package. The staged adapter re-decodes the temporary archive before opening
+the single SAF destination. Suggested names are `DEV--hollows--YYYY-MM-DD.zip` and
+`DEV--log-hives--YYYY-MM-DD.zip` through the existing sanitizer.
+
+Delete: blocking references are collected inside the delete transaction and returned as a structured
+model (`PhysicalObjectReferenceKind` + count, today only `BEE`) instead of a scalar count. With blockers
+nothing is removed — no subtype row, no media rows, no media bytes — and the card shows a dedicated
+dialog `Объект нельзя удалить` naming the blocking data and its amount (`Пчёлы — 3`) with no force
+delete, cascade or "delete anyway" action. The blocked-deletion result is a one-shot request on the
+route with an explicit consume step, not a durable flag. `RESTRICT` FKs stay the second, fail-safe line
+of defence, and `PhysicalObjectReferenceRestrictTest` now also fails when a non-owned table referencing
+`physical_objects` is not represented by a blocker kind. Numbering high-water state is still untouched
+by an ordinary deletion.
+
+Fixed defect: an unsafe stored media path used to make post-commit cleanup throw, so the UI reported
+"Не удалось удалить объект" although the database deletion had committed. Cleanup is now best-effort:
+such a path yields `fileCleanupComplete = false` and the existing
+`Объект удалён, но не все файлы медиа удалось удалить` message, while path safety still refuses to
+resolve or delete the escaping path.
+
+Verification: JVM `:app:testDebugUnitTest` `419/419 PASS` (24 new object-export tests plus the Help
+drift check after regenerating `HelpContent.kt` from `docs/ui/help/help-v2.md`); `assembleDebug`,
+`assembleDebugAndroidTest` and `lintDebug` pass; `git diff --check` clean.
+
+Preserving Samsung SM-S938B instrumentation (`android.injected.androidTest.leaveApksInstalledAfterRun`
+stays enabled, no clear and no uninstall): a focused run of the new and touched classes —
+`PhysicalObjectDeletionBlockerTest`, `PhysicalObjectExportDocumentContractTest`,
+`PhysicalObjectReferenceRestrictTest`, `FileAwarePhysicalObjectDeletionTest`,
+`PhysicalObjectNumberingAndDeletionTest`, `PhysicalObjectCardsTest` — reports `53 tests / 0 failed`,
+including all `RESTRICT` and staged-write cases. The full connected suite was not re-run.
+
+Manual device walk on `org.beesearch.app.dev`, at the owner's real system `font_scale = 1.7`, with the
+existing DEV objects left intact: map → `Объекты` → `Дупла` → card `Дупло 3` (`дупло в старой липе`)
+showed `Редактировать характеристики`, `Экспортировать объект`, `Удалить объект` with full labels;
+the picker opened in `Download/BeeSearch/Dev/Exchange/Data` with the suggested
+`DEV--hollow-3--2026-09-27--68711d39.zip`, saving it produced a 954-byte package, and the pulled file
+contains exactly `manifest.json` (profile `SINGLE_PHYSICAL_OBJECT`, `formatVersion 1`, type `HOLLOW`,
+`object.json` descriptor) and `object.json` (identity, `HOLLOW` properties, empty media, Territory
+snapshot `DEV / DEV Territory`, Observer snapshot `DEV-OBS1 / Testerov Ivan`) with no Bee, FlightCycle,
+ObservationPoint, weather or attachment data. The `Колода 1` card suggested
+`DEV--log-hive-1--2026-10-01--d170bb70.zip`; cancelling that picker returned to the card with no file,
+no success message and no error. The ordinary confirmation `Удалить Дупло 3?` is unchanged and
+cancelling it changed nothing.
+
+Collection-export verification added after that V1 pass: full `:app:testDebugUnitTest`, Help
+generation/drift/content checks, `assembleDebug`, `assembleDebugAndroidTest`,
+`compileDebugAndroidTestKotlin`, `lintDebug` and `git diff --check` pass. New focused tests cover both
+types, deterministic/canonical output, strict profile/version/entry/identity/media rules, caps,
+observer deduplication, nullable state, empty result, all-or-nothing corruption, staged SAF and the
+Room source Territory/type boundary. A preserving Samsung run of
+`PhysicalObjectCardsTest`, `PhysicalObjectListResetTest`,
+`PhysicalObjectExportDocumentContractTest` and `PhysicalObjectCollectionExportSourceTest` reports
+`29 tests / 0 failed`; DEV remained installed and app data was not cleared.
+
+Manual Samsung SM-S938B check at the existing real `font_scale = 1.7`: `Дупла` contained two saved
+objects and showed a readable one-item menu with only `Экспортировать все дупла`; one SAF flow opened
+in `Exchange/Data` with `DEV--hollows--2026-10-02.zip`. Saving produced a 4,102,162-byte package with
+profile/version `PHYSICAL_OBJECT_COLLECTION/1`, type `HOLLOW`, `objectCount = 2`, exactly one Territory
+and observers entry, two object entries and the owned media entry, with no LogHive or observation
+payload. `Колоды` showed only `Экспортировать все колоды`, suggested
+`DEV--log-hives--2026-10-02.zip`, and cancelling returned neutrally with no feedback. No real object
+was created or deleted for testing; empty-list behavior is therefore instrumentation-only.
+
+Not verified manually: the blocked-deletion dialog. No current screen can create a `Bee → object` link
+(`setBeeSourceObject` has no UI caller), and fabricating one in the owner's DEV database would alter
+real data, so that scenario is covered by instrumentation only.
+
+## Previous milestone — Help V2 illustrations
 
 The owner-approved Help V2 illustration pass is complete in the current dirty
 worktree, based on baseline HEAD `28ebc00f9ebb2265b4e85ed6c9b059477320085c`.

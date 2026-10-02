@@ -4,8 +4,10 @@ package org.beesearch.app.ui.physicalobjects
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,12 +32,18 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.beesearch.app.PhysicalObjectCoordinateUpdate
+import org.beesearch.app.PhysicalObjectDeletionBlockers
+import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
+import org.beesearch.app.data.exchange.CreateExchangeDocument
+import org.beesearch.app.data.exchange.ExchangeFolder
 import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
+import org.beesearch.app.data.objectexport.physicalObjectExportFileName
 import org.beesearch.app.domain.heading.HeadingProvider
 import org.beesearch.app.domain.heading.HeadingReference
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.PhysicalObjectMedia
 import org.beesearch.app.domain.model.PhysicalObjectMediaType
+import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.repository.PhysicalObjectRepository
 import java.util.UUID
@@ -48,11 +56,15 @@ internal fun PhysicalObjectDetailRoute(
     territories: List<Territory>,
     observers: List<Observer>,
     headingProvider: HeadingProvider,
+    exchangeStorage: BeeSearchExchangeStorage,
     coordinateUpdate: PhysicalObjectCoordinateUpdate? = null,
     onCoordinateUpdateHandled: (UUID) -> Unit = {},
+    deletionBlockers: PhysicalObjectDeletionBlockers? = null,
+    onDeletionBlockersHandled: (UUID) -> Unit = {},
     onEditCoordinates: (UUID, String, Double, Double) -> Unit = { _, _, _, _ -> },
     onShowOnMap: (Double, Double) -> Unit = { _, _ -> },
     onDelete: () -> Unit = {},
+    onExport: (Uri) -> Unit = {},
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -61,6 +73,16 @@ internal fun PhysicalObjectDetailRoute(
         factory = PhysicalObjectDetailViewModel.factory(objectId, repository),
     )
     val state by model.state.collectAsStateWithLifecycle()
+    // The picker owns the file name and the location; the app only suggests both. A cancelled choice
+    // returns null and changes nothing, so it is not reported as an error.
+    val createExportDocument = rememberLauncherForActivityResult(
+        CreateExchangeDocument(
+            mimeType = "application/zip",
+            initialFolder = exchangeStorage.initialDocumentUri(ExchangeFolder.DATA),
+        ),
+    ) { destination: Uri? ->
+        destination?.let(onExport)
+    }
     LaunchedEffect(coordinateUpdate?.requestId, state.isWorking) {
         val request = coordinateUpdate ?: return@LaunchedEffect
         if (state.isWorking) return@LaunchedEffect
@@ -111,6 +133,18 @@ internal fun PhysicalObjectDetailRoute(
                     },
                     onShowOnMap = { onShowOnMap(value.latitude(), value.longitude()) },
                     onDelete = onDelete,
+                    onExport = {
+                        createExportDocument.launch(
+                            physicalObjectExportFileName(
+                                type = value.type(),
+                                sequenceNumber = value.sequenceNumber(),
+                                territoryCode = territories.firstOrNull { it.id == value.territoryId() }
+                                    ?.code.orEmpty(),
+                                createdAt = value.createdAt(),
+                                objectId = value.id,
+                            ),
+                        )
+                    },
                     onOpenMedia = { media ->
                         val file = mediaStore.resolve(media.relativePath)
                         val uri = FileProvider.getUriForFile(
@@ -137,6 +171,12 @@ internal fun PhysicalObjectDetailRoute(
             }
         }
     }
+    deletionBlockers?.let { blockers ->
+        PhysicalObjectDeleteBlockedDialog(
+            references = blockers.references,
+            onDismiss = { onDeletionBlockersHandled(blockers.requestId) },
+        )
+    }
 }
 
 @Composable
@@ -149,12 +189,14 @@ private fun PhysicalObjectDetails(
     onEditCoordinates: () -> Unit,
     onShowOnMap: () -> Unit,
     onDelete: () -> Unit,
+    onExport: () -> Unit,
     onOpenMedia: (PhysicalObjectMedia) -> Unit,
 ) = when (value) {
     is PhysicalObjectDetailValue.HollowValue ->
         HollowCard(
             value.value, territoryLabel, creatorLabel, onEdit,
             onEditCoordinates, onShowOnMap, onDelete,
+            onExport = onExport,
             mediaFile = { mediaStore.resolve(it.relativePath) },
             onOpenMedia = onOpenMedia,
         )
@@ -162,6 +204,7 @@ private fun PhysicalObjectDetails(
         LogHiveCard(
             value.value, territoryLabel, creatorLabel, onEdit,
             onEditCoordinates, onShowOnMap, onDelete,
+            onExport = onExport,
             mediaFile = { mediaStore.resolve(it.relativePath) },
             onOpenMedia = onOpenMedia,
         )
@@ -246,6 +289,21 @@ private fun PhysicalObjectDetailValue.media(): List<PhysicalObjectMedia> = when 
 private fun PhysicalObjectDetailValue.designation(): String = when (this) {
     is PhysicalObjectDetailValue.HollowValue -> value.designation
     is PhysicalObjectDetailValue.LogHiveValue -> value.designation
+}
+
+private fun PhysicalObjectDetailValue.type(): PhysicalObjectType = when (this) {
+    is PhysicalObjectDetailValue.HollowValue -> PhysicalObjectType.HOLLOW
+    is PhysicalObjectDetailValue.LogHiveValue -> PhysicalObjectType.LOG_HIVE
+}
+
+private fun PhysicalObjectDetailValue.sequenceNumber(): Int = when (this) {
+    is PhysicalObjectDetailValue.HollowValue -> value.sequenceNumber
+    is PhysicalObjectDetailValue.LogHiveValue -> value.sequenceNumber
+}
+
+private fun PhysicalObjectDetailValue.createdAt(): java.time.Instant = when (this) {
+    is PhysicalObjectDetailValue.HollowValue -> value.createdAt
+    is PhysicalObjectDetailValue.LogHiveValue -> value.createdAt
 }
 
 private fun PhysicalObjectDetailValue.name(): String? = when (this) {

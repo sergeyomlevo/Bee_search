@@ -18,6 +18,7 @@ import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.room.ObserverEntity
 import org.beesearch.app.data.local.room.TerritoryEntity
 import org.beesearch.app.data.repository.RoomPhysicalObjectRepository
+import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
 import org.beesearch.app.domain.model.HollowProperties
 import org.beesearch.app.domain.model.NewHollow
 import org.beesearch.app.domain.model.PhysicalObjectSequenceResetBlockedException
@@ -46,6 +47,7 @@ class PhysicalObjectListResetTest {
 
     private lateinit var database: BeeSearchDatabase
     private lateinit var repository: RoomPhysicalObjectRepository
+    private lateinit var exchangeStorage: BeeSearchExchangeStorage
     private val territoryId = UUID.randomUUID()
     private val otherTerritoryId = UUID.randomUUID()
     private val observerId = UUID.randomUUID()
@@ -53,6 +55,7 @@ class PhysicalObjectListResetTest {
     @Before
     fun setUp() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
+        exchangeStorage = BeeSearchExchangeStorage(context.cacheDir, "Test")
         database = Room.inMemoryDatabaseBuilder(context, BeeSearchDatabase::class.java)
             .allowMainThreadQueries()
             .build()
@@ -82,7 +85,7 @@ class PhysicalObjectListResetTest {
     @Test
     fun emptyListOffersTheResetAndCancelDoesNothing() {
         var confirmed: Pair<UUID, PhysicalObjectType>? = null
-        renderList { territory, type -> confirmed = territory to type }
+        renderList(onResetSequence = { territory, type -> confirmed = territory to type })
 
         composeRule.onNodeWithTag("physical-objects-empty").assertIsDisplayed()
         composeRule.onNodeWithTag("physical-objects-reset").performClick()
@@ -98,10 +101,10 @@ class PhysicalObjectListResetTest {
     @Test
     fun confirmResetsOnlyTheOpenScope() = runBlocking {
         var confirmed: Pair<UUID, PhysicalObjectType>? = null
-        renderList { territory, type ->
+        renderList(onResetSequence = { territory, type ->
             confirmed = territory to type
             runBlocking { repository.resetSequence(territory, type) }
-        }
+        })
         createHollow(otherTerritoryId)
         createHollow(otherTerritoryId)
 
@@ -121,9 +124,9 @@ class PhysicalObjectListResetTest {
     @Test
     fun confirmedResetIsBlockedWhenTheCategoryIsNoLongerEmpty() = runBlocking {
         var blocked: Throwable? = null
-        renderList { territory, type ->
+        renderList(onResetSequence = { territory, type ->
             blocked = runCatching { runBlocking { repository.resetSequence(territory, type) } }.exceptionOrNull()
-        }
+        })
         createHollow(territoryId)
 
         composeRule.onNodeWithTag("physical-objects-reset").performClick()
@@ -141,6 +144,10 @@ class PhysicalObjectListResetTest {
                 type = PhysicalObjectType.LOG_HIVE,
                 territoryId = territoryId,
                 repository = repository,
+                exchangeStorage = exchangeStorage,
+                collectionExportFileName = "T--log-hives--2026-10-02.zip",
+                onExportCollection = {},
+                onEmptyCollection = {},
                 onOpen = {},
                 onBack = {},
                 onResetSequence = { territory, type -> confirmed = territory to type },
@@ -159,18 +166,67 @@ class PhysicalObjectListResetTest {
     fun nonEmptyListShowsNoResetAction() = runBlocking {
         createHollow(territoryId)
 
-        renderList { _, _ -> }
+        renderList(onResetSequence = { _, _ -> })
 
         composeRule.onNodeWithTag("physical-objects-list").assertIsDisplayed()
         composeRule.onNodeWithTag("physical-objects-reset").assertDoesNotExist()
     }
 
-    private fun renderList(onResetSequence: (UUID, PhysicalObjectType) -> Unit) {
+    @Test
+    fun hollowMenuOffersOnlyCollectionExportAndEmptyListStopsBeforeSaf() {
+        var emptyType: PhysicalObjectType? = null
+        var destinationReceived = false
+        renderList(
+            onResetSequence = { _, _ -> },
+            onEmptyCollection = { emptyType = it },
+            onExportCollection = { destinationReceived = true },
+        )
+
+        composeRule.onNodeWithTag("physical-objects-menu").performClick()
+        composeRule.onNodeWithText("Экспортировать все дупла").assertIsDisplayed().performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(PhysicalObjectType.HOLLOW, emptyType)
+            assertTrue(!destinationReceived)
+        }
+        composeRule.onNodeWithText("Удалить все дупла").assertDoesNotExist()
+    }
+
+    @Test
+    fun logHiveMenuUsesItsConcreteLabelAndHasNoBulkDelete() {
+        composeRule.setContent { Bee_searchTheme {
+            PhysicalObjectListRoute(
+                type = PhysicalObjectType.LOG_HIVE,
+                territoryId = territoryId,
+                repository = repository,
+                exchangeStorage = exchangeStorage,
+                collectionExportFileName = "T--log-hives--2026-10-02.zip",
+                onExportCollection = {},
+                onEmptyCollection = {},
+                onOpen = {},
+                onBack = {},
+            )
+        } }
+
+        composeRule.onNodeWithTag("physical-objects-menu").performClick()
+        composeRule.onNodeWithText("Экспортировать все колоды").assertIsDisplayed()
+        composeRule.onNodeWithText("Удалить все колоды").assertDoesNotExist()
+    }
+
+    private fun renderList(
+        onResetSequence: (UUID, PhysicalObjectType) -> Unit,
+        onEmptyCollection: (PhysicalObjectType) -> Unit = {},
+        onExportCollection: (android.net.Uri) -> Unit = {},
+    ) {
         composeRule.setContent { Bee_searchTheme {
             PhysicalObjectListRoute(
                 type = PhysicalObjectType.HOLLOW,
                 territoryId = territoryId,
                 repository = repository,
+                exchangeStorage = exchangeStorage,
+                collectionExportFileName = "T--hollows--2026-10-02.zip",
+                onExportCollection = onExportCollection,
+                onEmptyCollection = onEmptyCollection,
                 onOpen = {},
                 onBack = {},
                 onResetSequence = onResetSequence,
