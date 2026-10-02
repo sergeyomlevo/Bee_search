@@ -26,8 +26,15 @@
 
 ## UI: Layers/Filters (mockup-first)
 
-- [ ] Layers/Filters: inspect current UI entry points and prepare first visual mockup.
-- [ ] Owner review/revision/explicit approval of mockup.
+- [x] Layers/Filters: inspect current UI entry points and prepare visual mockups
+      (iterations V1 → V2 → V2.1; V1/V2 сохранены как history и не являются production specification).
+- [x] Owner review/revision/explicit approval of mockup: **V2.1 APPROVED UI DIRECTION** (2026-10-02).
+      Утверждённые артефакты: `docs/ui/mockups/unified-territory-layers-v2-1.png` (кадры A–D),
+      `docs/ui/mockups/unified-territory-layers-v2-1-calendar.png` (кадры E–H) и
+      `docs/ui/mockups/unified-territory-layers-v2-1.md` (семантический контракт направления).
+      Owner correction: `Apiary` / `Inspection` не показываются в панели, пока нет доступной
+      пользовательской функциональности. D094 §3 и I016 `Temporal filtering` приведены в
+      соответствие; D094 остаётся ACCEPTED, I016 — `idea`.
 - [ ] Convert approved mockup into textual UI specification.
 
 ## Temporal data-model design
