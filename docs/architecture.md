@@ -894,7 +894,8 @@ workflow для georeferenced raster imagery с validation, reprojection/mosaic,
 пирамидой реальных уровней согласно resolution, raster PMTiles и проверяемым
 metadata/manifest. Production import/acquisition, package management и final
 compatibility contract пока не определены. GPS, crosshair, ObservationPoints и
-app-generated research overlays не зависят от выбранной base-map composition.
+app-generated research overlays не зависят от выбранной base-map composition; механизм отображения
+overlays и layers — design proposal в разделе 73.3.
 
 ---
 
@@ -2146,6 +2147,44 @@ Inspection остаются deferred.
 persisted типом без пользовательского жизненного цикла: creation UI, категория, карточка, медиа,
 удаление и экспорт для него не реализуются, а экспорт отказывает для этого типа fail-closed. Это не
 создаёт отдельной архитектуры для Пасеки: решение потребуется вместе с её UI.
+
+## 73.3. Map overlays и layers: design proposal
+
+**Статус:** design proposal, а **не** accepted decision: направление предложено, но не принято и не
+реализовано. Причина разделения — разные свойства двух механизмов: MapLibre style/source/layer живёт
+внутри style JSON и заменяется целиком при смене basemap, а Compose overlays рисуются поверх карты и
+от смены style не зависят.
+
+```text
+MAPLIBRE SOURCES / LAYERS
+    basemap / presentation composition
+    raster и user georeferenced raster layers (I014)
+    GPX и другая bulk geometry (I011)
+    user field lines / polygons / areas
+    статическая analytical geometry: distance bands, probable nest zones, apiary-radius aids
+
+COMPOSE OVERLAYS
+    маркеры ObservationPoint, Hollow, LogHive, Apiary, будущий Inspection
+    selection и selected state
+    GPS marker, map-centre target, direction guide
+    temporary measurement marker
+    интерактивные analytical handles и элементы
+```
+
+Причины: Compose даёт interaction, accessibility semantics, 48 dp touch targets, уже проверенный
+marker path и независимость от смены style; MapLibre даёт raster, bulk geometry, ordering
+относительно basemap, labels и геометрию, масштабируемость на большое число features.
+
+Существующие research markers не переносятся в MapLibre только ради технологической унификации;
+вопрос масштаба Compose markers решается по реальным device measurements, конкретные performance
+limits сейчас не устанавливаются.
+
+Design requirement для будущих MapLibre-side overlays: они должны детерминированно восстанавливаться
+после смены style (`setStyle(...)` → style loaded → active MapLibre-side overlays restored), а
+registry/lifecycle должен жить вне конкретного style. Детальный дизайн — open implementation design.
+
+Territory Data Map, независимое включение слоёв и Layers/Filters UI остаются идеей I016
+(`docs/ideas.md`).
 
 # 74. Критерий правильности архитектуры
 
