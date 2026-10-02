@@ -35,7 +35,10 @@
       Owner correction: `Apiary` / `Inspection` не показываются в панели, пока нет доступной
       пользовательской функциональности. D094 §3 и I016 `Temporal filtering` приведены в
       соответствие; D094 остаётся ACCEPTED, I016 — `idea`.
-- [ ] Convert approved mockup into textual UI specification.
+- [x] Convert approved mockup into textual UI specification: **APPROVED · 2026-10-02**.
+      `docs/ui/unified-territory-map-display-spec.md` — утверждённая спецификация поведения; owner
+      decisions при approval: display state per-Territory и persistent, default второго фильтра
+      сознательно отложен. Реализация не начата.
 
 ## Temporal data-model design
 
