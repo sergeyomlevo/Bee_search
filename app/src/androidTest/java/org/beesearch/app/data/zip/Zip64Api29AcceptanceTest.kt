@@ -56,10 +56,12 @@ class Zip64Api29AcceptanceTest {
         if (large) assumeTrue("pass zip64LargeOffset=true explicitly", args.getString("zip64LargeOffset") == "true")
         assertEquals("API 29 required", 29, Build.VERSION.SDK_INT)
         assertTrue("not a physical device", Build.HARDWARE == "goldfish" || Build.HARDWARE == "ranchu")
-        val context = InstrumentationRegistry.getInstrumentation().context
-        assertEquals("test APK sandbox only", "org.beesearch.app.dev.test", context.packageName)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        assertEquals("test APK identity", "org.beesearch.app.dev.test", instrumentation.context.packageName)
+        val targetContext = instrumentation.targetContext
+        assertEquals("DEV target sandbox only", "org.beesearch.app.dev", targetContext.packageName)
         val needed = if (large) 10L * 1024 * 1024 * 1024 else 128L * 1024 * 1024
-        val root = context.dataDir
+        val root = targetContext.dataDir
         val usableSpace = root.usableSpace
         val filesystem = runCatching { StatFs(root.absolutePath) }
         val diagnostic = "root.absolutePath=${root.absolutePath}, root.exists=${root.exists()}, " +
@@ -76,7 +78,7 @@ class Zip64Api29AcceptanceTest {
     }
 
     private fun fixture(name: String): File {
-        val root = InstrumentationRegistry.getInstrumentation().context.dataDir
+        val root = InstrumentationRegistry.getInstrumentation().targetContext.dataDir
         check(root.exists() && root.isDirectory) { "fixture root must exist and be a directory: ${root.absolutePath}" }
         val operationDir = root.resolve("zip64-${java.util.UUID.randomUUID()}")
         check(operationDir.mkdir()) { "cannot create fixture directory: ${operationDir.absolutePath}" }
