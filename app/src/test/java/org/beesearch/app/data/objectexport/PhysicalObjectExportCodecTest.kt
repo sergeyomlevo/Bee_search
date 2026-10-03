@@ -239,6 +239,25 @@ class PhysicalObjectExportCodecTest {
         assertInvalid { decode(ByteArray(0)) }
     }
 
+    @Test
+    fun `decoder accepts reordered entries and separates object size and hash failures`() {
+        val fixture = fixture(PhysicalObjectType.HOLLOW)
+        val original = entries(encode(fixture.graph, fixture.blobs))
+        val reordered = writeEntries(original.entries.reversed().associate { it.toPair() })
+        assertEquals(fixture.graph, decode(reordered).graph)
+
+        assertIntegrity("object.json size mismatch") {
+            decode(replace(original, "manifest.json") {
+                it.replace("\"objectByteLength\":${original.getValue("object.json").size}", "\"objectByteLength\":${original.getValue("object.json").size + 1}")
+            })
+        }
+        assertIntegrity("object.json SHA-256 mismatch") {
+            decode(replace(original, "manifest.json") {
+                it.replace("\"objectSha256\":\"${sha(original.getValue("object.json"))}\"", "\"objectSha256\":\"${"0".repeat(64)}\"")
+            })
+        }
+    }
+
     private fun fixture(type: PhysicalObjectType, twoMedia: Boolean = false): Fixture {
         val objectId = UUID.fromString("11111111-1111-1111-1111-111111111111")
         val territoryId = UUID.fromString("22222222-2222-2222-2222-222222222222")
@@ -399,6 +418,13 @@ class PhysicalObjectExportCodecTest {
             thrown = error
         }
         assertTrue("expected PhysicalObjectExportIntegrityError, got $thrown", thrown is PhysicalObjectExportIntegrityError)
+    }
+
+    private fun assertIntegrity(message: String, block: () -> Unit) {
+        var thrown: Throwable? = null
+        try { block() } catch (error: Throwable) { thrown = error }
+        assertTrue("expected PhysicalObjectExportIntegrityError, got $thrown", thrown is PhysicalObjectExportIntegrityError)
+        assertEquals(message, thrown?.message)
     }
 
     private fun assertUnsupportedType(block: () -> Unit) {

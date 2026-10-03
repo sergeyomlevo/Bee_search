@@ -134,6 +134,34 @@ class PhysicalObjectCollectionExportCodecTest {
         assertEncodeInvalid(collection(PhysicalObjectType.HOLLOW, objects))
     }
 
+    @Test
+    fun `decoder accepts reordered entries and rejects object descriptor size or hash mismatch`() {
+        val graph = collection(PhysicalObjectType.HOLLOW, listOf(objectGraph(PhysicalObjectType.HOLLOW, 1)))
+        val good = encode(graph, blobs(graph))
+        val original = zip(good)
+        val reordered = ByteArrayOutputStream().also { output ->
+            ZipOutputStream(output).use { zip ->
+                original.entries.reversed().forEach { (name, bytes) ->
+                    zip.putNextEntry(ZipEntry(name).apply { time = 0L })
+                    zip.write(bytes)
+                    zip.closeEntry()
+                }
+            }
+        }.toByteArray()
+        assertEquals(graph.objects.single().id, decode(reordered).graph.objects.single().id)
+
+        val objectEntry = PhysicalObjectCollectionExportContract.objectEntry(graph.objects.single().id)
+        val objectBytes = original.getValue(objectEntry)
+        assertIntegrityFailure("objects/${graph.objects.single().id}.json size mismatch", mutate(good) { bytes ->
+            bytes[PhysicalObjectCollectionExportContract.MANIFEST_ENTRY] = bytes.getValue(PhysicalObjectCollectionExportContract.MANIFEST_ENTRY)
+                .decodeToString().replace("\"byteLength\":${objectBytes.size}", "\"byteLength\":${objectBytes.size + 1}").encodeToByteArray()
+        })
+        assertIntegrityFailure("objects/${graph.objects.single().id}.json SHA-256 mismatch", mutate(good) { bytes ->
+            bytes[PhysicalObjectCollectionExportContract.MANIFEST_ENTRY] = bytes.getValue(PhysicalObjectCollectionExportContract.MANIFEST_ENTRY)
+                .decodeToString().replace("\"sha256\":\"${sha(objectBytes)}\"", "\"sha256\":\"${"0".repeat(64)}\"").encodeToByteArray()
+        })
+    }
+
     private fun collection(type: PhysicalObjectType, objects: List<PhysicalObjectExportGraph>) =
         PhysicalObjectCollectionExportGraph(TERRITORY, type, objects)
 
@@ -223,6 +251,13 @@ class PhysicalObjectCollectionExportCodecTest {
         var thrown: Throwable? = null
         try { decode(bytes) } catch (error: Throwable) { thrown = error }
         assertTrue("expected invalid package, got $thrown", thrown is PhysicalObjectExportException)
+    }
+
+    private fun assertIntegrityFailure(message: String, bytes: ByteArray) {
+        var thrown: Throwable? = null
+        try { decode(bytes); throw AssertionError("expected integrity failure") } catch (error: Throwable) { thrown = error }
+        assertTrue("expected PhysicalObjectExportIntegrityError, got $thrown", thrown is PhysicalObjectExportIntegrityError)
+        assertEquals(message, thrown?.message)
     }
 
     private fun mediaBytes(sequence: Int) = "media-$sequence".encodeToByteArray()

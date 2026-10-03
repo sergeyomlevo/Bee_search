@@ -154,6 +154,29 @@ class ObservationPointExportCodecTest {
     }
 
     @Test
+    fun `decoder accepts reordered entries and rejects point descriptor size or hash mismatch`() {
+        val fixture = fixture()
+        val original = entries(encode(fixture.graph, fixture.blobs))
+        val reordered = writeEntries(original.entries.reversed().associate { it.toPair() })
+        assertEquals(fixture.graph.point, ObservationPointExportCodec.decode(reordered.inputStream()).graph.point)
+
+        assertIntegrityFailure("point.json size mismatch") {
+            ObservationPointExportCodec.decode(writeEntries(original.mapValues { (name, bytes) ->
+                if (name == "manifest.json") bytes.toString(Charsets.UTF_8)
+                    .replace("\"pointByteLength\":${original.getValue("point.json").size}", "\"pointByteLength\":${original.getValue("point.json").size + 1}")
+                    .toByteArray() else bytes
+            }).inputStream())
+        }
+        assertIntegrityFailure("point.json SHA-256 mismatch") {
+            ObservationPointExportCodec.decode(writeEntries(original.mapValues { (name, bytes) ->
+                if (name == "manifest.json") bytes.toString(Charsets.UTF_8)
+                    .replace("\"pointSha256\":\"${sha(original.getValue("point.json"))}\"", "\"pointSha256\":\"${"0".repeat(64)}\"")
+                    .toByteArray() else bytes
+            }).inputStream())
+        }
+    }
+
+    @Test
     fun `filename is deterministic readable collision resistant and sanitized`() {
         val fixture = fixture().graph
         val detail = org.beesearch.app.domain.model.ObservationPointDetail(
@@ -247,6 +270,13 @@ class ObservationPointExportCodecTest {
         var thrown: Throwable? = null
         try { block() } catch (error: Throwable) { thrown = error }
         assertTrue("Expected ObservationPointExportException, got $thrown", thrown is ObservationPointExportException)
+    }
+
+    private fun assertIntegrityFailure(message: String, block: () -> Unit) {
+        var thrown: Throwable? = null
+        try { block() } catch (error: Throwable) { thrown = error }
+        assertTrue("Expected ObservationPointExportIntegrityError, got $thrown", thrown is ObservationPointExportIntegrityError)
+        assertEquals(message, thrown?.message)
     }
 
     private data class Fixture(val graph: ObservationPointExportGraph, val blobs: Map<UUID, ByteArray>)
