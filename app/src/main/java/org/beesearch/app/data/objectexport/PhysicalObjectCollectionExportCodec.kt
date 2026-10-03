@@ -2,7 +2,6 @@ package org.beesearch.app.data.objectexport
 
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.charset.StandardCharsets
@@ -27,6 +26,11 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
+import org.beesearch.app.data.zip.ZipReadGuard
+import org.beesearch.app.data.zip.ZipSafetyException
+import org.beesearch.app.data.zip.ZipSafetyFailure
+import org.beesearch.app.data.zip.ZipSafetyPolicy
+import org.beesearch.app.data.zip.validateZipRelativePath
 import org.beesearch.app.domain.model.PhysicalObjectMedia
 import org.beesearch.app.domain.model.PhysicalObjectMediaType
 import org.beesearch.app.domain.model.PhysicalObjectType
@@ -299,17 +303,16 @@ internal object PhysicalObjectCollectionExportCodec {
 
     private fun readArchive(input: InputStream): Map<String, ByteArray> = try {
         val result = linkedMapOf<String, ByteArray>()
-        var total = 0L
+        val guard = ZipReadGuard(ZipSafetyPolicy(
+            PhysicalObjectCollectionExportContract.MAX_ENTRIES,
+            PhysicalObjectCollectionExportContract.MAX_ENTRY_BYTES,
+            PhysicalObjectCollectionExportContract.MAX_TOTAL_BYTES,
+        ))
         ZipInputStream(BufferedInputStream(input)).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
-                if (result.size >= PhysicalObjectCollectionExportContract.MAX_ENTRIES) invalid("too many ZIP entries")
-                if (entry.isDirectory) invalid("directory ZIP entry is not allowed")
-                validateEntryName(entry.name)
-                if (result.containsKey(entry.name)) invalid("duplicate ZIP entry")
-                val bytes = readLimited(zip, PhysicalObjectCollectionExportContract.MAX_ENTRY_BYTES)
-                total += bytes.size
-                if (total > PhysicalObjectCollectionExportContract.MAX_TOTAL_BYTES) invalid("archive is too large")
+                zipMechanics(entry.isDirectory) { guard.acceptEntry(entry.name, entry.isDirectory) }
+                val bytes = zipMechanics { guard.readEntry(zip) }
                 result[entry.name] = bytes
                 zip.closeEntry()
             }
@@ -322,26 +325,19 @@ internal object PhysicalObjectCollectionExportCodec {
         throw InvalidPhysicalObjectExport("malformed archive", error)
     }
 
-    private fun validateEntryName(name: String) {
-        val parts = name.split('/')
-        if (name.isBlank() || name.startsWith('/') || name.contains('\\') || name.contains(':') ||
-            parts.any { it.isBlank() || it == "." || it == ".." }
-        ) invalid("unsafe ZIP entry")
-    }
+    private fun validateEntryName(name: String) = zipMechanics { validateZipRelativePath(name) }
 
-    private fun readLimited(input: InputStream, limit: Long): ByteArray {
-        val output = ByteArrayOutputStream()
-        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-        var total = 0L
-        while (true) {
-            val read = input.read(buffer)
-            if (read < 0) break
-            total += read
-            if (total > limit) invalid("ZIP entry is too large")
-            output.write(buffer, 0, read)
+    private inline fun <T> zipMechanics(isDirectory: Boolean = false, block: () -> T): T =
+        try { block() } catch (error: ZipSafetyException) {
+            throw InvalidPhysicalObjectExport(when (error.failure) {
+                ZipSafetyFailure.ENTRY_COUNT -> "too many ZIP entries"
+                ZipSafetyFailure.UNSAFE_PATH -> if (isDirectory) "directory ZIP entry is not allowed" else "unsafe ZIP entry"
+                ZipSafetyFailure.DUPLICATE -> "duplicate ZIP entry"
+                ZipSafetyFailure.ENTRY_BYTES -> "ZIP entry is too large"
+                ZipSafetyFailure.TOTAL_BYTES -> "archive is too large"
+                else -> throw InvalidPhysicalObjectExport("malformed archive", error)
+            })
         }
-        return output.toByteArray()
-    }
 
     private fun putEntry(zip: ZipOutputStream, name: String, bytes: ByteArray) {
         zip.putNextEntry(ZipEntry(name).apply { time = 0L })
