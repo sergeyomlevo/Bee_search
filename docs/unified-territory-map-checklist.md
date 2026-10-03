@@ -42,12 +42,16 @@
 
 ## Temporal data-model design
 
-- [ ] Design minimal fixation-date data-model change for Hollow/LogHive/Apiary.
-- [ ] Resolve ObservationPoint late-entry consequence:
+- [x] Design minimal fixation-date data-model change for Hollow/LogHive/Apiary.
+- [x] Resolve ObservationPoint late-entry consequence:
       observation date vs created_at, observation_year, point numbering.
-- [ ] Design Apiary temporal fields: fixation date separately from establishment date/year;
+- [x] Design Apiary temporal fields: fixation date separately from establishment date/year;
       exact/year-only/approximate/unknown representation remains open until this step.
-- [ ] Design future Inspection entity with its own inspection date.
+- [x] Design future Inspection entity with its own inspection date.
+
+Design APPROVED · 2026-10-03: `docs/temporal-data-model-design.md`. Закрыт design: schema-направление,
+migration policy и invariants. За пределами утверждённого minimal scope остаются future concerns —
+establishment-date precision, схема Inspection, late-entry/weather design. Implementation не начата.
 
 ## Overlay architecture evidence
 
