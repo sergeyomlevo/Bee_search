@@ -1,6 +1,7 @@
 package org.beesearch.app.data.zip
 
 import android.os.Build
+import android.os.StatFs
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -58,10 +59,29 @@ class Zip64Api29AcceptanceTest {
         val context = InstrumentationRegistry.getInstrumentation().context
         assertEquals("test APK sandbox only", "org.beesearch.app.dev.test", context.packageName)
         val needed = if (large) 10L * 1024 * 1024 * 1024 else 128L * 1024 * 1024
-        assertTrue("insufficient storage: need $needed", context.noBackupFilesDir.usableSpace >= needed)
+        val root = context.dataDir
+        val usableSpace = root.usableSpace
+        val filesystem = runCatching { StatFs(root.absolutePath) }
+        val diagnostic = "root.absolutePath=${root.absolutePath}, root.exists=${root.exists()}, " +
+            "root.isDirectory=${root.isDirectory}, root.usableSpace=$usableSpace, " +
+            "root.freeSpace=${root.freeSpace}, root.totalSpace=${root.totalSpace}, " +
+            filesystem.fold(
+                onSuccess = { "StatFs.availableBytes=${it.availableBytes}, StatFs.totalBytes=${it.totalBytes}" },
+                onFailure = { "StatFs.error=$it" }
+            ) + ", requiredBytes=$needed"
+        println("ZIP64 storage: $diagnostic")
+        assertTrue("fixture root must exist and be a directory: $diagnostic", root.exists() && root.isDirectory)
+        assertTrue("cannot inspect fixture filesystem: $diagnostic", filesystem.isSuccess)
+        assertTrue("insufficient storage: $diagnostic", usableSpace >= needed)
     }
 
-    private fun fixture(name: String): File = InstrumentationRegistry.getInstrumentation().context.noBackupFilesDir.resolve("zip64-${java.util.UUID.randomUUID()}").also { check(it.mkdir()) }.resolve(name)
+    private fun fixture(name: String): File {
+        val root = InstrumentationRegistry.getInstrumentation().context.dataDir
+        check(root.exists() && root.isDirectory) { "fixture root must exist and be a directory: ${root.absolutePath}" }
+        val operationDir = root.resolve("zip64-${java.util.UUID.randomUUID()}")
+        check(operationDir.mkdir()) { "cannot create fixture directory: ${operationDir.absolutePath}" }
+        return operationDir.resolve(name)
+    }
 
     private fun writeDeflated(file: File) = ZipOutputStream(FileOutputStream(file)).use { zip ->
         val digest = MessageDigest.getInstance("SHA-256")
