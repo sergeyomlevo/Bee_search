@@ -20,6 +20,7 @@ import kotlinx.serialization.json.longOrNull
 import org.beesearch.app.BuildConfig
 import org.beesearch.app.data.local.room.*
 import org.beesearch.app.domain.backup.*
+import org.beesearch.app.data.zip.*
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.AttachmentType
@@ -276,9 +277,9 @@ private const val MAX_TOTAL_BYTES = 64L * 1024 * 1024
 private val JSON = Json { isLenient = false; ignoreUnknownKeys = false }
 
 internal class ZipEntryTracker {
-    private val names = hashSetOf<String>()
+    private val names = ZipEntryNames()
     fun accept(name: String) {
-        if (!names.add(name)) throw MalformedBackup("duplicate ZIP entry")
+        backupZipMechanics { names.accept(name) }
     }
 }
 
@@ -504,15 +505,13 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
 }
 
 private fun readArchive(file: File): Map<String, ByteArray> = try {
-    val result = linkedMapOf<String, ByteArray>(); val tracker = ZipEntryTracker(); var total = 0L
+    val result = linkedMapOf<String, ByteArray>()
+    val guard = ZipReadGuard(ZipSafetyPolicy(MAX_ENTRIES, MAX_ENTRY_BYTES, MAX_TOTAL_BYTES))
     ZipInputStream(BufferedInputStream(FileInputStream(file))).use { zip ->
         while (true) {
             val entry = zip.nextEntry ?: break
-            if (result.size >= MAX_ENTRIES) throw MalformedBackup("too many ZIP entries")
-            validatePath(entry)
-            tracker.accept(entry.name)
-            val bytes = readLimited(zip, MAX_ENTRY_BYTES); total += bytes.size
-            if (total > MAX_TOTAL_BYTES) throw MalformedBackup("archive is too large")
+            backupZipMechanics { guard.acceptEntry(entry.name, entry.isDirectory) }
+            val bytes = backupZipMechanics { guard.readEntry(zip) }
             result[entry.name] = bytes
             zip.closeEntry()
         }
@@ -521,15 +520,17 @@ private fun readArchive(file: File): Map<String, ByteArray> = try {
     result
 } catch (e: BackupException) { throw e } catch (e: Exception) { throw MalformedBackup("malformed archive", e) }
 
-private fun validatePath(entry: ZipEntry) {
-    if (entry.isDirectory) throw MalformedBackup("unsafe ZIP path")
-    validatePathName(entry.name)
-}
-private fun validatePathName(name: String) { val parts = name.split('/'); if (name.isBlank() || name.startsWith('/') || name.contains('\\') || name.contains(':') || parts.any { it.isBlank() || it == "." || it == ".." }) throw MalformedBackup("unsafe ZIP path") }
-private fun readLimited(input: InputStream, limit: Long): ByteArray {
-    val out = ByteArrayOutputStream(); val buffer = ByteArray(8192); var total = 0L
-    while (true) { val n = input.read(buffer); if (n < 0) break; total += n; if (total > limit) throw MalformedBackup("ZIP entry too large"); out.write(buffer, 0, n) }
-    return out.toByteArray()
+private fun validatePathName(name: String) = backupZipMechanics { validateZipRelativePath(name) }
+private inline fun <T> backupZipMechanics(block: () -> T): T = try { block() } catch (error: ZipSafetyException) {
+    throw MalformedBackup(when (error.failure) {
+        ZipSafetyFailure.ENTRY_COUNT -> "too many ZIP entries"
+        ZipSafetyFailure.UNSAFE_PATH -> "unsafe ZIP path"
+        ZipSafetyFailure.DUPLICATE -> "duplicate ZIP entry"
+        ZipSafetyFailure.ENTRY_BYTES -> "ZIP entry too large"
+        ZipSafetyFailure.TOTAL_BYTES -> "archive is too large"
+        ZipSafetyFailure.OVERFLOW -> "ZIP byte count overflow"
+        ZipSafetyFailure.SIZE_MISMATCH -> "ZIP entry size mismatch"
+    })
 }
 private fun put(zip: ZipOutputStream, name: String, bytes: ByteArray) { zip.putNextEntry(ZipEntry(name).apply { time = 0L }); zip.write(bytes); zip.closeEntry() }
 private fun logicalDigest(blobs: List<Blob>): String { val d = MessageDigest.getInstance("SHA-256"); blobs.sortedBy { it.name }.forEach { d.update(it.name.toByteArray()); d.update(0); d.update(it.bytes) }; return d.digest().hex() }
