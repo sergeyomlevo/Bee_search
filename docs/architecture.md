@@ -1680,6 +1680,12 @@ Room database должна иметь явную версию схемы.
 
 # 64. Резервное копирование
 
+Repository V1 foundation (`data/backuprepository`) отделён от Complete Backup:
+startup materializes variant-isolated Backup skeleton; explicit SAF maintenance initializes
+UUID identity and strongly verifies one immutable flat SHA blob through owned Staging and
+same-storage move. Capacity guard uses a configurable 20 GiB reserve. Snapshot/offload/UI
+не реализованы. Контракт и ограничения: [Repository V1 foundation](repository-v1-foundation.md), D095.
+
 Logical backup core реализует versioned архив согласно D069–D073. Пользовательский
 экспорт использует Android Storage Access Framework: отдельный Data ViewModel
 управляет состоянием операции, тонкий document adapter передаёт выбранный URI

@@ -5,5 +5,9 @@
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="true"
-        tools:replace="android:allowBackup" />
+        tools:replace="android:allowBackup">
+        <!-- DEV-only owner-operated SAF setup for the opt-in repository smoke. -->
+        <activity android:name="org.beesearch.app.data.backuprepository.RepositorySmokeAccessActivity"
+            android:exported="true" />
+    </application>
 </manifest>

@@ -1,6 +1,41 @@
 # Bee Search handoff
 
-## Active uncommitted milestone — Physical Object Export/Delete V1
+## Current milestone — Repository V1 Production Slice 1 (uncommitted)
+
+Baseline: clean `main`, HEAD/origin/main `4ef0de06715e5065d54c2ed5b46c22c6e5ec703e`.
+Owner authorized foundation only: skeleton, explicit header UUID initialization/open, typed SAF
+adapter, fixed configurable 20 GiB reserve, immutable flat SHA blob publication via owned Staging
+and same-storage move with full staged/final verification. See D095 and
+`docs/repository-v1-foundation.md`; next free decision is D096.
+
+No Complete Backup, Room schema, snapshots, PC ingest, handoff, offload or production backup UI
+changes. No commit/push. Current JVM result: 511 tests, 0 failures, including 42 foundation tests.
+Final production DEV assemble/unit tests/lint passed; test-only video generator was then adjusted
+to a supported 256x256 frame. Its final assemble and lint passed.
+Samsung: RFCY90MBYVZ / SM-S938B / API36, ~98 GB available. DEV/test APKs updated with install -r -t,
+no clear/uninstall. Old run `b1c39536-0cf4-49f9-aa61-bd73898506ab` failed fixture preparation
+at AVC start and is preserved. New preparation PASS (1 test), runId:
+`605340a6-3a60-44d2-86ed-e64d0410c72f`.
+First owner selection through the test APK did NOT persist a DEV grant; #publish failed with
+SecurityException before header creation. Replaced forwarding harness with debug-only
+RepositorySmokeAccessActivity in the DEV UID: takes exact leaf grant immediately.
+Old unregistered test helper removed. DEV APK preserving update succeeded; corrected system
+picker reopened with runId `605340a6-3a60-44d2-86ed-e64d0410c72f`.
+Second owner confirmation persisted the DEV grant. Device-discovered private-root alias defect
+fixed: lexical containment below trusted root, pinned canonical-root mapping, descendant symlinks
+rejected. Separate correction review cycle 2 found no new blocker. Test assertions now use SAF.
+#publish PASS and #restartAndConflict PASS after explicit DEV force-stop/relaunch.
+UUID `ba879c42-77ad-46f8-a46a-70fee456798b` preserved; JPEG 1146 bytes and MP4 1549 bytes
+full SHA matches independent shell sha256sum. Third owned synthetic blob intentionally same-size
+corrupted: VERIFY_FAILED, no overwrite. Evidence retained; source fixtures remain private.
+Final testDebugUnitTest, assembleDebug, assembleDebugAndroidTest and lintDebug passed.
+Never use production root or old R0 evidence for the corruption test. Preserve DEV package/data.
+
+Next: owner review of Slice 1 diff. Expected UUID binding persistence/selection remains a later
+integration boundary; foundation writes require explicit expected UUID. No backup UI yet.
+Do not begin Slice 2 automatically.
+
+## Historical operational context — Physical Object Export/Delete V1
 
 Implemented on top of clean baseline `eb130c2764bdad99574f3b5190fd7f6a57477834` and left
 uncommitted for owner review. Do not commit or push before owner review.

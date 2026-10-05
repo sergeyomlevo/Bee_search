@@ -2,8 +2,13 @@ package org.beesearch.app
 
 import android.app.Application
 import android.content.Context
+import android.net.Uri
+import kotlinx.coroutines.sync.Mutex
 import org.beesearch.app.data.backup.BackupDocumentExporter
 import org.beesearch.app.data.backup.BackupService
+import org.beesearch.app.data.backuprepository.beeSearchBackupBootstrap
+import org.beesearch.app.data.backuprepository.RepositoryFoundation
+import org.beesearch.app.data.backuprepository.SafRepositoryStorage
 import org.beesearch.app.data.backup.SafBackupDocumentExporter
 import org.beesearch.app.data.pointexport.ObservationPointExportService
 import org.beesearch.app.data.pointexport.ObservationPointDocumentExporter
@@ -61,7 +66,7 @@ class BeeSearchApplication : Application() {
     }
 }
 
-internal class AppContainer(context: Context) {
+internal class AppContainer(private val context: Context) {
     private val clock = Clock.systemUTC()
     private val database = BeeSearchDatabase.create(context)
     val attachmentFileStore = ObservationAttachmentFileStore(context.filesDir, context.cacheDir)
@@ -81,6 +86,15 @@ internal class AppContainer(context: Context) {
      * screen can forget it. A mirror failure never changes the canonical result.
      */
     val exchangeStorage = beeSearchExchangeStorage()
+    val backupBootstrap = beeSearchBackupBootstrap()
+    private val repositoryMaintenance = Mutex()
+
+    /** Explicit SAF binding; no initialization or ingest is triggered by app startup. */
+    fun repositoryFoundation(treeUri: Uri): RepositoryFoundation = RepositoryFoundation(
+        storage = SafRepositoryStorage(context, treeUri, backupBootstrap.root, context.filesDir),
+        variant = BuildConfig.EXCHANGE_VARIANT,
+        maintenance = repositoryMaintenance,
+    )
     val areaExchangeMirror = AreaExchangeMirror(exchangeStorage)
     val mapAreaStore: MapAreaStore = MirroringMapAreaStore(
         delegate = DataStoreMapAreaStore(context.settingsDataStore),

@@ -177,6 +177,7 @@ private fun BeeSearchApp(
     // predictable before the user goes looking for it. Idempotent: existing folders are reused.
     LaunchedEffect(application) {
         application.container.exchangeStorage.ensure()
+        application.container.backupBootstrap.ensure()
     }
 
     LaunchedEffect(route) {

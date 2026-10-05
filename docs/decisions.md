@@ -3090,8 +3090,8 @@ destination document в момент подтверждения имени по�
   трактуется как неполный cleanup (`Объект удалён, но не все файлы медиа удалось удалить`), а не как
   неудачное удаление. Path safety при этом не ослабляется: небезопасный путь не разрешается и не
   удаляется.
-- Следующий свободный номер durable decision: **D095** (номер D094 занят решением о временной
-  семантике исследовательских записей).
+- Следующий свободный номер durable decision: **D096** (D094 — временная семантика;
+  D095 — Repository V1 foundation).
 
 ---
 
@@ -3259,3 +3259,31 @@ map modes и текущий UI, не задаёт окончательный Lay
 Основной приоритет разработки:
 
 > сначала создать надёжный и быстрый инструмент полевой регистрации, проверить его в реальной работе и только затем добавлять сервер, аналитику и дополнительные уровни сложности.
+
+---
+
+# D095 — Repository V1 foundation: immutable flat media и защита field headroom
+
+**Статус:** ACCEPTED (owner-approved R0-PC-D / Production Slice 1).
+
+Repository V1 отделён от Complete Backup V1–V6. Приняты independent format identity
+`beesearch-repository`, repositoryFormatVersion 1, persistent random repository UUID и variant;
+snapshot identity `beesearch-snapshot`, snapshotFormatVersion 1 относится к будущему слою и
+не реализуется Slice 1. Path/URI/grant не являются repository identity.
+
+Layout: `Backup/repository.json`, flat `Media/<sha256>.<ext>`, `Snapshots/`, `Staging/`.
+V1 registry: JPEG `jpg`, MP4 `mp4`, unknown/generic `bin`; SHA bytes является identity,
+committed extension immutable. Skeleton bootstrap автоматический, identity initialization явный;
+non-empty root без header и wrong/invalid header запрещают writes.
+
+Fixed configurable reserve default **20 GiB**. Budget для artifact `N`:
+`checkedAdd(N, max(16 MiB, ceil(N / 100)))`, затем checkedAdd reserve.
+UNKNOWN capacity/mapping/publication capability — fail closed. Reserve ограничивает только
+собственный optional Backup growth, не резервирует место у Android/других приложений.
+
+Publication: owned Staging, streaming, close/sync, stage size/SHA, verified same-storage
+rename/move без copy fallback, final reopen size/SHA. Partial Staging не committed;
+atomic rename/power-loss durability не заявляются. Private originals не удаляются.
+No global index, GC, snapshot/offload/PC/handoff implementation в Slice 1.
+
+Implementation contract и границы: [repository-v1-foundation.md](repository-v1-foundation.md).

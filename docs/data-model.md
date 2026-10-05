@@ -2179,3 +2179,12 @@ Observer
 ```
 
 Эта модель должна использоваться как исходная при проектировании Room/SQLite, если дальнейшее обсуждение не выявит необходимости её изменить.
+
+## External Repository V1 foundation (D095)
+
+Repository V1 не меняет Room schema. Отдельный public `Backup/repository.json` сохраняет
+format identity `beesearch-repository`, version 1, persistent random repository UUID и variant.
+Media имеет immutable whole-file SHA-256 identity и flat canonical path
+`Media/<sha256>.<jpg|mp4|bin>`. Рабочие private originals не перемещаются и не удаляются.
+Snapshot schema/coverage/offload state пока не реализованы. Полный контракт:
+[repository-v1-foundation.md](repository-v1-foundation.md).
