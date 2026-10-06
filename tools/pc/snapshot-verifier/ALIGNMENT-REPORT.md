@@ -51,4 +51,29 @@ Independent read-only critic found no concrete implementation blocker; synthetic
 budget-boundary scope is explicit, not claimed full-valid 64 MiB archive generation.
 Verdict: READY_FOR_REAL_SNAPSHOT_TEST.
 
+## MIME vector alignment status (2026-10-06)
+
+Historical execution counts and findings above are retained. The verifier now
+derives `jpg`/`mp4` from the trimmed, Unicode-lowercased MIME hint using the
+fixed wire whitespace set, with `bin` fallback; recognized hints override
+generic hints and conflicting recognized classes retain `MEDIA_IDENTITY_CONFLICT`.
+`WireAlignmentTest` exercises every shared vector in
+`docs/test-vectors/repository-v1-mime-extensions.json` through a complete
+nonempty fixture and recomputed references. The approved offline test command
+completed successfully: 66 tests, zero failures/errors (CLI 1, Graph 22,
+SafeJson 7, Verifier 20, WireAlignment 16). All 16 single-hint and 9 merge data
+vectors pass, including jpg + bin -> jpg. Conflict classification remains the
+existing independent `MEDIA_IDENTITY_CONFLICT`; the data's Repository error token
+is explicitly mapped by tests, not imposed as a shared implementation.
+No real snapshot rerun or device execution is claimed. The earlier real fixture
+had no media records and cannot prove MIME parity.
+
+Production continuation is STOPPED separately: the unchanged
+`SnapshotAllCollectionsDeterminismTest` successfully builds archives containing
+UNAVAILABLE weather with nonnull `source="none"`, contrary to the wire
+ObservationPointWeather schema.
+This is a writer validation discrepancy; it is not a PC verifier defect or an
+invitation to weaken the normative weather matrix. G1–G6 production alignment
+has not been performed in this MIME reconciliation diff.
+
 STOP: no push, Android changes, device access, R2, UI, PC ingest or new slice.

@@ -43,7 +43,9 @@ For the nonblank/edge-whitespace validation predicates, whitespace is exactly Un
 U+0009..000D, U+001C..0020, U+00A0, U+1680, U+2000..200A, U+2028,
 U+2029, U+202F, U+205F, U+3000. Nonblank means at least one other code point;
 an edge-whitespace test only checks whether first/last code point belongs to this
-set. No reader trims/replaces/case-folds/NFC/NFD-normalizes user values. Existing
+set. No reader trims/replaces/case-folds/NFC/NFD-normalizes stored user values.
+MIME canonical-extension DERIVATION is the explicit exception described in §5;
+it does not rewrite the stored mimeType value. Existing
 domain requirements that a particular field have no edge whitespace are VALIDATION
 predicates (reject the value), never instructions to repair it or compare its trimmed
 form. All other strings are retained and compared exactly as recorded.
@@ -419,13 +421,26 @@ also not identity. Known SHA is identity; canonical blob path would be
    sizes in an eligible group must match; disagreement FAILS. Ineligible records
    (including a zero-size record sharing a SHA with a positive record) do not supply
    evidence or hints to the group and are not dropped from domain metadata.
-5. MIME classification uses the stored string EXACTLY, without trim/case-folding:
-   `image/jpeg` -> jpg, `video/mp4` -> mp4; null and every other hint are weak/generic
-   fallback bin. Thus `IMAGE/JPEG`, ` image/jpeg ` and MIME parameters are preserved
-   strings but unrecognized. No sniffing. One recognized class wins over weak hints;
-   two recognized classes in the eligible group conflict and FAIL; none -> bin.
-   `type`, original name and relativePath never override the MIME hint. This keeps
-   the approved jpg/mp4/bin registry without additional MIME normalization.
+5. Shared Repository V1 canonical-extension policy is normative. Single-hint
+   derivation: null -> bin; otherwise remove leading/trailing characters using
+   Kotlin `String.trim()` / `Char.isWhitespace()` semantics, then apply Unicode
+   `String.lowercase()` with invariant locale. For trimming, the precise code
+   point set is the whitespace set in §1 (not Java String.trim's <=U+0020 rule).
+   Exact lookup of the resulting string: `image/jpeg` -> jpg, `video/mp4` -> mp4,
+   all other values -> bin. No MIME parameter removal/parsing, sniffing, aliases,
+   Unicode normalization or filename/type inference. Stored mimeType is preserved.
+   Therefore `IMAGE/JPEG` and ` image/jpeg ` derive jpg; `image/jpeg; q=1` derives bin.
+   For one SHA, derive extensions only from ELIGIBLE rows, then form the recognized
+   set excluding bin. Empty set -> bin; {jpg} -> jpg; {mp4} -> mp4; {jpg,mp4} -> FAIL.
+   Bin is lack of recognized evidence, not an independently conflicting type.
+   Thus `IMAGE/JPEG` + `image/jpeg; q=1` -> jpg, VALID; size conflicts still FAIL.
+   Production Snapshot writer/reader and future ingest use the ONE shared
+   `CanonicalExtension.resolve` policy in RepositoryPolicy.kt. Independent PC readers
+   implement this TEXT without importing production code.
+   Contract vectors: [single/merged MIME hints](test-vectors/repository-v1-mime-extensions.json).
+   Primary API references: [trim](https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.text/trim.html),
+   [whitespace](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.text/is-whitespace.html),
+   [invariant lowercase](https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.text/lowercase.html).
 6. Emit exactly `{sha256:H, byteSize:canonical-safe-positive-integer,
    canonicalExtension:"jpg"|"mp4"|"bin"}`, canonical JSON per accepted restricted
    profile, one LF each. Deduplicate equal derived identities, sort by SHA ascending
@@ -533,7 +548,8 @@ O1 approved: closed V1 schema everywhere. Reject unknown manifest or domain fiel
 unknown enum values, duplicate keys, wrong type and unknown format/profile/policy/
 result. Missing fields reject except the explicitly optional sha256/byteSize media
 fields. Missing nullable fields are otherwise invalid; null is not a missing field.
-No permissive extras, inferred defaults, string normalization or silent loss. New
+No permissive extras, inferred defaults, stored-string normalization or silent loss.
+Only MIME extension derivation applies §5 normalization; it never rewrites a field. New
 fields/semantics need an explicit compatible evolution policy or new format version;
 version namespace remains independent of Complete Backup V1–V6.
 No stricter semantic dependency on domain member order. Existing canonical core is
@@ -589,7 +605,7 @@ OBSERVED CURRENT WRITER comparison (no execution / no real snapshot inspected):
 | PRODUCTION_VALIDATION_GAP G3 | Current domain parsers ignore unknown fields and do not verify input record ordering. Closed-schema membership and strict per-entry ordering/key checks are required; ordinary writer output is already closed/sorted. |
 | PRODUCTION_VALIDATION_GAP G4 | Current Snapshot validation rejects all media sizes <=0 and requires nonnull SHA/size. It must preserve schema-valid ineligible metadata, allow explicitly optional/nullable identity fields on read and compute references only from eligible records. References/count must match the new eligibility algorithm, not all media rows. |
 | PRODUCTION_VALIDATION_GAP G5 | Current shared graph validator wrongly demands global uniqueness across six primary collections. Remove that cross-type restriction for Snapshot V1 only; retain within-collection identity/subtype/FK checks. No change to legacy Complete Backup is authorized here. |
-| PRODUCTION_VALIDATION_GAP G6 | Current embedded Area reader can normalize names/UUIDs and accepts numeric spellings beyond the defined legacy decimal grammar. Current MIME resolver trims/case-folds hints. Snapshot validation/reference derivation must use exact lexical strings and reject forbidden geometry/UUID forms, without normalization; preserve allowed user strings verbatim. |
+| PRODUCTION_VALIDATION_GAP G6 | Current embedded Area reader can normalize names/UUIDs and accepts numeric spellings beyond the defined legacy decimal grammar. Geometry/UUID validation must reject forbidden forms and preserve allowed strings verbatim. The previously identified raw-MIME mismatch is superseded by the owner-approved §5 correction: shared MIME derivation normalization is normative, not a production gap. |
 
 G1–G6 are exact requirements for a future bounded Snapshot alignment slice, not
 owner decisions. No real invalid snapshot was inspected/observed. Existing writer
@@ -603,6 +619,8 @@ Owner decision closure (no remaining decisions in this wire contract):
 - **O1 APPROVED**: closed V1; exact lexical identities/enums; no automatic user
   string trim/case folding/Unicode normalization/replacement. Unknown fields reject;
   absent fields are allowed only where explicitly optional in these schemas.
+  The later approved §5 MIME extension derivation exception normalizes only a
+  temporary hint, never the stored string.
 - **O2 APPROVED**: zero-byte/incomplete eligible identity does not block metadata
   COMPLETE; preserve records, omit ineligible references. No DEGRADED/media promise.
 - **O3A APPROVED**: within-collection uniqueness only; explicit FK/subtype rules
@@ -638,3 +656,33 @@ This is documentary review evidence, not a parser/build/device/runtime test.
 Only this new document and follow-up links in the two approved existing reports
 were changed. Production source was inspected read-only; verifier and its tests
 were not edited. No Gradle, ADB, device, real snapshot test, commit or push.
+
+## 12. Later owner MIME reconciliation (implementation acceptance pending)
+
+The previous independent raw-MIME disagreement correctly exposed incompatible
+writer/spec semantics. It remains historical evidence of verifier independence.
+Owner subsequently chose shared Repository V1 policy as normative: §5 now specifies
+both normalized single-hint derivation and recognized-over-bin same-SHA aggregation.
+The proposed jpg+bin rejection was explicitly withdrawn. No version/field rename,
+MIME parameters parsing, shared production policy change or broader normalization
+is authorized. Other G1–G6 rules remain unchanged. Shared data vectors are not
+shared implementation. Real Android acceptance used empty media and cannot prove
+this new MIME contract; future nonempty device evidence is still pending.
+
+Current reconciliation verification: shared data has 16 single-hint and 9 merge
+vectors; production Repository/ Snapshot writer/reader MIME parity passes, and
+independent PC offline regression passes 66 tests. Shared Repository policy,
+Snapshot writer and reader production code remain unchanged.
+
+Continuation STOP gate: the unchanged all-collections writer determinism test
+successfully builds ZIP candidates with UNAVAILABLE weather and `source="none"`.
+The ObservationPointWeather schema requires source null for that status. This demonstrates a
+WRITER_DISCREPANCY in Snapshot creation validation, not just a reader gap.
+No G1–G6 implementation, full Android build/regression, device test, commit or
+push is claimed here. Owner review must resolve that writer gate before reader
+alignment resumes; the normative weather matrix is not changed by this finding.
+
+Later bounded continuation: the owner-authorized weather validation fix and
+subsequent writer gate are recorded in [alignment status](snapshot-v1-reader-alignment-status.md).
+The matrix above is unchanged; this later status supersedes the preceding
+weather-only STOP as current operational context, not as historical evidence.

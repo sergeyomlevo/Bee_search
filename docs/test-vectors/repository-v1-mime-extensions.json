@@ -1,0 +1,31 @@
+{
+  "singleHints": [
+    {"hint": null, "extension": "bin"},
+    {"hint": "", "extension": "bin"},
+    {"hint": "image/jpeg", "extension": "jpg"},
+    {"hint": "IMAGE/JPEG", "extension": "jpg"},
+    {"hint": " image/jpeg ", "extension": "jpg"},
+    {"hint": "image/JPEG", "extension": "jpg"},
+    {"hint": "video/mp4", "extension": "mp4"},
+    {"hint": " VIDEO/MP4 ", "extension": "mp4"},
+    {"hint": "application/octet-stream", "extension": "bin"},
+    {"hint": "unknown/type", "extension": "bin"},
+    {"hint": "image/jpeg; q=1", "extension": "bin"},
+    {"hint": "image/jpeg;charset=utf-8", "extension": "bin"},
+    {"hint": "\u00a0IMAGE/JPEG\u2003", "extension": "jpg"},
+    {"hint": "\tVIDEO/MP4\r\n", "extension": "mp4"},
+    {"hint": "\u200bimage/jpeg\u200b", "extension": "bin"},
+    {"hint": "\u0085image/jpeg\u0085", "extension": "bin"}
+  ],
+  "merges": [
+    {"hints": [], "extension": "bin"},
+    {"hints": ["unknown/type", null], "extension": "bin"},
+    {"hints": ["IMAGE/JPEG", "image/jpeg; q=1"], "extension": "jpg"},
+    {"hints": ["image/jpeg", "unknown/type"], "extension": "jpg"},
+    {"hints": ["video/mp4", null], "extension": "mp4"},
+    {"hints": ["image/jpeg", "IMAGE/JPEG", " image/jpeg ", null], "extension": "jpg"},
+    {"hints": ["video/mp4", " VIDEO/MP4 ", "unknown/type"], "extension": "mp4"},
+    {"hints": ["image/jpeg", "video/mp4"], "error": "METADATA_INCONSISTENCY"},
+    {"hints": ["IMAGE/JPEG", "video/mp4", "unknown/type"], "error": "METADATA_INCONSISTENCY"}
+  ]
+}

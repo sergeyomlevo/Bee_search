@@ -4,6 +4,7 @@ import com.google.gson.JsonObject
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Locale
 
 /** Raw JSONL framing, normative schemas and metadata-only reachability. */
 internal object WireRecords {
@@ -67,7 +68,7 @@ internal object WireRecords {
                 val sha = if (row.has("sha256")) RecordSchema.nullableString(row,"sha256") else null
                 val size = if (row.has("byteSize")) RecordSchema.nullableLong(row,"byteSize") else null
                 if (sha != null && size != null && size in 1..9007199254740991L) {
-                    val ext = when (RecordSchema.nullableString(row,"mimeType")) { "image/jpeg" -> "jpg"; "video/mp4" -> "mp4"; else -> "bin" }
+                    val ext = mimeExtension(RecordSchema.nullableString(row,"mimeType"))
                     val previous = result[sha]
                     if (previous != null && (previous.size != size || (previous.extension != "bin" && ext != "bin" && previous.extension != ext)))
                         reject("MEDIA_IDENTITY_CONFLICT",path)
@@ -77,6 +78,22 @@ internal object WireRecords {
         }
         return result
     }
+    private fun mimeExtension(hint: String?): String {
+        val normalized = hint?.trim { it in MIME_TRIM_CHARS }?.lowercase(Locale.ROOT)
+        return when (normalized) {
+            "image/jpeg" -> "jpg"
+            "video/mp4" -> "mp4"
+            else -> "bin"
+        }
+    }
+
+    private val MIME_TRIM_CHARS = setOf(
+        '\u0009', '\u000A', '\u000B', '\u000C', '\u000D',
+        '\u001C', '\u001D', '\u001E', '\u001F', '\u0020',
+        '\u00A0', '\u1680', '\u2000', '\u2001', '\u2002', '\u2003',
+        '\u2004', '\u2005', '\u2006', '\u2007', '\u2008', '\u2009',
+        '\u200A', '\u2028', '\u2029', '\u202F', '\u205F', '\u3000'
+    )
     private fun closed(row: JsonObject,fields: Set<String>,scope: String) {
         if (row.keySet() != fields) reject("WIRE_SCHEMA_INVALID",scope)
     }

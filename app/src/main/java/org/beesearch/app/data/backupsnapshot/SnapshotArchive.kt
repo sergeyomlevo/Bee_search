@@ -139,7 +139,8 @@ internal class SnapshotArchive(private val limits: SnapshotLimits = SnapshotLimi
                     }
                     verifiedFiles[path] = target
                 }
-                if (counts["references/media-blobs.jsonl"] != referenceCount) invalid("REFERENCE_COUNT")
+                if (counts["references/media-blobs.jsonl"] != referenceCount)
+                    throw SnapshotException(SnapshotError.LOGICAL_STATE_INCONSISTENT, "REFERENCE_COUNT")
                 SnapshotDomainCodec.validate(verifiedFiles, check, limits)
                 if (hash(file, check) != whole) throw SnapshotException(SnapshotError.WHOLE_DIGEST_MISMATCH, "SOURCE_CHANGED")
                 return ValidatedSnapshot(identity, whole, file.length(), SnapshotMetrics(counts, bytes,

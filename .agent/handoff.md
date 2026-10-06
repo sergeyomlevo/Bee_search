@@ -1,5 +1,41 @@
 # Bee Search handoff
 
+## Current continuation — Snapshot G1–G6 aligned; owner diff review pending
+
+2026-10-06: HEAD/origin main b3eec7d9e54011f1e482e68e7ee8c5e94efc0eba.
+Preserved approved MIME/weather dirty diff; owner authorized G2–G6 creation and
+reader validation together. G2 normal capture gate NORMAL_PRODUCTION_MAX_10:
+count guard and insertion inside one Room transaction. Shared Snapshot raw
+semantic boundary now enforces closed schemas, exact collection order, per-point
+Bee limit, weather, raw nullable/incomplete media eligibility/reachability,
+per-collection UUID scope, strict lexical rules and non-normalizing v1/v2 coverage.
+General strings unchanged; RepositoryPolicy unchanged; PC verifier independent.
+Legacy graph UUID scope unchanged by default, Snapshot-only opt-out tested.
+Focused Snapshot 69/69 PASS; full JVM 600 tests, 0 failures/errors/skipped.
+assembleDebug/assembleDebugAndroidTest/lintDebug PASS (0 errors,24 warnings,2 hints).
+PC offline command SUCCESS/UP-TO-DATE, retained 66 tests/0 failures/errors.
+Independent cross-author critic found no remaining concrete blockers; typed
+embedded coverage limit preservation fixed. git diff --check PASS. No device,
+real-media ZIP rerun, R2/FULL/restore/UI/stage/commit/push. Details and historical
+STOP evidence: docs/snapshot-v1-reader-alignment-status.md.
+Verdict READER_ALIGNED_WITH_WIRE_V1; STOP for owner review of the complete dirty diff.
+
+## Historical continuation — Snapshot weather aligned; writer gate STOP
+
+2026-10-06: HEAD/origin main b3eec7d9e54011f1e482e68e7ee8c5e94efc0eba.
+Approved MIME reconciliation diff is preserved and uncommitted. Weather state
+gate: TEST_FIXTURE_ONLY in current normal production paths (not a live DB audit).
+SnapshotDomainCodec now shares exact weather matrix/cardinality checks between
+creation and reader; no data normalization. Corrected valid fixture and retained
+negative UNAVAILABLE/source="none" tests. Focused weather/MIME/determinism 9/9
+PASS; independent PC offline test command SUCCESS/UP-TO-DATE, 66-test corpus.
+Required writer recheck found 11 Bees on one point can still be encoded, built
+and reopened successfully, against wire maximum 10. Owned 1-test JVM diagnostic
+confirmed it; temporary probe source removed. STOP before G2–G6 implementation.
+No full regression/build/lint/device/commit/push. Owner review must authorize the
+remaining creation AND reader validation scope. Details:
+docs/snapshot-v1-reader-alignment-status.md. Do not claim reader alignment complete.
+
 ## Current milestone — Slice 2B final acceptance audit ACCEPT
 
 2026-10-06: reviewed task-only diff from dc40b209. Exact default V1 limit boundary

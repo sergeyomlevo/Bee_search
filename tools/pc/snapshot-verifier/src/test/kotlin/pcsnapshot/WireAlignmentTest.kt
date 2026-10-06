@@ -1,11 +1,15 @@
 package pcsnapshot
 
+import com.google.gson.JsonNull
 import com.google.gson.JsonObject
+import com.google.gson.JsonPrimitive
 import com.google.gson.JsonParser
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.nio.file.Files
+import java.nio.file.Path
 
 /** Additional document-driven conformance matrices; no Android model dependencies. */
 class WireAlignmentTest {
@@ -70,12 +74,88 @@ class WireAlignmentTest {
             files["references/media-blobs.jsonl"] = "{\"byteSize\":10,\"canonicalExtension\":\"jpg\",\"sha256\":\"${NonEmptyFixture.shaImage}\"}\n".toByteArray()
         }.verdict)
     }
-    @Test fun mimeHintIsNotTrimmedOrCaseFolded() {
+    @Test fun mimeHintIsTrimmedByWireWhitespaceAndLowercasedInvariantly() {
         assertEquals("PASS",verify { files ->
             for (path in listOf("data/physical-object-media.jsonl","data/observation-point-attachments.jsonl")) edit(files,path) { it.addProperty("mimeType"," IMAGE/JPEG ") }
-            files["references/media-blobs.jsonl"] = files.getValue("references/media-blobs.jsonl").toString(Charsets.UTF_8).replace("jpg","bin").toByteArray()
+            files["references/media-blobs.jsonl"] = files.getValue("references/media-blobs.jsonl").toString(Charsets.UTF_8).toByteArray()
         }.verdict)
     }
+
+    @Test fun sharedMimeVectorsExerciseNonEmptyMetadataAndReferenceDerivation() {
+        val vectorPath = listOf(
+            Path.of("../../../docs/test-vectors/repository-v1-mime-extensions.json"),
+            Path.of("docs/test-vectors/repository-v1-mime-extensions.json")
+        ).firstOrNull { Files.exists(it) } ?: error("shared MIME vector file not found")
+        val vectors = JsonParser.parseString(Files.readString(vectorPath)).asJsonObject
+        vectors.getAsJsonArray("singleHints").forEach { value ->
+            val vector = value.asJsonObject
+            val hint = vector.get("hint")?.let { if (it.isJsonNull) null else it.asString }
+            val expected = vector.get("extension").asString
+            val report = verify { files ->
+                setMediaHints(files, listOf(hint, hint))
+                files["references/media-blobs.jsonl"] = references(
+                    NonEmptyFixture.shaImage to expected,
+                    NonEmptyFixture.shaAttachment to expected
+                )
+            }
+            assertEquals("hint=$hint", "PASS", report.verdict)
+        }
+        vectors.getAsJsonArray("merges").forEach { value ->
+            val vector = value.asJsonObject
+            val hints = vector.getAsJsonArray("hints").map { if (it.isJsonNull) null else it.asString }
+            val report = verify { files ->
+                setMergeMediaHints(files, hints)
+                val expected = vector.get("extension")
+                files["references/media-blobs.jsonl"] = if (expected != null && hints.isNotEmpty()) {
+                    references(NonEmptyFixture.shaImage to expected.asString)
+                } else ByteArray(0)
+            }
+            val expectedError = vector.get("error")
+            if (expectedError == null) assertEquals("hints=$hints", "PASS", report.verdict)
+            else {
+                assertEquals("METADATA_INCONSISTENCY", expectedError.asString)
+                code(report, "MEDIA_IDENTITY_CONFLICT")
+            }
+        }
+    }
+
+    private fun setMediaHints(files: MutableMap<String, ByteArray>, hints: List<String?>) {
+        listOf("data/physical-object-media.jsonl", "data/observation-point-attachments.jsonl").forEachIndexed { index, path ->
+            edit(files, path) { row ->
+                val hint = hints.getOrNull(index)
+                row.add("mimeType", hint?.let(::JsonPrimitive) ?: JsonNull.INSTANCE)
+            }
+        }
+    }
+
+    private fun setMergeMediaHints(files: MutableMap<String, ByteArray>, hints: List<String?>) {
+        val rows = listOf(
+            "data/physical-object-media.jsonl" to NonEmptyFixture.media,
+            "data/observation-point-attachments.jsonl" to NonEmptyFixture.attachment,
+            "data/physical-object-media.jsonl" to NonEmptyFixture.zeroMedia,
+            "data/observation-point-attachments.jsonl" to NonEmptyFixture.incompleteAttachment
+        )
+        rows.forEachIndexed { index, (path, id) -> edit(files, path) { row ->
+            val rowId = row.get("id").asString
+            val hint = hints.getOrNull(index)
+            if (rowId == id) {
+                row.add("mimeType", hint?.let(::JsonPrimitive) ?: JsonNull.INSTANCE)
+                if (index < hints.size) {
+                    row.addProperty("byteSize", 10)
+                    row.addProperty("sha256", NonEmptyFixture.shaImage)
+                } else {
+                    row.remove("byteSize")
+                    row.remove("sha256")
+                }
+            }
+        } }
+    }
+
+    private fun references(vararg rows: Pair<String, String>): ByteArray = rows
+        .sortedBy { it.first }
+        .joinToString("") { (sha, extension) ->
+            "{\"byteSize\":${if (sha == NonEmptyFixture.shaImage) 10 else 20},\"canonicalExtension\":\"$extension\",\"sha256\":\"$sha\"}\n"
+        }.toByteArray()
     @Test fun loadedWeatherMatrixAndPendingPayloadAreEnforced() {
         assertEquals("PASS",verify { edit(it,"data/observation-point-weather.jsonl") { row ->
             row.addProperty("status","LOADED"); row.addProperty("temperatureC",-12.5); row.addProperty("windSpeedMps",0); row.addProperty("windDirectionDeg",0); row.addProperty("sampleAt",-1); row.addProperty("fetchedAt",1); row.addProperty("source","provider")

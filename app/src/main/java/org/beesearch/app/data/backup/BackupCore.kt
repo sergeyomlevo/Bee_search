@@ -603,8 +603,13 @@ private fun validateObjectMedia(graph: Graph, blobs: Map<String, Blob>) {
     blobs.keys.filter { it.startsWith("object-media-file:") }.forEach { if (it !in ids.map { id -> "object-media-file:$id" }) throw MalformedBackup("unlisted object media file") }
 }
 
-internal fun validateGraph(g: Graph) {
-    val ids = hashSetOf<UUID>(); fun ids(label: String, values: List<UUID>) = values.forEach { if (!ids.add(it)) throw DuplicateBackupIdentity("duplicate $label id $it") }
+internal fun validateGraph(g: Graph, globalIdentityUniqueness: Boolean = true) {
+    // Legacy formats keep their original global scope; Repository Snapshot V1
+    // explicitly permits the same UUID in unrelated entity collections.
+    val ids = hashSetOf<UUID>(); fun ids(label: String, values: List<UUID>) {
+        if (!globalIdentityUniqueness) ids.clear()
+        values.forEach { if (!ids.add(it)) throw DuplicateBackupIdentity("duplicate $label id $it") }
+    }
     ids("territory", g.territories.map { it.id }); ids("observer", g.observers.map { it.id }); ids("physical object", g.physicalObjects.map { it.id }); ids("point", g.points.map { it.id }); ids("bee", g.bees.map { it.id }); ids("cycle", g.cycles.map { it.id })
     unique(g.territories, "territory code") { it.code }; unique(g.observers, "observer code") { it.code }
     g.territories.forEach { domain(it.code.isNotBlank() && it.name.isNotBlank() && it.region.isNotBlank() && it.district.isNotBlank(), "blank territory field"); ordered(it.createdAt, it.updatedAt, "territory") }
@@ -828,7 +833,7 @@ internal fun snapshotGraphFromRows(rows: Map<String, List<JsonObject>>): Graph {
         weather = values("data/observation-point-weather.jsonl").map(::weather),
         attachments = values("data/observation-point-attachments.jsonl").map(::attachment),
     )
-    validateGraph(graph)
+    validateGraph(graph, globalIdentityUniqueness = false)
     return graph
 }
 

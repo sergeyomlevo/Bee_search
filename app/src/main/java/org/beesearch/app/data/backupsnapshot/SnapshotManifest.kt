@@ -87,6 +87,7 @@ internal object SnapshotManifest {
             SnapshotEntryDescriptor(obj.string("path"), obj.long("byteSize"), obj.string("sha256")).also { validateDescriptor(it) }
         } ?: invalid()
         if (descriptors.map { it.path }.toSet().size != descriptors.size) invalid()
+        if (descriptors.map { it.path } != descriptors.map { it.path }.sorted()) invalid()
         val references = root["mediaReferences"] as? JsonObject ?: invalid()
         if (references.keys != setOf("path", "recordCount") || references.string("path") != "references/media-blobs.jsonl") invalid()
         val count = references.long("recordCount")

@@ -12,6 +12,10 @@ import org.beesearch.app.data.local.room.*
 import org.beesearch.app.domain.model.*
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import org.junit.Assert.assertThrows
 
 /** Exercises canonical ordering with every snapshot collection populated. */
 class SnapshotAllCollectionsDeterminismTest {
@@ -70,7 +74,7 @@ class SnapshotAllCollectionsDeterminismTest {
             ),
             weather = listOf(
                 ObservationPointWeatherEntity(id(31), WeatherStatus.LOADED, 20.0, 2.0, 180.0, at, at, "field"),
-                ObservationPointWeatherEntity(id(32), WeatherStatus.UNAVAILABLE, null, null, null, null, null, "none"),
+                ObservationPointWeatherEntity(id(32), WeatherStatus.UNAVAILABLE, null, null, null, null, null, null),
             ),
             attachments = listOf(
                 attachment(71, id(31), "c".repeat(64), "c.jpg"),
@@ -124,6 +128,32 @@ class SnapshotAllCollectionsDeterminismTest {
         zip.entries().asSequence().filter { it.name != "manifest.json" }.associate { entry ->
             entry.name to MessageDigest.getInstance("SHA-256").digest(zip.getInputStream(entry).use { it.readBytes() })
                 .joinToString("") { byte -> "%02x".format(byte) }
+        }
+    }
+
+    @Test
+    fun `every populated wire collection enforces closed schema and stable order`() {
+        val encoded = SnapshotDomainCodec.encode(graph(), settings(false))
+        encoded.records.forEach { (path, records) ->
+            val rows = records.map { SnapshotJson.parse(it.toByteArray(), false).jsonObject }
+            SnapshotRecordSchema.validateRows(path, rows)
+            val first = rows.first()
+            val unknown = JsonObject(first + ("unexpected" to JsonPrimitive("value")))
+            assertEquals(SnapshotError.INVALID_FORMAT, assertThrows(SnapshotException::class.java) {
+                SnapshotRecordSchema.validateRows(path, listOf(unknown))
+            }.error)
+            // All emitted non-media fields are required, including nullable fields.
+            val required = first.keys.first { it != "sha256" && it != "byteSize" }
+            assertEquals(SnapshotError.INVALID_FORMAT, assertThrows(SnapshotException::class.java) {
+                SnapshotRecordSchema.validateRows(path, listOf(JsonObject(first - required)))
+            }.error)
+            assertEquals(SnapshotError.LOGICAL_STATE_INCONSISTENT, assertThrows(SnapshotException::class.java) {
+                SnapshotRecordSchema.validateRows(path, listOf(first, first))
+            }.error)
+            if (rows.size > 1) assertEquals(SnapshotError.LOGICAL_STATE_INCONSISTENT,
+                assertThrows(SnapshotException::class.java) {
+                    SnapshotRecordSchema.validateRows(path, rows.asReversed())
+                }.error)
         }
     }
 }
