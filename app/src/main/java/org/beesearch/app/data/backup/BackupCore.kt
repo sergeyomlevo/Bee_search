@@ -249,7 +249,8 @@ internal class BackupService(
 }
 
 private data class Blob(val name: String, val path: String, val bytes: ByteArray, val count: Int)
-private data class Graph(
+/** Fixed Room capture used by legacy backup and the metadata snapshot profile. */
+internal data class Graph(
     val territories: List<TerritoryEntity>, val observers: List<ObserverEntity>,
     val physicalObjects: List<PhysicalObjectEntity> = emptyList(), val apiaries: List<ApiaryEntity> = emptyList(),
     val hollows: List<HollowEntity> = emptyList(), val logHives: List<LogHiveEntity> = emptyList(),
@@ -261,7 +262,7 @@ private data class Graph(
 )
 private data class Parsed(val archiveId: UUID, val graph: Graph, val settings: PortableSettingsSnapshot, val blobs: List<Blob>)
 
-private suspend fun BackupDao.snapshot() = Graph(
+internal suspend fun BackupDao.snapshot() = Graph(
     territories = territories(), observers = observers(), physicalObjects = physicalObjects(), apiaries = apiaries(),
     hollows = hollows(), logHives = logHives(), objectMedia = physicalObjectMedia(),
     sequences = physicalObjectSequences(),
@@ -535,7 +536,7 @@ private inline fun <T> backupZipMechanics(block: () -> T): T = try { block() } c
 private fun put(zip: ZipOutputStream, name: String, bytes: ByteArray) { zip.putNextEntry(ZipEntry(name).apply { time = 0L }); zip.write(bytes); zip.closeEntry() }
 private fun logicalDigest(blobs: List<Blob>): String { val d = MessageDigest.getInstance("SHA-256"); blobs.sortedBy { it.name }.forEach { d.update(it.name.toByteArray()); d.update(0); d.update(it.bytes) }; return d.digest().hex() }
 
-private fun validateSettings(settings: PortableSettingsSnapshot, graph: Graph) {
+internal fun validateSettings(settings: PortableSettingsSnapshot, graph: Graph) {
     val territories = graph.territories.mapTo(hashSetOf()) { it.id }
     if (!territories.containsAll(settings.coverage.keys)) throw BrokenBackupForeignKey("coverage territory missing")
     settings.coverage.values.forEach(MapCoverageValidator::validate)
@@ -602,7 +603,7 @@ private fun validateObjectMedia(graph: Graph, blobs: Map<String, Blob>) {
     blobs.keys.filter { it.startsWith("object-media-file:") }.forEach { if (it !in ids.map { id -> "object-media-file:$id" }) throw MalformedBackup("unlisted object media file") }
 }
 
-private fun validateGraph(g: Graph) {
+internal fun validateGraph(g: Graph) {
     val ids = hashSetOf<UUID>(); fun ids(label: String, values: List<UUID>) = values.forEach { if (!ids.add(it)) throw DuplicateBackupIdentity("duplicate $label id $it") }
     ids("territory", g.territories.map { it.id }); ids("observer", g.observers.map { it.id }); ids("physical object", g.physicalObjects.map { it.id }); ids("point", g.points.map { it.id }); ids("bee", g.bees.map { it.id }); ids("cycle", g.cycles.map { it.id })
     unique(g.territories, "territory code") { it.code }; unique(g.observers, "observer code") { it.code }
@@ -787,6 +788,59 @@ private fun sha256(file: File): String = file.inputStream().buffered().use { inp
     val buffer = ByteArray(8192)
     while (true) { val n = input.read(buffer); if (n < 0) break; if (n > 0) digest.update(buffer, 0, n) }
     return digest.digest().hex()
+}
+
+// Narrow bridge for the metadata snapshot codec. Keep the legacy serializers private and unchanged.
+internal fun snapshotRows(graph: Graph): Map<String, List<String>> = linkedMapOf(
+    "data/territories.jsonl" to graph.territories.sortedBy { it.id.toString() }.map { it.json() },
+    "data/observers.jsonl" to graph.observers.sortedBy { it.id.toString() }.map { it.json() },
+    "data/physical-objects.jsonl" to graph.physicalObjects.sortedBy { it.id.toString() }.map { it.jsonV4() },
+    "data/apiaries.jsonl" to graph.apiaries.sortedBy { it.physicalObjectId.toString() }.map { it.json() },
+    "data/hollows.jsonl" to graph.hollows.sortedBy { it.physicalObjectId.toString() }.map { it.jsonV6() },
+    "data/log-hives.jsonl" to graph.logHives.sortedBy { it.physicalObjectId.toString() }.map { it.jsonV6() },
+    "data/physical-object-sequences.jsonl" to graph.sequences.sortedWith(compareBy({ it.territoryId.toString() }, { it.objectType.name })).map { it.json() },
+    "data/physical-object-media.jsonl" to graph.objectMedia.sortedBy { it.id.toString() }.map { it.json() },
+    "data/observation-points.jsonl" to graph.points.sortedBy { it.id.toString() }.map { it.jsonV2() },
+    "data/bees.jsonl" to graph.bees.sortedBy { it.id.toString() }.map { it.jsonV3() },
+    "data/flight-cycles.jsonl" to graph.cycles.sortedBy { it.id.toString() }.map { it.json() },
+    "data/observation-point-weather.jsonl" to graph.weather.sortedBy { it.observationPointId.toString() }.map { it.json() },
+    "data/observation-point-attachments.jsonl" to graph.attachments.sortedBy { it.id.toString() }.map { it.json() },
+)
+
+internal fun snapshotPortableJson(settings: PortableSettingsSnapshot): String =
+    obj("currentTerritoryId" to j(settings.currentTerritoryId), "currentObserverId" to j(settings.currentObserverId))
+
+/** Snapshot reader bridge: uses the same entity parsers and graph invariants as Complete Backup. */
+internal fun snapshotGraphFromRows(rows: Map<String, List<JsonObject>>): Graph {
+    fun values(path: String) = rows[path].orEmpty()
+    val graph = Graph(
+        territories = values("data/territories.jsonl").map(::territory),
+        observers = values("data/observers.jsonl").map(::observer),
+        physicalObjects = values("data/physical-objects.jsonl").map(::physicalObjectV4),
+        apiaries = values("data/apiaries.jsonl").map { apiary(it) },
+        hollows = values("data/hollows.jsonl").map { hollow(it, true) },
+        logHives = values("data/log-hives.jsonl").map { logHive(it, true) },
+        sequences = values("data/physical-object-sequences.jsonl").map(::sequence),
+        objectMedia = values("data/physical-object-media.jsonl").map(::objectMedia),
+        points = values("data/observation-points.jsonl").map(::pointV2),
+        bees = values("data/bees.jsonl").map(::beeV3),
+        cycles = values("data/flight-cycles.jsonl").map(::cycle),
+        weather = values("data/observation-point-weather.jsonl").map(::weather),
+        attachments = values("data/observation-point-attachments.jsonl").map(::attachment),
+    )
+    validateGraph(graph)
+    return graph
+}
+
+internal fun snapshotSettingsFromRows(portable: JsonObject, coverage: List<JsonObject>): PortableSettingsSnapshot {
+    val keys = coverage.map { it.uuid("territoryId") }
+    if (keys.size != keys.toSet().size) throw DuplicateBackupIdentity("duplicate coverage territory")
+    val settings = PortableSettingsSnapshot(
+        portable.optionalUuid("currentTerritoryId"), portable.optionalUuid("currentObserverId"),
+        coverage.associate { it.uuid("territoryId") to it.string("encoded") },
+    )
+    settings.coverage.values.forEach(MapCoverageValidator::validate)
+    return settings
 }
 private const val MAX_PHOTO_BYTES = 16L * 1024 * 1024
 private fun ByteArray.hex() = joinToString("") { "%02x".format(it) }

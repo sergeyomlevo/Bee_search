@@ -3090,8 +3090,7 @@ destination document в момент подтверждения имени по�
   трактуется как неполный cleanup (`Объект удалён, но не все файлы медиа удалось удалить`), а не как
   неудачное удаление. Path safety при этом не ослабляется: небезопасный путь не разрешается и не
   удаляется.
-- Следующий свободный номер durable decision: **D097** (D094 — временная семантика;
-  D095 — Repository V1 foundation).
+- Следующий свободный номер durable decision: **D098** (D097 — metadata-first Snapshot V1).
 
 ---
 
@@ -3303,4 +3302,25 @@ Recreated empty root с прежним URI не принимается как п
 Adopt existing после reinstall/unbound и intentional rebind — только explicit операции;
 normal reconnect меняет locator только после совпадения UUID. Ошибки persistence/access не означают UNBOUND.
 Snapshots/restore/PC/handoff/coverage/offload и production selection UI не входят в Slice 2A.
-Контракт: [repository-v1-foundation.md](repository-v1-foundation.md). Следующий номер: D097.
+Контракт: [repository-v1-foundation.md](repository-v1-foundation.md).
+
+---
+
+# D097 — Repository Snapshot V1: metadata-first protection
+
+**Статус:** ACCEPTED (owner Snapshot 2B Contract Closure / implementation authorization).
+
+First profile is METADATA_ONLY, NO_MEDIA_EVIDENCE, COMPLETE relative to declared metadata.
+Not a media/recovery guarantee, not “Полная резервная копия”. Independent beesearch-snapshot
+format version1, exact17 entries; full Room graph captured in one consistent transaction;
+portable selections/geometry must resolve against it. No global Room+DataStore atomicity claim.
+Domain JSONL uses the shared domain codec and stable sorting, finite binary64 numbers;
+manifest/references reuse the accepted restricted integer-only canonical core. Entry integrity
+is exact stored byte length/SHA before semantic parsing. No parse/reserialize hashing.
+Approved limits and publication/discovery contract:
+[snapshot-2b-contract-preflight.md](snapshot-2b-contract-preflight.md),
+[repository-snapshot-v1.md](repository-snapshot-v1.md).
+Success requires validated candidate, fresh bound UUID check adjacent to same-storage move,
+and independent reopened final whole/entry SHA+ZIP/semantic validation. Invalid history is surfaced.
+FULL/LOCAL_VERIFIED, DEGRADED creation, restore, coverage/handoff/offload/UI not implemented.
+Final format acceptance still requires representative aggregate DEV sizing. Next decision: D098.

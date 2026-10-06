@@ -1,6 +1,9 @@
 package org.beesearch.app.data.backuprepository
 
 import java.util.UUID
+import java.io.File
+import org.beesearch.app.data.backupsnapshot.SnapshotDomainEntries
+import org.beesearch.app.data.backupsnapshot.SnapshotException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -90,6 +93,18 @@ internal class BoundRepository(
         foundation.ingest(binding.expectedRepositoryId, source, cancelled).valueOrThrow()
     }
 
+    suspend fun createMetadataSnapshot(workspace: File, capture: suspend () -> SnapshotDomainEntries,
+        cancelled: () -> Boolean = { false }): RepositoryResult<CommittedSnapshot> = operation {
+        val binding = store.read() ?: throw RepositoryException(RepositoryError.UNBOUND)
+        requireConnected(binding).createMetadataSnapshot(binding.expectedRepositoryId, workspace, capture,
+            cancelled = cancelled).valueOrThrow()
+    }
+
+    suspend fun discoverSnapshots(workspace: File): RepositoryResult<SnapshotDiscovery> = operation {
+        val binding = store.read() ?: throw RepositoryException(RepositoryError.UNBOUND)
+        requireConnected(binding).discoverSnapshots(binding.expectedRepositoryId, workspace).valueOrThrow()
+    }
+
     private suspend fun requireConnected(binding: RepositoryBinding): RepositoryFoundation {
         val foundation = try { roots.resolve(binding.rootLocator) } catch (e: RepositoryException) {
             if (e.error == RepositoryError.NOT_FOUND) throw RepositoryException(RepositoryError.BOUND_ROOT_UNAVAILABLE, e)
@@ -110,7 +125,8 @@ internal class BoundRepository(
 
     private suspend fun <T> operation(block: suspend () -> T): RepositoryResult<T> = gate.withLock {
         try { RepositoryResult.Success(block()) }
-        catch (e: RepositoryException) { RepositoryResult.Failure(e.error) }
+        catch (e: RepositoryException) { RepositoryResult.Failure(e.error, e.detail) }
+        catch (e: SnapshotException) { RepositoryResult.Failure(e.repositoryError(), e.repositoryDetail()) }
         catch (e: CancellationException) { throw e }
         catch (_: Exception) { RepositoryResult.Failure(RepositoryError.PROVIDER_FAILURE) }
     }
@@ -118,5 +134,5 @@ internal class BoundRepository(
 
 internal fun <T> RepositoryResult<T>.valueOrThrow(): T = when (this) {
     is RepositoryResult.Success -> value
-    is RepositoryResult.Failure -> throw RepositoryException(error)
+    is RepositoryResult.Failure -> throw RepositoryException(error, detail = detail)
 }

@@ -12,14 +12,18 @@ internal enum class RepositoryError {
     SOURCE_CHANGED, CANCELLED, DELETE_FAILED,
     UNBOUND, BOUND_ROOT_UNAVAILABLE, BOUND_REPOSITORY_MISSING,
     BINDING_INVALID, BINDING_CHANGED, BINDING_PERSISTENCE_FAILED,
+    INVALID_SNAPSHOT, LOGICAL_STATE_INCONSISTENT, SNAPSHOT_LIMIT_EXCEEDED, SNAPSHOT_ID_CONFLICT,
 }
 
-internal class RepositoryException(val error: RepositoryError, cause: Throwable? = null) :
+internal data class RepositoryFailureDetail(val category: String, val observed: Long?, val limit: Long?)
+
+internal class RepositoryException(val error: RepositoryError, cause: Throwable? = null,
+    val detail: RepositoryFailureDetail? = null) :
     Exception(error.name, cause)
 
 internal sealed interface RepositoryResult<out T> {
     data class Success<T>(val value: T) : RepositoryResult<T>
-    data class Failure(val error: RepositoryError) : RepositoryResult<Nothing>
+    data class Failure(val error: RepositoryError, val detail: RepositoryFailureDetail? = null) : RepositoryResult<Nothing>
 }
 
 internal data class RepositoryEntry(val path: String, val isDirectory: Boolean, val byteSize: Long)

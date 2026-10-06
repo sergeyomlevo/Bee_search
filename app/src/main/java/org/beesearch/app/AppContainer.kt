@@ -10,6 +10,10 @@ import org.beesearch.app.data.backuprepository.BoundRepository
 import org.beesearch.app.data.backuprepository.AndroidRepositoryRoots
 import org.beesearch.app.data.backuprepository.DataStoreRepositoryBindingStore
 import org.beesearch.app.data.backuprepository.repositoryBindingDataStore
+import org.beesearch.app.data.backup.DataStorePortableSettingsStore
+import org.beesearch.app.data.backupsnapshot.RepositorySnapshotService
+import org.beesearch.app.data.backupsnapshot.SnapshotCapture
+import java.io.File
 import org.beesearch.app.data.backup.SafBackupDocumentExporter
 import org.beesearch.app.data.pointexport.ObservationPointExportService
 import org.beesearch.app.data.pointexport.ObservationPointDocumentExporter
@@ -95,6 +99,9 @@ internal class AppContainer(private val context: Context) {
         store = DataStoreRepositoryBindingStore(repositoryBindingDataStore(context), BuildConfig.EXCHANGE_VARIANT),
         roots = AndroidRepositoryRoots(context, BuildConfig.EXCHANGE_VARIANT, repositoryMaintenance),
     )
+    val repositorySnapshots = RepositorySnapshotService(boundRepository,
+        SnapshotCapture(database, DataStorePortableSettingsStore(context.settingsDataStore)),
+        File(context.cacheDir, "repository-snapshots"))
     val areaExchangeMirror = AreaExchangeMirror(exchangeStorage)
     val mapAreaStore: MapAreaStore = MirroringMapAreaStore(
         delegate = DataStoreMapAreaStore(context.settingsDataStore),

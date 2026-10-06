@@ -2,6 +2,8 @@
 
 Status: owner-approved R0-PC-D rules; Slice 1 implementation, not a complete backup product.
 Complete Backup V1–V6 remains a separate portable archive mechanism with unchanged behavior.
+Slice 2B adds a separate [METADATA_ONLY Snapshot V1 service](repository-snapshot-v1.md).
+Historical Slice 1/2A scope exclusions below describe those slices, not the current snapshot layer.
 
 ## Scope and identity
 

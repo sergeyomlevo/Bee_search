@@ -2186,7 +2186,10 @@ Repository V1 не меняет Room schema. Отдельный public `Backup/r
 format identity `beesearch-repository`, version 1, persistent random repository UUID и variant.
 Media имеет immutable whole-file SHA-256 identity и flat canonical path
 `Media/<sha256>.<jpg|mp4|bin>`. Рабочие private originals не перемещаются и не удаляются.
-Snapshot schema/coverage/offload state пока не реализованы. Полный контракт:
+Snapshot V1 METADATA_ONLY exports logical graph/settings/references in an independent
+17-entry immutable ZIP; it does not alter Room schema or claim media protection.
+Profile/policy/COMPLETE meaning, exact-byte digests and limits:
+[repository-snapshot-v1.md](repository-snapshot-v1.md). Coverage/offload state not implemented. Foundation contract:
 [repository-v1-foundation.md](repository-v1-foundation.md).
 
 Slice 2A adds install-local repository binding outside Room: expected UUID and SAF root locator,

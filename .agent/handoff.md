@@ -1,5 +1,43 @@
 # Bee Search handoff
 
+## Current milestone — Slice 2B final acceptance audit ACCEPT
+
+2026-10-06: reviewed task-only diff from dc40b209. Exact default V1 limit boundary
+tests and all-13-collection deterministic raw-entry comparison added; production
+limiter only gains internal test visibility, no second algorithm. Capture/serialization/
+staging/final-reopen/cancellation injection preserves prior history. Adjacent fresh UUID
+publication check and Room transaction device evidence confirmed. Independent critic:
+no blocker. Final full regression 574 JVM tests, zero failures/errors;
+assembleDebug/assembleDebugAndroidTest/lintDebug PASS (0 errors,24 warnings,2 hints).
+Existing Samsung smoke/sizing reused, no new device actions or user-content read.
+Detailed audit: docs/repository-snapshot-v1-final-acceptance.md. Only explicit reviewed
+files may be committed; .review-tmp/temp/generated excluded and preserved.
+Owner authorized separate Slice 2B commit; STOP BEFORE PUSH. No R2 or PC verifier.
+Snapshot user entry point remains code/tests only; future UX requires mockup-first.
+
+## Current milestone — Repository V1 Production Slice 2B (owner review pending)
+
+Baseline 3db5dda; approved preflight committed/pushed alone as dc40b2092154f4d1a3b7dd3d1e70526e9ee95c7a.
+HEAD/origin main remain that contract commit; Slice 2B source/tests/docs are uncommitted.
+Explicit METADATA_ONLY / NO_MEDIA_EVIDENCE / COMPLETE service and strict fixed ZIP reader;
+17 entries, transactional Room capture, portable FK checks, deterministic domain records,
+raw-byte digests, preserved canonical corpus, guarded owned staging/move/final readback, discovery.
+No new UI, FULL/R2, DEGRADED creation, restore, PC ingest, handoff, coverage or offload.
+Samsung SM-S938B API36: preserving DEV/test update, canonical+numeric+transaction tests PASS;
+read-only DEV sizing: ZIP13106, uncompressed44761, maxrecord484 bytes. No user content exported.
+Disposable smoke run38f11516-fa3e-466a-8b7d-317c8445d8ee under _poc/ProductionSlice1:
+snapshot6584c2c5-ae4f-4081-a024-bbbc02957107, SHA1d7fee104800589f4ac7be29ffa4af7a783636edc564103726004dd05f51ff62;
+create/restart/discovery/corrupt-copy rejection PASS; valid original unchanged. Evidence retained.
+Critic: no production blocker after mediaReferences context and typed IO fixes; disk peak320MiB
+rechecked (not heap). Independent hand-authored nonempty ZIP and bounds tests added.
+Final regression:564 JVM tests,0 failures/errors; assembleDebug/AndroidTest/lint PASS
+(lint0errors,24warnings,2hints). Final APK smoke again PASS,2valid/2corrupt evidence retained.
+Latest synthetic snapshotdb78bc59-f91e-4377-84cc-4394e25a49bd,
+SHAe123cd9fdd5630a18443d22f8f7de722127dbe23ccfc100d2c8fc868c4f37bcc,3525bytes.
+Final aggregateDEV ZIP13105/uncompressed44761/maxrecord484. Report:
+docs/repository-snapshot-v1-slice2b-report.md. No Slice2B commit/push;
+STOP for owner review. Inaccessible pre-existing .review-tmp directories were not touched.
+
 ## Current milestone — Repository V1 Production Slice 2A (final audit ACCEPT)
 
 Slice 1 owner ACCEPTED and committed separately:

@@ -1115,3 +1115,8 @@ attachment metadata и photo bytes, а также минимальный Territo
 14. позднее открыть сохранённую точку и увидеть историю проведённого наблюдения.
 
 Основным критерием качества является не количество функций, а возможность провести реальное полевое наблюдение быстрее и надёжнее, чем при ручной регистрации данных.
+
+Repository Snapshot V1 starts with immutable METADATA_ONLY research metadata protection
+(D097), explicitly without photo/video protection or in-app restore. COMPLETE is relative
+to this profile, never a full recovery claim. FULL and fresh-PC-authorized duplicate
+offload remain later layers; private originals are never cleanup targets.

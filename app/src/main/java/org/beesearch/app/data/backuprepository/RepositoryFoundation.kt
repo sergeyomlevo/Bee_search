@@ -1,6 +1,7 @@
 package org.beesearch.app.data.backuprepository
 
 import java.io.InputStream
+import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
 import kotlin.coroutines.coroutineContext
@@ -10,6 +11,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.beesearch.app.data.backupsnapshot.*
 
 /** Explicit maintenance API, not a backup scheduler. A single instance owns one root and lock.
  * Expected UUID is supplied by the established binding; never inferred from URI continuity.
@@ -68,6 +70,26 @@ internal class RepositoryFoundation(
     suspend fun inspectRoot(): RepositoryResult<Unit> = operation {
         val root = storage.inspect("") ?: fail(RepositoryError.NOT_FOUND)
         if (!root.isDirectory) fail(RepositoryError.DIRECTORY_CONFLICT)
+    }
+
+    suspend fun createMetadataSnapshot(expectedRepositoryId: UUID, workspace: File,
+        capture: suspend () -> SnapshotDomainEntries, archive: SnapshotArchive = SnapshotArchive(),
+        createdAtEpochMs: Long = System.currentTimeMillis(), cancelled: () -> Boolean = { false },
+    ): RepositoryResult<CommittedSnapshot> = operation {
+        val context = coroutineContext
+        RepositorySnapshots(storage, capacity, { identity(expectedRepositoryId) },
+            { cleanOwned(it, expectedRepositoryId) }, workspace, archive).create(capture, createdAtEpochMs) {
+            context.ensureActive()
+            if (cancelled()) fail(RepositoryError.CANCELLED)
+        }
+    }
+
+    suspend fun discoverSnapshots(expectedRepositoryId: UUID, workspace: File,
+        archive: SnapshotArchive = SnapshotArchive(),
+    ): RepositoryResult<SnapshotDiscovery> = operation {
+        val context = coroutineContext
+        RepositorySnapshots(storage, capacity, { identity(expectedRepositoryId) },
+            { cleanOwned(it, expectedRepositoryId) }, workspace, archive).discover { context.ensureActive() }
     }
 
 
@@ -264,7 +286,8 @@ internal class RepositoryFoundation(
     private suspend fun <T> operation(block: suspend () -> T): RepositoryResult<T> = withContext(Dispatchers.IO) {
         maintenance.withLock {
             try { RepositoryResult.Success(block()) }
-            catch (e: RepositoryException) { RepositoryResult.Failure(e.error) }
+            catch (e: RepositoryException) { RepositoryResult.Failure(e.error, e.detail) }
+            catch (e: SnapshotException) { RepositoryResult.Failure(e.repositoryError(), e.repositoryDetail()) }
             catch (e: CancellationException) { throw e }
             catch (_: Exception) { RepositoryResult.Failure(RepositoryError.PROVIDER_FAILURE) }
         }

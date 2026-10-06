@@ -52,6 +52,8 @@ android {
         compose = true
         buildConfig = true
     }
+    // One conformance corpus, exercised by host tests and the Android reader.
+    sourceSets.getByName("androidTest").assets.srcDir("src/test/resources")
 }
 
 room {

@@ -1747,3 +1747,8 @@ single-point package v1 являются разными контрактами.
 установленная копия офлайн-карты остаются внутри приложения. Импортированная карта
 продолжает работать без сети после удаления или перемещения её исходной пары из
 каталога обмена, а удаление файла из каталога не удаляет данные наблюдений.
+
+Repository Snapshot V1 (Slice 2B) has an explicit internal METADATA_ONLY export/discovery
+API, no new user-facing screen or automated operation. It is distinct from Complete Backup.
+Future wording must convey: “Данные исследований сохранены. Фото и видео в эту копию
+не входят.” No in-app restore/FULL/PC handoff/offload workflow is available in this slice.
