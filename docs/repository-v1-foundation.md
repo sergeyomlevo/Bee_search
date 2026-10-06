@@ -26,7 +26,58 @@ invalid UUIDs and unsupported identities/versions fail closed. Header cap: 4096 
 Repository UUID persists in this file. Path, URI and grant are not identity. Every ingest
 requires the expected UUID from the established binding and revalidates the header before
 growth and publication. Explicit adoption is not an automatic replacement-root recovery.
-Future UI/binding persistence must retain this expected UUID; no selection UI is implemented here.
+Slice 2A retains this UUID in a durable install-local binding; no production selection UI is implemented.
+
+## Durable binding and reconnect (Slice 2A)
+
+The application-facing `BoundRepository` reads durable binding before every write-capable operation.
+Binding is `expectedRepositoryId` plus `rootLocator` (SAF tree/document reference), namespaced by the
+build variant. It contains no inventory, snapshots, coverage or PC state. The header remains truth.
+Location changes do not change identity: explicit `reconnect(locator)` accepts only the SAME UUID
+and variant, then atomically updates the locator. Failure preserves the old binding and all files.
+No cached BOUND probe result can authorize a later write; ingest revalidates header via foundation.
+Immediately before canonical Media move, foundation rereads and validates format/version,
+variant and expected UUID on its current locator, with no intervening lookup/hash/capacity query
+or suspension. It also checks identity after final readback. A provider does not offer atomic
+"move only if repository UUID still matches": mutation inside the provider call remains an
+unsupported external-writer race, not a claimed guarantee. Future snapshot publication must
+apply the same fresh boundary check; snapshots are not implemented here.
+
+The separate Preferences DataStore file is
+`files/install-state/repository_binding.preferences_pb`, already excluded from Auto Backup/device
+transfer by existing rules. Exactly one instance is created by AppContainer per process. Keys are
+`expected_repository_uuid_<Variant>` and `repository_root_locator_<Variant>`; absent pair is UNBOUND.
+Partial/malformed pair is BINDING_INVALID, not UNBOUND. Persistence errors remain typed failures.
+Compare-and-replace updates both fields atomically; no migration from path/URI or existing headers.
+
+- `initializeNew`: explicit, unbound only, empty skeleton only, header publication/readback before
+  durable bind. Existing header requires adoption; persistence failure can leave a valid unbound
+  repository, which must be explicitly adopted later. No cross-filesystem/DataStore transaction claimed.
+- `adoptExisting`: explicit unbound operation, validates existing header and structure without writing
+  repository content. Reinstall/data loss has no remembered history; fresh adopt is required.
+- `rebind`: intentional switch requires exact prior binding and explicitly selected target UUID;
+  validates target before atomic binding replacement. It never rewrites either repository header.
+- `clear`: exact prior binding required; removes only binding pair, not files/grants.
+- Valid wrong UUID/variant: ROOT_IDENTITY_MISMATCH, no writes/rebind/delete.
+- Missing root: BOUND_ROOT_UNAVAILABLE; missing header in an available/recreated root:
+  BOUND_REPOSITORY_MISSING. Access/provider failures are never converted into absence.
+- Startup creates skeleton and probes binding read-only, with no initialization/adoption/rebind.
+  Backup failure does not block primary capture.
+
+Stored UUID/locator are device-local safety context, not proof of current media availability.
+Updates/restarts preserve them; clean uninstall/app-data loss may remove them. Existing repositories
+can be adopted without copying Media back. Dev/Beta/Stable package/data and key namespaces remain isolated.
+No snapshots/restore/handoff/offload/UI have been added by Slice 2A.
+Two physical copies with the same UUID may explicitly reconnect/adopt. Until the snapshot layer
+exists, binding cannot distinguish a stale copy by research contents. Future reconnect UX may
+show the latest valid snapshot time/UUID/whole-file SHA; no copy identity or UI is introduced now.
+Android persistence uses one DataStore per process/file and atomic edit of the pair. Host tests
+use supported OkioStorage for Windows fault/concurrency checks; no production backend change.
+Crash exactly mid-persistence-write has not been physically characterized.
+
+DataStore atomic update/single-instance requirements are DOCUMENTED in the
+[official DataStore documentation](https://developer.android.com/topic/libraries/architecture/datastore)
+(project dependency 1.2.1). No new dependency or custom persistence engine is introduced.
 
 ## Media and publication
 
@@ -130,6 +181,53 @@ Current blob publication must not be presented as a completed research backup.
 Public `Download` is outside app Auto Backup's app-specific file/external domains. Current
 Room/DataStore rules and map exclusions remain unchanged. No claim is made about an OEM's
 independent whole-shared-storage migration.
+
+## Slice 2A verification
+
+- 2026-10-06: 525 JVM tests, zero failures/errors; DEV assemble, test APK assemble and lint PASS.
+- Persistence tests cover durable reopen/update-style reopen, atomic compare-and-replace,
+  variant keys, malformed/partial state, and explicit I/O failure. Windows host tests use the
+  existing official OkioStorage backend: Android FileStorage's File.renameTo replacement
+  failed on Windows. Production Android backend remains unchanged and was tested on device.
+- Samsung SM-S938B/API36: three opt-in instrumentation invocations PASS; isolated smoke
+  binding file and new disposable run `879198d5-f933-4f30-b565-331cfa660731` only.
+  UUID `8880d149-db43-41f6-98fb-da8ef361f699` survived DEV force-stop/relaunch;
+  repository `b062eb8d-cd45-4b2e-94cc-6b161748d7bd` was rejected without binding/header changes.
+- Newly created EMPTY RepositoryA was deleted/recreated under its same name. The old grant
+  resolved the replacement, but binding returned BOUND_REPOSITORY_MISSING; no new header
+  or automatic UUID adoption occurred. Independent shell listing confirmed A empty and B intact.
+- No real media, previous evidence, field/Beta package or actual app binding was changed.
+  Same-signature update was simulated by JVM reopen; clean reinstall was subsequently tested
+  on a separate disposable audit package as documented below. Selection/adoption UI is outside scope.
+
+### Final acceptance audit (2026-10-06)
+
+- Full JVM regression: 531 tests, zero failures/errors. DEV/test assemble and lint PASS;
+  standalone audit APK assemble/lint PASS; git diff --check PASS. Complete Backup remains unchanged.
+- Publication check now runs immediately before the canonical move, after the last existing-blob
+  lookup. Injected UUID replacement during that lookup returns ROOT_IDENTITY_MISMATCH, leaves
+  Media empty and does not clean staging against the foreign UUID. No provider atomic conditional
+  move or absolute protection against mutation inside a provider call is claimed.
+- Corrupt persisted protobuf bytes, malformed/incomplete pair and injected read/write failures
+  fail closed. CAS tests cover two initial binds, clear versus rebind, and explicit adoption
+  paused before CAS versus competing initialization; no mixed UUID/locator pair is accepted.
+- Permission/provider failures retain the durable binding and never turn into UNBOUND/missing.
+- Physical Samsung audit uses standalone `tools/repository-binding-audit`, not the production
+  Gradle graph. Application ID `org.beesearch.bindingaudit`, Auto Backup disabled, current
+  production repository sources compiled by a generated-source build task. No real DEV data linked.
+- Run `a55ab34b-f43f-4f93-be89-7aeaef8b4930`, public root under `_poc/Slice2AAudit`:
+  explicit init, tiny synthetic JPEG publication and duplicate ingest PASS; force-stop/relaunch
+  preserved UUID `b5a04173-d5aa-4e48-863f-0fc65ff2fd24`. Uninstall/reinstall ONLY this disposable
+  package yielded UNBOUND without automatic adoption. Explicit owner-selected adopt restored
+  the same UUID without returning any Media to the phone.
+- Public header and JPEG SHA remained identical through uninstall/reinstall/adopt. JPEG:
+  759 bytes, SHA `270c0ca16088b645bbc07143f8bece6c799e101204828f2f29b75ffe34a036fb`;
+  header SHA `b94648381eeec755aa2afad7baa1b1c3fc0d73379f79f83d98c7db290adf5941`.
+- Initial standalone harness launch failed before binding because its Android Main coroutine
+  dispatcher was absent. Added matching coroutines-android 1.9.0 to that test project only;
+  preserving reinstall and corrected run passed. Production dependencies/backend unchanged.
+- Crash exactly mid-DataStore write and stale-copy freshness without snapshots remain unproven.
+  Same UUID at a different valid location remains an allowed explicit reconnect/adopt.
 
 ## Technology evidence
 

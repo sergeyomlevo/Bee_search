@@ -3090,7 +3090,7 @@ destination document в момент подтверждения имени по�
   трактуется как неполный cleanup (`Объект удалён, но не все файлы медиа удалось удалить`), а не как
   неудачное удаление. Path safety при этом не ослабляется: небезопасный путь не разрешается и не
   удаляется.
-- Следующий свободный номер durable decision: **D096** (D094 — временная семантика;
+- Следующий свободный номер durable decision: **D097** (D094 — временная семантика;
   D095 — Repository V1 foundation).
 
 ---
@@ -3287,3 +3287,20 @@ atomic rename/power-loss durability не заявляются. Private originals
 No global index, GC, snapshot/offload/PC/handoff implementation в Slice 1.
 
 Implementation contract и границы: [repository-v1-foundation.md](repository-v1-foundation.md).
+
+---
+
+# D096 — Durable repository binding и safe reconnect
+
+**Статус:** ACCEPTED (owner-authorized Production Slice 2A).
+
+Device-local binding хранит expected repository UUID и реально необходимый SAF locator;
+variant namespace выводится из build и изолирует ключи. Binding находится в исключённом из
+backup/device-transfer install-state DataStore, не в Room и не в repository.json.
+Path/URI/grant continuity не заменяет UUID. Любой application-facing write требует fresh header
+format/version/variant/UUID validation против durable binding. Startup не initializes/rebinds.
+Recreated empty root с прежним URI не принимается как прежний repository.
+Adopt existing после reinstall/unbound и intentional rebind — только explicit операции;
+normal reconnect меняет locator только после совпадения UUID. Ошибки persistence/access не означают UNBOUND.
+Snapshots/restore/PC/handoff/coverage/offload и production selection UI не входят в Slice 2A.
+Контракт: [repository-v1-foundation.md](repository-v1-foundation.md). Следующий номер: D097.

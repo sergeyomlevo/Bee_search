@@ -24,8 +24,13 @@ internal class RepositoryFoundation(
     suspend fun bootstrap(): RepositoryResult<Unit> = operation { skeleton() }
 
     /** Explicit adoption/initialization only. Startup never calls this. */
-    suspend fun initialize(): RepositoryResult<RepositoryHeader> = operation {
+    suspend fun initialize(): RepositoryResult<RepositoryHeader> = initialize(allowExisting = true)
+
+    suspend fun initializeNew(): RepositoryResult<RepositoryHeader> = initialize(allowExisting = false)
+
+    private suspend fun initialize(allowExisting: Boolean): RepositoryResult<RepositoryHeader> = operation {
         if (storage.inspect(HEADER) != null) {
+            if (!allowExisting) fail(RepositoryError.AMBIGUOUS_REPOSITORY)
             val header = readHeader()
             skeleton()
             return@operation header
@@ -56,6 +61,15 @@ internal class RepositoryFoundation(
     suspend fun open(expectedRepositoryId: UUID): RepositoryResult<RepositoryHeader> = operation {
         identity(expectedRepositoryId)
     }
+
+    /** Read-only header probe for explicit adoption; never initializes or repairs directories. */
+    suspend fun inspectHeader(): RepositoryResult<RepositoryHeader> = operation { readHeader() }
+
+    suspend fun inspectRoot(): RepositoryResult<Unit> = operation {
+        val root = storage.inspect("") ?: fail(RepositoryError.NOT_FOUND)
+        if (!root.isDirectory) fail(RepositoryError.DIRECTORY_CONFLICT)
+    }
+
 
     suspend fun ingest(
         expectedRepositoryId: UUID,
@@ -121,7 +135,9 @@ internal class RepositoryFoundation(
             capacity.require(storage.availableBytes(), capacity.slack(size))
             // Serialized local operations do not race publication. External writers are unsupported.
             existing(first, size)?.let { return@operation it }
-            publish(stage, final, size, first) { context.ensureActive(); checkCancel() }
+            publish(stage, final, size, first,
+                beforeMove = { identity(expectedRepositoryId) },
+                check = { context.ensureActive(); checkCancel() })
             identity(expectedRepositoryId)
             CommittedBlob(first, size, extension, false)
         } finally { cleanOwned(operationId, expectedRepositoryId) }
@@ -184,7 +200,11 @@ internal class RepositoryFoundation(
         return CommittedBlob(hash, size, extension, true)
     }
 
-    private fun publish(stage: String, final: String, size: Long, hash: String, check: () -> Unit = {}) {
+    private fun publish(stage: String, final: String, size: Long, hash: String,
+        beforeMove: () -> Unit = {}, check: () -> Unit = {}) {
+        // No listing, hashing, capacity query or suspension between this check and move.
+        // Provider mutation inside its own move is not an atomic conditional operation.
+        beforeMove()
         try { storage.moveOwnedStage(stage, final) } catch (e: RepositoryException) {
             // A provider may move successfully and fail its response. Never infer success from existence.
             if (storage.inspect(final) == null) throw e

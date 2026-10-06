@@ -49,7 +49,10 @@ internal class SafRepositoryStorage(
         if (authority != EXTERNAL_STORAGE_AUTHORITY || !DocumentsContract.isTreeUri(treeUri)) {
             throw RepositoryException(RepositoryError.UNSUPPORTED_PUBLICATION_PATH)
         }
-        rootDocumentId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }
+        rootDocumentId = runCatching {
+            if (DocumentsContract.isDocumentUri(context, treeUri)) DocumentsContract.getDocumentId(treeUri)
+            else DocumentsContract.getTreeDocumentId(treeUri)
+        }
             .getOrElse { throw RepositoryException(RepositoryError.PROVIDER_FAILURE, it) }
         if (!treeMatchesMappedRoot()) throw RepositoryException(RepositoryError.ROOT_IDENTITY_MISMATCH)
     }

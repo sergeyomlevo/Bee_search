@@ -2,13 +2,14 @@ package org.beesearch.app
 
 import android.app.Application
 import android.content.Context
-import android.net.Uri
 import kotlinx.coroutines.sync.Mutex
 import org.beesearch.app.data.backup.BackupDocumentExporter
 import org.beesearch.app.data.backup.BackupService
 import org.beesearch.app.data.backuprepository.beeSearchBackupBootstrap
-import org.beesearch.app.data.backuprepository.RepositoryFoundation
-import org.beesearch.app.data.backuprepository.SafRepositoryStorage
+import org.beesearch.app.data.backuprepository.BoundRepository
+import org.beesearch.app.data.backuprepository.AndroidRepositoryRoots
+import org.beesearch.app.data.backuprepository.DataStoreRepositoryBindingStore
+import org.beesearch.app.data.backuprepository.repositoryBindingDataStore
 import org.beesearch.app.data.backup.SafBackupDocumentExporter
 import org.beesearch.app.data.pointexport.ObservationPointExportService
 import org.beesearch.app.data.pointexport.ObservationPointDocumentExporter
@@ -89,11 +90,10 @@ internal class AppContainer(private val context: Context) {
     val backupBootstrap = beeSearchBackupBootstrap()
     private val repositoryMaintenance = Mutex()
 
-    /** Explicit SAF binding; no initialization or ingest is triggered by app startup. */
-    fun repositoryFoundation(treeUri: Uri): RepositoryFoundation = RepositoryFoundation(
-        storage = SafRepositoryStorage(context, treeUri, backupBootstrap.root, context.filesDir),
-        variant = BuildConfig.EXCHANGE_VARIANT,
-        maintenance = repositoryMaintenance,
+    /** No raw write-capable foundation escapes the durable binding gate. */
+    val boundRepository = BoundRepository(
+        store = DataStoreRepositoryBindingStore(repositoryBindingDataStore(context), BuildConfig.EXCHANGE_VARIANT),
+        roots = AndroidRepositoryRoots(context, BuildConfig.EXCHANGE_VARIANT, repositoryMaintenance),
     )
     val areaExchangeMirror = AreaExchangeMirror(exchangeStorage)
     val mapAreaStore: MapAreaStore = MirroringMapAreaStore(

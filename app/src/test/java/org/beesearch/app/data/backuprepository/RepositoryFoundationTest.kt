@@ -20,6 +20,7 @@ internal class MemoryRepositoryStorage : RepositoryStorage {
     var afterMoveError = false
     var beforeReader: ((String) -> Unit)? = null
     var afterWrite: ((Long) -> Unit)? = null
+    var beforeList: ((String) -> Unit)? = null
     override fun ensureDirectory(path: String) {
         if (files.containsKey(path)) throw RepositoryException(RepositoryError.DIRECTORY_CONFLICT)
         directories += path
@@ -29,8 +30,11 @@ internal class MemoryRepositoryStorage : RepositoryStorage {
         path in files -> RepositoryEntry(path, false, files.getValue(path).size.toLong())
         else -> null
     }
-    override fun list(path: String): List<RepositoryEntry> = (directories + files.keys)
-        .filter { it.isNotEmpty() && it.substringBeforeLast('/', "") == path }.mapNotNull(::inspect)
+    override fun list(path: String): List<RepositoryEntry> {
+        beforeList?.invoke(path)
+        return (directories + files.keys)
+            .filter { it.isNotEmpty() && it.substringBeforeLast('/', "") == path }.mapNotNull(::inspect)
+    }
     override fun createOwnedStage(operationId: UUID): String {
         val parent = "Staging/$operationId"
         check(parent !in directories)
@@ -121,6 +125,22 @@ class RepositoryFoundationTest {
         val (s, f, id) = setup()
         s.files["repository.json"] = RepositoryHeaderCodec.encode(RepositoryHeader(UUID.randomUUID(), "Dev"))
         failure(f.ingest(id, source()), RepositoryError.ROOT_IDENTITY_MISMATCH)
+    }
+    @Test fun replacementAfterLastExistingLookupCannotPublishIntoB() = runBlocking {
+        val (s, f, id) = setup()
+        var mediaListings = 0
+        val replacement = RepositoryHeader(UUID.randomUUID(), "Dev")
+        s.beforeList = { path ->
+            if (path == "Media" && ++mediaListings == 2) {
+                s.files["repository.json"] = RepositoryHeaderCodec.encode(replacement)
+            }
+        }
+        failure(f.ingest(id, source()), RepositoryError.ROOT_IDENTITY_MISMATCH)
+        assertEquals(2, mediaListings)
+        assertTrue(s.list("Media").isEmpty())
+        assertEquals(replacement, RepositoryHeaderCodec.decode(s.files.getValue("repository.json")))
+        // Identity changed: even owned staging must not be cleaned in the replacement root.
+        assertTrue(s.files.keys.any { it.startsWith("Staging/") })
     }
     @Test fun publicationAndDuplicatePreserveRecognizedExtension() = runBlocking {
         val (s, f, id) = setup()

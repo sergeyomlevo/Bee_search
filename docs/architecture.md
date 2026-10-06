@@ -1684,7 +1684,9 @@ Repository V1 foundation (`data/backuprepository`) отделён от Complete 
 startup materializes variant-isolated Backup skeleton; explicit SAF maintenance initializes
 UUID identity and strongly verifies one immutable flat SHA blob through owned Staging and
 same-storage move. Capacity guard uses a configurable 20 GiB reserve. Snapshot/offload/UI
-не реализованы. Контракт и ограничения: [Repository V1 foundation](repository-v1-foundation.md), D095.
+не реализованы. Slice 2A adds an install-local DataStore binding gate: all application-facing repository
+writes require durable expected UUID + actual header match; startup probe never auto-adopts or initializes.
+Контракт и ограничения: [Repository V1 foundation](repository-v1-foundation.md), D095/D096.
 
 Logical backup core реализует versioned архив согласно D069–D073. Пользовательский
 экспорт использует Android Storage Access Framework: отдельный Data ViewModel

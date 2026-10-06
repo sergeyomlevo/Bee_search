@@ -178,6 +178,7 @@ private fun BeeSearchApp(
     LaunchedEffect(application) {
         application.container.exchangeStorage.ensure()
         application.container.backupBootstrap.ensure()
+        application.container.boundRepository.probe() // Read-only; failure must not block field capture.
     }
 
     LaunchedEffect(route) {

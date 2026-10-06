@@ -1,6 +1,47 @@
 # Bee Search handoff
 
-## Current milestone — Repository V1 Production Slice 1 (uncommitted)
+## Current milestone — Repository V1 Production Slice 2A (final audit ACCEPT)
+
+Slice 1 owner ACCEPTED and committed separately:
+`1f353497be746187354cf4d2868262be962a7f12`; clean tree confirmed before Slice 2A. No push.
+Slice 2A: durable install-local expected UUID + SAF locator, explicit init/adopt/reconnect/rebind,
+fresh identity gate before writes. No snapshots/restore/PC/handoff/coverage/offload/production UI.
+DataStore file under excluded install-state; no portable settings/Room migration.
+Verification 2026-10-06: 525 JVM tests, 0 failures/errors; assembleDebug,
+assembleDebugAndroidTest and lintDebug PASS. Independent critic found no concrete binding
+blocker; root reviewed the final task diff. git diff --check PASS.
+Windows FileStorage replacement failed two initial persistence tests; host-only tests now
+use the existing official OkioStorage/PreferencesSerializer backend, without dependency or
+Android storage changes. Android FileStorage was exercised on Samsung.
+Samsung RFCY90MBYVZ / SM-S938B / API36: preserving DEV/test update; no clear/uninstall.
+Owner selected the new disposable tree; prepare/bind/reconnectAndRecreate each PASS (1 test).
+Run: 879198d5-f933-4f30-b565-331cfa660731 under _poc/ProductionSlice1.
+Expected UUID: 8880d149-db43-41f6-98fb-da8ef361f699;
+other UUID: b062eb8d-cd45-4b2e-94cc-6b161748d7bd.
+Restart preserved binding; mismatch left binding/header unchanged; return PASS.
+Only newly owned EMPTY RepositoryA was deleted/recreated; old binding rejected empty
+replacement as BOUND_REPOSITORY_MISSING, no automatic initialization/writes.
+Isolated smoke DataStore did not change the actual app binding. Recreated A empty; B intact.
+Final audit: publication UUID reread moved directly before move; replacement-before-publication
+test PASS. Corrupt protobuf/CAS concurrency/competing adopt tests added; 531 JVM tests green.
+Standalone tools/repository-binding-audit built from production sources (no production Gradle edits).
+Initial missing Main-dispatcher harness crash fixed by matching test-only coroutines-android 1.9.0.
+New run a55ab34b-f43f-4f93-be89-7aeaef8b4930; UUID b5a04173-d5aa-4e48-863f-0fc65ff2fd24.
+Samsung normal tiny JPEG publication/duplicate PASS; restart BOUND; uninstall/reinstall ONLY
+org.beesearch.bindingaudit => UNBOUND; explicit adopt => original UUID. Public header/blob SHA unchanged.
+No media rehydration, no DEV/Stable/Beta uninstall/clear. Same-UUID stale-copy limitation documented.
+Owner authorizes separate Slice 2A commit after final ACCEPT. No push; do not start Slice 2B.
+Final full regression/DEV and test assemble/lint PASS (531 tests, zero failures/errors);
+standalone audit assemble/lint PASS. Exact diff reviewed, generated data excluded,
+git diff --check PASS. Independent review found no concrete blocker; test-only dispatcher
+correction separately reviewed. Accepted limitations: provider move is not UUID-conditional,
+mid-persistence crash physically unproven, stale same-UUID copy needs future snapshot context.
+Slice 2A checkpoint is recorded by the separate Git commit containing this handoff. STOP before push/2B.
+Never reuse/delete prior Slice 1/R0 evidence or real repositories for recreation test.
+
+## Accepted Slice 1 evidence (historical)
+
+### Repository V1 Production Slice 1
 
 Baseline: clean `main`, HEAD/origin/main `4ef0de06715e5065d54c2ed5b46c22c6e5ec703e`.
 Owner authorized foundation only: skeleton, explicit header UUID initialization/open, typed SAF

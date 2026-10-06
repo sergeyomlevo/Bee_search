@@ -2188,3 +2188,8 @@ Media имеет immutable whole-file SHA-256 identity и flat canonical path
 `Media/<sha256>.<jpg|mp4|bin>`. Рабочие private originals не перемещаются и не удаляются.
 Snapshot schema/coverage/offload state пока не реализованы. Полный контракт:
 [repository-v1-foundation.md](repository-v1-foundation.md).
+
+Slice 2A adds install-local repository binding outside Room: expected UUID and SAF root locator,
+namespaced by build variant, in `install-state/repository_binding.preferences_pb` (Preferences DataStore).
+Absent keys default to UNBOUND; malformed/partial state fails closed. Explicit adoption/rebind only;
+no migration from path or repository presence. This state is excluded from portable/Android backup.
