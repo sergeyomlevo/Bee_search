@@ -789,6 +789,19 @@ separate, deliberate operation, not normal post-test cleanup.
 The device-test workflow must not affect `org.beesearch.app.beta` or the field
 package `org.beesearch.app`.
 
+### Physical-device tests and other worktrees
+
+Connected/instrumentation tests install the DEV APK of the project they run from.
+Running them from another worktree — especially an older baseline worktree — therefore
+replaces the DEV build on the physical device with that worktree's build.
+
+After such a run, the device is not trustworthy evidence for the current HEAD until the
+current HEAD build has been explicitly reinstalled and identified again. Worktrees can
+share `versionCode`/`versionName`, so record something stronger when accepting device
+evidence: the package update time, or the installed APK SHA.
+
+Prefer an emulator or a separate device for baseline connected comparisons.
+
 ---
 
 ## 18. Documentation Discipline
