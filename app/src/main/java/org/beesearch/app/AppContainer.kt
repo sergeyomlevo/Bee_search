@@ -11,6 +11,9 @@ import org.beesearch.app.data.backuprepository.AndroidRepositoryRoots
 import org.beesearch.app.data.backuprepository.AndroidBackupTreeAccess
 import org.beesearch.app.data.backuprepository.BackupAccessCoordinator
 import org.beesearch.app.data.backuprepository.BackupOperationCoordinator
+import org.beesearch.app.data.backuprepository.FileStoreMediaSourceResolver
+import org.beesearch.app.data.backuprepository.MediaProtectionService
+import org.beesearch.app.data.backuprepository.MediaStateCapture
 import org.beesearch.app.data.backupsnapshot.RepositoryBackupSnapshotOperations
 import org.beesearch.app.data.backuprepository.DataStoreRepositoryBindingStore
 import org.beesearch.app.data.backuprepository.repositoryBindingDataStore
@@ -129,6 +132,20 @@ internal class AppContainer(private val context: Context) {
      * repository), never through Repository V1 directly, and hold no state of their own.
      */
     val backupOperations = BackupOperationCoordinator(RepositoryBackupSnapshotOperations(repositorySnapshots))
+
+    /**
+     * Explicit media protection: copy every blob the current research state requires into the
+     * repository through the existing ingest gate.
+     *
+     * Nothing calls this automatically and no screen exposes it yet; private originals stay untouched,
+     * so protection duplicates storage until a future offload slice exists.
+     */
+    val mediaStateCapture = MediaStateCapture(database)
+    val mediaProtection = MediaProtectionService(
+        repository = boundRepository,
+        sources = FileStoreMediaSourceResolver(physicalObjectMediaFileStore, attachmentFileStore),
+        privateRoot = context.filesDir,
+    )
     val areaExchangeMirror = AreaExchangeMirror(exchangeStorage)
     val mapAreaStore: MapAreaStore = MirroringMapAreaStore(
         delegate = DataStoreMapAreaStore(context.settingsDataStore),

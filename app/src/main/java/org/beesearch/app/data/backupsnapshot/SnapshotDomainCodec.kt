@@ -5,6 +5,9 @@ import org.beesearch.app.data.backup.PortableSettingsSnapshot
 import org.beesearch.app.data.backup.snapshotPortableJson
 import org.beesearch.app.data.backup.snapshotRows
 import org.beesearch.app.data.backuprepository.CanonicalExtension
+import org.beesearch.app.data.backuprepository.MediaIdentityCandidate
+import org.beesearch.app.data.backuprepository.RequiredMediaSet
+import org.beesearch.app.data.backuprepository.RequiredMediaSetException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -142,19 +145,29 @@ internal object SnapshotDomainCodec {
         return references(mediaPaths.flatMap { rows.getValue(it) })
     }
 
-    private fun references(rows: List<JsonObject>): List<SnapshotMediaReference> {
-        val pairs = rows.mapNotNull {
-            val sha = it.nullableString("sha256")
-            val size = (it["byteSize"] as? JsonPrimitive)?.takeIf { value -> value != JsonNull }?.content?.toLongOrNull()
-            if (sha != null && size != null && size in 1..9007199254740991L) Triple(sha, size, it.nullableString("mimeType")) else null
+    /**
+     * The required media set, resolved through the one shared definition.
+     *
+     * [org.beesearch.app.data.backuprepository.RequiredMediaSet] owns eligibility, deduplication,
+     * MIME aggregation and the canonical extension; media protection resolves its work through the
+     * same object, so snapshot references and protected blobs cannot disagree. Internal rather than
+     * private so the parity test can compare both paths on identical input.
+     */
+    internal fun references(rows: List<JsonObject>): List<SnapshotMediaReference> {
+        val candidates = rows.map {
+            MediaIdentityCandidate(
+                sha256 = it.nullableString("sha256"),
+                byteSize = (it["byteSize"] as? JsonPrimitive)?.takeIf { value -> value != JsonNull }?.content?.toLongOrNull(),
+                mimeType = it.nullableString("mimeType"),
+            )
         }
-        val grouped = pairs.groupBy { it.first }
-        if (grouped.values.any { it.map { pair -> pair.second }.distinct().size > 1 }) logical("conflicting media size")
-        return grouped.map { (sha, values) ->
-            val ext = try { CanonicalExtension.resolve(values.map { it.third }) }
-                catch (e: Exception) { logical("conflicting media type", e) }
-            SnapshotMediaReference(sha, values.first().second, ext)
-        }.sortedBy { it.sha256 }
+        return try {
+            RequiredMediaSet.resolve(candidates).map {
+                SnapshotMediaReference(it.sha256, it.byteSize, it.canonicalExtension)
+            }
+        } catch (e: RequiredMediaSetException) {
+            logical(e.message ?: RequiredMediaSet.CONFLICTING_SIZE, e)
+        }
     }
 
     private fun readRows(file: File, limits: SnapshotLimits, check: () -> Unit, canonical: Boolean = false): List<JsonObject> {

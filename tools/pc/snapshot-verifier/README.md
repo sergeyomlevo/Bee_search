@@ -22,6 +22,38 @@ unreadable and contract-verification failure. Never modifies input. Reports cont
 paths/counts/hashes/issues, never research content. Owned temporary verification
 spools are separate from the input and removed; generated corpus stays outside Git.
 
+## Repository-aware mode
+
+A second, additive mode answers a question the standalone mode cannot: does the repository
+actually hold the bytes the selected snapshot requires?
+
+```powershell
+.\tools\pc\snapshot-verifier\verify-repository.ps1 'C:\path\repository-root' 'C:\path\snapshot-<uuid>-<sha>.zip'
+```
+
+It is read-only and never modifies the repository or the snapshot. It checks:
+
+- `repository.json`: bounded JSON with exactly the four header keys, `beesearch-repository`
+  format version 1, canonical repository UUID and variant;
+- the snapshot itself, through the unchanged standalone verification, which must pass;
+- context agreement: snapshot `repositoryId` and `variant` against the header;
+- every blob in the snapshot's `references/media-blobs.jsonl`: the canonical path
+  `Media/<sha256>.<canonicalExtension>` must exist as a regular file with the exact declared
+  size and a SHA-256 recomputed from its actual bytes;
+- extras: additional valid blobs are allowed, because other snapshots may require them. A blob
+  present under a second canonical name, or a `Media` entry that is not a canonical blob name, is
+  a repository-integrity failure rather than an allowed extra.
+
+Exit 0 means the repository context, the snapshot and every required blob passed. The JSON report
+lists the repository identity, snapshot identity, per-blob outcomes and any issues.
+
+The mode reads the snapshot archive twice: once through the unchanged standalone verification and once
+to read its references. Both reads of a static file are the same bytes; the snapshot file is not
+re-hashed between them, so verify a snapshot that is not being rewritten while the check runs.
+
+Both modes are implemented from the documented text only; no Android production code is imported
+or copied.
+
 ## Independence and limitations
 
 Implementation workers began with empty context and were explicitly forbidden to

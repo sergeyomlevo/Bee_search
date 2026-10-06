@@ -1,5 +1,123 @@
 # Bee Search handoff
 
+## Current continuation — S6A Media Protection Foundation (finalized as two commits)
+
+Baseline: clean `main`, `HEAD == origin/main == d562734a34cb905e99e3b95d63c636b7d5a238dc`
+(«Implement metadata backup UI»). This slice was finalized as two commits — `Document backup verification
+safeguards` (pre-existing documentation debt: the `AGENTS.md` device/worktree rule, the D099
+access-class nuance, the S3 acceptance record) and `Implement repository media protection` (this slice) —
+and pushed to `origin/main`. S6B was not started.
+
+Scope: the minimum backend foundation that copies the media blobs the current research state
+requires into the already existing `Download/BeeSearch/<variant>/Backup/Media/` through the already
+implemented `BoundRepository.ingest()`. There is no UI, no automatic caller, no FULL snapshot, no
+restore/offload, no cleanup, no limit change and no snapshot side effect. Protection duplicates
+storage: it protects nothing away and frees no phone space. `METADATA_ONLY` snapshots stay
+`METADATA_ONLY` and still contain metadata only.
+
+One shared required-media-set definition. `RequiredMediaSet` (data/backuprepository) now owns
+eligibility (present SHA, size `1..9007199254740991`), SHA grouping, conflicting-size rejection,
+MIME aggregation through `CanonicalExtension` (`jpg`/`mp4`/`bin`) and result ordering.
+`SnapshotDomainCodec.references` was reduced to a caller of that same object, so snapshot
+`references/media-blobs.jsonl` and protection cannot drift apart; wire behaviour is byte-identical
+(same two logical error strings, same order of checks) and a parity test proves both paths agree on
+identical input, including the refusal cases.
+
+Protection semantics. `MediaStateCapture` reads the graph in one Room transaction, exactly like
+snapshot creation, and never writes; the plan is derived from the captured rows only, so the only
+way protection reaches private bytes is a captured metadata record naming them. `MediaProtectionService`
+is deliberately not a transaction: every required blob gets its own typed outcome (`INGESTED`,
+`ALREADY_PRESENT`, `SOURCE_MISSING`, `SOURCE_CHANGED`, `CAPACITY_BLOCKED`, `VERIFY_FAILED`,
+`EXTENSION_MISMATCH`, `REPOSITORY_ERROR`, `SKIPPED_AFTER_GLOBAL_BLOCKER`) and one blob's failure never
+rolls back or hides another's bytes. `ALL_PROTECTED` / `PARTIALLY_PROTECTED` / `NOTHING_PROTECTED` /
+`REPOSITORY_BLOCKED` (plus `CANCELLED` and `METADATA_INCONSISTENT`) are distinguishable, and only a
+repository-wide error stops the run — then the untouched blobs are reported as skipped, never hidden.
+A rerun reports `ALREADY_PRESENT` only after the repository hashed the existing canonical file again,
+so idempotency is also a byte-level re-verification; a corrupt canonical blob yields `VERIFY_FAILED`.
+Protection never deletes, moves or rewrites a private original and never touches Room, DataStore or
+snapshots. `AppContainer` only wires the service; nothing calls it.
+
+Device defect found by real acceptance and fixed: `PrivateBlobSource.checkPath` required the raw file
+path to be lexically inside the raw private root. On the phone the same app-private directory is
+spelled `/data/user/0/...` by the application context and `/data/data/...` by the filesystem, so every
+real blob was refused with `SOURCE_CHANGED` (`NOTHING_PROTECTED`) before any byte was read. Containment
+is now proven on resolved paths, which is exactly what `docs/repository-v1-foundation.md` already
+documented for the pinned canonical mapping; a source that resolves outside the root, a non-file and a
+changed root mapping are still refused, and a link below the boundary is refused both on the device
+(real `Os.symlink`, with an inside-root and an outside-root target) and, where the host can create a
+link, in JVM. The two JVM alias tests are guards for the accepted behaviour rather than a reproduction
+of the device's bind-mount alias shape: a Windows drive-letter alias would have satisfied the old
+lexical check too, so the device logcat spelling and the instrumented symlink test are the evidence
+that matters. A second defect was found in the new PC verifier output: a
+verified blob still reported `message = "MISSING"`; the message is now absent for verified blobs and
+explicit for every failure, with two tests pinning that.
+
+Verification after hardening. App JVM `:app:testDebugUnitTest` **693 tests / 0 failures / 0 errors /
+0 skipped** (this slice adds 34: 10 `RequiredMediaSetTest` incl. the snapshot parity proof, 21
+`MediaProtectionTest` incl. the two size-agreement tests and the dedicated `EXTENSION_MISMATCH` test,
+3 path-containment tests in `BackupDirectoryBootstrapTest`); `assembleDebug`, `assembleDebugAndroidTest`,
+`lintDebug` PASS (0 errors, 24 warnings, 2 hints — unchanged); PC verifier `test` **80 tests /
+0 failures** (14 new); `git diff --check` clean. Hardened APK SHA-256: app
+`5E710C7F208DC585FD26E750DA2A20D3ED545F34B0A8E4BDA18AB2213A795272`, test
+`15D634D30B4347EF17913C539503DBDBFCD1A77CBB19AE9FF75EC9EB0F1A38BE`.
+
+Samsung SM-S938B / API 36 / `RFCY90MBYVZ`, DEV package updated in place (no clear, no uninstall;
+`firstInstallTime` unchanged): the installed app APK SHA-256 read back from the device equals the
+hardened build above, update time `2026-10-06 23:55:50`. The original acceptance run (earlier build)
+reported the required set = the 4 real JPEG blobs from 2 physical-object-media rows and 2
+observation-point attachments, `ALL_PROTECTED` with 4 × `INGESTED`, then 4 × `ALREADY_PRESENT`, and
+left `Media/` with 4 canonical `<sha256>.jpg` files (18,294,728 bytes total) whose device-computed
+SHA-256 equals their own file names. On the hardened build the same harness ran twice more over that
+unchanged dataset: `OK (2 tests)` then `OK (1 test)`, both times `ALL_PROTECTED required=4 protected=4`
+with every blob `ALREADY_PRESENT`, snapshots 3 before and after, `Staging/` empty, no `Media/` file
+rewritten (mtimes unchanged) and the 4 private originals byte-identical. The symlink probe logged
+`root=/data/user/0/org.beesearch.app.dev/files canonical=/data/data/org.beesearch.app.dev/files` and
+refused both the outside-root and the inside-root link while accepting a real file. Device
+`stay_on_while_plugged_in` was set to 15 for the runs and restored to 0.
+
+PC evidence (`TRANSPORT = ADB_PULL`, 8 files / 18,333,530 bytes) is in
+`C:\App\BeeSearchBackupResearch\S6A\Backup`; every pulled file's SHA-256 matches the device. All three
+real snapshots require exactly those 4 blobs, and each snapshot was verified twice on the PC: standalone
+`PASS` 17/17 entries, and the new repository-aware mode `PASS` with 4/4 required blobs verified and
+`repository.json` identity `df4d52a9-7033-43c5-9620-e0e5b2fb3e16` / `Dev`. Four negative checks on
+workspace copies of that repository fail closed with exit 1: a removed blob (`MISSING`), a same-size
+byte flip (`SHA_MISMATCH`), `variant = Beta` (`VARIANT_MISMATCH`) and a stray `Media/junk.jpg`
+(`NONCANONICAL_MEDIA_ENTRY`). The new verifier mode is additive; standalone behaviour is unchanged and
+is covered by a regression test. After hardening the same six verifications were re-run against the
+unchanged accepted copy and reproduced exactly (`PASS` 17/17 and `required 4/4 verified`, exit 0), so
+the accepted PC evidence still applies to the committed production bytes.
+
+Not verified / limits to state honestly: real media in this slice is ≤16 MiB JPEG only, so large-video
+protection is unproven; repository behaviour under real capacity exhaustion and provider failure was
+exercised by tests, not by a real device; protection's own UI, its automatic caller, FULL snapshots,
+restore, offload and stale-`Staging` reconciliation are all still absent by design; the known
+pre-existing `CleanStartupIntegrationTest` blocked-deletion timeout is unchanged and unrelated.
+
+Hardening after the first acceptance (same slice, before finalization): protection now refuses a
+source candidate whose actual size differs from the size the required set declares and never asks the
+repository to publish it, so `ALL_PROTECTED` means agreement of SHA-256, size and canonical extension
+with the required set; another captured source for the same SHA may still satisfy the blob. Two
+mandatory size tests, a dedicated `EXTENSION_MISMATCH` test and dedicated link/symlink rejection
+evidence were added. The symlink guarantee is proved on the device
+(`MediaProtectionDeviceTest.rejectsASymlinkBelowThePrivateRootAndStillAcceptsARealFile`, real
+`Os.symlink`, both an inside-root and an outside-root target refused while a real file is accepted)
+and additionally in JVM with a directory junction, because a Windows host cannot create a real symlink
+without elevation (`BackupDirectoryBootstrapTest.aLinkBelowTheRootThatResolvesOutsideItIsRefused`).
+Independent reviews: `S6A_CRITIC_NO_BLOCKER` before the hardening and `S6A_FINAL_CRITIC_NO_BLOCKER`
+after it; the one remaining correctness nuance the first review raised (required size not compared with
+the actual source size) is now closed in code and covered by tests, and the second review's findings
+are documentation-accuracy NITs about this handoff's wording plus three accepted coverage NITs.
+
+Earlier slice recorded for context (owner-accepted, unchanged here): S3 produced
+`S3_PIPELINE_PASS` and `S3_DATASET_COVERAGE_SUFFICIENT` — the real DEV repository holds the three
+snapshots from that acceptance (`06c4610b`, `1f9e43e7`, `8d6a9be2`), each requiring the same four
+media blobs that S6A has now protected.
+
+Next (owner decision, in order): S6B (FULL snapshot plus repository-aware PC verification), then
+stale-`Staging` reconciliation, then the S5 large-media policy, then the PC handoff, offload and
+restore. S4 (streaming export) was not started and is not authorized by this slice; protection still
+has no UI and no automatic caller.
+
 ## Current continuation — S2 METADATA_ONLY Backup UI (working tree, owner review pending)
 
 S2 extends `Настройки → Резервное копирование` so the user can create the already accepted
