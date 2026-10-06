@@ -11,10 +11,12 @@ internal sealed interface BackupTreeSelection {
 }
 
 /**
- * Grouped, user-meaningful repository access problems.
+ * Grouped, user-meaningful problems.
  *
  * Raw [RepositoryError] names never reach the UI: several of them mean the same thing to a field
- * user, and the groups are what the screen can actually offer an action for.
+ * user, and the groups are what the screen can actually offer an action for. The same groups cover
+ * repository *access* problems and manual *backup creation* problems, so one screen keeps one
+ * problem vocabulary instead of two competing ones.
  */
 internal enum class BackupAccessProblem {
     /** The fixed folder grant is missing, revoked or unusable. Granting access again can fix it. */
@@ -43,6 +45,15 @@ internal enum class BackupAccessProblem {
 
     /** The phone cannot afford the fixed reserve even for a new repository. */
     CAPACITY,
+
+    /** The current research state could not be captured as one consistent graph. */
+    LOGICAL_DATA,
+
+    /** A backup could not be created or verified safely; existing backups stay unchanged. */
+    SNAPSHOT,
+
+    /** The backup operation stopped before it finished. */
+    CANCELLED,
     ;
 
     /** True only for problems that granting access to the fixed folder again may resolve. */
@@ -230,6 +241,16 @@ internal fun RepositoryError.toBackupAccessProblem(): BackupAccessProblem = when
     RepositoryError.CAPACITY_INSUFFICIENT,
     -> BackupAccessProblem.CAPACITY
 
+    // Snapshot-specific and operation-specific failures are grouped as their own problems so the
+    // screen can say what actually happened instead of calling them generic storage failures.
+    RepositoryError.LOGICAL_STATE_INCONSISTENT -> BackupAccessProblem.LOGICAL_DATA
+    RepositoryError.INVALID_SNAPSHOT,
+    RepositoryError.SNAPSHOT_LIMIT_EXCEEDED,
+    RepositoryError.SNAPSHOT_ID_CONFLICT,
+    -> BackupAccessProblem.SNAPSHOT
+
+    RepositoryError.CANCELLED -> BackupAccessProblem.CANCELLED
+
     RepositoryError.PROVIDER_FAILURE,
     RepositoryError.WRITE_FAILED,
     RepositoryError.SYNC_FAILED,
@@ -237,11 +258,6 @@ internal fun RepositoryError.toBackupAccessProblem(): BackupAccessProblem = when
     RepositoryError.PUBLISH_FAILED,
     RepositoryError.METADATA_INCONSISTENCY,
     RepositoryError.SOURCE_CHANGED,
-    RepositoryError.CANCELLED,
     RepositoryError.DELETE_FAILED,
-    RepositoryError.INVALID_SNAPSHOT,
-    RepositoryError.LOGICAL_STATE_INCONSISTENT,
-    RepositoryError.SNAPSHOT_LIMIT_EXCEEDED,
-    RepositoryError.SNAPSHOT_ID_CONFLICT,
     -> BackupAccessProblem.PROVIDER
 }

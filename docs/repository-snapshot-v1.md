@@ -8,8 +8,11 @@ No format freeze is inferred from compilation. Independent contract:
 
 Only `METADATA_ONLY / NO_MEDIA_EVIDENCE / COMPLETE` is implemented. COMPLETE means
 successful capture and validated publication of the declared logical metadata, not
-photo/video protection or recoverability. No UI, restore, FULL, DEGRADED creation,
-coverage, handoff, PC ingest, cleanup or scheduling is added. Legacy Complete Backup
+photo/video protection or recoverability. No restore, FULL, DEGRADED creation,
+coverage, handoff, PC ingest, cleanup or scheduling is added by this slice, and this
+slice itself added no UI. The user-facing entry point for creating this profile by hand
+was added later by D099 and only drives this service; the profile, its limits and its
+promises are unchanged. Legacy Complete Backup
 V1–V6 remains separate. Never label this profile “Полная резервная копия”.
 
 The 13 Room collections, current Territory/Observer and persisted Area geometry are

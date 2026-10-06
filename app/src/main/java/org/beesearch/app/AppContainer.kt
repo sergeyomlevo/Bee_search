@@ -10,6 +10,8 @@ import org.beesearch.app.data.backuprepository.BoundRepository
 import org.beesearch.app.data.backuprepository.AndroidRepositoryRoots
 import org.beesearch.app.data.backuprepository.AndroidBackupTreeAccess
 import org.beesearch.app.data.backuprepository.BackupAccessCoordinator
+import org.beesearch.app.data.backuprepository.BackupOperationCoordinator
+import org.beesearch.app.data.backupsnapshot.RepositoryBackupSnapshotOperations
 import org.beesearch.app.data.backuprepository.DataStoreRepositoryBindingStore
 import org.beesearch.app.data.backuprepository.repositoryBindingDataStore
 import org.beesearch.app.data.backup.DataStorePortableSettingsStore
@@ -119,6 +121,14 @@ internal class AppContainer(private val context: Context) {
         repository = boundRepository,
         location = backupBootstrap.location,
     )
+
+    /**
+     * Manual METADATA_ONLY backup for the backup screen.
+     *
+     * The operations go through the accepted snapshot service (which itself goes through the bound
+     * repository), never through Repository V1 directly, and hold no state of their own.
+     */
+    val backupOperations = BackupOperationCoordinator(RepositoryBackupSnapshotOperations(repositorySnapshots))
     val areaExchangeMirror = AreaExchangeMirror(exchangeStorage)
     val mapAreaStore: MapAreaStore = MirroringMapAreaStore(
         delegate = DataStoreMapAreaStore(context.settingsDataStore),

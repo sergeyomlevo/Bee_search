@@ -222,6 +222,7 @@ private fun BeeSearchApp(
                     )
                     AppRoute.Backup -> BackupRoute(
                         coordinator = application.container.backupAccessCoordinator,
+                        operations = application.container.backupOperations,
                         treeAccess = application.container.backupTreeAccess,
                         location = application.container.backupBootstrap.location,
                         onBack = viewModel::returnFromBackup,

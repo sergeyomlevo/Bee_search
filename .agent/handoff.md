@@ -1,12 +1,52 @@
 # Bee Search handoff
 
-## Current continuation — S1 Production Backup Repository Access (owner review pending)
+## Current continuation — S2 METADATA_ONLY Backup UI (working tree, owner review pending)
 
-2026-10-06: HEAD/origin main `fd0e380645be1b4d8db53a1a0916a6cdf2449d90`, baseline clean.
-Owner-authorized S1: fixed per-variant backup location, one-time SAF grant for that exact folder,
-automatic initialize/adopt/reconnect. Uncommitted; no commit/push.
+S2 extends `Настройки → Резервное копирование` so the user can create the already accepted
+Repository Snapshot V1 METADATA_ONLY backup by hand. Fixed Backup location, SAF grant, exact-folder
+validation and initialize/adopt/reconnect are S1's and unchanged.
 
-Recorded as **D098** (next free durable decision: **D099**). The user never chooses a backup folder:
+`BackupSnapshotOperations` is the only seam the screen may use for snapshots; its production
+implementation is a pass-through to the accepted `RepositorySnapshotService` (which itself goes
+through `BoundRepository`), so no UI code touches Repository V1, captures a graph or writes an
+archive. `BackupOperationCoordinator` (Android-free, JVM-tested) owns two rules: **one creation at a
+time** (a second request while one runs returns `AlreadyRunning` and publishes nothing) and **the
+repository is the source of truth** — every read calls `discover()`, a successful creation
+immediately re-reads it, and no timestamp is stored in Room or DataStore. Discovery maps to
+`None` / `Latest(createdAt, warning)` / `Unusable`: unusable candidates are never hidden, a valid
+latest backup is still shown next to the warning, and when nothing can be validated no last-backup
+claim is made. Creation problems are grouped into access/space/logical-data/snapshot/identity/
+provider/cancelled groups; an access-class problem sends the screen back to the S1 access states
+(«Восстановить доступ») rather than opening a second access branch.
+
+Owner decisions for the S2 UI, taken from the owner-provided mockup
+(`C:\App\Bee_search_ui_input\Макет интерфейса резервного копирования.png`, deliberately not copied
+into the repository), recorded here for later slices: **no numeric progress** (indeterminate only),
+**no technical tokens** in normal UI (`METADATA_ONLY`, ZIP file name, SHA, snapshot UUID, repository
+UUID), **no explicit «Отмена»** button and no new cancellation architecture, and
+history/details/rename/delete/restore/PC/offload stay out of scope. The implementing screen was
+compared against that mockup on the Samsung at the owner's real font scale 1.7 (title, explanation,
+tinted photo/video notice, last-copy line, full-width primary action); the mockup's percentage ring,
+`METADATA_ONLY` row, file name and «Отмена» were deliberately not implemented. The screen keeps the
+approved wording «Резервная копия создана. Данные исследований сохранены. Фото и видео в эту копию
+не входят.» and never says «полная резервная копия» или «все данные сохранены».
+
+Next: owner review of the S2 diff, then the separate **S3** slice (real non-empty dataset → snapshot
+through the production UI → copied to PC → independent PC verifier → acceptance). S2 proves only
+that the production UI drives the accepted service correctly. The known pre-existing
+`CleanStartupIntegrationTest` blocked-deletion timeout is unchanged by S2 (same single failure as the
+S1 baseline `09b148a`).
+
+## Previous milestone — S1 Production Backup Repository Access (accepted and finalized)
+
+Finalized as commit `09b148a25affa4c509ba8a619ced47feb09c146f`
+(«Implement production backup repository access»), pushed to `origin/main`. Its S1 verdict was
+`S1_READY_FOR_OWNER_REVIEW`; the owner then accepted it and the working tree was clean at that commit.
+
+Original implementation report: fixed per-variant backup location, one-time SAF grant for that exact
+folder, automatic initialize/adopt/reconnect.
+
+Recorded as **D098** (S1) and **D099** (S2). The user never chooses a backup folder:
 `BackupLocation` is the single source of `BeeSearch/<variant>/Backup` and of its SAF document id
 `primary:Download/BeeSearch/<variant>/Backup`, and `BackupDirectoryBootstrap` derives its skeleton
 from it. The production picker accepts ONLY that exact tree — `Download` itself, the `BeeSearch`
@@ -45,8 +85,7 @@ times out waiting for the blocked-deletion feedback. Not caused by S1, not fixed
 
 Residue: DEV still holds a persisted grant for `Download/BeeSearch/Dev`, created by the pre-fix
 intermediate build during that verification; the final code never persists a grant for a rejected
-folder, and the entry disappears with a DEV data reset. Next: owner review of the S1 diff; S2
-(snapshot creation UI) only after explicit approval.
+folder, and the entry disappears with a DEV data reset.
 
 ## Previous continuation — Snapshot G1–G6 aligned; owner diff review pending
 
