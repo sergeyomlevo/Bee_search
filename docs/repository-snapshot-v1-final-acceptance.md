@@ -1,5 +1,11 @@
 # Slice 2B Final Acceptance Report
 
+Later independent-verifier follow-up:
+[Snapshot V1 normative wire schema](snapshot-v1-wire-schema.md) closes textual gaps
+under owner-approved O1/O2/O3 and lists current production validation gaps.
+It does not establish implementation conformance to the closure; the original
+Slice 2B evidence and verdict below are not rewritten.
+
 2026-10-06. Final audit of the existing Slice 2B only; no R2, PC verifier or UI.
 
 ## 1. Worktree safety

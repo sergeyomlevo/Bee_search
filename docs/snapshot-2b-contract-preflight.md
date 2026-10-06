@@ -1,5 +1,11 @@
 # Snapshot 2B Contract Closure
 
+Wire-schema reconciliation follow-up (2026-10-06):
+[Snapshot V1 normative wire schema](snapshot-v1-wire-schema.md) supplies field-level
+schemas with O1/O2/O3 now owner-approved. Current implementation validation gaps
+are listed there; this does not rewrite the historical acceptance below or claim
+that app/verifier alignment has already been implemented.
+
 Status: owner-approved design contract, READY_FOR_SLICE_2B; implementation not started.
 Date: 2026-10-06. Baseline: `3db5dda29f5306bd76c5dc33cafc6190499870f6`.
 
