@@ -86,6 +86,8 @@ sealed interface AppRoute {
     data object Settings : AppRoute
     data object InitialSetup : AppRoute
     data object Help : AppRoute
+    /** Settings → Резервное копирование: repository access only in S1. */
+    data object Backup : AppRoute
     data object Objects : AppRoute
     data object Area : AppRoute
     data object AreaView : AppRoute
@@ -435,6 +437,16 @@ internal class MainViewModel(
     }
 
     fun returnFromHelp() {
+        manualRoute.value = AppRoute.Settings
+        clearFeedback()
+    }
+
+    fun openBackup() {
+        manualRoute.value = AppRoute.Backup
+        clearFeedback()
+    }
+
+    fun returnFromBackup() {
         manualRoute.value = AppRoute.Settings
         clearFeedback()
     }

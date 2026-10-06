@@ -1120,3 +1120,12 @@ Repository Snapshot V1 starts with immutable METADATA_ONLY research metadata pro
 (D097), explicitly without photo/video protection or in-app restore. COMPLETE is relative
 to this profile, never a full recovery claim. FULL and fresh-PC-authorized duplicate
 offload remain later layers; private originals are never cleanup targets.
+
+Доступ к резервным копиям (D098) пользователь настраивает один раз в
+`Настройки → Резервное копирование`: Bee Search показывает собственную фиксированную папку
+`Загрузки/BeeSearch/<variant>/Backup` и просит Android разрешить доступ именно к ней. Отдельной
+настройки расположения резервных копий, выбора SD-карты и нескольких репозиториев нет. Пока доступ
+не выдан, приложение работает как обычно: настройка резервного копирования не является условием
+полевой работы, не показывается модально при запуске и не блокирует ни одно полевое действие.
+Понятные состояния экрана: нужно выдать доступ, доступ есть, доступ потерян (нужно выдать снова),
+папку нельзя использовать как резервную копию этого варианта сборки.

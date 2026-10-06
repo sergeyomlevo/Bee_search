@@ -1,6 +1,54 @@
 # Bee Search handoff
 
-## Current continuation — Snapshot G1–G6 aligned; owner diff review pending
+## Current continuation — S1 Production Backup Repository Access (owner review pending)
+
+2026-10-06: HEAD/origin main `fd0e380645be1b4d8db53a1a0916a6cdf2449d90`, baseline clean.
+Owner-authorized S1: fixed per-variant backup location, one-time SAF grant for that exact folder,
+automatic initialize/adopt/reconnect. Uncommitted; no commit/push.
+
+Recorded as **D098** (next free durable decision: **D099**). The user never chooses a backup folder:
+`BackupLocation` is the single source of `BeeSearch/<variant>/Backup` and of its SAF document id
+`primary:Download/BeeSearch/<variant>/Backup`, and `BackupDirectoryBootstrap` derives its skeleton
+from it. The production picker accepts ONLY that exact tree — `Download` itself, the `BeeSearch`
+root, `Exchange`, another variant, nested folders, other providers and SD cards are rejected before
+any repository call. A `…/tree/<expected>/document/<other>` result is rejected as well, because the
+repository layer honours the document segment of such a URI. The grant is persisted only after that
+validation (device-verified: `persisted=0x0` for a rejected tree, `persisted=0x3` for the accepted
+one), and `status()` prepares the fixed skeleton before the access probe, so a removed `Media`
+child directory is repaired while conflicting content still fails closed. The Android-free
+`BackupAccessCoordinator` owns the state machine: existing binding → `reconnect` of the same UUID;
+UNBOUND → `adoptExisting`; only a genuinely absent `repository.json` → `initializeNew` in an
+otherwise valid empty skeleton; foreign UUID, invalid/unsupported header, ambiguous content,
+unreadable binding and UNKNOWN capacity fail closed with the previous binding preserved. UI errors
+are grouped into typed problems with Russian messages; raw repository errors never reach a screen.
+Route: `Настройки → Резервное копирование` (`AppRoute.Backup`), Back → Settings. Startup is
+unchanged (skeleton + read-only probe, no modal); field capture is never blocked.
+
+Verification: JVM 629 tests / 0 failures/errors (S1: 18 coordinator, 7 UI-state, 4 location);
+`assembleDebug`, `assembleDebugAndroidTest`, `lintDebug` PASS (0 errors, 24 warnings, 2 hints —
+unchanged from baseline); `git diff --check` clean. Samsung SM-S938B/API36 with preserving DEV
+updates (no clear/uninstall): 12 focused instrumentation tests PASS (`BackupScreenTest`,
+`AndroidBackupTreeAccessDeviceTest`, the Settings→Backup→Settings route test). Manual DEV smoke
+PASS: the picker opens at `Download/BeeSearch/Dev/Backup`; a wrong folder shows the recoverable
+message, offers the picker again and creates no `repository.json`; the exact folder gives
+`✓ Доступно` with `repository.json` `df4d52a9-7033-43c5-9620-e0e5b2fb3e16` (sha `162feffe…828a`);
+force-stop/relaunch keeps `✓ Доступно` with a byte-identical header; with only
+`repository_binding.preferences_pb` removed (reinstall-equivalent) the same folder is ADOPTED —
+same UUID, same mtime, binding restored. Independent critic: **S1_CRITIC_NO_BLOCKER**; both
+high-priority concerns were closed before acceptance. Detailed pre-fix defect found on the device:
+the grant was persisted before validation (stray durable grant for a rejected folder) — fixed and
+re-verified.
+
+Known pre-existing failure, verified on the untouched baseline `fd0e380` in a separate worktree:
+`CleanStartupIntegrationTest.deletingAnObjectUsedByObservationDataIsRefusedAndKeepsTheCardOpen`
+times out waiting for the blocked-deletion feedback. Not caused by S1, not fixed here.
+
+Residue: DEV still holds a persisted grant for `Download/BeeSearch/Dev`, created by the pre-fix
+intermediate build during that verification; the final code never persists a grant for a rejected
+folder, and the entry disappears with a DEV data reset. Next: owner review of the S1 diff; S2
+(snapshot creation UI) only after explicit approval.
+
+## Previous continuation — Snapshot G1–G6 aligned; owner diff review pending
 
 2026-10-06: HEAD/origin main b3eec7d9e54011f1e482e68e7ee8c5e94efc0eba.
 Preserved approved MIME/weather dirty diff; owner authorized G2–G6 creation and

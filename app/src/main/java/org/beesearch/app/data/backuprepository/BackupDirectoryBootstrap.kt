@@ -10,8 +10,9 @@ import org.beesearch.app.BuildConfig
 
 /** Directory skeleton only: never reads, creates or replaces repository identity. */
 internal class BackupDirectoryBootstrap(publicDownloads: File, variant: String) {
-    val root = File(publicDownloads, "BeeSearch/$variant/Backup")
-    init { require(variant in setOf("Stable", "Beta", "Dev")) }
+    /** The fixed location of this variant's backup folder; the only place the layout is defined. */
+    val location = BackupLocation(variant)
+    val root: File = location.rootDirectory(publicDownloads)
 
     suspend fun ensure(): RepositoryResult<Unit> = withContext(Dispatchers.IO) {
         try {

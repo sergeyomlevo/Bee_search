@@ -3090,7 +3090,7 @@ destination document в момент подтверждения имени по�
   трактуется как неполный cleanup (`Объект удалён, но не все файлы медиа удалось удалить`), а не как
   неудачное удаление. Path safety при этом не ослабляется: небезопасный путь не разрешается и не
   удаляется.
-- Следующий свободный номер durable decision: **D098** (D097 — metadata-first Snapshot V1).
+- Следующий свободный номер durable decision: **D099** (D097 — metadata-first Snapshot V1, D098 — доступ к фиксированной папке резервных копий).
 
 ---
 
@@ -3323,4 +3323,41 @@ Approved limits and publication/discovery contract:
 Success requires validated candidate, fresh bound UUID check adjacent to same-storage move,
 and independent reopened final whole/entry SHA+ZIP/semantic validation. Invalid history is surfaced.
 FULL/LOCAL_VERIFIED, DEGRADED creation, restore, coverage/handoff/offload/UI not implemented.
-Final format acceptance still requires representative aggregate DEV sizing. Next decision: D098.
+Final format acceptance still requires representative aggregate DEV sizing. Next decision: D099.
+
+---
+
+# D098 — Доступ к фиксированной папке резервных копий и автоматическое подключение репозитория
+
+**Статус:** ACCEPTED (owner S1 authorization: fixed Backup location + one-time SAF grant).
+
+У пользователя нет выбора папки резервных копий. Bee Search владеет одной предсказуемой публичной
+папкой на вариант сборки: `Download/BeeSearch/<Stable|Beta|Dev>/Backup` (в файловом менеджере —
+`Загрузки/BeeSearch/<variant>/Backup`). Настройки «своя папка», «сменить папку», выбор SD-карты и
+второй репозиторий не вводятся; системный picker используется только для выдачи доступа к уже
+определённой папке. Единственный источник пути — `BackupLocation`; `BackupDirectoryBootstrap`
+выводит из него skeleton (`Media/`, `Snapshots/`, `Staging/`), и ни один экран не строит путь сам.
+
+Принимается только точно эта tree (`primary:Download/BeeSearch/<variant>/Backup`). Любой другой
+результат picker (`Download`, корень `BeeSearch`, `Exchange`, другой вариант, вложенная папка, чужой
+провайдер) отклоняется до любого обращения к репозиторию: ничего не создаётся, не связывается и не
+инициализируется. Долговременное (persisted) разрешение запрашивается только для точно этой папки,
+поэтому отклонённый выбор не оставляет у Bee Search постоянного доступа к посторонней папке: на
+целевом устройстве отклонённая tree сохраняет только временное разрешение текущего сеанса. Grant,
+который не удалось сделать persistable, binding не создаёт.
+
+После точного grant `BackupAccessCoordinator` применяет неизменённые правила D095/D096: при
+существующем durable binding выполняется `reconnect` только к тому же UUID; при UNBOUND сначала
+`adoptExisting`, и только при действительно отсутствующем `repository.json` — `initializeNew` в
+иначе валидном пустом skeleton. Identity — UUID из `repository.json`; совпадение пути identity не
+является: переустановка приложения с тем же физическим `Backup` и тем же `repository.json` даёт
+adopt существующего UUID, а не новый. Каталоги skeleton (`Media`, `Snapshots`, `Staging`) приложение
+создаёт и при необходимости восстанавливает, но содержимое папки, `repository.json` и identity
+репозитория не удаляются, не перезаписываются и не «ремонтируются»; конфликт identity,
+ambiguous/invalid содержимое, нечитаемый binding и UNKNOWN capacity ведут к fail closed с сохранением
+прежнего binding.
+
+UI: `Настройки → Резервное копирование` показывает фиксированную папку и состояния «Разрешить
+доступ» / «✓ Доступно» / «Восстановить доступ» / понятную ошибку. Создание snapshot, media ingest,
+FULL, PC handoff, cleanup/offload и restore в этот слой не входят (отдельные последующие слайсы).
+Контракт и ограничения: [repository-v1-foundation.md](repository-v1-foundation.md).

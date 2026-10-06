@@ -1691,6 +1691,18 @@ writes require durable expected UUID + actual header match; startup probe never 
 Контракт и ограничения: [Repository V1 foundation](repository-v1-foundation.md), D095/D096.
 Snapshot contract: [Repository Snapshot V1](repository-snapshot-v1.md), D097.
 
+Доступ пользователя к резервным копиям (D098) отделён от хранения: `BackupLocation` — единственный
+источник фиксированного пути `Download/BeeSearch/<variant>/Backup` и его SAF document id,
+`BackupDirectoryBootstrap` выводит из него skeleton, `AndroidBackupTreeAccess` переводит результат
+системного picker в locator и сохраняет persistable grant, а Android-независимый
+`BackupAccessCoordinator` решает только одно: принять ли выбор и какую identity-операцию выполнить
+(`reconnect` того же UUID, `adoptExisting` существующего `repository.json` или `initializeNew` в
+пустом skeleton). Выбор, не совпадающий с фиксированной папкой, отклоняется до любого обращения к
+репозиторию. Типизированные ошибки хранения группируются в понятные пользователю проблемы на
+границе UI; экран `Настройки → Резервное копирование` не знает ни форматов, ни правил identity.
+Настройка доступа не входит в полевой путь: startup по-прежнему только создаёт skeleton и
+read-only проверяет binding.
+
 Logical backup core реализует versioned архив согласно D069–D073. Пользовательский
 экспорт использует Android Storage Access Framework: отдельный Data ViewModel
 управляет состоянием операции, тонкий document adapter передаёт выбранный URI

@@ -308,6 +308,21 @@ class CleanStartupIntegrationTest {
     }
 
     @Test
+    fun backupAccessScreenOpensFromSettingsAndReturnsToSettings() = runBlocking {
+        val viewModel = newViewModel()
+
+        // Settings → Резервное копирование → Back, on the production route mechanism.
+        viewModel.openSettings()
+        awaitRoute(viewModel, AppRoute.Settings)
+
+        viewModel.openBackup()
+        awaitRoute(viewModel, AppRoute.Backup)
+
+        viewModel.returnFromBackup()
+        awaitRoute(viewModel, AppRoute.Settings)
+    }
+
+    @Test
     fun physicalObjectCardKeepsItsReturnPathAcrossTheMap() = runBlocking {
         val viewModel = newViewModel()
         val hollowId = UUID.randomUUID()

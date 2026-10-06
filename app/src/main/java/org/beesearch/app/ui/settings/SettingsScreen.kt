@@ -55,6 +55,7 @@ internal fun SettingsScreen(
     onOpenOfflineMaps: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
     onOpenInitialSetup: () -> Unit = {},
+    onOpenBackup: () -> Unit = {},
     initialSetupSection: SetupSettingsSection? = null,
     /** The checklist step opened a value that does not exist yet, so its existing form opens directly. */
     initialSetupCreatesMissingValue: Boolean = false,
@@ -172,6 +173,12 @@ internal fun SettingsScreen(
                     TextButton(onClick = onOpenOfflineMaps) { Text("Открыть") }
                 }
             }
+            SettingsDestination(
+                title = "Резервное копирование",
+                description = "Доступ к папке резервных копий Bee Search.",
+                testTag = "settings-backup",
+                onOpen = onOpenBackup,
+            )
             SettingsDestination(
                 title = "Начальная настройка",
                 description = "Проверить готовность к работе и открыть нужные настройки.",

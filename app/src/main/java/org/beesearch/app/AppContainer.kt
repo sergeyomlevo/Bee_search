@@ -8,6 +8,8 @@ import org.beesearch.app.data.backup.BackupService
 import org.beesearch.app.data.backuprepository.beeSearchBackupBootstrap
 import org.beesearch.app.data.backuprepository.BoundRepository
 import org.beesearch.app.data.backuprepository.AndroidRepositoryRoots
+import org.beesearch.app.data.backuprepository.AndroidBackupTreeAccess
+import org.beesearch.app.data.backuprepository.BackupAccessCoordinator
 import org.beesearch.app.data.backuprepository.DataStoreRepositoryBindingStore
 import org.beesearch.app.data.backuprepository.repositoryBindingDataStore
 import org.beesearch.app.data.backup.DataStorePortableSettingsStore
@@ -102,6 +104,21 @@ internal class AppContainer(private val context: Context) {
     val repositorySnapshots = RepositorySnapshotService(boundRepository,
         SnapshotCapture(database, DataStorePortableSettingsStore(context.settingsDataStore)),
         File(context.cacheDir, "repository-snapshots"))
+
+    /**
+     * Settings → Резервное копирование.
+     *
+     * The user gets access to the one fixed Backup folder of this build variant; which identity
+     * operation follows (initialize / adopt / reconnect) is decided from the durable binding, never
+     * from the path. Both objects are Android-facing adapters over already verified repository
+     * semantics, and nothing here reads or writes research data.
+     */
+    val backupTreeAccess = AndroidBackupTreeAccess(context)
+    val backupAccessCoordinator = BackupAccessCoordinator(
+        bootstrap = backupBootstrap,
+        repository = boundRepository,
+        location = backupBootstrap.location,
+    )
     val areaExchangeMirror = AreaExchangeMirror(exchangeStorage)
     val mapAreaStore: MapAreaStore = MirroringMapAreaStore(
         delegate = DataStoreMapAreaStore(context.settingsDataStore),

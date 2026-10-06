@@ -49,6 +49,7 @@ import org.beesearch.app.ui.map.CurrentTerritoryScreen
 import org.beesearch.app.ui.map.OfflineMapManagementScreen
 import org.beesearch.app.ui.area.AreaRoute
 import org.beesearch.app.ui.area.AreaViewRoute
+import org.beesearch.app.ui.backup.BackupRoute
 import org.beesearch.app.ui.help.HelpScreen
 import org.beesearch.app.ui.points.PointDetailRoute
 import org.beesearch.app.ui.points.PointsRoute
@@ -215,8 +216,15 @@ private fun BeeSearchApp(
                         onOpenOfflineMaps = viewModel::openOfflineMaps,
                         onOpenHelp = viewModel::openHelp,
                         onOpenInitialSetup = viewModel::openInitialSetup,
+                        onOpenBackup = viewModel::openBackup,
                         initialSetupSection = setupSettingsSection,
                         initialSetupCreatesMissingValue = initialSetupCreatesMissingValue,
+                    )
+                    AppRoute.Backup -> BackupRoute(
+                        coordinator = application.container.backupAccessCoordinator,
+                        treeAccess = application.container.backupTreeAccess,
+                        location = application.container.backupBootstrap.location,
+                        onBack = viewModel::returnFromBackup,
                     )
                     AppRoute.Help -> HelpScreen(
                         exchangeStorage = application.container.exchangeStorage,
