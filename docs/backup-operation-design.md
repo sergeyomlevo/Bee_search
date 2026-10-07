@@ -4,7 +4,7 @@
 Никакие принятые решения S6A/S6B здесь не пересматриваются: защита медиа, проверка требуемого набора,
 профиль копии и поведение discovery остаются такими, какими они закрыты в S6A/S6B.
 
-Связанный макет: `docs/ui/mockups/backup-v1.md` + `backup-v1.png` / `backup-v1-result.png`.
+Связанный утверждённый макет: `docs/ui/mockups/backup-v2.md` + `docs/ui/mockups/backup-v2.png`.
 
 ---
 
