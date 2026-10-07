@@ -22,6 +22,26 @@ unreadable and contract-verification failure. Never modifies input. Reports cont
 paths/counts/hashes/issues, never research content. Owned temporary verification
 spools are separate from the input and removed; generated corpus stays outside Git.
 
+## Evidence profiles and exit codes
+
+Snapshot V1 accepts exactly two evidence tuples (wire schema §7.1):
+`METADATA_ONLY`/`NO_MEDIA_EVIDENCE`/`COMPLETE` and `FULL`/`LOCAL_VERIFIED`/`COMPLETE`.
+The archive structure is the same for both: metadata and references only, no payload
+bytes and no `Media/*` entry.
+
+A metadata-only snapshot can be judged on its own, so standalone verification ends in
+`PASS`. A FULL snapshot additionally claims that the required blobs of the same capture
+were verified in the bound local repository, which a ZIP alone cannot establish, so
+standalone verification reports `REPOSITORY_EVIDENCE_REQUIRED` instead of a final PASS.
+That is not a failure and not an acceptance: run the repository-aware mode for the local
+evidence decision. An unsupported tuple or token fails with
+`MANIFEST_UNSUPPORTED_PROFILE`.
+
+Exit codes: `0` = PASS, `1` = FAIL/invalid, `2` = invalid arguments or unreadable input,
+`3` = REPOSITORY_EVIDENCE_REQUIRED (structure valid, declared local repository evidence
+needs a repository root). The JSON report always states the declared `snapshotProfile`,
+`evidencePolicy`, `creationResult` and `repositoryEvidenceRequired`.
+
 ## Repository-aware mode
 
 A second, additive mode answers a question the standalone mode cannot: does the repository
@@ -35,7 +55,8 @@ It is read-only and never modifies the repository or the snapshot. It checks:
 
 - `repository.json`: bounded JSON with exactly the four header keys, `beesearch-repository`
   format version 1, canonical repository UUID and variant;
-- the snapshot itself, through the unchanged standalone verification, which must pass;
+- the snapshot itself, through the unchanged standalone verification (for a FULL snapshot that
+  means its structure is valid and its local evidence is decided here, not there);
 - context agreement: snapshot `repositoryId` and `variant` against the header;
 - every blob in the snapshot's `references/media-blobs.jsonl`: the canonical path
   `Media/<sha256>.<canonicalExtension>` must exist as a regular file with the exact declared

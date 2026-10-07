@@ -47,9 +47,42 @@ class Budget(private val maximum: Long, private val scope: String) {
     }
 }
 
+/**
+ * The two supported Snapshot V1 evidence tuples (wire schema §7.1).
+ *
+ * Transcribed from the contract text only; no production Kotlin is imported or copied.
+ */
+enum class EvidenceProfile(val token: String, val profile: String, val repositoryEvidenceRequired: Boolean) {
+    METADATA_ONLY("METADATA_ONLY/NO_MEDIA_EVIDENCE/COMPLETE", "METADATA_ONLY", false),
+    FULL_LOCAL_VERIFIED("FULL/LOCAL_VERIFIED/COMPLETE", "FULL", true),
+    ;
+
+    companion object {
+        /** Null for every unknown token and for every unsupported cross-combination. */
+        fun parse(profile: String?, evidencePolicy: String?, creationResult: String?): EvidenceProfile? =
+            entries.firstOrNull { it.token == "$profile/$evidencePolicy/$creationResult" }
+    }
+}
+
 data class VerificationReport(val inputPath: String, var fileSize: Long? = null,
     var actualWholeSha256: String? = null, var filenameSnapshotId: String? = null,
     var filenameWholeSha256: String? = null, var verifiedEntries: Int = 0,
     val issues: MutableList<Issue> = mutableListOf()) {
-    val verdict: String get() = if (issues.isEmpty()) "PASS" else "FAIL"
+    /** The declared, immutable manifest evidence of this snapshot; never inferred from the ZIP only. */
+    var evidenceProfile: EvidenceProfile? = null
+    var snapshotProfile: String? = null
+    var evidencePolicy: String? = null
+    var creationResult: String? = null
+
+    /**
+     * True when the snapshot declares the local full-evidence profile: standalone inspection can prove
+     * the structure, but only a repository context can prove the declared media evidence.
+     */
+    val repositoryEvidenceRequired: Boolean get() = evidenceProfile?.repositoryEvidenceRequired == true
+
+    val verdict: String get() = when {
+        issues.isNotEmpty() -> "FAIL"
+        repositoryEvidenceRequired -> "REPOSITORY_EVIDENCE_REQUIRED"
+        else -> "PASS"
+    }
 }

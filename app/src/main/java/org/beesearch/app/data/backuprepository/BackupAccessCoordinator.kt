@@ -247,6 +247,12 @@ internal fun RepositoryError.toBackupAccessProblem(): BackupAccessProblem = when
     RepositoryError.INVALID_SNAPSHOT,
     RepositoryError.SNAPSHOT_LIMIT_EXCEEDED,
     RepositoryError.SNAPSHOT_ID_CONFLICT,
+    // Media-evidence failures stay distinct at the operation-result level, where a backend caller
+    // must tell "this snapshot's required media is not verifiable here" from a container failure.
+    // For the diagnosis groups of the access screen they are a snapshot-creation problem.
+    RepositoryError.MEDIA_EVIDENCE_MISSING,
+    RepositoryError.MEDIA_EVIDENCE_MISMATCH,
+    RepositoryError.MEDIA_EVIDENCE_INCONSISTENT,
     -> BackupAccessProblem.SNAPSHOT
 
     RepositoryError.CANCELLED -> BackupAccessProblem.CANCELLED

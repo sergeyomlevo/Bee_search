@@ -3,6 +3,7 @@ package pcsnapshot
 import java.nio.file.Files
 import java.nio.file.Path
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -26,7 +27,7 @@ private object RepositoryFixture {
             "\"repositoryId\":\"$repositoryId\",\"variant\":\"$variant\"}").toByteArray()
 
     /** A complete snapshot whose two required blobs describe the two payloads above. */
-    fun snapshot(extraReferences: List<String> = emptyList()): ByteArray {
+    fun snapshot(extraReferences: List<String> = emptyList(), full: Boolean = false): ByteArray {
         val (objectBytes, attachmentBytes) = payloads()
         val shaObject = Fixture.sha256(objectBytes)
         val shaAttachment = Fixture.sha256(attachmentBytes)
@@ -56,7 +57,8 @@ private object RepositoryFixture {
             ).toByteArray()
 
         files["manifest.json"] = Fixture.manifest(files)
-        return Fixture.zip(files)
+        val built = Fixture.zip(files)
+        return if (full) Fixture.fullEvidence(built) else built
     }
 
     fun requiredShas(): Pair<String, String> {
@@ -285,5 +287,134 @@ class RepositoryVerifierTest {
         assertEquals(listOf<String>(), standalone.issues.map { it.code })
         assertEquals("PASS", standalone.verdict)
         assertEquals(17, standalone.verifiedEntries)
+    }
+
+    // --- the local full-evidence profile ---
+
+    @Test
+    fun aValidFullSnapshotWithACompleteRepositoryPasses() {
+        val (root, snapshot) = repository(RepositoryFixture.snapshot(full = true))
+        bothBlobs(root)
+
+        val report = RepositoryVerifier().verify(root, snapshot)
+
+        assertEquals(listOf<String>(), issueCodes(report))
+        assertEquals("PASS", report.verdict)
+        assertEquals("REPOSITORY_EVIDENCE_REQUIRED", report.snapshotVerdict)
+        assertTrue(report.repositoryEvidenceRequired)
+        assertEquals("FULL", report.snapshotProfile)
+        assertEquals("LOCAL_VERIFIED", report.evidencePolicy)
+        assertEquals(2, report.requiredCount)
+        assertEquals(2, report.verifiedRequired)
+    }
+
+    @Test
+    fun aFullSnapshotWithoutItsRequiredBlobsFails() {
+        val (root, snapshot) = repository(RepositoryFixture.snapshot(full = true))
+
+        val report = RepositoryVerifier().verify(root, snapshot)
+
+        assertEquals("FAIL", report.verdict)
+        assertEquals(0, report.verifiedRequired)
+        assertEquals(2, issueCodes(report).count { it == RepositoryVerificationReport.MISSING })
+    }
+
+    @Test
+    fun aFullSnapshotWithAWrongSizeFails() {
+        val (root, snapshot) = repository(RepositoryFixture.snapshot(full = true))
+        val (_, attachmentBytes) = RepositoryFixture.payloads()
+        val (shaObject, shaAttachment) = RepositoryFixture.requiredShas()
+        publish(root, ByteArray(11) { 1 }, "$shaObject.jpg")
+        publish(root, attachmentBytes, "$shaAttachment.jpg")
+
+        val report = RepositoryVerifier().verify(root, snapshot)
+
+        assertEquals("FAIL", report.verdict)
+        assertTrue(issueCodes(report).contains(RepositoryVerificationReport.SIZE_MISMATCH))
+    }
+
+    @Test
+    fun aFullSnapshotWithWrongBytesFails() {
+        val (root, snapshot) = repository(RepositoryFixture.snapshot(full = true))
+        val (_, attachmentBytes) = RepositoryFixture.payloads()
+        val (shaObject, shaAttachment) = RepositoryFixture.requiredShas()
+        publish(root, ByteArray(10) { 7 }, "$shaObject.jpg")
+        publish(root, attachmentBytes, "$shaAttachment.jpg")
+
+        val report = RepositoryVerifier().verify(root, snapshot)
+
+        assertEquals("FAIL", report.verdict)
+        assertTrue(issueCodes(report).contains(RepositoryVerificationReport.SHA_MISMATCH))
+    }
+
+    @Test
+    fun aFullSnapshotWithAWrongCanonicalExtensionFails() {
+        val (root, snapshot) = repository(RepositoryFixture.snapshot(full = true))
+        val (objectBytes, attachmentBytes) = RepositoryFixture.payloads()
+        val (shaObject, shaAttachment) = RepositoryFixture.requiredShas()
+        publish(root, objectBytes, "$shaObject.mp4")
+        publish(root, attachmentBytes, "$shaAttachment.jpg")
+
+        val report = RepositoryVerifier().verify(root, snapshot)
+
+        assertEquals("FAIL", report.verdict)
+        assertTrue(issueCodes(report).contains(RepositoryVerificationReport.MISSING))
+        assertTrue(issueCodes(report).contains("DUPLICATE_SHA_ENTRY"))
+    }
+
+    @Test
+    fun aFullSnapshotFromAnotherRepositoryIdentityFails() {
+        val (root, snapshot) = repository(
+            RepositoryFixture.snapshot(full = true),
+            RepositoryFixture.header(repositoryId = "44444444-4444-4444-8444-444444444444"),
+        )
+        bothBlobs(root)
+
+        val report = RepositoryVerifier().verify(root, snapshot)
+
+        assertEquals("FAIL", report.verdict)
+        assertTrue(issueCodes(report).contains("REPOSITORY_UUID_MISMATCH"))
+    }
+
+    @Test
+    fun aFullSnapshotFromAnotherVariantFails() {
+        val (root, snapshot) = repository(
+            RepositoryFixture.snapshot(full = true),
+            RepositoryFixture.header(variant = "Beta"),
+        )
+        bothBlobs(root)
+
+        val report = RepositoryVerifier().verify(root, snapshot)
+
+        assertEquals("FAIL", report.verdict)
+        assertTrue(issueCodes(report).contains("VARIANT_MISMATCH"))
+    }
+
+    /** Manifest evidence is authoritative: satisfied bytes never promote a metadata-only snapshot. */
+    @Test
+    fun aMetadataOnlySnapshotIsNeverDescribedAsFullOrLocalVerified() {
+        val (root, snapshot) = repository()
+        bothBlobs(root)
+
+        val report = RepositoryVerifier().verify(root, snapshot)
+
+        assertEquals("PASS", report.verdict)
+        assertEquals("PASS", report.snapshotVerdict)
+        assertFalse(report.repositoryEvidenceRequired)
+        assertEquals("METADATA_ONLY", report.snapshotProfile)
+        assertEquals("NO_MEDIA_EVIDENCE", report.evidencePolicy)
+    }
+
+    @Test
+    fun aFullSnapshotWithZeroReferencesAndAMatchingRepositoryPasses() {
+        val (root, snapshot) = repository(Fixture.fullEvidence(Fixture.validBytes()))
+
+        val report = RepositoryVerifier().verify(root, snapshot)
+
+        assertEquals(listOf<String>(), issueCodes(report))
+        assertEquals("PASS", report.verdict)
+        assertTrue(report.repositoryEvidenceRequired)
+        assertEquals(0, report.requiredCount)
+        assertEquals(0, report.verifiedRequired)
     }
 }

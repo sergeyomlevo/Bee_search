@@ -100,6 +100,14 @@ internal class BoundRepository(
             cancelled = cancelled).valueOrThrow()
     }
 
+    /** Tuple B: the same capture with its required media set verified in this same bound repository. */
+    suspend fun createFullSnapshot(workspace: File, capture: suspend () -> SnapshotDomainEntries,
+        cancelled: () -> Boolean = { false }): RepositoryResult<CommittedSnapshot> = operation {
+        val binding = store.read() ?: throw RepositoryException(RepositoryError.UNBOUND)
+        requireConnected(binding).createFullSnapshot(binding.expectedRepositoryId, workspace, capture,
+            cancelled = cancelled).valueOrThrow()
+    }
+
     suspend fun discoverSnapshots(workspace: File): RepositoryResult<SnapshotDiscovery> = operation {
         val binding = store.read() ?: throw RepositoryException(RepositoryError.UNBOUND)
         requireConnected(binding).discoverSnapshots(binding.expectedRepositoryId, workspace).valueOrThrow()

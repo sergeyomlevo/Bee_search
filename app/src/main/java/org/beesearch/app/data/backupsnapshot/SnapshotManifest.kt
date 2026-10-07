@@ -35,16 +35,30 @@ internal data class ValidatedSnapshot(
     val wholeSha256: String,
     val byteSize: Long,
     val metrics: SnapshotMetrics,
+    /** Immutable manifest evidence, never inferred from repository contents. */
+    val evidenceProfile: SnapshotEvidenceProfile = SnapshotEvidenceProfile.METADATA_ONLY,
+    /** The decoded `references/media-blobs.jsonl` of this same snapshot, in wire order. */
+    val references: List<SnapshotMediaReference> = emptyList(),
+)
+
+/** One decoded manifest: identity, descriptors, declared reference count and declared profile. */
+internal data class DecodedSnapshotManifest(
+    val identity: SnapshotIdentity,
+    val descriptors: List<SnapshotEntryDescriptor>,
+    val mediaReferenceCount: Long,
+    val evidenceProfile: SnapshotEvidenceProfile,
 )
 
 internal object SnapshotManifest {
-    private const val PROFILE = "METADATA_ONLY"
-    private const val RESULT = "COMPLETE"
-    private const val EVIDENCE = "NO_MEDIA_EVIDENCE"
-
-    fun encode(identity: SnapshotIdentity, descriptors: List<SnapshotEntryDescriptor>, mediaReferenceCount: Long = 0): ByteArray {
+    fun encode(
+        identity: SnapshotIdentity,
+        descriptors: List<SnapshotEntryDescriptor>,
+        mediaReferenceCount: Long = 0,
+        evidenceProfile: SnapshotEvidenceProfile = SnapshotEvidenceProfile.METADATA_ONLY,
+    ): ByteArray {
         validateIdentity(identity)
         if (mediaReferenceCount < 0) invalid()
+        if (!evidenceProfile.supported) invalid()
         val sorted = descriptors.sortedBy { it.path }
         val json = buildJsonObject {
             put("snapshotFormat", SnapshotContract.FORMAT)
@@ -53,9 +67,9 @@ internal object SnapshotManifest {
             put("repositoryId", identity.repositoryId.toString())
             put("variant", identity.variant)
             put("createdAtEpochMs", identity.createdAtEpochMs)
-            put("snapshotProfile", PROFILE)
-            put("creationResult", RESULT)
-            put("evidencePolicy", EVIDENCE)
+            put("snapshotProfile", evidenceProfile.profile.token)
+            put("creationResult", evidenceProfile.creationResult.token)
+            put("evidencePolicy", evidenceProfile.evidencePolicy.token)
             put("entries", buildJsonArray {
                 sorted.forEach { descriptor -> add(buildJsonObject {
                     put("path", descriptor.path)
@@ -72,12 +86,16 @@ internal object SnapshotManifest {
         return SnapshotJson.encode(json)
     }
 
-    fun decode(bytes: ByteArray, limits: SnapshotLimits = SnapshotLimits()): Triple<SnapshotIdentity, List<SnapshotEntryDescriptor>, Long> {
+    fun decode(bytes: ByteArray, limits: SnapshotLimits = SnapshotLimits()): DecodedSnapshotManifest {
         val root = SnapshotJson.parse(bytes, integerOnly = true, limits = limits) as? JsonObject ?: invalid()
         val required = setOf("snapshotFormat", "snapshotFormatVersion", "snapshotId", "repositoryId", "variant", "createdAtEpochMs", "snapshotProfile", "creationResult", "evidencePolicy", "entries", "creationIssues", "mediaReferences")
         if (root.keys != required) invalid()
         if (root.string("snapshotFormat") != SnapshotContract.FORMAT || root.long("snapshotFormatVersion") != SnapshotContract.VERSION.toLong()) invalid()
-        if (root.string("snapshotProfile") != PROFILE || root.string("creationResult") != RESULT || root.string("evidencePolicy") != EVIDENCE) invalid()
+        val evidenceProfile = SnapshotEvidenceProfile.parse(
+            root.string("snapshotProfile"),
+            root.string("evidencePolicy"),
+            root.string("creationResult"),
+        )
         val identity = SnapshotIdentity(uuid(root.string("snapshotId")), uuid(root.string("repositoryId")), root.string("variant"), root.long("createdAtEpochMs"))
         validateIdentity(identity)
         if (root["creationIssues"] !is JsonArray || root["creationIssues"]!!.jsonArray.isNotEmpty()) invalid()
@@ -92,7 +110,7 @@ internal object SnapshotManifest {
         if (references.keys != setOf("path", "recordCount") || references.string("path") != "references/media-blobs.jsonl") invalid()
         val count = references.long("recordCount")
         if (count < 0) invalid()
-        return Triple(identity, descriptors.sortedBy { it.path }, count)
+        return DecodedSnapshotManifest(identity, descriptors.sortedBy { it.path }, count, evidenceProfile)
     }
 
     private fun validateIdentity(identity: SnapshotIdentity) {

@@ -28,8 +28,11 @@ internal class RepositorySnapshots(
     private val archive: SnapshotArchive,
     private val limits: SnapshotLimits = SnapshotLimits(),
 ) {
+    private val mediaEvidence = RepositoryMediaEvidence(storage)
+
     suspend fun create(capture: suspend () -> SnapshotDomainEntries, now: Long,
-        check: () -> Unit): CommittedSnapshot {
+        check: () -> Unit,
+        evidenceProfile: SnapshotEvidenceProfile = SnapshotEvidenceProfile.METADATA_ONLY): CommittedSnapshot {
         val header = identityCheck()
         storage.requirePublicationCapability()
         // Bounds include fixed ZIP, public Staging, readback ZIP, and validation spools.
@@ -51,7 +54,7 @@ internal class RepositorySnapshots(
             }
             val identity = SnapshotIdentity(UUID.randomUUID(), header.repositoryId, header.variant, now)
             val candidate = File(scratch, "candidate.zip")
-            val built = archive.build(candidate, identity, entries, guardedCheck)
+            val built = archive.build(candidate, identity, entries, guardedCheck, evidenceProfile)
             check()
             identityCheck()
             capacity.require(storage.availableBytes(), peakBudget())
@@ -69,6 +72,12 @@ internal class RepositorySnapshots(
             if (storage.inspect(target) != null) throw RepositoryException(RepositoryError.SNAPSHOT_ID_CONFLICT)
             storage.requirePublicationCapability()
             capacity.require(storage.availableBytes(), capacity.slack(candidate.length()))
+            check()
+            // Full-evidence profile: the required set comes from the SAME immutable capture that was
+            // just serialized, and it is verified in this same repository immediately before
+            // publication. Nothing here ingests, repairs or re-captures anything: a failure publishes
+            // nothing and never falls back to the metadata profile.
+            if (evidenceProfile.requiresRepositoryMediaEvidence) mediaEvidence.verify(entries.references, guardedCheck)
             check()
             // No provider lookups, hashing, capacity queries or suspension after this check.
             identityCheck()
@@ -101,6 +110,12 @@ internal class RepositorySnapshots(
                 val file = fixedReadback(entry.path, scratch, "discovery.zip", check)
                 val result = archive.validate(file, header.repositoryId, header.variant,
                     UUID.fromString(match.groupValues[1]), match.groupValues[2], check)
+                // A declared full-evidence snapshot is only a usable local result while its required
+                // set is still strongly present in this bound repository. The ZIP itself is never
+                // rewritten, deleted or reinterpreted as the metadata profile.
+                if (result.evidenceProfile.requiresRepositoryMediaEvidence) {
+                    mediaEvidence.verify(result.references, check)
+                }
                 identityCheck()
                 SnapshotCandidateResult(entry.path, result)
             } catch (e: SnapshotException) {

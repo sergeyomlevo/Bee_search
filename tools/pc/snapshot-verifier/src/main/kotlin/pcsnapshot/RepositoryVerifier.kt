@@ -30,10 +30,23 @@ data class RepositoryVerificationReport(
     var variant: String? = null,
     var snapshotVerdict: String? = null,
     var snapshotId: String? = null,
-    val required: MutableList<RequiredBlobCheck> = mutableListOf(),
-    val extras: MutableList<String> = mutableListOf(),
-    val issues: MutableList<Issue> = mutableListOf(),
+    var required: MutableList<RequiredBlobCheck> = mutableListOf(),
+    var extras: MutableList<String> = mutableListOf(),
+    var issues: MutableList<Issue> = mutableListOf(),
 ) {
+    /** The declared, immutable manifest evidence of the verified snapshot. Never inferred here. */
+    var snapshotEvidenceProfile: EvidenceProfile? = null
+    var snapshotProfile: String? = null
+    var evidencePolicy: String? = null
+    var creationResult: String? = null
+
+    /**
+     * True when the snapshot itself declares the local full-evidence profile, i.e. when the required
+     * blobs below are a requirement of that snapshot rather than a coincidence of the current
+     * repository contents.
+     */
+    val repositoryEvidenceRequired: Boolean get() = snapshotEvidenceProfile?.repositoryEvidenceRequired == true
+
     val verdict: String get() = if (issues.isEmpty()) "PASS" else "FAIL"
     val verifiedRequired: Int get() = required.count { it.outcome == VERIFIED }
     val requiredCount: Int get() = required.size
@@ -79,6 +92,12 @@ class RepositoryVerifier(private val snapshotVerifier: Verifier = Verifier()) {
             return report
         }
         report.snapshotVerdict = snapshotReport.verdict
+        // The declared manifest evidence is authoritative and is reported as declared: this mode never
+        // promotes a metadata-only snapshot to FULL and never demotes a FULL snapshot to metadata-only.
+        report.snapshotEvidenceProfile = snapshotReport.evidenceProfile
+        report.snapshotProfile = snapshotReport.snapshotProfile
+        report.evidencePolicy = snapshotReport.evidencePolicy
+        report.creationResult = snapshotReport.creationResult
         if (snapshotReport.issues.isNotEmpty()) {
             report.issues += Issue("SNAPSHOT_INVALID", snapshot.toString(), message = snapshotReport.issues.first().code)
             return report

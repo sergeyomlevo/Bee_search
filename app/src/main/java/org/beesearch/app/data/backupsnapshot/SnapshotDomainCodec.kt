@@ -59,8 +59,12 @@ internal object SnapshotDomainCodec {
         return SnapshotDomainEntries(records, portable, references)
     }
 
-    /** Only fixed, integrity-checked files supplied by the archive reader. */
-    fun validate(entries: Map<String, File>, check: () -> Unit = {}, limits: SnapshotLimits = SnapshotLimits()) {
+    /** Only fixed, integrity-checked files supplied by the archive reader. Returns the wire references. */
+    fun validate(
+        entries: Map<String, File>,
+        check: () -> Unit = {},
+        limits: SnapshotLimits = SnapshotLimits(),
+    ): List<SnapshotMediaReference> {
         if (entries.keys != allExpected) logical("entry set mismatch")
         try {
             val parsed = expected.associateWith { path ->
@@ -71,6 +75,7 @@ internal object SnapshotDomainCodec {
             val actual = readReferences(entries.getValue("references/media-blobs.jsonl"), limits, check)
             if (actual != expectedReferences) logical("media reference set mismatch")
             check()
+            return actual
         } catch (e: CancellationException) { throw e }
         catch (e: SnapshotException) { throw e }
         catch (e: Exception) { logical(e.message ?: "logical state inconsistent", e) }

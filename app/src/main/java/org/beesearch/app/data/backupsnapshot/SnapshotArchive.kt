@@ -17,7 +17,8 @@ import org.beesearch.app.data.zip.validateZipRelativePath
 /** Fixed private ZIP, bounded streaming spools, integrity before semantics. */
 internal class SnapshotArchive(private val limits: SnapshotLimits = SnapshotLimits()) {
     fun build(target: File, identity: SnapshotIdentity, domainEntries: SnapshotDomainEntries,
-        check: () -> Unit = {}): ValidatedSnapshot {
+        check: () -> Unit = {},
+        evidenceProfile: SnapshotEvidenceProfile = SnapshotEvidenceProfile.METADATA_ONLY): ValidatedSnapshot {
         val expected = SnapshotContract.paths.drop(1)
         if (domainEntries.records.keys != expected.filter { it.endsWith("jsonl") && !it.startsWith("references/") }.toSet()) invalid("ENTRY_SET")
         target.parentFile?.mkdirs()
@@ -47,7 +48,7 @@ internal class SnapshotArchive(private val limits: SnapshotLimits = SnapshotLimi
                 files[path] = file
             }
             val descriptors = files.map { (path, file) -> SnapshotEntryDescriptor(path, file.length(), hash(file, check)) }
-            val manifest = SnapshotManifest.encode(identity, descriptors, domainEntries.references.size.toLong())
+            val manifest = SnapshotManifest.encode(identity, descriptors, domainEntries.references.size.toLong(), evidenceProfile)
             addBound(0, manifest.size.toLong(), limits.manifestBytes, "manifest.json")
             addBound(total, manifest.size.toLong(), limits.totalBytes, "totalBytes")
             ZipOutputStream(BoundedOutput(target.outputStream(), limits.zipBytes, "zipBytes", check)).use { zip ->
@@ -123,12 +124,16 @@ internal class SnapshotArchive(private val limits: SnapshotLimits = SnapshotLimi
                 }
                 val manifestFile = spool("manifest.json", 0)
                 val manifestBytes = manifestFile.readBytes() // bounded to 1 MiB
-                val (identity, descriptors, referenceCount) = SnapshotManifest.decode(manifestBytes, limits)
+                val manifest = SnapshotManifest.decode(manifestBytes, limits)
+                val identity = manifest.identity
+                val descriptors = manifest.descriptors
+                val referenceCount = manifest.mediaReferenceCount
                 if (identity.repositoryId != expectedRepositoryId || identity.variant != variant ||
                     (expectedSnapshotId != null && identity.snapshotId != expectedSnapshotId)) {
                     throw SnapshotException(SnapshotError.SNAPSHOT_ID_CONFLICT, "IDENTITY")
                 }
-                if (!SnapshotManifest.encode(identity, descriptors, referenceCount).contentEquals(manifestBytes)) invalid("NONCANONICAL_MANIFEST")
+                if (!SnapshotManifest.encode(identity, descriptors, referenceCount, manifest.evidenceProfile)
+                        .contentEquals(manifestBytes)) invalid("NONCANONICAL_MANIFEST")
                 val descriptorMap = descriptors.associateBy { it.path }
                 if (descriptorMap.keys != SnapshotContract.paths.drop(1).toSet()) invalid("MANIFEST_ENTRIES")
                 for ((index, path) in SnapshotContract.paths.drop(1).withIndex()) {
@@ -141,10 +146,10 @@ internal class SnapshotArchive(private val limits: SnapshotLimits = SnapshotLimi
                 }
                 if (counts["references/media-blobs.jsonl"] != referenceCount)
                     throw SnapshotException(SnapshotError.LOGICAL_STATE_INCONSISTENT, "REFERENCE_COUNT")
-                SnapshotDomainCodec.validate(verifiedFiles, check, limits)
+                val references = SnapshotDomainCodec.validate(verifiedFiles, check, limits)
                 if (hash(file, check) != whole) throw SnapshotException(SnapshotError.WHOLE_DIGEST_MISMATCH, "SOURCE_CHANGED")
                 return ValidatedSnapshot(identity, whole, file.length(), SnapshotMetrics(counts, bytes,
-                    maxima.values.maxOrNull() ?: 0, file.length(), total, maxima))
+                    maxima.values.maxOrNull() ?: 0, file.length(), total, maxima), manifest.evidenceProfile, references)
             }
         } catch (e: CancellationException) { throw e }
         catch (e: SnapshotException) { throw e }

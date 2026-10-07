@@ -16,10 +16,25 @@ fun main(args: Array<String>) {
     catch (_: Exception) { VerificationReport(args[0], issues = mutableListOf(Issue("UNREADABLE_INPUT"))) }
     System.err.println("${report.verdict}: ${report.verifiedEntries}/17 entries; ${report.issues.size} issues")
     report.issues.forEach { System.err.println("- ${it.code} ${it.scope}") }
+    if (report.repositoryEvidenceRequired) {
+        System.err.println("This snapshot declares FULL/LOCAL_VERIFIED evidence: its structure is valid, " +
+            "but the declared local repository evidence is not established without a repository root.")
+        System.err.println("Run: verify-repository <repository-root> <snapshot-file.zip>")
+    }
     val output = linkedMapOf("inputPath" to report.inputPath, "fileSize" to report.fileSize,
         "actualWholeSha256" to report.actualWholeSha256, "filenameSnapshotId" to report.filenameSnapshotId,
-        "filenameWholeSha256" to report.filenameWholeSha256, "verdict" to report.verdict,
+        "filenameWholeSha256" to report.filenameWholeSha256,
+        "snapshotProfile" to report.snapshotProfile, "evidencePolicy" to report.evidencePolicy,
+        "creationResult" to report.creationResult,
+        "repositoryEvidenceRequired" to report.repositoryEvidenceRequired,
+        "verdict" to report.verdict,
         "verifiedEntries" to report.verifiedEntries, "issues" to report.issues)
     println(GsonBuilder().serializeNulls().disableHtmlEscaping().create().toJson(output))
-    exitProcess(if (report.issues.isEmpty()) 0 else 1)
+    // 0 = fully verified structure, 1 = invalid, 2 = usage, 3 = structure valid but the declared
+    // local repository evidence needs a repository root (never reported as a final PASS).
+    exitProcess(when {
+        report.issues.isNotEmpty() -> 1
+        report.repositoryEvidenceRequired -> 3
+        else -> 0
+    })
 }

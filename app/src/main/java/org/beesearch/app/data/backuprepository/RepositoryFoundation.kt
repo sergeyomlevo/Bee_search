@@ -75,13 +75,36 @@ internal class RepositoryFoundation(
     suspend fun createMetadataSnapshot(expectedRepositoryId: UUID, workspace: File,
         capture: suspend () -> SnapshotDomainEntries, archive: SnapshotArchive = SnapshotArchive(),
         createdAtEpochMs: Long = System.currentTimeMillis(), cancelled: () -> Boolean = { false },
+    ): RepositoryResult<CommittedSnapshot> = createSnapshot(expectedRepositoryId, workspace, capture, archive,
+        createdAtEpochMs, SnapshotEvidenceProfile.METADATA_ONLY, cancelled)
+
+    /**
+     * The local full-evidence profile (wire contract §7.1).
+     *
+     * The required media set is taken from the SAME immutable capture that is serialized, and every
+     * blob of it must be strongly present in this same bound repository immediately before
+     * publication. A blob that is missing, differently sized, differently valued or not at its
+     * canonical path fails the whole creation: nothing is published, nothing is ingested, and there is
+     * no fallback to the metadata-only profile.
+     */
+    suspend fun createFullSnapshot(expectedRepositoryId: UUID, workspace: File,
+        capture: suspend () -> SnapshotDomainEntries, archive: SnapshotArchive = SnapshotArchive(),
+        createdAtEpochMs: Long = System.currentTimeMillis(), cancelled: () -> Boolean = { false },
+    ): RepositoryResult<CommittedSnapshot> = createSnapshot(expectedRepositoryId, workspace, capture, archive,
+        createdAtEpochMs, SnapshotEvidenceProfile.FULL_LOCAL_VERIFIED, cancelled)
+
+    private suspend fun createSnapshot(expectedRepositoryId: UUID, workspace: File,
+        capture: suspend () -> SnapshotDomainEntries, archive: SnapshotArchive,
+        createdAtEpochMs: Long, evidenceProfile: SnapshotEvidenceProfile, cancelled: () -> Boolean,
     ): RepositoryResult<CommittedSnapshot> = operation {
         val context = coroutineContext
         RepositorySnapshots(storage, capacity, { identity(expectedRepositoryId) },
-            { cleanOwned(it, expectedRepositoryId) }, workspace, archive).create(capture, createdAtEpochMs) {
-            context.ensureActive()
-            if (cancelled()) fail(RepositoryError.CANCELLED)
-        }
+            { cleanOwned(it, expectedRepositoryId) }, workspace, archive).create(capture, createdAtEpochMs,
+            check = {
+                context.ensureActive()
+                if (cancelled()) fail(RepositoryError.CANCELLED)
+            },
+            evidenceProfile = evidenceProfile)
     }
 
     suspend fun discoverSnapshots(expectedRepositoryId: UUID, workspace: File,

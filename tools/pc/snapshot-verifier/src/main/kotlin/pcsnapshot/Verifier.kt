@@ -168,7 +168,16 @@ class Verifier {
         if (id != report.filenameSnapshotId) report.issues += Issue("SNAPSHOT_ID_MISMATCH")
         if (text(o, "variant") !in setOf("Dev", "Beta", "Stable")) report.issues += Issue("MANIFEST_INVALID")
         val created = number(o, "createdAtEpochMs"); if (created == null || created < 0) report.issues += Issue("MANIFEST_INVALID")
-        if (text(o, "snapshotProfile") != "METADATA_ONLY" || text(o, "evidencePolicy") != "NO_MEDIA_EVIDENCE" || text(o, "creationResult") != "COMPLETE") report.issues += Issue("MANIFEST_UNSUPPORTED_PROFILE")
+        val declaredProfile = EvidenceProfile.parse(
+            text(o, "snapshotProfile"), text(o, "evidencePolicy"), text(o, "creationResult"))
+        if (declaredProfile == null) {
+            report.issues += Issue("MANIFEST_UNSUPPORTED_PROFILE")
+        } else {
+            report.evidenceProfile = declaredProfile
+            report.snapshotProfile = text(o, "snapshotProfile")
+            report.evidencePolicy = text(o, "evidencePolicy")
+            report.creationResult = text(o, "creationResult")
+        }
         val issues = o.get("creationIssues"); if (issues == null || !issues.isJsonArray || issues.asJsonArray.size() != 0) report.issues += Issue("MANIFEST_INVALID")
         val descriptors = o.get("entries"); if (descriptors == null || !descriptors.isJsonArray || descriptors.asJsonArray.size() != 16) report.issues += Issue("MANIFEST_INVALID")
         else validateDescriptors(descriptors.asJsonArray, view, report)

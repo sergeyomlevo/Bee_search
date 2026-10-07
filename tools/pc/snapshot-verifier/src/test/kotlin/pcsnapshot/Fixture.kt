@@ -34,6 +34,33 @@ object Fixture {
         return write(dir, "snapshot-$snapshotId-$sha.zip", bytes)
     }
 
+    /**
+     * The same fixture with its declared evidence tuple replaced.
+     *
+     * The manifest is rebuilt and re-zipped so the archive stays self-consistent; this is the only way
+     * to build the FULL/LOCAL_VERIFIED tuple with an independent reader fixture.
+     */
+    fun withEvidenceProfile(bytes: ByteArray, profile: String, evidencePolicy: String, creationResult: String): ByteArray {
+        val files = entries(bytes)
+        val manifest = String(files.getValue("manifest.json"), Charsets.UTF_8)
+            .replace("\"snapshotProfile\":\"METADATA_ONLY\"", "\"snapshotProfile\":\"$profile\"")
+            .replace("\"evidencePolicy\":\"NO_MEDIA_EVIDENCE\"", "\"evidencePolicy\":\"$evidencePolicy\"")
+            .replace("\"creationResult\":\"COMPLETE\"", "\"creationResult\":\"$creationResult\"")
+        files["manifest.json"] = manifest.toByteArray()
+        return zip(files)
+    }
+
+    fun fullEvidence(bytes: ByteArray): ByteArray =
+        withEvidenceProfile(bytes, "FULL", "LOCAL_VERIFIED", "COMPLETE")
+
+    /** The same fixture with a non-empty creationIssues array. */
+    fun withCreationIssues(bytes: ByteArray, issuesJson: String): ByteArray {
+        val files = entries(bytes)
+        files["manifest.json"] = String(files.getValue("manifest.json"), Charsets.UTF_8)
+            .replace("\"creationIssues\":[]", "\"creationIssues\":$issuesJson").toByteArray()
+        return zip(files)
+    }
+
     fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
         .joinToString("") { "%02x".format(it) }
 

@@ -1,6 +1,78 @@
 # Bee Search handoff
 
-## Current continuation — S6A Media Protection Foundation (finalized as two commits)
+## Current continuation — S6B FULL / LOCAL_VERIFIED Snapshot (working tree, owner review pending)
+
+Baseline: clean `main`, `HEAD == origin/main == 6b629587fb744f1dc777ae582df011342aed1ba4`
+(«Implement repository media protection»). S6B is an uncommitted, reviewable working-tree diff. **No
+commit and no push.**
+
+Scope: a second supported Snapshot V1 evidence profile. `snapshotFormatVersion` stays 1 and the
+structural envelope is unchanged (same 17 entries, same manifest field set, same descriptor/JSON/digest
+rules and limits); V1 now accepts exactly two tuples — `METADATA_ONLY`/`NO_MEDIA_EVIDENCE`/`COMPLETE`
+(unchanged) and `FULL`/`LOCAL_VERIFIED`/`COMPLETE` (new, D101). Every other combination, unknown token,
+non-empty `creationIssues` and any DEGRADED/PARTIAL/INCOMPLETE/REMOTE_VERIFIED/PC_VERIFIED value is
+refused; a reader that knows only the first tuple fails closed instead of misreading the second. The
+policy is normative in `docs/snapshot-v1-wire-schema.md` §7.1 and the shared vector file
+`docs/test-vectors/snapshot-v1-evidence-profiles.json` is consumed by both the Android and the PC test
+suites.
+
+What FULL means: the ZIP still contains metadata and references only (no payload bytes, no `Media/*`
+entry). The required set comes from the SAME immutable `SnapshotDomainEntries` that is serialized, and
+every blob of it is strongly verified in the same bound repository immediately before publication —
+canonical `Media/<sha256>.<canonicalExtension>`, exact size, actual SHA-256 recomputed from repository
+bytes, single unambiguous canonical identity. `RepositoryMediaEvidence` is read-only: it never ingests
+and never writes. A blob that is missing, differently sized, differently valued, under another
+canonical extension or ambiguous fails the creation with a typed error
+(`MEDIA_EVIDENCE_MISSING` / `MEDIA_EVIDENCE_MISMATCH` / `MEDIA_EVIDENCE_INCONSISTENT`; access/identity
+failures keep their own errors and cancellation propagates), publishes nothing and never falls back to
+`METADATA_ONLY`. Repository discovery refuses a declared FULL candidate whose required blobs are no
+longer verifiable without deleting, rewriting or reinterpreting it, so an older valid `METADATA_ONLY`
+snapshot can remain the newest usable one. `LOCAL_VERIFIED` is local evidence only: it says nothing
+about a PC, cloud or external copy and does not protect against losing the phone.
+
+No UI, no automatic ingest, no S4/S5, no stale-`Staging` cleanup, no offload or restore; media limits
+are untouched. The backup screen still creates the metadata-only profile, and `createFull()` has no
+product caller.
+
+Verification. App JVM `:app:testDebugUnitTest` **721 tests / 0 failures / 0 errors / 0 skipped** (28
+new across `SnapshotEvidenceProfileTest`, `RepositoryMediaEvidenceTest`, `RepositoryFullSnapshotTest`);
+PC verifier `test` **93 tests / 0 failures** (13 new in `EvidenceProfileTest` and the FULL
+repository-aware cases); `assembleDebug`, `assembleDebugAndroidTest`, `lintDebug` PASS (0 errors,
+23 warnings, 2 hints — all remaining warnings are pre-existing and outside this change); `git diff
+--check` clean. APK SHA-256: app `48dd291cfb9e8dc034eba5262e53e8f54a16dff9a6327ae42c381c86fddaa9fd`,
+test `e797bd014b234de7e54700f6f05a1834a229bf5257d80d94bc8af6d77a7943ce`.
+
+Samsung SM-S938B / API 36 / `RFCY90MBYVZ`, DEV updated in place (no clear, no uninstall;
+`firstInstallTime` unchanged, `lastUpdateTime=2026-10-07 18:02:09`, device read-back APK SHA equals the
+artifact above). Pre-state matched the accepted S6A state exactly: repository `df4d52a9-…` / `Dev`,
+`repository.json` sha `162feffe…828a`, 3 snapshots, 4 canonical Media blobs, empty `Staging`, and the
+same 4 private originals — so the captured required set had not changed. Real creation through the
+production backend produced `snapshot-a38408e3-fb92-43d9-8e26-07963edb45d9-ccdccf0e31634bf738ec645784f59a534d310a14b3af795f8736b6dae6e02ac3.zip`
+(12434 bytes, 17 entries, `FULL/LOCAL_VERIFIED/COMPLETE`, `recordCount=4` with exactly the accepted
+blob SHAs/sizes). A fresh instrumentation process then reconstructed the state from repository contents
+alone: 4 candidates, 3 usable `METADATA_ONLY` plus 1 usable FULL, and the FULL one as `latest`. Media
+blobs and the 3 old snapshots stayed byte-identical, `Staging` ended empty and `repository.json` was
+unchanged. No media payload exists inside the ZIP.
+
+PC evidence: `C:\App\BeeSearchBackupResearch\S6B\Backup` (**TRANSPORT = ADB_PULL**, 9 files /
+18,345,964 bytes; every PC hash equals the device hash; S3 already proved manual USB/MTP byte identity
+separately, this slice does not re-prove MTP). Standalone verifier: the three old snapshots PASS (exit
+0) and the FULL one returns `REPOSITORY_EVIDENCE_REQUIRED` (exit 3), never a final PASS without a
+repository root. Repository-aware verifier: FULL → PASS with required 4/4 verified and the declared
+tuple; an old `METADATA_ONLY` snapshot → PASS and still described as metadata-only evidence.
+
+Not verified / limits: real media here is ≤16 MiB JPEG; large-video behaviour is unproven. The negative
+FULL evidence cases (missing, wrong size, wrong bytes, wrong extension, ambiguity, identity/variant
+mismatch, cancellation, discovery refusal, media-after-capture boundary) are proven by JVM fixtures and
+temporary in-memory repositories, never by corrupting the owner's live repository. No PC/cloud/handoff
+layer exists yet, so `LOCAL_VERIFIED` remains local-only evidence.
+
+Next (owner decision): S6B owner review, then the stale-`Staging` reconciliation slice, then the S5
+large-media policy, then the PC handoff/offload and restore layers, and only then a mockup-first UI
+slice that may expose protection and the FULL profile (its zero-required case must read as "nothing to
+save", not "everything protected").
+
+## Previous milestone — S6A Media Protection Foundation (finalized)
 
 Baseline: clean `main`, `HEAD == origin/main == d562734a34cb905e99e3b95d63c636b7d5a238dc`
 («Implement metadata backup UI»). This slice was finalized as two commits — `Document backup verification

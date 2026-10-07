@@ -31,6 +31,7 @@ fun main(args: Array<String>) {
     System.err.println(
         "${report.verdict}: repository ${report.repositoryId ?: "?"} variant ${report.variant ?: "?"}; " +
             "snapshot ${report.snapshotId ?: "?"} (${report.snapshotVerdict ?: "?"}); " +
+            "declared ${report.snapshotProfile ?: "?"}/${report.evidencePolicy ?: "?"}/${report.creationResult ?: "?"}; " +
             "required ${report.verifiedRequired}/${report.requiredCount} verified; ${report.issues.size} issues",
     )
     report.required.forEach { System.err.println("- ${it.outcome} ${it.sha256} ${it.canonicalExtension} ${it.byteSize}") }
@@ -44,6 +45,10 @@ fun main(args: Array<String>) {
         "variant" to report.variant,
         "snapshotId" to report.snapshotId,
         "snapshotVerdict" to report.snapshotVerdict,
+        "snapshotProfile" to report.snapshotProfile,
+        "evidencePolicy" to report.evidencePolicy,
+        "creationResult" to report.creationResult,
+        "repositoryEvidenceRequired" to report.repositoryEvidenceRequired,
         "requiredVerified" to report.verifiedRequired,
         "requiredCount" to report.requiredCount,
         "required" to report.required,
