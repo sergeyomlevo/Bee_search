@@ -6,9 +6,16 @@ The owner resolved the D101 ↔ approved `backup-v2.md` §5.6 conflict in favour
 D101 still permits FULL with zero required media blobs: Success describes saved research data and
 settings, with no `0 из 0` count or claim of media verification. The operation design now links to the
 approved `backup-v2.md` / `backup-v2.png`; the authoritative contracts are aligned on this case.
-Production implementation remains **not started**. Next: resume the authorized implementation from
-the clean `HEAD == origin/main` after `docs: reconcile backup no-media semantics`, using the approved
-v2 contracts without reopening the mockup-first gate.
+The ordinary-opening S5 blocker is now architecturally resolved: the owner accepted a separate
+`readPublishedSummary()` contract for snapshot-container/metadata validation without media reads.
+Existing strong `discover()` and the strong evidence gate before FULL publication remain unchanged.
+The Ready last-backup date describes a recognized published artifact, not current media evidence or
+a journal of historical UI Success returns. Workflows §45–§47 now describe the approved operation
+and preserve the historical S3 acceptance and standalone backend semantics.
+Production implementation remains **not started**, including the new summary boundary.
+Next: implement `readPublishedSummary()`, `CreateBackupOperation` and the approved `backup-v2` UI
+from the clean `HEAD == origin/main` after `docs: separate backup summary from strong discovery`.
+Do not reopen the mockup-first gate. The rest of S5 policy remains future work.
 
 ## Current continuation — S6B FULL / LOCAL_VERIFIED Snapshot (finalized and pushed; backup mockup approved, mockup-first gate closed)
 
