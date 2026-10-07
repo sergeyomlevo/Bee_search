@@ -1,0 +1,79 @@
+{
+  "contract": "snapshot-v1-evidence-profiles",
+  "snapshotFormat": "beesearch-snapshot",
+  "snapshotFormatVersion": 1,
+  "supported": [
+    {
+      "snapshotProfile": "METADATA_ONLY",
+      "evidencePolicy": "NO_MEDIA_EVIDENCE",
+      "creationResult": "COMPLETE",
+      "creationIssues": [],
+      "profile": "METADATA_ONLY",
+      "repositoryEvidenceRequired": false
+    },
+    {
+      "snapshotProfile": "FULL",
+      "evidencePolicy": "LOCAL_VERIFIED",
+      "creationResult": "COMPLETE",
+      "creationIssues": [],
+      "profile": "FULL",
+      "repositoryEvidenceRequired": true
+    }
+  ],
+  "unsupported": [
+    {
+      "snapshotProfile": "METADATA_ONLY",
+      "evidencePolicy": "LOCAL_VERIFIED",
+      "creationResult": "COMPLETE",
+      "creationIssues": []
+    },
+    {
+      "snapshotProfile": "FULL",
+      "evidencePolicy": "NO_MEDIA_EVIDENCE",
+      "creationResult": "COMPLETE",
+      "creationIssues": []
+    },
+    {
+      "snapshotProfile": "FULL",
+      "evidencePolicy": "LOCAL_VERIFIED",
+      "creationResult": "DEGRADED",
+      "creationIssues": []
+    },
+    {
+      "snapshotProfile": "FULL",
+      "evidencePolicy": "LOCAL_VERIFIED",
+      "creationResult": "PARTIAL",
+      "creationIssues": []
+    },
+    {
+      "snapshotProfile": "FULL",
+      "evidencePolicy": "LOCAL_VERIFIED",
+      "creationResult": "INCOMPLETE",
+      "creationIssues": []
+    },
+    {
+      "snapshotProfile": "UNKNOWN_PROFILE",
+      "evidencePolicy": "NO_MEDIA_EVIDENCE",
+      "creationResult": "COMPLETE",
+      "creationIssues": []
+    },
+    {
+      "snapshotProfile": "METADATA_ONLY",
+      "evidencePolicy": "REMOTE_VERIFIED",
+      "creationResult": "COMPLETE",
+      "creationIssues": []
+    },
+    {
+      "snapshotProfile": "FULL",
+      "evidencePolicy": "PC_VERIFIED",
+      "creationResult": "COMPLETE",
+      "creationIssues": []
+    },
+    {
+      "snapshotProfile": "FULL",
+      "evidencePolicy": "LOCAL_VERIFIED",
+      "creationResult": "COMPLETE",
+      "creationIssues": ["media evidence unavailable"]
+    }
+  ]
+}

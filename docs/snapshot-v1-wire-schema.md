@@ -415,8 +415,8 @@ also not identity. Known SHA is identity; canonical blob path would be
    entry but excluded from blob references. An out-of-range canonical size still
    fitting L is preserved/ineligible, not rounded. Neither source nor Repository
    Media bytes are required/read. No existence test, automatic DEGRADED or media
-   protection promise applies to METADATA_ONLY COMPLETE. Future FULL cannot count
-   an ineligible record as a LOCAL_VERIFIED protected blob.
+   protection promise applies to METADATA_ONLY COMPLETE. Tuple B (§7.1) cannot count
+   an ineligible record as a LOCAL_VERIFIED protected blob either.
 4. Group only ELIGIBLE records from both collections by exact SHA. All positive
    sizes in an eligible group must match; disagreement FAILS. Ineligible records
    (including a zero-size record sharing a SHA with a positive record) do not supply
@@ -519,12 +519,16 @@ Required top-level fields, no invented domain record counters:
 | repositoryId | U, not inferred from filename/location |
 | variant | Stable / Beta / Dev |
 | createdAtEpochMs | canonical integer, 0..9007199254740991; provenance/order metadata only |
-| snapshotProfile | METADATA_ONLY |
+| snapshotProfile | METADATA_ONLY or FULL (§7.1) |
 | creationResult | COMPLETE |
-| evidencePolicy | NO_MEDIA_EVIDENCE |
+| evidencePolicy | NO_MEDIA_EVIDENCE or LOCAL_VERIFIED (§7.1) |
 | entries | Array, exactly 16 unique sorted digest descriptors below |
 | mediaReferences | Exactly {path:"references/media-blobs.jsonl",recordCount:nonnegative canonical integer} |
-| creationIssues | Empty array for this supported combination |
+| creationIssues | Empty array for both supported combinations |
+
+Only the two evidence tuples of §7.1 are supported. Every other combination of
+these three fields FAILS closed; the field set, the field order and the value
+types above are unchanged by §7.1.
 
 Each of the 16 non-manifest entries (13 data + portable + coverage + references)
 has descriptor with exactly `path:S`, `byteSize:nonnegative canonical integer`,
@@ -542,6 +546,81 @@ is permitted for createdAtEpochMs. Future clock errors do not invalidate its wir
 representation. Discovery may sort by (createdAtEpochMs,snapshotId), but UI/restore
 must not treat the timestamp as proof that a physical repository copy is fresh.
 
+## 7.1 Supported evidence profiles
+
+Snapshot V1 accepts exactly two semantic tuples of the three manifest fields
+`snapshotProfile` / `evidencePolicy` / `creationResult`:
+
+| # | snapshotProfile | evidencePolicy | creationResult | Meaning |
+|---|---|---|---|---|
+| A | METADATA_ONLY | NO_MEDIA_EVIDENCE | COMPLETE | Research metadata only; no claim about media bytes |
+| B | FULL | LOCAL_VERIFIED | COMPLETE | The same capture's required media set was strongly verified in the same bound local Repository immediately before publication |
+
+Both tuples require `creationIssues` to be an empty array. Everything else is
+unsupported and FAILS: `METADATA_ONLY`+`LOCAL_VERIFIED`, `FULL`+`NO_MEDIA_EVIDENCE`,
+an unknown profile token, an unknown evidence-policy token, an unknown or
+non-`COMPLETE` creation result, a non-empty `creationIssues`, and any other token
+such as `DEGRADED`, `PARTIAL`, `INCOMPLETE`, `REMOTE_VERIFIED` or `PC_VERIFIED`.
+Those tokens are not reserved and not partially accepted; no reader may invent a
+fallback meaning for them.
+
+**Compatible evolution policy.** This is an explicit semantic extension of
+Snapshot V1, not a new container format. The structural envelope is unchanged:
+the same 17 exact entries, the same manifest field set and ordering, the same
+descriptor rules, the same canonical JSON/digest semantics and the same limits.
+No new manifest field is added, so `snapshotFormatVersion` remains 1: a reader
+that implements only tuple A rejects tuple B with an unsupported-profile failure
+(§8) instead of misreading it, which is the fail-closed behaviour this policy
+requires. A writer must never emit a tuple outside the table above. Any future
+profile, policy or result value needs its own documented policy of this kind or
+a new `snapshotFormatVersion`.
+
+Contract vectors: [supported and unsupported evidence tuples](test-vectors/snapshot-v1-evidence-profiles.json)
+are read by both the Android production model and the independent PC verifier.
+This table is the normative text for that file.
+
+**What FULL does not mean.** The ZIP is still metadata/reference only: it contains
+no JPEG/MP4 payload, no `Media/*` entry and no blob bytes. `references/media-blobs.jsonl`
+continues to be exactly the eligible reference set of §5, emitted from the same
+capture as every other entry. Tuple B asserts only that the blobs of that same
+required set were present in the same bound Repository, at the canonical path
+`Media/<sha256>.<canonicalExtension>`, with the exact declared `byteSize`, with an
+actual SHA-256 recomputed from the repository bytes, and with exactly one
+unambiguous canonical identity at verification time.
+
+**Boundary of LOCAL_VERIFIED.** Tuple B is local evidence only: it says nothing
+about a PC copy, another device, cloud storage, an external disk, survival of
+device loss or any independent off-device verification. Off-device protection is a
+separate evidence layer (handoff/offload) that this profile must never imply.
+
+**Zero required blobs.** Tuple B with `mediaReferences.recordCount = 0` is valid
+when the capture itself is valid: it is a vacuous repository evidence set, not a
+claim that photos and videos are protected. A future UI must present that case as
+"nothing to save", never as "everything protected".
+
+**Ineligible metadata stays ineligible.** §5 eligibility is unchanged. Tuple B
+proves only the eligible reference set; schema-valid but ineligible media metadata
+rows stay preserved domain metadata, never repository evidence, and no SHA/size is
+invented for them.
+
+**Old snapshots never change meaning.** Profile and evidence policy are immutable
+manifest evidence. A snapshot that declares tuple A remains `METADATA_ONLY` /
+`NO_MEDIA_EVIDENCE` even when its referenced blobs now exist in the Repository, and
+no reader or repository scan may retroactively promote it to tuple B.
+
+**Discovery of tuple B.** A repository snapshot candidate that declares tuple B is
+a usable local FULL result only when its required set is currently strongly present
+in the same bound Repository. If a required blob later disappears, changes size,
+changes bytes, moves to another canonical extension or becomes ambiguous, the
+candidate is surfaced as a typed media-evidence failure: the ZIP is neither
+deleted, rewritten nor reinterpreted as tuple A, and an older valid tuple A
+candidate may still be the newest usable snapshot.
+
+**No automatic protection and no fallback.** Snapshot creation never ingests media
+and never protects a missing blob implicitly. If a required blob is not already
+strongly present, tuple B creation fails and publishes nothing; it must not fall
+back to tuple A and must not silently drop the reference.
+
 ## 8. Strictness / compatibility
 
 O1 approved: closed V1 schema everywhere. Reject unknown manifest or domain fields,
@@ -551,7 +630,9 @@ fields. Missing nullable fields are otherwise invalid; null is not a missing fie
 No permissive extras, inferred defaults, stored-string normalization or silent loss.
 Only MIME extension derivation applies §5 normalization; it never rewrites a field. New
 fields/semantics need an explicit compatible evolution policy or new format version;
-version namespace remains independent of Complete Backup V1–V6.
+the two supported evidence profiles of §7.1 are the one such policy in force, and
+they change no field, entry, ordering or digest rule. Version namespace remains
+independent of Complete Backup V1–V6.
 No stricter semantic dependency on domain member order. Existing canonical core is
 unchanged. Limits apply to embedded geometry as well as outer records.
 
