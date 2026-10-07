@@ -1,10 +1,25 @@
 # Bee Search handoff
 
-## Current continuation — S6B FULL / LOCAL_VERIFIED Snapshot (working tree, owner review pending)
+## Current continuation — S6B FULL / LOCAL_VERIFIED Snapshot (finalized and pushed; backup mockup approved, mockup-first gate closed)
 
 Baseline: clean `main`, `HEAD == origin/main == 6b629587fb744f1dc777ae582df011342aed1ba4`
-(«Implement repository media protection»). S6B is an uncommitted, reviewable working-tree diff. **No
-commit and no push.**
+(«Implement repository media protection»). S6B was finalized as two commits and pushed to `origin/main`:
+`16e2fdd` «Extend Snapshot V1 with the local full-evidence profile» (contract §7.1 + shared vector file +
+D101) and `b8612fe` «Implement the local full-evidence backup profile» (implementation, tests, DEV
+harness, repository-aware PC verifier and descriptive docs). Working tree is clean.
+
+Next gate: the single-button backup UI. The mockup-first gate is **CLOSED / APPROVED**: the owner
+visually approved `docs/ui/mockups/backup-v2.png` as the reference for the current backup slice, with its
+contract `backup-v2.md` (five states of one screen) and the design-only single-capture operation
+specification `docs/backup-operation-design.md`, which is committed as the design contract of this
+stage. The approved version has a real Back arrow in all five app bars, no app-bar help icon, a purely
+informational (non-interactive) storage path row, the collapsed summary `Данные исследований,
+настройки, фото и видео`, a down chevron when collapsed and an up chevron when expanded, Working
+without percentages and without Cancel, Success with media verification, Error with `Повторить`, one
+primary bottom button and the always-visible boundary line `Копия хранится на этом телефоне. Передача
+на компьютер выполняется отдельно.` The intermediate `backup-v1.*` drafts were deleted as the owner
+requested. Next separate stage: production implementation of that one operation — **not started**; no
+production UI, no `CreateBackupOperation`.
 
 Scope: a second supported Snapshot V1 evidence profile. `snapshotFormatVersion` stays 1 and the
 structural envelope is unchanged (same 17 entries, same manifest field set, same descriptor/JSON/digest
@@ -67,10 +82,14 @@ mismatch, cancellation, discovery refusal, media-after-capture boundary) are pro
 temporary in-memory repositories, never by corrupting the owner's live repository. No PC/cloud/handoff
 layer exists yet, so `LOCAL_VERIFIED` remains local-only evidence.
 
-Next (owner decision): S6B owner review, then the stale-`Staging` reconciliation slice, then the S5
-large-media policy, then the PC handoff/offload and restore layers, and only then a mockup-first UI
-slice that may expose protection and the FULL profile (its zero-required case must read as "nothing to
-save", not "everything protected").
+Next (owner decision): implement the single-button backup UI and the single-capture operation component
+described in `docs/backup-operation-design.md`, following the approved mockup
+`docs/ui/mockups/backup-v2.png` with its contract `backup-v2.md` (S6A protection and S6B full-evidence
+publication stay internal stages of that one operation; no separate «Сохранить фото и видео» button).
+That implementation is a separate task and has **not** started. After that: stale-`Staging`
+reconciliation, then the S5 large-media policy — with the mandatory S5 constraint that ordinary screen
+opening and ordinary discovery must not re-read all media bytes, and that the cheap display state is
+distinguished from the strong verification performed during a backup operation.
 
 ## Previous milestone — S6A Media Protection Foundation (finalized)
 
