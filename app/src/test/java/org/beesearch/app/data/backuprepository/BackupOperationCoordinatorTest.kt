@@ -11,6 +11,7 @@ import org.beesearch.app.data.backupsnapshot.BackupSnapshotOperations
 import org.beesearch.app.data.backupsnapshot.SnapshotIdentity
 import org.beesearch.app.data.backupsnapshot.SnapshotMetrics
 import org.beesearch.app.data.backupsnapshot.ValidatedSnapshot
+import org.beesearch.app.data.backupoperation.CreateBackupResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -44,9 +45,11 @@ private fun discovery(vararg candidates: SnapshotCandidateResult) = SnapshotDisc
 private class FakeSnapshotOperations : BackupSnapshotOperations {
     var discoveryResult: RepositoryResult<SnapshotDiscovery> = RepositoryResult.Success(discovery())
     var createResults = ArrayDeque<RepositoryResult<CommittedSnapshot>>()
+    var createBackupResults = ArrayDeque<CreateBackupResult>()
     var onCreate: (suspend () -> Unit)? = null
     var createCalls = 0
-    var discoveryCalls = 0
+    var summaryCalls = 0
+    var strongDiscoverCalls = 0
 
     override suspend fun create(): RepositoryResult<CommittedSnapshot> {
         createCalls++
@@ -55,8 +58,32 @@ private class FakeSnapshotOperations : BackupSnapshotOperations {
     }
 
     override suspend fun discover(): RepositoryResult<SnapshotDiscovery> {
-        discoveryCalls++
-        return discoveryResult
+        strongDiscoverCalls++
+        error("ordinary coordinator reads must never call strong discover()")
+    }
+
+    override suspend fun readPublishedSummary(): RepositoryResult<PublishedBackupSummary> {
+        summaryCalls++
+        return when (val result = discoveryResult) {
+            is RepositoryResult.Failure -> RepositoryResult.Failure(result.error, result.detail)
+            is RepositoryResult.Success -> {
+                val latest = result.value.candidates.mapNotNull { it.snapshot }
+                    .maxWithOrNull(compareBy({ it.identity.createdAtEpochMs }, { it.identity.snapshotId.toString() }))
+                    ?.identity
+                    ?.let { PublishedBackupInfo(it.snapshotId, it.createdAtEpochMs) }
+                RepositoryResult.Success(
+                    PublishedBackupSummary(latest, result.value.candidates.any { it.snapshot == null }),
+                )
+            }
+        }
+    }
+
+    suspend fun nextCreateResult(): CreateBackupResult {
+        createBackupResults.removeFirstOrNull()?.let { return it }
+        return when (val result = create()) {
+            is RepositoryResult.Failure -> CreateBackupResult.Failed(result.error)
+            is RepositoryResult.Success -> CreateBackupResult.Created(result.value, result.value.snapshot.references.size)
+        }
     }
 }
 
@@ -68,7 +95,7 @@ private class FakeSnapshotOperations : BackupSnapshotOperations {
  */
 class BackupOperationCoordinatorTest {
     private val operations = FakeSnapshotOperations()
-    private val coordinator = BackupOperationCoordinator(operations)
+    private val coordinator = BackupOperationCoordinator(operations) { operations.nextCreateResult() }
 
     private fun committed(createdAtEpochMs: Long) = RepositoryResult.Success(
         CommittedSnapshot("Snapshots/snapshot-committed.zip", validatedSnapshot(createdAtEpochMs)),
@@ -167,18 +194,20 @@ class BackupOperationCoordinatorTest {
             outcome,
         )
         assertEquals(1, operations.createCalls)
-        assertEquals(1, operations.discoveryCalls)
+        assertEquals(1, operations.summaryCalls)
     }
 
     @Test
-    fun aRepositoryReadThatFindsNothingAfterASuccessfulCreationStillShowsTheVerifiedBackup() = runBlocking {
+    fun anEmptyPublishedSummaryAfterSuccessMakesNoLastBackupClaim() = runBlocking {
         operations.createResults.addLast(committed(2_000_000_000_000))
         operations.onCreate = { operations.discoveryResult = RepositoryResult.Success(discovery()) }
 
         val outcome = coordinator.create() as BackupCreateOutcome.Created
 
         assertEquals(2_000_000_000_000, outcome.committedAtEpochMs)
-        assertEquals(BackupSnapshotStatus.Latest(2_000_000_000_000, hasUnusable = false), outcome.snapshots)
+        assertEquals(BackupSnapshotStatus.None, outcome.snapshots)
+        assertEquals(1, operations.createCalls)
+        assertEquals(1, operations.summaryCalls)
     }
 
     // A read that fails or finds only unusable copies after a successful creation is reported as it
@@ -314,6 +343,23 @@ class BackupOperationCoordinatorTest {
             discovery(validCandidate(1_800_000_000_000), validCandidate(2_100_000_000_000)),
         )
         assertEquals(BackupSnapshotStatus.Latest(2_100_000_000_000, false), coordinator.inspect())
-        assertEquals(3, operations.discoveryCalls)
+        assertEquals(3, operations.summaryCalls)
+        assertEquals("ordinary reads must not use strong discovery", 0, operations.strongDiscoverCalls)
+    }
+
+    @Test
+    fun mediaFailureForwardsCountsAndDoesNotReReadOrCreateALastBackup() = runBlocking {
+        operations.discoveryResult = RepositoryResult.Success(discovery(validCandidate(1_800_000_000_000)))
+        operations.createBackupResults.addLast(CreateBackupResult.MediaFailed(failedCount = 1, totalCount = 3))
+
+        assertEquals(
+            BackupCreateOutcome.MediaFailed(failedCount = 1, totalCount = 3),
+            coordinator.create(),
+        )
+        assertEquals(0, operations.summaryCalls)
+        assertEquals(
+            BackupSnapshotStatus.Latest(1_800_000_000_000, hasUnusable = false),
+            coordinator.inspect(),
+        )
     }
 }

@@ -224,6 +224,7 @@ private fun BeeSearchApp(
                         coordinator = application.container.backupAccessCoordinator,
                         operations = application.container.backupOperations,
                         treeAccess = application.container.backupTreeAccess,
+                        openDirectory = application.container::openBackupDirectory,
                         location = application.container.backupBootstrap.location,
                         onBack = viewModel::returnFromBackup,
                     )

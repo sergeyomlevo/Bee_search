@@ -43,7 +43,11 @@ internal class MediaStateCapture(
 ) {
     suspend fun capture(): CapturedMediaState {
         val graph: Graph = database.withTransaction { database.backupDao().snapshot() }
-        return CapturedMediaState(
+        return rowsOf(graph)
+    }
+
+    companion object {
+        fun rowsOf(graph: Graph): CapturedMediaState = CapturedMediaState(
             rows = buildList {
                 graph.objectMedia.forEach {
                     add(

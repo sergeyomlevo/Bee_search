@@ -60,10 +60,10 @@ internal sealed interface BackupSnapshotsUi {
     data object None : BackupSnapshotsUi
 
     /**
-     * The latest valid backup time.
+     * The latest recognized published snapshot time.
      *
-     * [warning] is set when unusable files were also visible: the valid backup is still shown as the
-     * last verified copy, but the screen does not pretend the repository history is entirely healthy.
+     * [warning] records unrecognized snapshot containers. This ordinary read makes no claim about
+     * current media evidence; the operation's verified count is transient and lives separately.
      */
     data class Latest(val createdAt: String, val warning: String?) : BackupSnapshotsUi
 
@@ -79,7 +79,10 @@ internal sealed interface BackupOperationUi {
     data object Creating : BackupOperationUi
 
     /** A committed and verified backup was created in this attempt. */
-    data object Created : BackupOperationUi
+    data class Created(val verifiedMediaCount: Int = 0) : BackupOperationUi
+
+    /** The required media set was not fully protected; no snapshot was published. */
+    data class MediaFailed(val failedCount: Int, val totalCount: Int) : BackupOperationUi
 
     /** The attempt stopped before finishing; never shown as success. */
     data object Cancelled : BackupOperationUi
@@ -152,7 +155,18 @@ internal fun BackupCreateOutcome.toScreenState(
     snapshots: BackupSnapshotsUi,
 ): BackupScreenState = when (this) {
     is BackupCreateOutcome.Created ->
-        BackupScreenState.Ready(path, this.snapshots.toSnapshotsUi(zone, locale), BackupOperationUi.Created)
+        BackupScreenState.Ready(
+            path,
+            this.snapshots.toSnapshotsUi(zone, locale),
+            BackupOperationUi.Created(verifiedMediaCount),
+        )
+
+    is BackupCreateOutcome.MediaFailed ->
+        BackupScreenState.Ready(
+            path,
+            snapshots,
+            BackupOperationUi.MediaFailed(failedCount, totalCount),
+        )
 
     BackupCreateOutcome.Cancelled ->
         BackupScreenState.Ready(path, snapshots, BackupOperationUi.Cancelled)
@@ -248,12 +262,11 @@ internal const val BACKUP_GRANT_EXPLANATION =
 internal const val BACKUP_READY_LABEL = "✓ Доступно"
 internal const val BACKUP_WORKING_LABEL = "Проверка доступа к папке…"
 
-internal const val BACKUP_SECTION_TITLE = "Резервное копирование данных исследований"
-internal const val BACKUP_EXPLANATION =
-    "В копию сохраняются данные исследований: территории, точки наблюдения, наблюдения, пчёлы, " +
-        "циклы вылетов, погода и объекты."
-internal const val BACKUP_MEDIA_NOTE = "Фото и видео пока в эту копию не входят."
-internal const val BACKUP_LAST_PREFIX = "Последняя копия"
+internal const val BACKUP_SECTION_TITLE = "Что сохраняется в резервной копии"
+internal const val BACKUP_EXPLANATION = "Данные исследований, настройки, фото и видео"
+internal const val BACKUP_PROMISE =
+    "Копия хранится на этом телефоне. Передача на компьютер выполняется отдельно."
+internal const val BACKUP_LAST_PREFIX = "Последняя резервная копия"
 internal const val BACKUP_NO_SNAPSHOTS = "Резервных копий пока нет"
 internal const val BACKUP_SNAPSHOT_WARNING = "Не удалось проверить одну из сохранённых копий."
 internal const val BACKUP_UNUSABLE_MESSAGE =
@@ -263,6 +276,13 @@ internal const val BACKUP_CREATE_ACTION = "Создать резервную к�
 internal const val BACKUP_CREATE_RETRY = "Повторить"
 internal const val BACKUP_CREATING = "Создание резервной копии…"
 internal const val BACKUP_CREATED_TITLE = "Резервная копия создана"
-internal const val BACKUP_CREATED_BODY = "Данные исследований сохранены."
-internal const val BACKUP_CREATED_MEDIA_NOTE = "Фото и видео в эту копию не входят."
+internal const val BACKUP_CREATED_BODY =
+    "Данные исследований и относящиеся к ним фото и видео сохранены в резервном хранилище на этом телефоне."
+internal const val BACKUP_CREATED_NO_MEDIA_BODY =
+    "Данные исследований и настройки сохранены в резервном хранилище на этом телефоне."
+internal const val BACKUP_MEDIA_ERROR_TITLE = "Резервная копия не создана"
+internal const val BACKUP_MEDIA_ERROR_PREFIX = "Не удалось сохранить"
+internal const val BACKUP_MEDIA_ERROR_SUFFIX = "файлов фото или видео."
+internal const val BACKUP_MEDIA_ERROR_RETRY =
+    "Уже сохранённые файлы останутся в резервном хранилище. Повторите попытку."
 internal const val BACKUP_CANCELLED_MESSAGE = "Создание резервной копии не завершено."

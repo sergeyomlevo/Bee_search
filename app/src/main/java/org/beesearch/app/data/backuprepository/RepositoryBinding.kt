@@ -113,6 +113,18 @@ internal class BoundRepository(
         requireConnected(binding).discoverSnapshots(binding.expectedRepositoryId, workspace).valueOrThrow()
     }
 
+    suspend fun readPublishedSummary(workspace: File): RepositoryResult<PublishedBackupSummary> = operation {
+        val binding = store.read() ?: throw RepositoryException(RepositoryError.UNBOUND)
+        requireConnected(binding).readPublishedSummary(binding.expectedRepositoryId, workspace).valueOrThrow()
+    }
+
+    suspend fun createFullSnapshotFromCaptured(workspace: File, entries: SnapshotDomainEntries,
+        cancelled: () -> Boolean = { false }): RepositoryResult<CommittedSnapshot> = operation {
+        val binding = store.read() ?: throw RepositoryException(RepositoryError.UNBOUND)
+        requireConnected(binding).createFullSnapshotFromCaptured(binding.expectedRepositoryId, workspace,
+            entries, cancelled = cancelled).valueOrThrow()
+    }
+
     private suspend fun requireConnected(binding: RepositoryBinding): RepositoryFoundation {
         val foundation = try { roots.resolve(binding.rootLocator) } catch (e: RepositoryException) {
             if (e.error == RepositoryError.NOT_FOUND) throw RepositoryException(RepositoryError.BOUND_ROOT_UNAVAILABLE, e)

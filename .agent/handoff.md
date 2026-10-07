@@ -1,6 +1,23 @@
 # Bee Search handoff
 
-## Current continuation — backup documentation reconciliation
+## Current continuation — single-button backup implementation (working tree, not committed)
+
+Owner-approved post-device-test UX correction: the owner manually verified the new backup operation
+on Samsung and replaced informational-only path behavior with a link opening the current bound
+Backup directory in system Android Files UI. The action uses the persisted SAF tree and a read-only
+binding/access probe; it does not pick/rebind, persist grants, create folders/backups or run summary/
+media verification. Underlined path retains the existing composition without a chevron or extra
+button. It is unavailable on access-loss screens and during backup creation. PNG remains unchanged.
+Correction verification: full JVM/debug/debugAndroidTest/lint gate PASS (748 JVM tests, zero
+failures/errors; lint zero errors, 23 warnings), and 33 focused Samsung UI/Room/SAF tests PASS.
+New assertions cover click routing, access loss/restoration, exact directory document intent, no
+persistable/write grant, repeated binding/permission preservation, and long-path fontScale 1.0/1.7.
+Actual Settings → Backup → path tap opened `BeeSearch/Dev/Backup` in Android Files, showing Media,
+Snapshots, Staging and repository.json. System Back traversed parent folders before returning to
+Bee Search. Access remained available and binding persistence stayed byte-identical. A real Create
+after returning succeeded with 5/5 verified files and last-backup time 7 October 2026, 22:50.
+Screenshots are under ignored `app/build/reports/backup-path-review/`. No destructive device action
+was performed; one new backup was created as the requested positive regression check.
 
 The owner resolved the D101 ↔ approved `backup-v2.md` §5.6 conflict in favour of `backup-v2`.
 D101 still permits FULL with zero required media blobs: Success describes saved research data and
@@ -12,12 +29,35 @@ Existing strong `discover()` and the strong evidence gate before FULL publicatio
 The Ready last-backup date describes a recognized published artifact, not current media evidence or
 a journal of historical UI Success returns. Workflows §45–§47 now describe the approved operation
 and preserve the historical S3 acceptance and standalone backend semantics.
-Production implementation remains **not started**, including the new summary boundary.
-Next: implement `readPublishedSummary()`, `CreateBackupOperation` and the approved `backup-v2` UI
-from the clean `HEAD == origin/main` after `docs: separate backup summary from strong discovery`.
-Do not reopen the mockup-first gate. The rest of S5 policy remains future work.
+Production implementation is now in the working tree on baseline
+`c84270cdea1c5559789d9176efe2fa653b41f6d7`; HEAD and origin/main remain unchanged.
+`readPublishedSummary()` validates published snapshot containers without opening Media, with a
+separate result and pass-through through the existing bound/service/coordinator layers.
+`CreateBackupOperation` captures one Room graph and one portable-settings snapshot per attempt,
+protects media derived from that graph and publishes FULL from the same captured entries through
+the existing strong evidence gate. Partial media failure publishes no snapshot; accepted blobs remain
+and Retry captures current state again. The approved v2 UI uses transient real counts and zero-media
+Success without a media claim. Existing access/error semantics and standalone APIs are preserved.
 
-## Current continuation — S6B FULL / LOCAL_VERIFIED Snapshot (finalized and pushed; backup mockup approved, mockup-first gate closed)
+Verification: final `:app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+:app:lintDebug --offline --max-workers=2` gate PASS (JVM 748 tests, zero failures/errors/skips;
+lint zero errors, 23 warnings). The invocation used `-Dorg.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8`
+without changing Gradle configuration. Samsung DEV was updated in place; final focused UI/Room/access
+tests passed 27/27 (including the scroll-reset adjustment), and the real-media protection/reuse test
+passed 1/1. An intervening locked-device rerun had 20 UI failures (no Compose hierarchy); after owner
+unlock the same final APKs passed. No uninstall, data clear, restore,
+negative live-repository tests or owner-data deletion was performed.
+Nine final UI fixture screenshots at fontScale 1.7 were visually reviewed against v2, including
+expanded/scrolled content and both Success variants. Artifacts are under the ignored
+`app/build/reports/backup-v2-review/`. Long content remains available by scrolling, with a stable
+bottom action. The original implementation pass had no manual end-to-end tap against the owner's
+live repository; the subsequent correction verification above now supplies that evidence.
+
+Next: owner review of the uncommitted implementation and final device layout evidence.
+No commit or push was performed. Do not reopen the mockup-first gate. The rest of S5 policy remains
+future work; no cache, background verification, media-health UI or cleanup policy was introduced.
+
+## Historical continuation — S6B FULL / LOCAL_VERIFIED Snapshot (finalized and pushed; backup mockup approved, mockup-first gate closed)
 
 Baseline: clean `main`, `HEAD == origin/main == 6b629587fb744f1dc777ae582df011342aed1ba4`
 («Implement repository media protection»). S6B was finalized as two commits and pushed to `origin/main`:
@@ -30,7 +70,8 @@ visually approved `docs/ui/mockups/backup-v2.png` as the reference for the curre
 contract `backup-v2.md` (five states of one screen) and the design-only single-capture operation
 specification `docs/backup-operation-design.md`, which is committed as the design contract of this
 stage. The approved version has a real Back arrow in all five app bars, no app-bar help icon, a purely
-informational (non-interactive) storage path row, the collapsed summary `Данные исследований,
+informational (non-interactive) storage path row (historical rule; superseded by the owner correction
+above), the collapsed summary `Данные исследований,
 настройки, фото и видео`, a down chevron when collapsed and an up chevron when expanded, Working
 without percentages and without Cancel, Success with media verification, Error with `Повторить`, one
 primary bottom button and the always-visible boundary line `Копия хранится на этом телефоне. Передача

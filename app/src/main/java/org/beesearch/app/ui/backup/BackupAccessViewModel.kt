@@ -34,6 +34,7 @@ internal class BackupAccessViewModel(
     private val operations: BackupOperationCoordinator,
     private val treeAccess: AndroidBackupTreeAccess,
     private val location: BackupLocation,
+    private val openDirectory: suspend () -> Boolean,
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val locale: Locale = BACKUP_DATE_LOCALE,
 ) : ViewModel() {
@@ -43,6 +44,7 @@ internal class BackupAccessViewModel(
 
     /** The running manual creation, if any. Null or finished means the button is usable again. */
     private var creation: Job? = null
+    private var refreshJob: Job? = null
 
     private val displayPath: String get() = "$USER_VISIBLE_DOWNLOADS/${location.relativePath}"
 
@@ -57,7 +59,8 @@ internal class BackupAccessViewModel(
      */
     fun refresh() {
         if (creation?.isActive == true) return
-        viewModelScope.launch {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             _state.value = BackupScreenState.Working
             _state.value = loadedScreenState()
         }
@@ -72,6 +75,8 @@ internal class BackupAccessViewModel(
     fun createBackup() {
         if (creation?.isActive == true) return
         val ready = _state.value as? BackupScreenState.Ready ?: return
+        refreshJob?.cancel()
+        refreshJob = null
         _state.value = ready.copy(operation = BackupOperationUi.Creating)
         creation = viewModelScope.launch {
             val outcome = try {
@@ -83,6 +88,9 @@ internal class BackupAccessViewModel(
             }
             _state.value = when (outcome) {
                 is BackupCreateOutcome.Created ->
+                    outcome.toScreenState(displayPath, zone, locale, ready.snapshots)
+
+                is BackupCreateOutcome.MediaFailed ->
                     outcome.toScreenState(displayPath, zone, locale, ready.snapshots)
 
                 // Another creation owns the screen state; leaving it untouched keeps the running
@@ -111,6 +119,12 @@ internal class BackupAccessViewModel(
                 }
             }
         }
+    }
+
+    suspend fun openBackupDirectory(): Boolean {
+        val ready = _state.value as? BackupScreenState.Ready ?: return false
+        if (creation?.isActive == true || ready.operation == BackupOperationUi.Creating) return false
+        return openDirectory()
     }
 
     /**
@@ -167,10 +181,11 @@ internal class BackupAccessViewModel(
             operations: BackupOperationCoordinator,
             treeAccess: AndroidBackupTreeAccess,
             location: BackupLocation,
+            openDirectory: suspend () -> Boolean,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                BackupAccessViewModel(coordinator, operations, treeAccess, location) as T
+                BackupAccessViewModel(coordinator, operations, treeAccess, location, openDirectory) as T
         }
     }
 }

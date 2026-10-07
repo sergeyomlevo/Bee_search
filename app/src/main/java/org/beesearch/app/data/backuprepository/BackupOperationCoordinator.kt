@@ -2,11 +2,12 @@ package org.beesearch.app.data.backuprepository
 
 import kotlinx.coroutines.sync.Mutex
 import org.beesearch.app.data.backupsnapshot.BackupSnapshotOperations
+import org.beesearch.app.data.backupoperation.CreateBackupResult
 
 /**
  * What the repository currently holds, as far as the backup screen needs to know.
  *
- * [Latest] follows the accepted `SnapshotDiscovery.latest` semantics: the newest snapshot by
+ * [Latest] follows published summary semantics: the newest recognized artifact by
  * creation time and then by snapshot id, never by file name or listing order.
  */
 internal sealed interface BackupSnapshotStatus {
@@ -29,7 +30,10 @@ internal sealed interface BackupSnapshotStatus {
 /** Outcome of one manual snapshot creation attempt. */
 internal sealed interface BackupCreateOutcome {
     /** A committed and verified snapshot exists; [snapshots] is the re-read repository state. */
-    data class Created(val snapshots: BackupSnapshotStatus, val committedAtEpochMs: Long) : BackupCreateOutcome
+    data class Created(val snapshots: BackupSnapshotStatus, val committedAtEpochMs: Long,
+        val verifiedMediaCount: Int = 0) : BackupCreateOutcome
+
+    data class MediaFailed(val failedCount: Int, val totalCount: Int) : BackupCreateOutcome
 
     /** Another creation is already running, so this request did not start a second one. */
     data object AlreadyRunning : BackupCreateOutcome
@@ -53,11 +57,12 @@ internal sealed interface BackupCreateOutcome {
  */
 internal class BackupOperationCoordinator(
     private val operations: BackupSnapshotOperations,
+    private val createBackup: suspend () -> CreateBackupResult,
 ) {
     private val gate = Mutex()
 
     /** Reads the current snapshot state. Never modifies the repository. */
-    suspend fun inspect(): BackupSnapshotStatus = when (val result = operations.discover()) {
+    suspend fun inspect(): BackupSnapshotStatus = when (val result = operations.readPublishedSummary()) {
         is RepositoryResult.Success -> result.value.toSnapshotStatus()
         is RepositoryResult.Failure -> BackupSnapshotStatus.Failed(result.error.toBackupAccessProblem())
     }
@@ -71,47 +76,36 @@ internal class BackupOperationCoordinator(
     suspend fun create(): BackupCreateOutcome {
         if (!gate.tryLock()) return BackupCreateOutcome.AlreadyRunning
         return try {
-            when (val result = operations.create()) {
-                is RepositoryResult.Success -> {
-                    val committedAt = result.value.snapshot.identity.createdAtEpochMs
+            when (val result = createBackup()) {
+                is CreateBackupResult.Created -> {
+                    val committedAt = result.committed.snapshot.identity.createdAtEpochMs
                     BackupCreateOutcome.Created(
-                        snapshots = inspect().orNewerEvidence(committedAt),
+                        snapshots = inspect(),
                         committedAtEpochMs = committedAt,
+                        verifiedMediaCount = result.verifiedMediaCount,
                     )
                 }
 
-                is RepositoryResult.Failure -> if (result.error == RepositoryError.CANCELLED) {
+                is CreateBackupResult.Failed -> if (result.error == RepositoryError.CANCELLED) {
                     BackupCreateOutcome.Cancelled
                 } else {
                     BackupCreateOutcome.Failed(result.error.toBackupAccessProblem())
                 }
+                is CreateBackupResult.MediaFailed -> BackupCreateOutcome.MediaFailed(result.failedCount, result.totalCount)
+                CreateBackupResult.AlreadyRunning -> BackupCreateOutcome.AlreadyRunning
             }
         } finally {
             gate.unlock()
         }
     }
 
-    /**
-     * The re-read state after a successful creation.
-     *
-     * Its problems are never masked: an unreadable or unusable repository read keeps its own state so
-     * the screen can say so. The one narrow exception is a read that found *nothing at all* right
-     * after a verified publication — claiming «Резервных копий пока нет» next to a just-created
-     * backup would contradict the operation that demonstrably committed and verified it.
-     */
-    private fun BackupSnapshotStatus.orNewerEvidence(committedAtEpochMs: Long): BackupSnapshotStatus = when (this) {
-        BackupSnapshotStatus.Unknown, BackupSnapshotStatus.None ->
-            BackupSnapshotStatus.Latest(committedAtEpochMs, hasUnusable = false)
-
-        else -> this
-    }
 }
 
-private fun SnapshotDiscovery.toSnapshotStatus(): BackupSnapshotStatus {
-    val unusable = candidates.any { it.snapshot == null }
+private fun PublishedBackupSummary.toSnapshotStatus(): BackupSnapshotStatus {
+    val unusable = hasUnrecognizedCandidates
     val valid = latest
     return when {
-        valid != null -> BackupSnapshotStatus.Latest(valid.identity.createdAtEpochMs, unusable)
+        valid != null -> BackupSnapshotStatus.Latest(valid.createdAtEpochMs, unusable)
         unusable -> BackupSnapshotStatus.Unusable
         else -> BackupSnapshotStatus.None
     }

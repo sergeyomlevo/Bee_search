@@ -4,6 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.content.ActivityNotFoundException
+import androidx.core.net.toUri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Android-only translation between a picked storage-access-framework tree and the fixed
@@ -14,6 +18,30 @@ import android.provider.DocumentsContract
  * about the repository — it only describes what the user picked and records the grant.
  */
 internal class AndroidBackupTreeAccess(private val context: Context) {
+
+    /** Read-only viewing of the currently bound directory; never a picker or a new grant. */
+    suspend fun openDirectory(repository: BoundRepository, location: BackupLocation,
+        launch: (Intent) -> Unit = context::startActivity): Boolean {
+        val connection = withContext(Dispatchers.IO) { repository.probe() }
+        val binding = (connection as? RepositoryConnection.Bound)?.binding ?: return false
+        val intent = directoryViewIntent(binding.rootLocator, location) ?: return false
+        return withContext(Dispatchers.Main) {
+            try {
+                launch(intent)
+                true
+            } catch (_: ActivityNotFoundException) { false }
+            catch (_: SecurityException) { false }
+        }
+    }
+
+    internal fun directoryViewIntent(locator: String, location: BackupLocation): Intent? {
+        val tree = locator.toUri()
+        val selection = describe(tree) as? BackupTreeSelection.Picked ?: return null
+        if (selection.treeDocumentId != location.documentId) return null
+        val directory = DocumentsContract.buildDocumentUriUsingTree(tree, selection.treeDocumentId)
+        return Intent(Intent.ACTION_VIEW).setDataAndType(directory, DocumentsContract.Document.MIME_TYPE_DIR)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
 
     /**
      * The initial location handed to the system picker, so it opens at the fixed Backup folder

@@ -18,6 +18,13 @@ internal data class SnapshotDiscovery(val candidates: List<SnapshotCandidateResu
         .maxWithOrNull(compareBy({ it.identity.createdAtEpochMs }, { it.identity.snapshotId.toString() }))
 }
 
+/** A recognized published artifact, not current media evidence or an operation journal. */
+internal data class PublishedBackupInfo(val snapshotId: UUID, val createdAtEpochMs: Long)
+internal data class PublishedBackupSummary(
+    val latest: PublishedBackupInfo?,
+    val hasUnrecognizedCandidates: Boolean,
+)
+
 /** Called only under Foundation's maintenance lock and BoundRepository's binding gate. */
 internal class RepositorySnapshots(
     private val storage: RepositoryStorage,
@@ -30,7 +37,13 @@ internal class RepositorySnapshots(
 ) {
     private val mediaEvidence = RepositoryMediaEvidence(storage)
 
-    suspend fun create(capture: suspend () -> SnapshotDomainEntries, now: Long,
+    fun prepareCreation() {
+        identityCheck()
+        storage.requirePublicationCapability()
+        capacity.require(storage.availableBytes(), peakBudget())
+    }
+
+    suspend fun create(entries: SnapshotDomainEntries, now: Long,
         check: () -> Unit,
         evidenceProfile: SnapshotEvidenceProfile = SnapshotEvidenceProfile.METADATA_ONLY): CommittedSnapshot {
         val header = identityCheck()
@@ -39,7 +52,6 @@ internal class RepositorySnapshots(
         // Conservatively reserve all peak temporary bytes before any filesystem growth.
         capacity.require(storage.availableBytes(), peakBudget())
         check()
-        val entries = capture()
         val operationId = UUID.randomUUID()
         val scratch = ownedWorkspace()
         try {
@@ -94,6 +106,45 @@ internal class RepositorySnapshots(
             cleanOwned(operationId)
             scratch.deleteRecursively() // exclusively generated private scratch, never repository content
         }
+    }
+
+    /** Container/metadata validation only. Never opens Media blobs or invokes media evidence. */
+    fun readPublishedSummary(check: () -> Unit): PublishedBackupSummary {
+        val header = identityCheck()
+        val files = storage.list("Snapshots")
+        val conflicts = files.mapNotNull { NAME.matchEntire(it.path.substringAfterLast('/'))?.groupValues?.get(1) }
+            .groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        val recognized = mutableListOf<PublishedBackupInfo>()
+        var unrecognized = false
+        for (entry in files) {
+            check()
+            val match = NAME.matchEntire(entry.path.substringAfterLast('/'))
+            if (entry.isDirectory || match == null || match.groupValues[1] in conflicts ||
+                entry.path != "Snapshots/${match.value}") {
+                unrecognized = true
+                continue
+            }
+            capacity.require(storage.availableBytes(), peakBudget())
+            val scratch = ownedWorkspace()
+            try {
+                val file = fixedReadback(entry.path, scratch, "summary.zip", check)
+                val snapshot = archive.validate(file, header.repositoryId, header.variant,
+                    UUID.fromString(match.groupValues[1]), match.groupValues[2], check)
+                recognized += PublishedBackupInfo(snapshot.identity.snapshotId, snapshot.identity.createdAtEpochMs)
+            } catch (e: CancellationException) { throw e }
+            catch (_: SnapshotException) { unrecognized = true }
+            catch (e: RepositoryException) {
+                if (e.error.isRepositoryWide) throw e
+                unrecognized = true
+            } catch (e: Exception) { throw RepositoryException(RepositoryError.PROVIDER_FAILURE, e) }
+            finally { scratch.deleteRecursively() }
+        }
+        check()
+        identityCheck() // also rechecked for an empty or wholly unrecognized listing
+        return PublishedBackupSummary(
+            recognized.maxWithOrNull(compareBy({ it.createdAtEpochMs }, { it.snapshotId.toString() })),
+            unrecognized,
+        )
     }
 
     fun discover(check: () -> Unit): SnapshotDiscovery {

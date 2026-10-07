@@ -20,6 +20,11 @@ import org.beesearch.app.data.backuprepository.repositoryBindingDataStore
 import org.beesearch.app.data.backup.DataStorePortableSettingsStore
 import org.beesearch.app.data.backupsnapshot.RepositorySnapshotService
 import org.beesearch.app.data.backupsnapshot.SnapshotCapture
+import org.beesearch.app.data.backupoperation.BackupOperationCapture
+import org.beesearch.app.data.backupoperation.CreateBackupOperation
+import org.beesearch.app.data.backuprepository.RepositoryConnection
+import org.beesearch.app.data.backuprepository.RepositoryResult
+import org.beesearch.app.data.backuprepository.RepositoryError
 import java.io.File
 import org.beesearch.app.data.backup.SafBackupDocumentExporter
 import org.beesearch.app.data.pointexport.ObservationPointExportService
@@ -119,6 +124,8 @@ internal class AppContainer(private val context: Context) {
      * semantics, and nothing here reads or writes research data.
      */
     val backupTreeAccess = AndroidBackupTreeAccess(context)
+    suspend fun openBackupDirectory(): Boolean =
+        backupTreeAccess.openDirectory(boundRepository, backupBootstrap.location)
     val backupAccessCoordinator = BackupAccessCoordinator(
         bootstrap = backupBootstrap,
         repository = boundRepository,
@@ -126,18 +133,10 @@ internal class AppContainer(private val context: Context) {
     )
 
     /**
-     * Manual METADATA_ONLY backup for the backup screen.
-     *
-     * The operations go through the accepted snapshot service (which itself goes through the bound
-     * repository), never through Repository V1 directly, and hold no state of their own.
-     */
-    val backupOperations = BackupOperationCoordinator(RepositoryBackupSnapshotOperations(repositorySnapshots))
-
-    /**
      * Explicit media protection: copy every blob the current research state requires into the
      * repository through the existing ingest gate.
      *
-     * Nothing calls this automatically and no screen exposes it yet; private originals stay untouched,
+     * The single-button backup operation invokes this internally; private originals stay untouched,
      * so protection duplicates storage until a future offload slice exists.
      */
     val mediaStateCapture = MediaStateCapture(database)
@@ -145,6 +144,21 @@ internal class AppContainer(private val context: Context) {
         repository = boundRepository,
         sources = FileStoreMediaSourceResolver(physicalObjectMediaFileStore, attachmentFileStore),
         privateRoot = context.filesDir,
+    )
+    val createBackupOperation = CreateBackupOperation(
+        capture = BackupOperationCapture(database, DataStorePortableSettingsStore(context.settingsDataStore)),
+        protect = { mediaProtection.protect(it) },
+        publish = { repositorySnapshots.createFullFromCaptured(it) },
+        preflight = {
+            when (val connection = boundRepository.probe()) {
+                is RepositoryConnection.Bound -> RepositoryResult.Success(Unit)
+                is RepositoryConnection.Failed -> RepositoryResult.Failure(connection.error)
+                RepositoryConnection.Unbound -> RepositoryResult.Failure(RepositoryError.UNBOUND)
+            }
+        },
+    )
+    val backupOperations = BackupOperationCoordinator(
+        RepositoryBackupSnapshotOperations(repositorySnapshots), createBackupOperation::create,
     )
     val areaExchangeMirror = AreaExchangeMirror(exchangeStorage)
     val mapAreaStore: MapAreaStore = MirroringMapAreaStore(

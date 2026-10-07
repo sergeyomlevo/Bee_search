@@ -195,7 +195,7 @@ class BackupUiStateTest {
             BackupScreenState.Ready(
                 path = path,
                 snapshots = BackupSnapshotsUi.Problem(accessProblemMessage(BackupAccessProblem.PERMISSION)),
-                operation = BackupOperationUi.Created,
+                operation = BackupOperationUi.Created(0),
             ),
             screen,
         )
@@ -326,7 +326,7 @@ class BackupUiStateTest {
             BackupScreenState.Ready(
                 path = path,
                 snapshots = BackupSnapshotsUi.Latest("6 октября 2026, 20:15", warning = null),
-                operation = BackupOperationUi.Created,
+                operation = BackupOperationUi.Created(0),
             ),
             created,
         )
@@ -350,24 +350,36 @@ class BackupUiStateTest {
     }
 
     @Test
-    fun successWordingNeverClaimsMoreThanMetadata() {
+    fun mediaFailureIsVisibleAsRetryableErrorWithActualCounts() {
+        val screen = BackupCreateOutcome.MediaFailed(failedCount = 1, totalCount = 4)
+            .toScreenState(path, zone, BACKUP_DATE_LOCALE, BackupSnapshotsUi.None)
+
+        assertEquals(
+            BackupScreenState.Ready(
+                path,
+                BackupSnapshotsUi.None,
+                BackupOperationUi.MediaFailed(failedCount = 1, totalCount = 4),
+            ),
+            screen,
+        )
+    }
+
+    @Test
+    fun successWordingDescribesTheCapturedMediaResult() {
         assertEquals("Резервная копия создана", BACKUP_CREATED_TITLE)
-        assertEquals("Данные исследований сохранены.", BACKUP_CREATED_BODY)
-        assertEquals("Фото и видео в эту копию не входят.", BACKUP_CREATED_MEDIA_NOTE)
-        listOf(BACKUP_CREATED_TITLE, BACKUP_CREATED_BODY, BACKUP_CREATED_MEDIA_NOTE, BACKUP_MEDIA_NOTE)
-            .forEach { text ->
-                assertFalse("'$text' must not claim a full backup", text.contains("полн", ignoreCase = true))
-                assertFalse("'$text' must not claim everything is saved", text.contains("все данные"))
-            }
+        assertTrue(BACKUP_CREATED_BODY.contains("фото и видео"))
+        assertTrue(BACKUP_CREATED_NO_MEDIA_BODY.contains("Данные исследований и настройки"))
+        assertFalse(BACKUP_CREATED_NO_MEDIA_BODY.contains("0 из 0"))
     }
 
     @Test
     fun userFacingBackupTextsNeverExposeTechnicalTokens() {
         val texts = listOf(
-            BACKUP_SECTION_TITLE, BACKUP_EXPLANATION, BACKUP_MEDIA_NOTE, BACKUP_LAST_PREFIX,
+            BACKUP_SECTION_TITLE, BACKUP_EXPLANATION, BACKUP_PROMISE, BACKUP_LAST_PREFIX,
             BACKUP_NO_SNAPSHOTS, BACKUP_SNAPSHOT_WARNING, BACKUP_UNUSABLE_MESSAGE,
             BACKUP_CREATE_ACTION, BACKUP_CREATE_RETRY, BACKUP_CREATING, BACKUP_CREATED_TITLE,
-            BACKUP_CREATED_BODY, BACKUP_CREATED_MEDIA_NOTE, BACKUP_CANCELLED_MESSAGE,
+            BACKUP_CREATED_BODY, BACKUP_CREATED_NO_MEDIA_BODY, BACKUP_MEDIA_ERROR_RETRY,
+            BACKUP_CANCELLED_MESSAGE,
         )
         val tokens = listOf("METADATA_ONLY", "NO_MEDIA_EVIDENCE", "SHA", "UUID", "SAF", "Snapshot", "snapshot", ".zip")
         texts.forEach { text ->

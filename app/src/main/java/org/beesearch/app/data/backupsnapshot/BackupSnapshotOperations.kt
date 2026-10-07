@@ -3,13 +3,13 @@ package org.beesearch.app.data.backupsnapshot
 import org.beesearch.app.data.backuprepository.CommittedSnapshot
 import org.beesearch.app.data.backuprepository.RepositoryResult
 import org.beesearch.app.data.backuprepository.SnapshotDiscovery
+import org.beesearch.app.data.backuprepository.PublishedBackupSummary
 
 /**
  * The narrow seam the backup screen uses for snapshots.
  *
- * It exposes exactly the two accepted service operations and nothing else, so screen logic can be
- * driven and tested on the host without a repository, and no caller can reach Repository V1 or
- * write a snapshot archive itself.
+ * Keeps standalone metadata creation and strong discovery separate from the ordinary screen's
+ * published summary. The single-button operation is supplied by CreateBackupOperation.
  */
 internal interface BackupSnapshotOperations {
     /**
@@ -22,6 +22,9 @@ internal interface BackupSnapshotOperations {
 
     /** Reads the current snapshot state from the repository itself. Never cached by this seam. */
     suspend fun discover(): RepositoryResult<SnapshotDiscovery>
+
+    /** Published container/metadata only; never current media evidence. */
+    suspend fun readPublishedSummary(): RepositoryResult<PublishedBackupSummary>
 }
 
 /** Production implementation: a pass-through to the accepted [RepositorySnapshotService]. */
@@ -31,4 +34,7 @@ internal class RepositoryBackupSnapshotOperations(
     override suspend fun create(): RepositoryResult<CommittedSnapshot> = service.create()
 
     override suspend fun discover(): RepositoryResult<SnapshotDiscovery> = service.discover()
+
+    override suspend fun readPublishedSummary(): RepositoryResult<PublishedBackupSummary> =
+        service.readPublishedSummary()
 }

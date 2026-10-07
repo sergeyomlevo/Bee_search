@@ -98,13 +98,33 @@ internal class RepositoryFoundation(
         createdAtEpochMs: Long, evidenceProfile: SnapshotEvidenceProfile, cancelled: () -> Boolean,
     ): RepositoryResult<CommittedSnapshot> = operation {
         val context = coroutineContext
-        RepositorySnapshots(storage, capacity, { identity(expectedRepositoryId) },
-            { cleanOwned(it, expectedRepositoryId) }, workspace, archive).create(capture, createdAtEpochMs,
+        val snapshots = RepositorySnapshots(storage, capacity, { identity(expectedRepositoryId) },
+            { cleanOwned(it, expectedRepositoryId) }, workspace, archive)
+        snapshots.prepareCreation()
+        context.ensureActive()
+        if (cancelled()) fail(RepositoryError.CANCELLED)
+        val entries = capture()
+        snapshots.create(entries, createdAtEpochMs,
             check = {
                 context.ensureActive()
                 if (cancelled()) fail(RepositoryError.CANCELLED)
             },
             evidenceProfile = evidenceProfile)
+    }
+
+    suspend fun createFullSnapshotFromCaptured(expectedRepositoryId: UUID, workspace: File,
+        entries: SnapshotDomainEntries, archive: SnapshotArchive = SnapshotArchive(),
+        createdAtEpochMs: Long = System.currentTimeMillis(), cancelled: () -> Boolean = { false },
+    ): RepositoryResult<CommittedSnapshot> = createSnapshot(expectedRepositoryId, workspace, { entries },
+        archive, createdAtEpochMs, SnapshotEvidenceProfile.FULL_LOCAL_VERIFIED, cancelled)
+
+    suspend fun readPublishedSummary(expectedRepositoryId: UUID, workspace: File,
+        archive: SnapshotArchive = SnapshotArchive(),
+    ): RepositoryResult<PublishedBackupSummary> = operation {
+        val context = coroutineContext
+        RepositorySnapshots(storage, capacity, { identity(expectedRepositoryId) },
+            { cleanOwned(it, expectedRepositoryId) }, workspace, archive)
+            .readPublishedSummary { context.ensureActive() }
     }
 
     suspend fun discoverSnapshots(expectedRepositoryId: UUID, workspace: File,
