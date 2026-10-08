@@ -1,6 +1,8 @@
 package org.beesearch.app.data.pointexport
 
 import java.util.UUID
+import java.io.Closeable
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.domain.model.BeeObservationHistory
 import org.beesearch.app.domain.model.ObservationPoint
 import org.beesearch.app.domain.model.ObservationPointAttachment
@@ -32,8 +34,11 @@ internal data class ObservationPointExportGraph(
 
 internal data class DecodedObservationPointExport(
     val graph: ObservationPointExportGraph,
-    val attachmentBytes: Map<UUID, ByteArray>,
-)
+    val attachmentPayloads: Map<UUID, ArchivePayload>,
+    private val archive: Closeable,
+) : Closeable {
+    override fun close() = archive.close()
+}
 
 internal sealed class ObservationPointExportException(message: String, cause: Throwable? = null) :
     Exception(message, cause)

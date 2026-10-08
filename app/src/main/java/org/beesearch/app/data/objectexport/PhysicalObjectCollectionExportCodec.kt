@@ -27,6 +27,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import org.beesearch.app.data.zip.ZipReadGuard
+import org.beesearch.app.data.zip.ArchivePayload
+import org.beesearch.app.data.zip.StagedZipArchive
 import org.beesearch.app.data.zip.ZipSafetyException
 import org.beesearch.app.data.zip.ZipSafetyFailure
 import org.beesearch.app.data.zip.ZipSafetyPolicy
@@ -50,19 +52,19 @@ internal object PhysicalObjectCollectionExportCodec {
 
     fun encode(
         graph: PhysicalObjectCollectionExportGraph,
-        mediaBytes: Map<UUID, ByteArray>,
+        mediaBytes: Map<UUID, ArchivePayload>,
         output: OutputStream,
     ) = encodeVersion(graph, mediaBytes, output, PhysicalObjectCollectionExportContract.FORMAT_VERSION)
 
     fun encodeV1(
         graph: PhysicalObjectCollectionExportGraph,
-        mediaBytes: Map<UUID, ByteArray>,
+        mediaBytes: Map<UUID, ArchivePayload>,
         output: OutputStream,
     ) = encodeVersion(graph, mediaBytes, output, PhysicalObjectCollectionExportContract.LEGACY_FORMAT_VERSION)
 
     private fun encodeVersion(
         graph: PhysicalObjectCollectionExportGraph,
-        mediaBytes: Map<UUID, ByteArray>,
+        mediaBytes: Map<UUID, ArchivePayload>,
         output: OutputStream,
         version: Int,
     ) {
@@ -85,7 +87,7 @@ internal object PhysicalObjectCollectionExportCodec {
                 put("id", value.id.toString())
                 put("entry", PhysicalObjectCollectionExportContract.objectEntry(value.id))
                 put("byteLength", bytes.size)
-                put("sha256", sha256(bytes))
+                put("sha256", sha256Bytes(bytes))
             }
         }
         val mediaDescriptors = canonical.objects.flatMap { value ->
@@ -97,7 +99,7 @@ internal object PhysicalObjectCollectionExportCodec {
                     put("entry", PhysicalObjectCollectionExportContract.mediaEntry(value.id, media.id))
                     put("mediaType", media.type.name)
                     put("byteLength", bytes.size)
-                    put("sha256", sha256(bytes))
+                    put("sha256", bytes.sha256)
                     putNullable("mimeType", media.mimeType)
                 }
             }
@@ -116,7 +118,7 @@ internal object PhysicalObjectCollectionExportCodec {
         requireEntrySize(manifestBytes)
 
         val total = manifestBytes.size.toLong() + territoryBytes.size + observersBytes.size +
-            objectPayloads.values.sumOf { it.size.toLong() } + mediaBytes.values.sumOf { it.size.toLong() }
+            objectPayloads.values.sumOf { it.size.toLong() } + mediaBytes.values.sumOf { it.size }
         if (total > PhysicalObjectCollectionExportContract.MAX_TOTAL_BYTES) invalid("package is too large")
 
         ZipOutputStream(BufferedOutputStream(output)).use { zip ->
@@ -137,7 +139,9 @@ internal object PhysicalObjectCollectionExportCodec {
     }
 
     fun decode(input: InputStream): DecodedPhysicalObjectCollectionExport {
-        val entries = readArchive(input)
+        val archive = readArchive(input)
+        try {
+        val entries = archive.entries
         val manifest = parseObject(entries[PhysicalObjectCollectionExportContract.MANIFEST_ENTRY], "manifest")
         manifest.requireKeys(
             "profile", "formatVersion", "territoryId", "physicalObjectType", "objectCount",
@@ -196,7 +200,7 @@ internal object PhysicalObjectCollectionExportCodec {
         val mediaOwners = hashMapOf<UUID, UUID>()
         val mediaTypes = hashMapOf<UUID, PhysicalObjectMediaType>()
         val mediaMimeTypes = hashMapOf<UUID, String?>()
-        val mediaBytes = linkedMapOf<UUID, ByteArray>()
+        val mediaBytes = linkedMapOf<UUID, ArchivePayload>()
         manifest.array("media").forEach { element ->
             val descriptor = element.asObject("media descriptor")
             descriptor.requireKeys(
@@ -237,12 +241,16 @@ internal object PhysicalObjectCollectionExportCodec {
         }
         val collection = PhysicalObjectCollectionExportGraph(territory, type, objects)
         validate(collection, mediaBytes, allowFixationDate)
-        return DecodedPhysicalObjectCollectionExport(collection, mediaBytes)
+        return DecodedPhysicalObjectCollectionExport(collection, mediaBytes, archive)
+        } catch (error: Throwable) {
+            try { archive.close() } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
+            throw error
+        }
     }
 
     private fun validate(
         graph: PhysicalObjectCollectionExportGraph,
-        mediaBytes: Map<UUID, ByteArray>,
+        mediaBytes: Map<UUID, ArchivePayload>,
         allowFixationDate: Boolean,
     ) {
         PhysicalObjectExportValidator.validateSupportedType(graph.type)
@@ -316,33 +324,24 @@ internal object PhysicalObjectCollectionExportCodec {
     private fun verifyDescriptor(
         descriptor: JsonObject,
         expectedEntry: String,
-        entries: Map<String, ByteArray>,
+        entries: Map<String, ArchivePayload>,
     ): ByteArray {
         descriptor.requireKeys("entry", "byteLength", "sha256")
         if (descriptor.string("entry") != expectedEntry) invalid("unexpected descriptor entry")
         val bytes = entries[expectedEntry] ?: invalid("$expectedEntry is missing")
         verifyBytes(bytes, descriptor.long("byteLength"), descriptor.string("sha256"), expectedEntry)
-        return bytes
+        return try { bytes.readMetadata(PhysicalObjectCollectionExportContract.MAX_ENTRY_BYTES) }
+        catch (error: Exception) { throw InvalidPhysicalObjectExport("malformed $expectedEntry", error) }
     }
 
-    private fun readArchive(input: InputStream): Map<String, ByteArray> = try {
-        val result = linkedMapOf<String, ByteArray>()
-        val guard = ZipReadGuard(ZipSafetyPolicy(
+    private fun readArchive(input: InputStream): StagedZipArchive = try {
+        StagedZipArchive.read(input, ZipSafetyPolicy(
             PhysicalObjectCollectionExportContract.MAX_ENTRIES,
             PhysicalObjectCollectionExportContract.MAX_ENTRY_BYTES,
             PhysicalObjectCollectionExportContract.MAX_TOTAL_BYTES,
-        ))
-        ZipInputStream(BufferedInputStream(input)).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                zipMechanics(entry.isDirectory) { guard.acceptEntry(entry.name, entry.isDirectory) }
-                val bytes = zipMechanics { guard.readEntry(zip) }
-                result[entry.name] = bytes
-                zip.closeEntry()
-            }
-        }
-        if (result.isEmpty()) invalid("empty archive")
-        result
+        )).also { if (it.entries.isEmpty()) { it.close(); invalid("empty archive") } }
+    } catch (error: ZipSafetyException) {
+        throw InvalidPhysicalObjectExport(if (error.isDirectory) "directory ZIP entry is not allowed" else zipFailureMessage(error.failure), error)
     } catch (error: PhysicalObjectExportException) {
         throw error
     } catch (error: Exception) {
@@ -350,6 +349,15 @@ internal object PhysicalObjectCollectionExportCodec {
     }
 
     private fun validateEntryName(name: String) = zipMechanics { validateZipRelativePath(name) }
+
+    private fun zipFailureMessage(failure: ZipSafetyFailure) = when (failure) {
+        ZipSafetyFailure.ENTRY_COUNT -> "too many ZIP entries"
+        ZipSafetyFailure.UNSAFE_PATH -> "unsafe ZIP entry"
+        ZipSafetyFailure.DUPLICATE -> "duplicate ZIP entry"
+        ZipSafetyFailure.ENTRY_BYTES -> "ZIP entry is too large"
+        ZipSafetyFailure.TOTAL_BYTES -> "archive is too large"
+        else -> "malformed archive"
+    }
 
     private inline fun <T> zipMechanics(isDirectory: Boolean = false, block: () -> T): T =
         try { block() } catch (error: ZipSafetyException) {
@@ -369,14 +377,22 @@ internal object PhysicalObjectCollectionExportCodec {
         zip.closeEntry()
     }
 
+    private fun putEntry(zip: ZipOutputStream, name: String, payload: ArchivePayload) {
+        zip.putNextEntry(ZipEntry(name).apply { time = 0L })
+        payload.copyTo(zip)
+        zip.closeEntry()
+    }
+
     private fun requireEntrySize(bytes: ByteArray) {
         if (bytes.size.toLong() > PhysicalObjectCollectionExportContract.MAX_ENTRY_BYTES) invalid("entry is too large")
     }
 
-    private fun verifyBytes(bytes: ByteArray, size: Long, hash: String, label: String) {
-        requireEntrySize(bytes)
-        if (size != bytes.size.toLong()) throw PhysicalObjectExportIntegrityError("$label size mismatch")
-        if (!hash.matches(hashPattern) || hash != sha256(bytes)) {
+    private fun sha256Bytes(bytes: ByteArray): String = ArchivePayload.metadata(bytes).sha256
+
+    private fun verifyBytes(bytes: ArchivePayload, size: Long, hash: String, label: String) {
+        if (bytes.size > PhysicalObjectCollectionExportContract.MAX_ENTRY_BYTES) invalid("entry is too large")
+        if (size != bytes.size) throw PhysicalObjectExportIntegrityError("$label size mismatch")
+        if (!hash.matches(hashPattern) || hash != bytes.sha256) {
             throw PhysicalObjectExportIntegrityError("$label SHA-256 mismatch")
         }
     }
@@ -385,6 +401,15 @@ internal object PhysicalObjectCollectionExportCodec {
         if (bytes == null) invalid("$label is missing")
         return try {
             json.parseToJsonElement(bytes.toString(StandardCharsets.UTF_8)).jsonObject
+        } catch (error: Exception) {
+            throw InvalidPhysicalObjectExport("malformed $label", error)
+        }
+    }
+
+    private fun parseObject(payload: ArchivePayload?, label: String): JsonObject {
+        if (payload == null) invalid("$label is missing")
+        return try {
+            json.parseToJsonElement(payload.readMetadata(PhysicalObjectCollectionExportContract.MAX_ENTRY_BYTES).toString(StandardCharsets.UTF_8)).jsonObject
         } catch (error: Exception) {
             throw InvalidPhysicalObjectExport("malformed $label", error)
         }

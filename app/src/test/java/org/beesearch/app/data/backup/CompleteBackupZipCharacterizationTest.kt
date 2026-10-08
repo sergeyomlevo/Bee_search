@@ -1,6 +1,8 @@
 package org.beesearch.app.data.backup
 
 import org.beesearch.app.domain.backup.*
+import org.beesearch.app.data.zip.ArchivePayload
+import org.beesearch.app.data.zip.StagedZipArchive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -21,7 +23,7 @@ class CompleteBackupZipCharacterizationTest {
     @get:Rule val temporary = TemporaryFolder()
 
     @Test fun parsesMinimalValidV1ThroughV6Archives() {
-        (1..6).forEach { format -> parse(readArchive(validArchive(format))) }
+        (1..6).forEach { format -> parseArchive(validArchive(format)) }
     }
 
     @Test fun parsesNonEmptyV6AndReorderedEntries() {
@@ -30,7 +32,7 @@ class CompleteBackupZipCharacterizationTest {
         val entries = base + ("research/territories.json" to territory.toByteArray())
         val complete = entries + (MANIFEST to manifest(6, CONTRACTS[5]!!, entries).toByteArray())
         val file = temporary.newFile().also { it.writeBytes(zipEntries(complete.toList().reversed())) }
-        parse(readArchive(file))
+        parseArchive(file)
     }
 
     @Test fun readArchiveHasInclusiveEntryAndByteBoundaries() {
@@ -68,7 +70,9 @@ class CompleteBackupZipCharacterizationTest {
         val central = full.indexOfSignature(0x50, 0x4b, 0x01, 0x02)
         val file = temporary.newFile("central-truncated.zip")
         file.writeBytes(full.copyOfRange(0, central))
-        assertEquals(byteArrayOf(1, 2, 3).toList(), readArchive(file).getValue("complete").toList())
+        readArchive(file).use { archive ->
+            assertEquals(byteArrayOf(1, 2, 3).toList(), archive.entries.getValue("complete").readMetadata(16).toList())
+        }
     }
 
     @Test fun parseReportsRequiredMissingExtraMalformedAndIntegrityCases() {
@@ -123,10 +127,16 @@ class CompleteBackupZipCharacterizationTest {
         assertParseFailure(base - MANIFEST, MissingBackupCollection::class.java, MANIFEST)
     }
 
-    private fun readArchive(file: File): Map<String, ByteArray> = invoke("readArchive", file)
+    private fun readArchive(file: File): StagedZipArchive = invoke("readArchive", file)
     private fun assertReadFailure(bytes: ByteArray, type: Class<out Throwable>, message: String) =
         assertReadFailure(temporary.newFile().also { it.writeBytes(bytes) }, type, message)
-    private fun parse(entries: Map<String, ByteArray>) { invoke<Any>("parse", entries) }
+    private fun parse(entries: Map<String, ByteArray>) {
+        invoke<Any>("parse", entries.mapValues { ArchivePayload.metadata(it.value) })
+    }
+
+    private fun parseArchive(file: File) {
+        readArchive(file).use { archive -> invoke<Any>("parse", archive.entries) }
+    }
 
     private inline fun <reified T> invoke(name: String, arg: Any): T {
         val method: Method = Class.forName("org.beesearch.app.data.backup.BackupCoreKt").declaredMethods.single { it.name == name }
@@ -134,9 +144,15 @@ class CompleteBackupZipCharacterizationTest {
         return try { method.invoke(null, arg) as T } catch (e: InvocationTargetException) { throw e.targetException }
     }
 
-    private fun assertReadOk(file: File) { readArchive(file) }
+    private fun assertReadOk(file: File) { readArchive(file).use { } }
     private fun assertReadFailure(file: File, type: Class<out Throwable>, message: String) {
-        try { readArchive(file); throw AssertionError("expected $type") } catch (e: Throwable) { assertEquals(type, e.javaClass); assertTrue("${e.message}", e.message!!.contains(message)) }
+        try {
+            readArchive(file).also { it.close() }
+            throw AssertionError("expected $type")
+        } catch (e: Throwable) {
+            assertEquals(type, e.javaClass)
+            assertTrue("${e.message}", e.message!!.contains(message))
+        }
     }
     private fun assertParseFailure(entries: Map<String, ByteArray>, type: Class<out Throwable>, message: String) {
         try { parse(entries); throw AssertionError("expected $type") } catch (e: Throwable) { assertEquals(type, e.javaClass); assertTrue("${e.message}", e.message!!.contains(message)) }

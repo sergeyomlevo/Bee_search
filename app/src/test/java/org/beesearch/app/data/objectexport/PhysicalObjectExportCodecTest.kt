@@ -1,6 +1,7 @@
 package org.beesearch.app.data.objectexport
 
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
@@ -13,6 +14,7 @@ import java.util.zip.ZipOutputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.domain.model.HollowProperties
 import org.beesearch.app.domain.model.LogHiveProperties
 import org.beesearch.app.domain.model.PhysicalObjectMedia
@@ -23,6 +25,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Test
 
 /**
@@ -30,6 +33,13 @@ import org.junit.Test
  * the reader is about a file that claims this profile.
  */
 class PhysicalObjectExportCodecTest {
+    private val decodedArchives = mutableListOf<java.io.Closeable>()
+
+    @After
+    fun closeDecodedArchives() {
+        decodedArchives.asReversed().forEach { it.close() }
+        decodedArchives.clear()
+    }
     @Test
     fun `v2 fixation date is unchanged across timezone changes`() {
         val fixture = fixture(PhysicalObjectType.HOLLOW).graph.copy(fixationDate = LocalDate.of(2026, 12, 31))
@@ -49,9 +59,7 @@ class PhysicalObjectExportCodecTest {
         val fixture = fixture(PhysicalObjectType.HOLLOW)
         val output = ByteArrayOutputStream().apply { write("existing".toByteArray()) }
         assertInvalid {
-            PhysicalObjectExportCodec.encode(
-                fixture.graph.copy(fixationDate = LocalDate.of(10000, 1, 1)), fixture.blobs, output,
-            )
+            encode(fixture.graph.copy(fixationDate = LocalDate.of(10000, 1, 1)), fixture.blobs, output)
         }
         assertEquals("existing", output.toString(Charsets.UTF_8.name()))
     }
@@ -60,8 +68,8 @@ class PhysicalObjectExportCodecTest {
     fun `v2 carries canonical fixation date including null without deriving from createdAt`() {
         val fixture = fixture(PhysicalObjectType.HOLLOW)
         val dated = fixture.graph.copy(fixationDate = LocalDate.of(2026, 9, 21))
-        assertEquals(dated, PhysicalObjectExportCodec.decode(encode(dated, fixture.blobs).inputStream()).graph)
-        assertNull(PhysicalObjectExportCodec.decode(encode(fixture.graph, fixture.blobs).inputStream()).graph.fixationDate)
+        assertEquals(dated, decode(encode(dated, fixture.blobs)).graph)
+        assertNull(decode(encode(fixture.graph, fixture.blobs)).graph.fixationDate)
 
         val original = entries(encode(dated, fixture.blobs))
         assertInvalid {
@@ -86,8 +94,8 @@ class PhysicalObjectExportCodecTest {
     fun `legacy single export accepts null fixation date and refuses a non-null date before writing`() {
         val fixture = fixture(PhysicalObjectType.HOLLOW)
         val output = ByteArrayOutputStream()
-        PhysicalObjectExportCodec.encodeV1(fixture.graph, fixture.blobs, output)
-        assertNull(PhysicalObjectExportCodec.decode(output.toByteArray().inputStream()).graph.fixationDate)
+        encodeV1(fixture.graph, fixture.blobs, output)
+        assertNull(decode(output.toByteArray()).graph.fixationDate)
         assertFalse(entries(output.toByteArray()).getValue("object.json").decodeToString().contains("fixationDate"))
         assertInvalid {
             val legacy = entries(output.toByteArray())
@@ -96,7 +104,7 @@ class PhysicalObjectExportCodecTest {
 
         val divergent = fixture.graph.copy(fixationDate = LocalDate.parse("2026-09-21"))
         val untouched = ByteArrayOutputStream().apply { write("existing".toByteArray()) }
-        assertLegacyNotRepresentable { PhysicalObjectExportCodec.encodeV1(divergent, fixture.blobs, untouched) }
+        assertLegacyNotRepresentable { encodeV1(divergent, fixture.blobs, untouched) }
         assertArrayEquals("existing".toByteArray(), untouched.toByteArray())
     }
 
@@ -104,20 +112,20 @@ class PhysicalObjectExportCodecTest {
     fun `hollow round trip preserves the object its properties its media and its context`() {
         val fixture = fixture(PhysicalObjectType.HOLLOW)
         val archive = encode(fixture.graph, fixture.blobs)
-        val decoded = PhysicalObjectExportCodec.decode(archive.inputStream())
+        val decoded = decode(archive)
 
         assertEquals(fixture.graph, decoded.graph)
-        fixture.blobs.forEach { (id, bytes) -> assertArrayEquals(bytes, decoded.mediaBytes.getValue(id)) }
+        fixture.blobs.forEach { (id, bytes) -> assertArrayEquals(bytes, decoded.mediaBytes.getValue(id).open().use { it.readBytes() }) }
     }
 
     @Test
     fun `log hive round trip preserves the object its properties its media and its context`() {
         val fixture = fixture(PhysicalObjectType.LOG_HIVE)
         val archive = encode(fixture.graph, fixture.blobs)
-        val decoded = PhysicalObjectExportCodec.decode(archive.inputStream())
+        val decoded = decode(archive)
 
         assertEquals(fixture.graph, decoded.graph)
-        fixture.blobs.forEach { (id, bytes) -> assertArrayEquals(bytes, decoded.mediaBytes.getValue(id)) }
+        fixture.blobs.forEach { (id, bytes) -> assertArrayEquals(bytes, decoded.mediaBytes.getValue(id).open().use { it.readBytes() }) }
     }
 
     @Test
@@ -131,7 +139,7 @@ class PhysicalObjectExportCodecTest {
             media = emptyList(),
         )
 
-        val decoded = PhysicalObjectExportCodec.decode(encode(graph, emptyMap()).inputStream()).graph
+        val decoded = decode(encode(graph, emptyMap())).graph
 
         assertNull(decoded.properties)
         assertNull(decoded.name)
@@ -391,10 +399,23 @@ class PhysicalObjectExportCodecTest {
         )
     }
 
-    private fun encode(graph: PhysicalObjectExportGraph, blobs: Map<UUID, ByteArray>): ByteArray =
-        ByteArrayOutputStream().also { PhysicalObjectExportCodec.encode(graph, blobs, it) }.toByteArray()
+    private fun encode(graph: PhysicalObjectExportGraph, blobs: Map<UUID, ByteArray>, output: ByteArrayOutputStream) =
+        PhysicalObjectExportCodec.encode(graph, payloads(blobs), output)
 
-    private fun decode(archive: ByteArray) = PhysicalObjectExportCodec.decode(archive.inputStream())
+    private fun encode(graph: PhysicalObjectExportGraph, blobs: Map<UUID, ByteArray>): ByteArray =
+        ByteArrayOutputStream().also { encode(graph, blobs, it) }.toByteArray()
+
+    private fun encodeV1(graph: PhysicalObjectExportGraph, blobs: Map<UUID, ByteArray>, output: ByteArrayOutputStream) =
+        PhysicalObjectExportCodec.encodeV1(graph, payloads(blobs), output)
+
+    private fun payloads(blobs: Map<UUID, ByteArray>) = blobs.mapValues { (_, bytes) ->
+        File.createTempFile("bee-export-test-", ".media").also {
+            it.writeBytes(bytes)
+            it.deleteOnExit()
+        }.let(ArchivePayload::fromFile)
+    }
+
+    private fun decode(archive: ByteArray) = PhysicalObjectExportCodec.decode(archive.inputStream()).also(decodedArchives::add)
 
     private fun entries(archive: ByteArray): LinkedHashMap<String, ByteArray> {
         val result = linkedMapOf<String, ByteArray>()

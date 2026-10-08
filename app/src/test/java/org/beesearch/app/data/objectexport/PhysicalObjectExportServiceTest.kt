@@ -42,9 +42,59 @@ class PhysicalObjectExportServiceTest {
             runBlocking { service.export(graph.id, output) }
 
             assertEquals(listOf(graph.id), calls)
-            val decoded = PhysicalObjectExportCodec.decode(output.toByteArray().inputStream())
-            assertEquals(graph, decoded.graph)
-            assertArrayEquals(mediaFile.readBytes(), decoded.mediaBytes.getValue(graph.media.single().id))
+            PhysicalObjectExportCodec.decode(output.toByteArray().inputStream()).use { decoded ->
+                assertEquals(graph, decoded.graph)
+                assertArrayEquals(mediaFile.readBytes(), decoded.mediaBytes.getValue(graph.media.single().id).open().use { it.readBytes() })
+            }
+        }
+    }
+
+    @Test
+    fun `single export streams a multi-buffer payload`() = withStore { store ->
+        val payload = ByteArray(96 * 1024) { index -> (index * 31).toByte() }
+        val base = graph(PhysicalObjectType.HOLLOW)
+        val media = base.media.single().copy(byteSize = payload.size.toLong(), sha256 = sha(payload))
+        val value = base.copy(media = listOf(media))
+        val file = store.resolve(media.relativePath).also { it.parentFile?.mkdirs(); it.writeBytes(payload) }
+        val output = ByteArrayOutputStream()
+        runBlocking {
+            PhysicalObjectExportService(PhysicalObjectExportSource { value }, store).export(value.id, output)
+        }
+        PhysicalObjectExportCodec.decode(output.toByteArray().inputStream()).use { decoded ->
+            assertEquals(payload.size.toLong(), decoded.mediaBytes.getValue(media.id).size)
+            assertEquals(sha(payload), decoded.mediaBytes.getValue(media.id).sha256)
+        }
+        assertTrue(file.isFile)
+    }
+
+    @Test
+    fun `collection export streams multi-buffer payloads per object`() = withStore { store ->
+        val firstBase = graph(PhysicalObjectType.HOLLOW)
+        val secondBase = graph(PhysicalObjectType.HOLLOW).withIdentity(
+            UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 5,
+        )
+        val values = listOf(firstBase, secondBase).mapIndexed { index, base ->
+            val payload = ByteArray(96 * 1024) { value -> (value + index * 17).toByte() }
+            val media = base.media.single().copy(byteSize = payload.size.toLong(), sha256 = sha(payload))
+            val value = base.copy(media = listOf(media))
+            store.resolve(media.relativePath).also { it.parentFile?.mkdirs(); it.writeBytes(payload) }
+            value
+        }
+        val collection = PhysicalObjectCollectionExportGraph(values.first().territory, PhysicalObjectType.HOLLOW, values)
+        val output = ByteArrayOutputStream()
+        runBlocking {
+            PhysicalObjectCollectionExportService(
+                PhysicalObjectCollectionExportSource { _, _ -> collection }, store,
+            ).export(collection.territory.id, collection.type, output)
+        }
+        PhysicalObjectCollectionExportCodec.decode(output.toByteArray().inputStream()).use { decoded ->
+            values.forEach { value ->
+                val media = value.media.single()
+                val payload = decoded.mediaBytes.getValue(media.id)
+                assertEquals(media.byteSize, payload.size)
+                assertEquals(media.sha256, payload.sha256)
+            }
         }
     }
 
@@ -61,7 +111,8 @@ class PhysicalObjectExportServiceTest {
 
             runBlocking { service.export(graph.id, output) }
 
-            val decoded = PhysicalObjectExportCodec.decode(output.toByteArray().inputStream()).graph
+            PhysicalObjectExportCodec.decode(output.toByteArray().inputStream()).use { decodedPackage ->
+            val decoded = decodedPackage.graph
             assertEquals(graph.territory, decoded.territory)
             assertEquals(graph.observer, decoded.observer)
             assertEquals(graph.creatorObserverId, decoded.creatorObserverId)
@@ -69,6 +120,7 @@ class PhysicalObjectExportServiceTest {
                 setOf("object", "properties", "media", "territory", "observer"),
                 objectJsonKeys(output.toByteArray()),
             )
+            }
         }
 
     @Test
@@ -83,9 +135,11 @@ class PhysicalObjectExportServiceTest {
 
         runBlocking { service.export(graph.id, output) }
 
-        val decoded = PhysicalObjectExportCodec.decode(output.toByteArray().inputStream()).graph
-        assertNull(decoded.observer)
-        assertNull(decoded.creatorObserverId)
+        PhysicalObjectExportCodec.decode(output.toByteArray().inputStream()).use { decodedPackage ->
+            val decoded = decodedPackage.graph
+            assertNull(decoded.observer)
+            assertNull(decoded.creatorObserverId)
+        }
     }
 
     @Test
@@ -157,10 +211,11 @@ class PhysicalObjectExportServiceTest {
 
         runBlocking { service.export(first.territoryId, PhysicalObjectType.HOLLOW, output) }
 
-        val decoded = PhysicalObjectCollectionExportCodec.decode(output.toByteArray().inputStream())
-        assertEquals(listOf(first.territoryId to PhysicalObjectType.HOLLOW), calls)
-        assertEquals(setOf(first.id, second.id), decoded.graph.objects.map { it.id }.toSet())
-        assertEquals(setOf(first.media.single().id, second.media.single().id), decoded.mediaBytes.keys)
+        PhysicalObjectCollectionExportCodec.decode(output.toByteArray().inputStream()).use { decoded ->
+            assertEquals(listOf(first.territoryId to PhysicalObjectType.HOLLOW), calls)
+            assertEquals(setOf(first.id, second.id), decoded.graph.objects.map { it.id }.toSet())
+            assertEquals(setOf(first.media.single().id, second.media.single().id), decoded.mediaBytes.keys)
+        }
         assertEquals(collection, collection)
     }
 

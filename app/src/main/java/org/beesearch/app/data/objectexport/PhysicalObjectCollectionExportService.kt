@@ -8,6 +8,7 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.repository.ObserverRepository
 import org.beesearch.app.domain.repository.PhysicalObjectRepository
@@ -64,7 +65,7 @@ internal class PhysicalObjectCollectionExportService(
         val graph = source.load(territoryId, type)
         if (graph.objects.isEmpty()) throw EmptyPhysicalObjectCollectionExport(type)
         withContext(Dispatchers.IO) {
-            val mediaBytes = linkedMapOf<UUID, ByteArray>()
+            val mediaBytes = linkedMapOf<UUID, ArchivePayload>()
             graph.objects.forEach { value ->
                 value.media.forEach { media ->
                     val file = try {
@@ -76,7 +77,7 @@ internal class PhysicalObjectCollectionExportService(
                     if (file.length() != media.byteSize) {
                         throw PhysicalObjectExportIntegrityError("Размер медиа не совпадает с метаданными")
                     }
-                    if (mediaBytes.put(media.id, file.readBytes()) != null) {
+                    if (mediaBytes.put(media.id, ArchivePayload.fromFile(file)) != null) {
                         throw InvalidPhysicalObjectExport("duplicate media id")
                     }
                 }
@@ -107,7 +108,9 @@ internal class SafPhysicalObjectCollectionDocumentExporter(
             val temporaryArchive = File.createTempFile("bee-search-object-collection-", ".zip", cacheDirectory)
             try {
                 temporaryArchive.outputStream().buffered().use { service.export(territoryId, type, it) }
-                temporaryArchive.inputStream().buffered().use(PhysicalObjectCollectionExportCodec::decode)
+                temporaryArchive.inputStream().buffered().use { input ->
+                    PhysicalObjectCollectionExportCodec.decode(input).use { }
+                }
                 val output = openDestination(destination)
                     ?: throw PhysicalObjectExportSourceMissing("Выбранный файл недоступен для записи")
                 output.use { destinationStream ->

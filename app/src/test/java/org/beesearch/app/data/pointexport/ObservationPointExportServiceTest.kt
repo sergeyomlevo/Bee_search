@@ -34,7 +34,7 @@ class ObservationPointExportServiceTest {
         runBlocking { service.export(selected.point.id, output) }
 
         assertEquals(listOf(selected.point.id), calls)
-        val decoded = ObservationPointExportCodec.decode(output.toByteArray().inputStream()).graph
+        val decoded = ObservationPointExportCodec.decode(output.toByteArray().inputStream()).use { it.graph }
         assertEquals(selected.point, decoded.point)
         assertTrue(decoded.point.id != other.point.id)
         assertEquals("Описание", selected.point.description)

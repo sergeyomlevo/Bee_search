@@ -120,60 +120,69 @@ internal class BackupService(
         val blobs = blobsV7(graph, portable, attachmentStore, objectMediaStore, format)
         val id = UUID.randomUUID()
         output.parentFile?.mkdirs()
-        ZipOutputStream(BufferedOutputStream(FileOutputStream(output))).use { zip ->
-            put(zip, MANIFEST, manifest(id, clock.instant(), sourceAppVersion, blobs, format))
-            blobs.forEach { put(zip, it.path, it.bytes) }
+        try {
+            ZipOutputStream(BufferedOutputStream(FileOutputStream(output))).use { zip ->
+                put(zip, MANIFEST, manifest(id, clock.instant(), sourceAppVersion, blobs, format))
+                blobs.forEach { put(zip, it.path, it.payload) }
+            }
+        } catch (error: Throwable) {
+            if (output.exists() && !output.delete()) error.addSuppressed(IOException("incomplete backup cleanup failed"))
+            throw error
         }
         return id
     }
 
     fun validate(input: File): BackupValidationResult {
-        val parsed = parse(readArchive(input))
-        return BackupValidationResult(parsed.archiveId, logicalDigest(parsed.blobs))
+        return readArchive(input).use { archive ->
+            val parsed = parse(archive.entries)
+            BackupValidationResult(parsed.archiveId, logicalDigest(parsed.blobs))
+        }
     }
 
     suspend fun restore(input: File) {
-        val parsed = parse(readArchive(input)) // All archive/graph validation precedes Room access.
-        val stagedFiles = stageFiles(parsed)
-        val activatedFiles = mutableListOf<File>()
-        try {
-            // A complete restore targets an empty research database. Check this
-            // before touching the live attachment root as well as inside the
-            // transaction below, so a rejected destination has no file effects.
-            if (database.withTransaction { database.backupDao().totalCount() } != 0) {
-                throw BackupDestinationNotEmpty("research database is not empty")
+        readArchive(input).use { archive ->
+            val parsed = parse(archive.entries) // All archive/graph validation precedes Room access.
+            val stagedFiles = stageFiles(parsed)
+            val activatedFiles = mutableListOf<File>()
+            try {
+                // A complete restore targets an empty research database. Check this
+                // before touching the live attachment root as well as inside the
+                // transaction below, so a rejected destination has no file effects.
+                if (database.withTransaction { database.backupDao().totalCount() } != 0) {
+                    throw BackupDestinationNotEmpty("research database is not empty")
+                }
+                activatedFiles += activateFiles(stagedFiles, parsed)
+                database.withTransaction {
+                    val dao = database.backupDao()
+                    if (dao.totalCount() != 0) throw BackupDestinationNotEmpty("research database is not empty")
+                    dao.insertTerritories(parsed.graph.territories); checkpoint.afterCollection("territories")
+                    dao.insertPhysicalObjectSequences(parsed.graph.sequences); checkpoint.afterCollection("physical-object-sequences")
+                    dao.insertObservers(parsed.graph.observers); checkpoint.afterCollection("observers")
+                    dao.insertPhysicalObjects(parsed.graph.physicalObjects); checkpoint.afterCollection("physical-objects")
+                    dao.insertHollows(parsed.graph.hollows); dao.insertLogHives(parsed.graph.logHives)
+                    dao.insertPhysicalObjectMedia(parsed.graph.objectMedia); checkpoint.afterCollection("physical-object-media")
+                    dao.insertApiaries(parsed.graph.apiaries); checkpoint.afterCollection("apiaries")
+                    dao.insertObservationPoints(parsed.graph.points); checkpoint.afterCollection("observation-points")
+                    dao.insertBees(parsed.graph.bees); checkpoint.afterCollection("bees")
+                    dao.insertFlightCycles(parsed.graph.cycles); checkpoint.afterCollection("flight-cycles")
+                    dao.insertObservationPointWeather(parsed.graph.weather)
+                    dao.insertObservationPointAttachments(parsed.graph.attachments)
+                }
+            } catch (error: BackupDestinationNotEmpty) {
+                cleanupRestore(stagedFiles, activatedFiles, error)
+                throw error
+            } catch (error: Exception) {
+                cleanupRestore(stagedFiles, activatedFiles, error)
+                throw BackupDatabaseRestoreFailure("database restore failed", error)
             }
-            activatedFiles += activateFiles(stagedFiles, parsed)
-            database.withTransaction {
-                val dao = database.backupDao()
-                if (dao.totalCount() != 0) throw BackupDestinationNotEmpty("research database is not empty")
-                dao.insertTerritories(parsed.graph.territories); checkpoint.afterCollection("territories")
-                dao.insertPhysicalObjectSequences(parsed.graph.sequences); checkpoint.afterCollection("physical-object-sequences")
-                dao.insertObservers(parsed.graph.observers); checkpoint.afterCollection("observers")
-                dao.insertPhysicalObjects(parsed.graph.physicalObjects); checkpoint.afterCollection("physical-objects")
-                dao.insertHollows(parsed.graph.hollows); dao.insertLogHives(parsed.graph.logHives)
-                dao.insertPhysicalObjectMedia(parsed.graph.objectMedia); checkpoint.afterCollection("physical-object-media")
-                dao.insertApiaries(parsed.graph.apiaries); checkpoint.afterCollection("apiaries")
-                dao.insertObservationPoints(parsed.graph.points); checkpoint.afterCollection("observation-points")
-                dao.insertBees(parsed.graph.bees); checkpoint.afterCollection("bees")
-                dao.insertFlightCycles(parsed.graph.cycles); checkpoint.afterCollection("flight-cycles")
-                dao.insertObservationPointWeather(parsed.graph.weather)
-                dao.insertObservationPointAttachments(parsed.graph.attachments)
-            }
-        } catch (error: BackupDestinationNotEmpty) {
-            stagedFiles?.deleteRecursively()
-            activatedFiles.asReversed().forEach { it.delete() }
-            throw error
-        } catch (error: Exception) {
-            stagedFiles?.deleteRecursively()
-            activatedFiles.asReversed().forEach { it.delete() }
-            throw BackupDatabaseRestoreFailure("database restore failed", error)
+            applySettings(parsed, "research restored, settings were not applied")
         }
-        applySettings(parsed, "research restored, settings were not applied")
     }
 
     /** Revalidates the archive and retries only portable state after a post-commit settings failure. */
-    suspend fun retrySettings(input: File) = applySettings(parse(readArchive(input)), "settings were not applied")
+    suspend fun retrySettings(input: File) = readArchive(input).use { archive ->
+        applySettings(parse(archive.entries), "settings were not applied")
+    }
 
     private suspend fun applySettings(parsed: Parsed, message: String) {
         try {
@@ -187,6 +196,15 @@ internal class BackupService(
             ))
         } catch (error: Exception) {
             throw BackupSettingsRestoreFailure(message, error)
+        }
+    }
+
+    private fun cleanupRestore(stage: File?, activated: List<File>, error: Throwable) {
+        if (stage != null && stage.exists() && !stage.deleteRecursively()) {
+            error.addSuppressed(IOException("restore staging cleanup failed"))
+        }
+        activated.asReversed().forEach { file ->
+            if (file.exists() && !file.delete()) error.addSuppressed(IOException("restore activation rollback failed"))
         }
     }
 
@@ -205,7 +223,7 @@ internal class BackupService(
                 val blob = blobs["attachment-file:${attachment.id}"] ?: throw MissingBackupCollection("attachment file ${attachment.id}")
                 val target = File(stage, attachment.relativePath)
                 target.parentFile?.mkdirs()
-                target.outputStream().buffered().use { it.write(blob.bytes) }
+                target.outputStream().buffered().use { blob.payload.copyTo(it) }
             }
             if (parsed.graph.objectMedia.isNotEmpty()) {
                 val objectStore = objectMediaStore ?: throw MalformedBackup("physical object media storage is not configured")
@@ -213,14 +231,14 @@ internal class BackupService(
                     val blob = blobs["object-media-file:${media.id}"] ?: throw MissingBackupCollection("object media file ${media.id}")
                     val target = File(stage, media.relativePath)
                     target.parentFile?.mkdirs()
-                    target.outputStream().buffered().use { it.write(blob.bytes) }
-                    if (media.byteSize != blob.bytes.size.toLong() || sha256(blob.bytes) != media.sha256) throw BackupIntegrityMismatch("object media file mismatch")
+                    target.outputStream().buffered().use { blob.payload.copyTo(it) }
+                    if (media.byteSize != blob.payload.size || blob.payload.sha256 != media.sha256) throw BackupIntegrityMismatch("object media file mismatch")
                     objectStore.resolve(media.relativePath)
                 }
             }
             return stage
         } catch (error: Exception) {
-            stage.deleteRecursively()
+            cleanupRestore(stage, emptyList(), error)
             throw error
         }
     }
@@ -247,16 +265,16 @@ internal class BackupService(
                 if (destination.exists() || !source.renameTo(destination)) throw IOException("object media activation failed")
                 activated += destination
             }
-            stage.deleteRecursively()
+            if (stage.exists() && !stage.deleteRecursively()) throw IOException("restore staging cleanup failed")
             return activated
         } catch (error: Exception) {
-            activated.asReversed().forEach { it.delete() }
+            cleanupRestore(stage, activated, error)
             throw error
         }
     }
 }
 
-private data class Blob(val name: String, val path: String, val bytes: ByteArray, val count: Int)
+private data class Blob(val name: String, val path: String, val payload: ArchivePayload, val count: Int)
 /** Fixed Room capture used by legacy backup and the metadata snapshot profile. */
 internal data class Graph(
     val territories: List<TerritoryEntity>, val observers: List<ObserverEntity>,
@@ -295,7 +313,7 @@ internal class ZipEntryTracker {
 private fun blobs(graph: Graph, settings: PortableSettingsSnapshot): List<Blob> {
     fun rows(name: String, values: List<String>): Blob {
         val text = values.joinToString("\n", postfix = if (values.isEmpty()) "" else "\n")
-        return Blob(name, BackupContractV1.collections.getValue(name), text.toByteArray(StandardCharsets.UTF_8), values.size)
+        return Blob(name, BackupContractV1.collections.getValue(name), ArchivePayload.metadata(text.toByteArray(StandardCharsets.UTF_8)), values.size)
     }
     return listOf(
         rows("territories", graph.territories.sortedBy { it.id.toString() }.map { it.json() }),
@@ -315,7 +333,7 @@ private fun blobsV3(
 ): List<Blob> {
     fun rows(name: String, values: List<String>): Blob {
         val text = values.joinToString("\n", postfix = if (values.isEmpty()) "" else "\n")
-        return Blob(name, BackupContractV3.collections.getValue(name), text.toByteArray(StandardCharsets.UTF_8), values.size)
+        return Blob(name, BackupContractV3.collections.getValue(name), ArchivePayload.metadata(text.toByteArray(StandardCharsets.UTF_8)), values.size)
     }
     val weatherByPoint = graph.weather.associateBy { it.observationPointId }
     val weatherRows = graph.points.map { point ->
@@ -343,7 +361,7 @@ private fun blobsV3(
         validatePathName(attachment.relativePath)
         domain(attachment.relativePath == ObservationAttachmentFileStore.relativePath(attachment.observationPointId, attachment.id), "attachment path is not deterministic")
         val archivePath = "${BackupContractV3.ATTACHMENT_PREFIX}${attachment.observationPointId}/${attachment.id}"
-        result += Blob("attachment-file:${attachment.id}", archivePath, file.readBytes(), 1)
+        result += Blob("attachment-file:${attachment.id}", archivePath, mediaPayload(file, attachment.byteSize, attachment.sha256), 1)
     }
     return result
 }
@@ -357,7 +375,7 @@ private fun blobsV7(
 ): List<Blob> {
     fun rows(name: String, values: List<String>): Blob {
         val text = values.joinToString("\n", postfix = if (values.isEmpty()) "" else "\n")
-        return Blob(name, BackupContractV6.collections.getValue(name), text.toByteArray(StandardCharsets.UTF_8), values.size)
+        return Blob(name, BackupContractV6.collections.getValue(name), ArchivePayload.metadata(text.toByteArray(StandardCharsets.UTF_8)), values.size)
     }
     val weatherByPoint = graph.weather.associateBy { it.observationPointId }
     val weatherRows = graph.points.map { point -> weatherByPoint[point.id] ?: ObservationPointWeatherEntity(point.id, WeatherStatus.PENDING, null, null, null, null, null, null) }
@@ -383,7 +401,7 @@ private fun blobsV7(
         val file = store.resolve(attachment.relativePath)
         if (!file.isFile || file.length() != attachment.byteSize || sha256(file) != attachment.sha256) throw BackupIntegrityMismatch("attachment file mismatch")
         val path = "${BackupContractV6.ATTACHMENT_PREFIX}${attachment.observationPointId}/${attachment.id}"
-        result += Blob("attachment-file:${attachment.id}", path, file.readBytes(), 1)
+        result += Blob("attachment-file:${attachment.id}", path, mediaPayload(file, attachment.byteSize, attachment.sha256), 1)
     }
     graph.objectMedia.sortedBy { it.id.toString() }.forEach { media ->
         val store = objectMediaStore ?: throw MalformedBackup("physical object media storage is not configured")
@@ -392,9 +410,13 @@ private fun blobsV7(
         domain(media.relativePath == PhysicalObjectMediaFileStore.relativePath(media.physicalObjectId, media.id), "object media path is not deterministic")
         if (!file.isFile || file.length() != media.byteSize || sha256(file) != media.sha256) throw BackupIntegrityMismatch("object media file mismatch")
         val path = "${BackupContractV6.OBJECT_MEDIA_PREFIX}${media.physicalObjectId}/${media.id}"
-        result += Blob("object-media-file:${media.id}", path, file.readBytes(), 1)
+        result += Blob("object-media-file:${media.id}", path, mediaPayload(file, media.byteSize, media.sha256), 1)
     }
     return result
+}
+
+private fun mediaPayload(file: File, size: Long, hash: String): ArchivePayload = ArchivePayload.fromFile(file).also {
+    if (it.size != size || it.sha256 != hash) throw BackupIntegrityMismatch("media source changed")
 }
 
 private fun manifest(id: UUID, created: Instant, appVersion: String, blobs: List<Blob>, format: Int = BackupContractV7.FORMAT) = obj(
@@ -403,12 +425,12 @@ private fun manifest(id: UUID, created: Instant, appVersion: String, blobs: List
     "roomSchemaVersion" to (if (format == 7) "13" else "11"), "profile" to j(BackupContractV6.PROFILE),
     "collections" to blobs.joinToString(",", "[", "]") { obj(
         "name" to j(it.name), "path" to j(it.path), "collectionSchemaVersion" to "1", "required" to "true",
-        "recordCount" to it.count.toString(), "byteLength" to it.bytes.size.toString(), "sha256" to j(sha256(it.bytes)),
+        "recordCount" to it.count.toString(), "byteLength" to it.payload.size.toString(), "sha256" to j(it.payload.sha256),
     ) },
 ).toByteArray(StandardCharsets.UTF_8)
 
-private fun parse(entries: Map<String, ByteArray>): Parsed {
-    val manifest = objectFrom(entries[MANIFEST] ?: throw MissingBackupCollection(MANIFEST), "manifest")
+private fun parse(entries: Map<String, ArchivePayload>): Parsed {
+    val manifest = objectFrom((entries[MANIFEST] ?: throw MissingBackupCollection(MANIFEST)).readMetadata(MAX_ENTRY_BYTES), "manifest")
     val format = manifest.int("backupFormatVersion")
     val schema = manifest.int("archiveSchemaVersion")
     if (format !in 1..7) throw UnsupportedBackupFormat("unsupported backup format")
@@ -444,7 +466,7 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
                 validatePathName(path)
                 if (!describedPaths.add(path)) throw MalformedBackup("duplicate collection path $path")
                 val bytes = entries[path] ?: throw MissingBackupCollection(name)
-                if (item.long("byteLength") != bytes.size.toLong() || sha256(bytes) != item.string("sha256")) throw BackupIntegrityMismatch("attachment file mismatch")
+                if (item.long("byteLength") != bytes.size || bytes.sha256 != item.string("sha256")) throw BackupIntegrityMismatch("attachment file mismatch")
                 if (item.int("recordCount") != 1) throw BackupIntegrityMismatch("attachment recordCount mismatch")
                 known[name] = Blob(name, path, bytes, 1)
                 return@forEach
@@ -454,9 +476,9 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
             validatePathName(path)
             if (!describedPaths.add(path)) throw MalformedBackup("duplicate collection path $path")
             entries[path]?.let { bytes ->
-                if (item.long("byteLength") != bytes.size.toLong()) throw BackupIntegrityMismatch("byteLength mismatch for $name")
+                if (item.long("byteLength") != bytes.size) throw BackupIntegrityMismatch("byteLength mismatch for $name")
                 val expectedHash = item.string("sha256")
-                if (!expectedHash.matches(Regex("[0-9a-f]{64}")) || sha256(bytes) != expectedHash) throw BackupIntegrityMismatch("sha256 mismatch for $name")
+                if (!expectedHash.matches(Regex("[0-9a-f]{64}")) || bytes.sha256 != expectedHash) throw BackupIntegrityMismatch("sha256 mismatch for $name")
                 if (item.int("recordCount") < 0) throw BackupIntegrityMismatch("recordCount mismatch for $name")
                 optionalPaths += path
             }
@@ -467,17 +489,17 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
         if (path != contract.getValue(name)) throw MalformedBackup("unexpected path for $name")
         if (!describedPaths.add(path)) throw MalformedBackup("duplicate collection path $path")
         val bytes = entries[path] ?: throw MissingBackupCollection(name)
-        if (item.long("byteLength") != bytes.size.toLong()) throw BackupIntegrityMismatch("byteLength mismatch for $name")
+        if (item.long("byteLength") != bytes.size) throw BackupIntegrityMismatch("byteLength mismatch for $name")
         val expectedHash = item.string("sha256")
-        if (!expectedHash.matches(Regex("[0-9a-f]{64}")) || sha256(bytes) != expectedHash) throw BackupIntegrityMismatch("sha256 mismatch for $name")
+        if (!expectedHash.matches(Regex("[0-9a-f]{64}")) || bytes.sha256 != expectedHash) throw BackupIntegrityMismatch("sha256 mismatch for $name")
         val count = item.int("recordCount")
-        if (count < 0 || rows(bytes, name).size != count) throw BackupIntegrityMismatch("recordCount mismatch for $name")
+        if (count < 0 || rows(bytes.readMetadata(MAX_ENTRY_BYTES), name).size != count) throw BackupIntegrityMismatch("recordCount mismatch for $name")
         known[name] = Blob(name, path, bytes, count)
     }
     contract.keys.forEach { if (it !in known) throw MissingBackupCollection(it) }
     val listedPaths = known.values.mapTo(mutableSetOf(MANIFEST)) { it.path }.apply { addAll(optionalPaths) }
     if (entries.keys != listedPaths) throw MalformedBackup("unlisted ZIP entry")
-    fun objects(name: String) = rows(known.getValue(name).bytes, name).map { objectFrom(it.toByteArray(StandardCharsets.UTF_8), name) }
+    fun objects(name: String) = rows(known.getValue(name).payload.readMetadata(MAX_ENTRY_BYTES), name).map { objectFrom(it.toByteArray(StandardCharsets.UTF_8), name) }
     val graph = Graph(
         territories = objects("territories").map(::territory),
         observers = objects("observers").map(::observer),
@@ -515,20 +537,15 @@ private fun parse(entries: Map<String, ByteArray>): Parsed {
     return Parsed(archiveId, graphWithHistoricalSubtypes, settings, known.values.toList())
 }
 
-private fun readArchive(file: File): Map<String, ByteArray> = try {
-    val result = linkedMapOf<String, ByteArray>()
-    val guard = ZipReadGuard(ZipSafetyPolicy(MAX_ENTRIES, MAX_ENTRY_BYTES, MAX_TOTAL_BYTES))
-    ZipInputStream(BufferedInputStream(FileInputStream(file))).use { zip ->
-        while (true) {
-            val entry = zip.nextEntry ?: break
-            backupZipMechanics { guard.acceptEntry(entry.name, entry.isDirectory) }
-            val bytes = backupZipMechanics { guard.readEntry(zip) }
-            result[entry.name] = bytes
-            zip.closeEntry()
-        }
+private fun readArchive(file: File): StagedZipArchive = try {
+    val archive = backupZipMechanics {
+        file.inputStream().use { StagedZipArchive.read(it, ZipSafetyPolicy(MAX_ENTRIES, MAX_ENTRY_BYTES, MAX_TOTAL_BYTES)) }
     }
-    if (result.isEmpty()) throw MalformedBackup("empty archive")
-    result
+    if (archive.entries.isEmpty()) {
+        archive.close()
+        throw MalformedBackup("empty archive")
+    }
+    archive
 } catch (e: BackupException) { throw e } catch (e: Exception) { throw MalformedBackup("malformed archive", e) }
 
 private fun validatePathName(name: String) = backupZipMechanics { validateZipRelativePath(name) }
@@ -544,7 +561,23 @@ private inline fun <T> backupZipMechanics(block: () -> T): T = try { block() } c
     })
 }
 private fun put(zip: ZipOutputStream, name: String, bytes: ByteArray) { zip.putNextEntry(ZipEntry(name).apply { time = 0L }); zip.write(bytes); zip.closeEntry() }
-private fun logicalDigest(blobs: List<Blob>): String { val d = MessageDigest.getInstance("SHA-256"); blobs.sortedBy { it.name }.forEach { d.update(it.name.toByteArray()); d.update(0); d.update(it.bytes) }; return d.digest().hex() }
+private fun put(zip: ZipOutputStream, name: String, payload: ArchivePayload) {
+    zip.putNextEntry(ZipEntry(name).apply { time = 0L })
+    payload.copyTo(zip)
+    zip.closeEntry()
+}
+private fun logicalDigest(blobs: List<Blob>): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val sink = object : OutputStream() {
+        override fun write(value: Int) { digest.update(value.toByte()) }
+        override fun write(bytes: ByteArray, offset: Int, length: Int) { digest.update(bytes, offset, length) }
+    }
+    blobs.sortedBy { it.name }.forEach {
+        digest.update(it.name.toByteArray()); digest.update(0)
+        it.payload.copyTo(sink)
+    }
+    return digest.digest().hex()
+}
 
 internal fun validateSettings(settings: PortableSettingsSnapshot, graph: Graph) {
     val territories = graph.territories.mapTo(hashSetOf()) { it.id }
@@ -590,7 +623,7 @@ private fun validateAttachments(graph: Graph, blobs: Map<String, Blob>) {
         domain(attachment.sha256.matches(Regex("[0-9a-f]{64}")), "invalid attachment hash")
         val file = blobs["attachment-file:${attachment.id}"] ?: throw MissingBackupCollection("attachment file ${attachment.id}")
         val archivePath = "${BackupContractV2.ATTACHMENT_PREFIX}${attachment.observationPointId}/${attachment.id}"
-        if (file.path != archivePath || file.bytes.size.toLong() != attachment.byteSize || sha256(file.bytes) != attachment.sha256) throw BackupIntegrityMismatch("attachment metadata/file mismatch")
+        if (file.path != archivePath || file.payload.size != attachment.byteSize || file.payload.sha256 != attachment.sha256) throw BackupIntegrityMismatch("attachment metadata/file mismatch")
     }
     val attachmentIds = graph.attachments.mapTo(hashSetOf()) { "attachment-file:${it.id}" }
     blobs.keys.filter { it.startsWith("attachment-file:") }.forEach { if (it !in attachmentIds) throw MalformedBackup("unlisted attachment file") }
@@ -608,7 +641,7 @@ private fun validateObjectMedia(graph: Graph, blobs: Map<String, Blob>) {
         domain(media.sha256.matches(Regex("[0-9a-f]{64}")), "invalid object media hash")
         val blob = blobs["object-media-file:${media.id}"] ?: throw MissingBackupCollection("object media file ${media.id}")
         val expectedPath = "${BackupContractV5.OBJECT_MEDIA_PREFIX}${media.physicalObjectId}/${media.id}"
-        if (blob.path != expectedPath || blob.bytes.size.toLong() != media.byteSize || sha256(blob.bytes) != media.sha256) throw BackupIntegrityMismatch("object media metadata/file mismatch")
+        if (blob.path != expectedPath || blob.payload.size != media.byteSize || blob.payload.sha256 != media.sha256) throw BackupIntegrityMismatch("object media metadata/file mismatch")
     }
     blobs.keys.filter { it.startsWith("object-media-file:") }.forEach { if (it !in ids.map { id -> "object-media-file:$id" }) throw MalformedBackup("unlisted object media file") }
 }

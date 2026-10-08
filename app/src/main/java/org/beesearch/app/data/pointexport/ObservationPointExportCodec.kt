@@ -1,15 +1,12 @@
 package org.beesearch.app.data.pointexport
 
-import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
 import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -30,7 +27,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
-import org.beesearch.app.data.zip.ZipReadGuard
+import org.beesearch.app.data.zip.ArchivePayload
+import org.beesearch.app.data.zip.StagedZipArchive
 import org.beesearch.app.data.zip.ZipSafetyException
 import org.beesearch.app.data.zip.ZipSafetyFailure
 import org.beesearch.app.data.zip.ZipSafetyPolicy
@@ -55,25 +53,25 @@ internal object ObservationPointExportCodec {
 
     fun encode(
         graph: ObservationPointExportGraph,
-        attachmentBytes: Map<UUID, ByteArray>,
+        attachmentPayloads: Map<UUID, ArchivePayload>,
         output: OutputStream,
         formatVersion: Int = ObservationPointExportContract.FORMAT_VERSION,
     ) {
         requireVersion(formatVersion)
         val canonical = canonicalize(graph)
-        ObservationPointExportValidator.validate(canonical, attachmentBytes)
+        ObservationPointExportValidator.validate(canonical, attachmentPayloads)
         if (formatVersion == 1 && canonical.point.observationDate != legacyObservationDate(canonical.point.createdAt)) {
             throw LegacyObservationPointExportNotRepresentable("legacy format cannot represent canonical observationDate")
         }
         val pointBytes = pointJson(canonical, formatVersion).toString().toByteArray(StandardCharsets.UTF_8)
         requireEntrySize(pointBytes.size.toLong())
         val attachmentDescriptors = canonical.attachments.map { attachment ->
-            val bytes = attachmentBytes.getValue(attachment.id)
+            val payload = attachmentPayloads.getValue(attachment.id)
             buildJsonObject {
                 put("id", attachment.id.toString())
                 put("entry", ObservationPointExportContract.attachmentEntry(attachment.id))
-                put("byteLength", bytes.size)
-                put("sha256", sha256(bytes))
+                put("byteLength", payload.size)
+                put("sha256", payload.sha256)
                 attachment.mimeType?.let { put("mimeType", it) }
             }
         }
@@ -87,7 +85,7 @@ internal object ObservationPointExportCodec {
             put("attachments", JsonArray(attachmentDescriptors))
         }.toString().toByteArray(StandardCharsets.UTF_8)
         requireEntrySize(manifestBytes.size.toLong())
-        val total = manifestBytes.size.toLong() + pointBytes.size + attachmentBytes.values.sumOf { it.size.toLong() }
+        val total = manifestBytes.size.toLong() + pointBytes.size + attachmentPayloads.values.sumOf { it.size }
         if (total > ObservationPointExportContract.MAX_TOTAL_BYTES) {
             throw InvalidObservationPointExport("package is too large")
         }
@@ -95,57 +93,65 @@ internal object ObservationPointExportCodec {
             putEntry(zip, ObservationPointExportContract.MANIFEST_ENTRY, manifestBytes)
             putEntry(zip, ObservationPointExportContract.POINT_ENTRY, pointBytes)
             canonical.attachments.forEach { attachment ->
-                putEntry(zip, ObservationPointExportContract.attachmentEntry(attachment.id), attachmentBytes.getValue(attachment.id))
+                putPayloadEntry(zip, ObservationPointExportContract.attachmentEntry(attachment.id), attachmentPayloads.getValue(attachment.id))
             }
         }
     }
 
     fun decode(input: InputStream): DecodedObservationPointExport {
-        val entries = readArchive(input)
-        val manifest = parseObject(entries[ObservationPointExportContract.MANIFEST_ENTRY], "manifest")
-        if (manifest.string("profile") != ObservationPointExportContract.PROFILE) {
-            throw InvalidObservationPointExport("unsupported profile")
-        }
-        val formatVersion = requireVersion(manifest.int("formatVersion"))
-        val pointId = manifest.uuid("observationPointId")
-        val pointEntry = manifest.string("pointEntry")
-        if (pointEntry != ObservationPointExportContract.POINT_ENTRY) {
-            throw InvalidObservationPointExport("unexpected point entry")
-        }
-        val pointBytes = entries[pointEntry] ?: throw InvalidObservationPointExport("point.json is missing")
-        verifyBytes(pointBytes, manifest.long("pointByteLength"), manifest.string("pointSha256"), "point.json")
-
-        val descriptors = manifest.array("attachments")
-        val describedIds = hashSetOf<UUID>()
-        val describedEntries = hashSetOf<String>()
-        val bytesById = linkedMapOf<UUID, ByteArray>()
-        descriptors.forEach { element ->
-            val descriptor = element.asObject("attachment descriptor")
-            val id = descriptor.uuid("id")
-            if (!describedIds.add(id)) throw InvalidObservationPointExport("duplicate attachment id")
-            val entry = descriptor.string("entry")
-            validateEntryName(entry)
-            if (entry != ObservationPointExportContract.attachmentEntry(id) || !describedEntries.add(entry)) {
-                throw InvalidObservationPointExport("invalid attachment entry")
+        val archive = readArchive(input)
+        val entries = archive.entries
+        try {
+            val manifestPayload = entries[ObservationPointExportContract.MANIFEST_ENTRY]
+                ?: throw InvalidObservationPointExport("manifest is missing")
+            val manifest = parseObject(readMetadata(manifestPayload, manifestPayload.size, manifestPayload.sha256, "manifest"), "manifest")
+            if (manifest.string("profile") != ObservationPointExportContract.PROFILE) {
+                throw InvalidObservationPointExport("unsupported profile")
             }
-            val bytes = entries[entry] ?: throw InvalidObservationPointExport("attachment blob is missing")
-            verifyBytes(bytes, descriptor.long("byteLength"), descriptor.string("sha256"), entry)
-            bytesById[id] = bytes
-        }
-        val expectedEntries = buildSet {
-            add(ObservationPointExportContract.MANIFEST_ENTRY)
-            add(ObservationPointExportContract.POINT_ENTRY)
-            addAll(describedEntries)
-        }
-        if (entries.keys != expectedEntries) throw InvalidObservationPointExport("unexpected ZIP entry")
+            val formatVersion = requireVersion(manifest.int("formatVersion"))
+            val pointId = manifest.uuid("observationPointId")
+            val pointEntry = manifest.string("pointEntry")
+            if (pointEntry != ObservationPointExportContract.POINT_ENTRY) {
+                throw InvalidObservationPointExport("unexpected point entry")
+            }
+            val pointPayload = entries[pointEntry] ?: throw InvalidObservationPointExport("point.json is missing")
+            val pointBytes = readMetadata(pointPayload, manifest.long("pointByteLength"), manifest.string("pointSha256"), "point.json")
 
-        val graph = parseGraph(parseObject(pointBytes, "point.json"), formatVersion)
-        if (graph.point.id != pointId) throw InvalidObservationPointExport("manifest point id mismatch")
-        ObservationPointExportValidator.validate(graph, bytesById)
-        if (graph.attachments.map { it.id }.toSet() != describedIds) {
-            throw InvalidObservationPointExport("attachment manifest mismatch")
+            val descriptors = manifest.array("attachments")
+            val describedIds = hashSetOf<UUID>()
+            val describedEntries = hashSetOf<String>()
+            val payloadsById = linkedMapOf<UUID, ArchivePayload>()
+            descriptors.forEach { element ->
+                val descriptor = element.asObject("attachment descriptor")
+                val id = descriptor.uuid("id")
+                if (!describedIds.add(id)) throw InvalidObservationPointExport("duplicate attachment id")
+                val entry = descriptor.string("entry")
+                validateEntryName(entry)
+                if (entry != ObservationPointExportContract.attachmentEntry(id) || !describedEntries.add(entry)) {
+                    throw InvalidObservationPointExport("invalid attachment entry")
+                }
+                val payload = entries[entry] ?: throw InvalidObservationPointExport("attachment blob is missing")
+                verifyPayload(payload, descriptor.long("byteLength"), descriptor.string("sha256"), entry)
+                payloadsById[id] = payload
+            }
+            val expectedEntries = buildSet {
+                add(ObservationPointExportContract.MANIFEST_ENTRY)
+                add(ObservationPointExportContract.POINT_ENTRY)
+                addAll(describedEntries)
+            }
+            if (entries.keys != expectedEntries) throw InvalidObservationPointExport("unexpected ZIP entry")
+
+            val graph = parseGraph(parseObject(pointBytes, "point.json"), formatVersion)
+            if (graph.point.id != pointId) throw InvalidObservationPointExport("manifest point id mismatch")
+            ObservationPointExportValidator.validate(graph, payloadsById)
+            if (graph.attachments.map { it.id }.toSet() != describedIds) {
+                throw InvalidObservationPointExport("attachment manifest mismatch")
+            }
+            return DecodedObservationPointExport(graph, payloadsById, archive)
+        } catch (error: Throwable) {
+            try { archive.close() } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
+            throw error
         }
-        return DecodedObservationPointExport(graph, bytesById)
     }
 
     private fun canonicalize(graph: ObservationPointExportGraph) = graph.copy(
@@ -291,24 +297,21 @@ internal object ObservationPointExportCodec {
         )
     }
 
-    private fun readArchive(input: InputStream): Map<String, ByteArray> = try {
-        val result = linkedMapOf<String, ByteArray>()
-        val guard = ZipReadGuard(ZipSafetyPolicy(
+    private fun readArchive(input: InputStream): StagedZipArchive = try {
+        StagedZipArchive.read(input, ZipSafetyPolicy(
             ObservationPointExportContract.MAX_ENTRIES,
             ObservationPointExportContract.MAX_ENTRY_BYTES,
             ObservationPointExportContract.MAX_TOTAL_BYTES,
-        ))
-        ZipInputStream(BufferedInputStream(input)).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                zipMechanics(entry.isDirectory) { guard.acceptEntry(entry.name, entry.isDirectory) }
-                val bytes = zipMechanics { guard.readEntry(zip) }
-                result[entry.name] = bytes
-                zip.closeEntry()
-            }
-        }
-        if (result.isEmpty()) throw InvalidObservationPointExport("empty archive")
-        result
+        )).also { if (it.entries.isEmpty()) { it.close(); throw InvalidObservationPointExport("empty archive") } }
+    } catch (error: ZipSafetyException) {
+        throw InvalidObservationPointExport(when (error.failure) {
+            ZipSafetyFailure.ENTRY_COUNT -> "too many ZIP entries"
+            ZipSafetyFailure.UNSAFE_PATH -> if (error.isDirectory) "directory ZIP entry is not allowed" else "unsafe ZIP entry"
+            ZipSafetyFailure.DUPLICATE -> "duplicate ZIP entry"
+            ZipSafetyFailure.ENTRY_BYTES -> "ZIP entry is too large"
+            ZipSafetyFailure.TOTAL_BYTES -> "archive is too large"
+            else -> "malformed archive"
+        }, error)
     } catch (error: ObservationPointExportException) {
         throw error
     } catch (error: Exception) {
@@ -335,17 +338,34 @@ internal object ObservationPointExportCodec {
         zip.closeEntry()
     }
 
+    private fun putPayloadEntry(zip: ZipOutputStream, name: String, payload: ArchivePayload) {
+        zip.putNextEntry(ZipEntry(name).apply { time = 0L })
+        try {
+            payload.copyTo(zip)
+        } catch (error: Exception) {
+            throw InvalidObservationPointExport("attachment payload changed while exporting", error)
+        } finally {
+            zip.closeEntry()
+        }
+    }
+
     private fun requireEntrySize(size: Long) {
         if (size > ObservationPointExportContract.MAX_ENTRY_BYTES) throw InvalidObservationPointExport("entry is too large")
     }
 
-    private fun verifyBytes(bytes: ByteArray, expectedSize: Long, expectedSha: String, label: String) {
-        requireEntrySize(bytes.size.toLong())
-        if (expectedSize != bytes.size.toLong()) throw ObservationPointExportIntegrityError("$label size mismatch")
-        if (!expectedSha.matches(hashPattern) || expectedSha != sha256(bytes)) throw ObservationPointExportIntegrityError("$label SHA-256 mismatch")
+    private fun verifyPayload(payload: ArchivePayload, expectedSize: Long, expectedSha: String, label: String) {
+        requireEntrySize(payload.size)
+        if (expectedSize != payload.size) throw ObservationPointExportIntegrityError("$label size mismatch")
+        if (!expectedSha.matches(hashPattern) || expectedSha != payload.sha256) throw ObservationPointExportIntegrityError("$label SHA-256 mismatch")
     }
 
-    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
+    private fun readMetadata(payload: ArchivePayload, expectedSize: Long, expectedSha: String, label: String): ByteArray {
+        verifyPayload(payload, expectedSize, expectedSha, label)
+        return try { payload.readMetadata(ObservationPointExportContract.MAX_ENTRY_BYTES) }
+        catch (error: Exception) { throw InvalidObservationPointExport("malformed $label", error) }
+    }
+
+    private fun sha256(bytes: ByteArray): String = java.security.MessageDigest.getInstance("SHA-256")
         .digest(bytes).joinToString("") { "%02x".format(it) }
 
     private fun parseObject(bytes: ByteArray?, label: String): JsonObject {

@@ -19,13 +19,13 @@ class PortableZipSafetyCharacterizationTest {
             failure(reader, zipOf((0..reader.count).map { "e$it" to byteArrayOf() }), "too many ZIP entries")
 
             val exactEntry = zipOfSizes(listOf("entry" to reader.entryBytes))
-            assertEquals(reader.entryBytes, read(reader, exactEntry).getValue("entry").size.toLong())
+            assertEquals(reader.entryBytes, read(reader, exactEntry).getValue("entry"))
             failure(reader, zipOfSizes(listOf("entry" to reader.entryBytes + 1)), "ZIP entry is too large")
 
             val exactAggregate = zipOfSizes((0 until reader.aggregateBytes / reader.entryBytes).map {
                 "part$it" to reader.entryBytes
             })
-            assertEquals(reader.aggregateBytes, read(reader, exactAggregate).values.sumOf { it.size.toLong() })
+            assertEquals(reader.aggregateBytes, read(reader, exactAggregate).values.sum())
             val aggregatePlusOne = (0 until reader.aggregateBytes / reader.entryBytes).map {
                 "part$it" to reader.entryBytes
             } + ("last" to 1L)
@@ -86,8 +86,10 @@ class PortableZipSafetyCharacterizationTest {
         }
     }
 
-    private fun read(reader: Reader, bytes: ByteArray): Map<String, ByteArray> = try {
-        reader.method.invoke(reader.instance, bytes.inputStream()) as Map<String, ByteArray>
+    private fun read(reader: Reader, bytes: ByteArray): Map<String, Long> = try {
+        (reader.method.invoke(reader.instance, bytes.inputStream()) as StagedZipArchive).use { archive ->
+            archive.entries.mapValues { it.value.size }
+        }
     } catch (error: InvocationTargetException) {
         throw error.targetException
     }

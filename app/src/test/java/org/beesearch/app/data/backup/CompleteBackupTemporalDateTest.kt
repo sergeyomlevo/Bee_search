@@ -2,6 +2,7 @@ package org.beesearch.app.data.backup
 
 import org.beesearch.app.domain.backup.MalformedBackup
 import org.beesearch.app.data.local.room.*
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.model.WeatherStatus
 import org.junit.Assert.assertEquals
@@ -49,20 +50,21 @@ class CompleteBackupTemporalDateTest {
         val blobs = writer.invoke(null, graph, settings, null, null, 7) as List<Any>
         val manifestMethod = declaredMethod("manifest", UUID::class.java, Instant::class.java, String::class.java, List::class.java, Int::class.javaPrimitiveType!!)
         val manifest = manifestMethod.invoke(null, UUID.randomUUID(), created, "test", blobs, 7) as ByteArray
-        val entries = linkedMapOf<String, ByteArray>(MANIFEST to manifest)
+        val entries = linkedMapOf<String, ArchivePayload>(MANIFEST to ArchivePayload.metadata(manifest))
         blobs.forEach { blob ->
             val type = blob.javaClass
-            entries[type.getDeclaredMethod("getPath").also { it.isAccessible = true }.invoke(blob) as String] = type.getDeclaredMethod("getBytes").also { it.isAccessible = true }.invoke(blob) as ByteArray
+            entries[type.getDeclaredMethod("getPath").also { it.isAccessible = true }.invoke(blob) as String] =
+                type.getDeclaredMethod("getPayload").also { it.isAccessible = true }.invoke(blob) as ArchivePayload
         }
-        val parsed = parseObject(entries)
+        val parsed = parsePayloadObject(entries)
         val parsedGraph = parsed.javaClass.getDeclaredMethod("getGraph").also { it.isAccessible = true }.invoke(parsed) as Graph
         assertEquals(java.time.LocalDate.of(2026, 8, 25), parsedGraph.points.single().observationDate)
         assertEquals(java.time.LocalDate.of(2026, 8, 21), parsedGraph.physicalObjects.single { it.id == h }.fixationDate)
         assertEquals(java.time.LocalDate.of(2026, 8, 22), parsedGraph.physicalObjects.single { it.id == l }.fixationDate)
         assertEquals(null, parsedGraph.physicalObjects.single { it.id == a }.fixationDate)
         assertEquals("13", String(manifest).substringAfter("\"roomSchemaVersion\":").substringBefore(','))
-        val pointPayload = entries.getValue("research/observation-points.json").toString(Charsets.UTF_8)
-        val physicalPayload = entries.getValue("research/physical-objects.json").toString(Charsets.UTF_8)
+        val pointPayload = entries.getValue("research/observation-points.json").readMetadata(1024).toString(Charsets.UTF_8)
+        val physicalPayload = entries.getValue("research/physical-objects.json").readMetadata(1024).toString(Charsets.UTF_8)
         assertTrue(pointPayload.contains("\"observationDate\":\"2026-08-25\""))
         assertTrue(physicalPayload.contains("\"fixationDate\":\"2026-08-21\""))
         assertTrue(physicalPayload.contains("\"fixationDate\":\"2026-08-22\""))
@@ -145,7 +147,9 @@ class CompleteBackupTemporalDateTest {
         parseObject(entries)
     }
 
-    private fun parseObject(entries: Map<String, ByteArray>): Any {
+    private fun parseObject(entries: Map<String, ByteArray>): Any = parsePayloadObject(entries.mapValues { ArchivePayload.metadata(it.value) })
+
+    private fun parsePayloadObject(entries: Map<String, ArchivePayload>): Any {
         val method = declaredMethod("parse", Map::class.java)
         try {
             return method.invoke(null, entries)

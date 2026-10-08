@@ -1,6 +1,7 @@
 package org.beesearch.app.data.objectexport
 
 import java.util.UUID
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.domain.model.PhysicalObjectType
 
 /** Portable package of one concrete Physical Object type in one Territory. */
@@ -28,8 +29,11 @@ internal data class PhysicalObjectCollectionExportGraph(
 
 internal data class DecodedPhysicalObjectCollectionExport(
     val graph: PhysicalObjectCollectionExportGraph,
-    val mediaBytes: Map<UUID, ByteArray>,
-)
+    val mediaBytes: Map<UUID, ArchivePayload>,
+    private val archive: java.io.Closeable,
+) : java.io.Closeable {
+    override fun close() = archive.close()
+}
 
 internal class EmptyPhysicalObjectCollectionExport(type: PhysicalObjectType) :
     PhysicalObjectExportException(

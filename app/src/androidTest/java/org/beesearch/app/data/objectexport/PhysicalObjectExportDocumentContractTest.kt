@@ -74,9 +74,10 @@ class PhysicalObjectExportDocumentContractTest {
 
         runBlocking { exporter.export(graph.id, DOCUMENT) }
 
-        val decoded = PhysicalObjectExportCodec.decode(destination.toByteArray().inputStream())
-        assertEquals(graph, decoded.graph)
-        assertArrayEquals(mediaFile.readBytes(), decoded.mediaBytes.getValue(graph.media.single().id))
+        PhysicalObjectExportCodec.decode(destination.toByteArray().inputStream()).use { decoded ->
+            assertEquals(graph, decoded.graph)
+            assertArrayEquals(mediaFile.readBytes(), decoded.mediaBytes.getValue(graph.media.single().id).open().use { it.readBytes() })
+        }
     }
 
     @Test
@@ -143,9 +144,10 @@ class PhysicalObjectExportDocumentContractTest {
 
         runBlocking { exporter.export(graph.territoryId, graph.type, DOCUMENT) }
 
-        val decoded = PhysicalObjectCollectionExportCodec.decode(destination.toByteArray().inputStream())
-        assertEquals(listOf(graph), decoded.graph.objects)
-        assertArrayEquals(mediaFile.readBytes(), decoded.mediaBytes.getValue(graph.media.single().id))
+        PhysicalObjectCollectionExportCodec.decode(destination.toByteArray().inputStream()).use { decoded ->
+            assertEquals(listOf(graph), decoded.graph.objects)
+            assertArrayEquals(mediaFile.readBytes(), decoded.mediaBytes.getValue(graph.media.single().id).open().use { it.readBytes() })
+        }
     }
 
     @Test

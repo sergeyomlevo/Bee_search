@@ -237,6 +237,58 @@ class BackupServiceTest {
         assertNull(target.backupDao().physicalObjects().single { it.id == apiaryId }.fixationDate)
     }
 
+    /** Compiled here; runtime execution is a separate owner-authorized Android gate. */
+    @Test fun v7StreamingMediaRoundTripUsesPublicServiceAndRestoresManagedFiles() = runBlocking {
+        val ids = seed(source)
+        val sourceRoot = temp("streaming-source-files")
+        val targetRoot = temp("streaming-target-files")
+        val cacheRoot = temp("streaming-cache")
+        try {
+            sourceRoot.mkdirs()
+            val input = File(sourceRoot, "generated-input")
+            input.outputStream().use { output ->
+                val buffer = ByteArray(8192) { (it and 0xff).toByte() }
+                repeat(5) { output.write(buffer) }
+                output.write(buffer, 0, 37)
+            }
+            val attachmentSource = ObservationAttachmentFileStore(sourceRoot, cacheRoot)
+            val objectSource = PhysicalObjectMediaFileStore(sourceRoot, cacheRoot)
+            val attachmentTarget = ObservationAttachmentFileStore(targetRoot, cacheRoot)
+            val objectTarget = PhysicalObjectMediaFileStore(targetRoot, cacheRoot)
+            val point = source.backupDao().observationPoints().first()
+            val attachmentId = UUID.randomUUID()
+            val photo = attachmentSource.importPhoto(point.id, attachmentId) { input.inputStream() }
+            source.backupDao().insertObservationPointAttachments(listOf(
+                ObservationPointAttachmentEntity(attachmentId, point.id, AttachmentType.PHOTO, photo.relativePath, "generated.jpg", "image/jpeg", photo.byteSize, photo.sha256, NOW),
+            ))
+            val objectId = UUID.randomUUID()
+            val mediaId = UUID.randomUUID()
+            source.backupDao().insertPhysicalObjects(listOf(
+                PhysicalObjectEntity(objectId, ids.territory2, PhysicalObjectType.HOLLOW, 1, 56.3, 42.9, NOW, ids.observer2, java.time.LocalDate.of(2026, 9, 12)),
+            ))
+            source.backupDao().insertHollows(listOf(HollowEntity(objectId, null, null, null, null, null, null)))
+            val video = objectSource.importMedia(objectId, mediaId) { input.inputStream() }
+            source.backupDao().insertPhysicalObjectMedia(listOf(
+                PhysicalObjectMediaEntity(mediaId, objectId, PhysicalObjectMediaType.VIDEO, video.relativePath, "generated.mp4", "video/mp4", video.byteSize, video.sha256, NOW),
+            ))
+            val writer = service(source, sourceStore, attachmentSource, objectSource)
+            val reader = service(target, targetStore, attachmentTarget, objectTarget)
+            writer.export(archive)
+            val logical = writer.validate(archive).logicalContentSha256
+            reader.restore(archive)
+            assertEquals(source.backupDao().snapshot(), target.backupDao().snapshot())
+            listOf(attachmentTarget.resolve(photo.relativePath) to photo.sha256, objectTarget.resolve(video.relativePath) to video.sha256).forEach { (file, expectedHash) ->
+                val payload = org.beesearch.app.data.zip.ArchivePayload.fromFile(file)
+                assertEquals(input.length(), payload.size)
+                assertEquals(expectedHash, payload.sha256)
+            }
+            reader.export(secondArchive)
+            assertEquals(logical, reader.validate(secondArchive).logicalContentSha256)
+        } finally {
+            sourceRoot.deleteRecursively(); targetRoot.deleteRecursively(); cacheRoot.deleteRecursively()
+        }
+    }
+
     @Test fun v3RoundTripPreservesPhysicalObjectsApiaryAndBeeAssociation() = runBlocking {
         val ids = seed(source)
         val hollowId = UUID.randomUUID()

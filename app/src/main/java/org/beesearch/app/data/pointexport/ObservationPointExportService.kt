@@ -7,6 +7,7 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.domain.model.ObservationPointDetail
 import org.beesearch.app.domain.repository.ObservationRepository
 
@@ -30,7 +31,7 @@ internal class ObservationPointExportService(
         val detail = source.load(pointId)
             ?: throw ObservationPointExportSourceMissing("Точка наблюдения не найдена")
         withContext(Dispatchers.IO) {
-            val attachmentBytes = detail.attachments.associate { attachment ->
+            val attachmentPayloads = detail.attachments.associate { attachment ->
                 val file = try {
                     attachmentStore.resolve(attachment.relativePath)
                 } catch (error: Exception) {
@@ -40,7 +41,7 @@ internal class ObservationPointExportService(
                 if (file.length() != attachment.byteSize) {
                     throw ObservationPointExportIntegrityError("Размер фотографии не совпадает с метаданными")
                 }
-                attachment.id to file.readBytes()
+                attachment.id to ArchivePayload.fromFile(file)
             }
             ObservationPointExportCodec.encode(
                 graph = ObservationPointExportGraph(
@@ -51,7 +52,7 @@ internal class ObservationPointExportService(
                     beeHistories = detail.beeHistories,
                     attachments = detail.attachments,
                 ),
-                attachmentBytes = attachmentBytes,
+                attachmentPayloads = attachmentPayloads,
                 output = output,
             )
         }

@@ -1758,6 +1758,19 @@ Logical backup core реализует versioned архив согласно D06
 существующему `BackupService`, а UI не знает формат ZIP, manifest или правила
 целостности. Broad storage permissions не требуются.
 
+M2A media I/O boundary: Complete Backup и три portable export profiles используют
+`ArchivePayload` для file-backed media и `StagedZipArchive` для чтения ZIP. Payload
+копируется bounded buffer с Long byte count и incremental SHA-256; source size/hash
+повторно проверяются при записи. Readers извлекают entries в isolated cache workspace,
+валидируют полный manifest/domain/media graph и только затем допускают restore activation.
+Known bounded JSON остаётся memory-resident. Decoded export result является Closeable:
+caller обязан закрыть его после работы с graph/media; validation failure закрывает workspace.
+Collection temp-ZIP read-back использует тот же staged reader и закрывает result перед SAF copy.
+Wire versions, paths/order, legacy semantics и все прежние archive/import caps сохранены.
+Это изменение памяти, не обещание >=1000 MB support: изменение payload budgets относится
+к будущему M2B, снятие import cap — к M1. Direct-SAF Point export и возможность partial
+destination при SAF copy failure остаются прежними; filesystem/Room crash recovery не добавлен.
+
 Single ObservationPoint export отделён от logical backup пакетом
 `data/pointexport`. Транзакционный `getObservationPointDetail(pointId)` является
 единственным source read: он возвращает выбранную Point, Territory/Observer context,

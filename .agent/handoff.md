@@ -1,5 +1,31 @@
 # Bee Search handoff
 
+## Current continuation — Large media M2A (2026-10-08)
+
+Temporal work is owner-accepted CLOSED / PASS / PUSHED at 0dca7b7; the older temporal
+sections below are historical and do not reopen that work.
+
+M2A replaces Complete Backup and all three portable export media ByteArrays with
+file-backed ArchivePayload and isolated StagedZipArchive readers. Current Backup V7 /
+Export V2 and supported legacy readers retain versions, paths/order, validation and dates.
+Decoded export results must be closed; collection temp read-back closes the spool before
+SAF copy. Backup validates before managed-file activation / empty-destination Room restore.
+Cleanup errors are attached to failures rather than silently hiding staging/rollback failure.
+
+Fresh host gate: 802/802 JVM tests PASS (Backup 27, point export 20, physical/collection
+export 49, ZIP 29, Snapshot 77); assembleDebug and compileDebugAndroidTestKotlin PASS.
+Generated multi-buffer payload tests cover streamed copy, source changes, reader size/hash
+validation, truncation and staging cleanup. The new public BackupService Android round-trip
+test is COMPILED ONLY, NOT EXECUTED. No ADB, emulator/Samsung actions or APK installation.
+Independent read-only audit found no blocking production defect; root corrected compile
+integration and characterization-test adapters before the final passing gate.
+
+Import 16 MiB caps and all archive safety caps remain. This is NOT >=1000 MB support.
+Next owner-scoped task: M2B payload budget policy / writer-reader alignment, then M1 import
+cap and cleanup; both must be ready before accepting large media. EXIF/M3 not started.
+Point direct-SAF partial-output limitation and untested process-kill recovery remain.
+M2A is retained as a local commit only; no push. Protected unrelated TOML remains unchanged.
+
 ## Current continuation — Temporal I4 implemented in worktree, owner review required (2026-10-08)
 
 I1 pushed (f4f5105 = origin/main); I2 committed locally (bd977b3); I3 committed locally

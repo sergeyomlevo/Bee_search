@@ -11,7 +11,7 @@ internal data class ZipSafetyPolicy(val maxEntries: Int, val maxEntryBytes: Long
     init { require(maxEntries >= 0 && maxEntryBytes >= 0 && maxTotalBytes >= 0) }
 }
 internal enum class ZipSafetyFailure { ENTRY_COUNT, UNSAFE_PATH, DUPLICATE, ENTRY_BYTES, TOTAL_BYTES, OVERFLOW, SIZE_MISMATCH }
-internal class ZipSafetyException(val failure: ZipSafetyFailure) : Exception(failure.name)
+internal class ZipSafetyException(val failure: ZipSafetyFailure, val isDirectory: Boolean = false) : Exception(failure.name)
 
 /** Exact, case-sensitive names. Path validation is deliberately separate. */
 internal class ZipEntryNames {
@@ -49,17 +49,21 @@ internal class ZipReadGuard(private val policy: ZipSafetyPolicy) {
     private var entries = 0
     fun acceptEntry(name: String, isDirectory: Boolean) {
         if (entries >= policy.maxEntries) throw ZipSafetyException(ZipSafetyFailure.ENTRY_COUNT)
-        if (isDirectory) throw ZipSafetyException(ZipSafetyFailure.UNSAFE_PATH)
+        if (isDirectory) throw ZipSafetyException(ZipSafetyFailure.UNSAFE_PATH, isDirectory = true)
         validateZipRelativePath(name)
         names.accept(name)
         entries++
     }
     fun readEntry(input: InputStream): ByteArray {
         val output = ByteArrayOutputStream()
-        copyZipBytes(input, output, policy.maxEntryBytes)
+        copyEntry(input, output)
         val bytes = output.toByteArray()
-        aggregate.add(bytes.size.toLong())
         return bytes
+    }
+    fun copyEntry(input: InputStream, output: OutputStream): ZipCopyResult {
+        val result = copyZipBytesWithSha256(input, output, policy.maxEntryBytes)
+        aggregate.add(result.byteCount)
+        return result
     }
 }
 

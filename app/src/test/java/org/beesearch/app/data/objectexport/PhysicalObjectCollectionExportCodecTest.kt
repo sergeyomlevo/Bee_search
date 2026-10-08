@@ -1,6 +1,7 @@
 package org.beesearch.app.data.objectexport
 
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
@@ -13,6 +14,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.domain.model.HollowProperties
 import org.beesearch.app.domain.model.LogHiveProperties
 import org.beesearch.app.domain.model.PhysicalObjectMedia
@@ -22,9 +24,17 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Test
 
 class PhysicalObjectCollectionExportCodecTest {
+    private val decodedArchives = mutableListOf<java.io.Closeable>()
+
+    @After
+    fun closeDecodedArchives() {
+        decodedArchives.asReversed().forEach { it.close() }
+        decodedArchives.clear()
+    }
     @Test
     fun `v2 collection fixation dates are unchanged across timezone changes`() {
         val graph = collection(PhysicalObjectType.LOG_HIVE, listOf(
@@ -48,7 +58,7 @@ class PhysicalObjectCollectionExportCodecTest {
             listOf(objectGraph(PhysicalObjectType.HOLLOW, 1).copy(fixationDate = LocalDate.of(10000, 1, 1))),
         )
         val output = ByteArrayOutputStream().apply { write("existing".toByteArray()) }
-        assertLegacyOrInvalid { PhysicalObjectCollectionExportCodec.encode(graph, blobs(graph), output) }
+        assertLegacyOrInvalid { PhysicalObjectCollectionExportCodec.encode(graph, payloads(blobs(graph)), output) }
         assertEquals("existing", output.toString(Charsets.UTF_8.name()))
     }
 
@@ -73,7 +83,7 @@ class PhysicalObjectCollectionExportCodecTest {
                 val expectedDate = value.fixationDate?.let { "\"$it\"" } ?: "null"
                 assertEquals(expectedDate, identity.getValue("fixationDate").toString())
             }
-            val decoded = decode(archive).graph.objects.sortedBy { it.sequenceNumber }
+        val decoded = decode(archive).graph.objects.sortedBy { it.sequenceNumber }
             assertNull(decoded[0].fixationDate)
             assertEquals(LocalDate.of(2026, 10, 4), decoded[1].fixationDate)
             assertEquals(LocalDate.of(2026, 10, 5), decoded[2].fixationDate)
@@ -98,7 +108,7 @@ class PhysicalObjectCollectionExportCodecTest {
         val graph = collection(PhysicalObjectType.HOLLOW, listOf(objectGraph(PhysicalObjectType.HOLLOW, 1)))
         val blobs = blobs(graph)
         val output = ByteArrayOutputStream()
-        PhysicalObjectCollectionExportCodec.encodeV1(graph, blobs, output)
+        encodeV1(graph, blobs, output)
         assertTrue(output.size() > 0)
         val legacy = output.toByteArray()
         val manifest = Json.parseToJsonElement(zip(legacy).getValue("manifest.json").decodeToString()).jsonObject
@@ -107,8 +117,7 @@ class PhysicalObjectCollectionExportCodecTest {
             it.replace("\"name\":null", "\"name\":null,\"fixationDate\":null")
         })
         assertNull(
-            PhysicalObjectCollectionExportCodec.decode(output.toByteArray().inputStream())
-                .graph.objects.single().fixationDate,
+            decode(output.toByteArray()).graph.objects.single().fixationDate,
         )
 
         val divergent = collection(
@@ -129,7 +138,7 @@ class PhysicalObjectCollectionExportCodecTest {
             assertEquals(listOf(1, 2), decoded.graph.objects.map { it.sequenceNumber })
             assertEquals(type, decoded.graph.type)
             assertEquals(blobs.keys, decoded.mediaBytes.keys)
-            blobs.forEach { (id, bytes) -> assertArrayEquals(bytes, decoded.mediaBytes.getValue(id)) }
+            blobs.forEach { (id, bytes) -> assertArrayEquals(bytes, decoded.mediaBytes.getValue(id).open().use { it.readBytes() }) }
         }
     }
 
@@ -310,9 +319,19 @@ class PhysicalObjectCollectionExportCodecTest {
         }
 
     private fun encode(graph: PhysicalObjectCollectionExportGraph, blobs: Map<UUID, ByteArray>): ByteArray =
-        ByteArrayOutputStream().also { PhysicalObjectCollectionExportCodec.encode(graph, blobs, it) }.toByteArray()
+        ByteArrayOutputStream().also { PhysicalObjectCollectionExportCodec.encode(graph, payloads(blobs), it) }.toByteArray()
 
-    private fun decode(bytes: ByteArray) = PhysicalObjectCollectionExportCodec.decode(bytes.inputStream())
+    private fun encodeV1(graph: PhysicalObjectCollectionExportGraph, blobs: Map<UUID, ByteArray>, output: ByteArrayOutputStream) =
+        PhysicalObjectCollectionExportCodec.encodeV1(graph, payloads(blobs), output)
+
+    private fun payloads(blobs: Map<UUID, ByteArray>) = blobs.mapValues { (_, bytes) ->
+        File.createTempFile("bee-export-test-", ".media").also {
+            it.writeBytes(bytes)
+            it.deleteOnExit()
+        }.let(ArchivePayload::fromFile)
+    }
+
+    private fun decode(bytes: ByteArray) = PhysicalObjectCollectionExportCodec.decode(bytes.inputStream()).also(decodedArchives::add)
 
     private fun zip(bytes: ByteArray): LinkedHashMap<String, ByteArray> {
         val result = linkedMapOf<String, ByteArray>()
@@ -384,7 +403,7 @@ class PhysicalObjectCollectionExportCodecTest {
         output: ByteArrayOutputStream,
     ) {
         var thrown: Throwable? = null
-        try { PhysicalObjectCollectionExportCodec.encode(graph, mediaBytes, output) } catch (error: Throwable) { thrown = error }
+        try { PhysicalObjectCollectionExportCodec.encode(graph, payloads(mediaBytes), output) } catch (error: Throwable) { thrown = error }
         assertTrue("expected collection validation failure, got $thrown", thrown is PhysicalObjectExportException)
     }
 
@@ -394,7 +413,7 @@ class PhysicalObjectCollectionExportCodecTest {
         output: ByteArrayOutputStream,
     ) {
         var thrown: Throwable? = null
-        try { PhysicalObjectCollectionExportCodec.encodeV1(graph, mediaBytes, output) } catch (error: Throwable) { thrown = error }
+        try { PhysicalObjectCollectionExportCodec.encodeV1(graph, payloads(mediaBytes), output) } catch (error: Throwable) { thrown = error }
         assertTrue("expected LegacyPhysicalObjectExportNotRepresentable, got $thrown", thrown is LegacyPhysicalObjectExportNotRepresentable)
     }
 

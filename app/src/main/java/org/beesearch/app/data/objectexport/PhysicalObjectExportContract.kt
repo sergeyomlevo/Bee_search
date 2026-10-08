@@ -3,6 +3,7 @@ package org.beesearch.app.data.objectexport
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.domain.model.HollowProperties
 import org.beesearch.app.domain.model.LogHiveProperties
 import org.beesearch.app.domain.model.PhysicalObjectMedia
@@ -105,8 +106,11 @@ internal data class PhysicalObjectExportGraph(
 
 internal data class DecodedPhysicalObjectExport(
     val graph: PhysicalObjectExportGraph,
-    val mediaBytes: Map<UUID, ByteArray>,
-)
+    val mediaBytes: Map<UUID, ArchivePayload>,
+    private val archive: java.io.Closeable,
+) : java.io.Closeable {
+    override fun close() = archive.close()
+}
 
 internal sealed class PhysicalObjectExportException(message: String, cause: Throwable? = null) :
     Exception(message, cause)

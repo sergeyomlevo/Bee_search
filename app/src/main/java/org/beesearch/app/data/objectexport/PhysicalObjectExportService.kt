@@ -8,6 +8,7 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.domain.model.Hollow
 import org.beesearch.app.domain.model.LogHive
 import org.beesearch.app.domain.model.Observer
@@ -134,7 +135,9 @@ internal class PhysicalObjectExportService(
                 if (file.length() != media.byteSize) {
                     throw PhysicalObjectExportIntegrityError("Размер медиа не совпадает с метаданными")
                 }
-                media.id to file.readBytes()
+                media.id to try { ArchivePayload.fromFile(file) } catch (error: Exception) {
+                    throw PhysicalObjectExportSourceMissing("Не удалось прочитать медиа объекта").also { it.initCause(error) }
+                }
             }
             PhysicalObjectExportCodec.encode(graph, mediaBytes, output)
         }

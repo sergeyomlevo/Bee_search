@@ -1,7 +1,7 @@
 package org.beesearch.app.data.objectexport
 
-import java.security.MessageDigest
 import java.util.UUID
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
 import org.beesearch.app.domain.model.PhysicalObjectType
 
@@ -18,7 +18,7 @@ internal object PhysicalObjectExportValidator {
 
     fun validate(
         graph: PhysicalObjectExportGraph,
-        mediaBytes: Map<UUID, ByteArray>,
+        mediaBytes: Map<UUID, ArchivePayload>,
         allowFixationDate: Boolean = true,
     ) {
         validateSupportedType(graph.type)
@@ -56,10 +56,10 @@ internal object PhysicalObjectExportValidator {
         if (mediaBytes.keys != mediaIds) invalid("media blob set mismatch")
         graph.media.forEach { media ->
             val content = mediaBytes.getValue(media.id)
-            if (content.size.toLong() != media.byteSize) {
+            if (content.size != media.byteSize) {
                 throw PhysicalObjectExportIntegrityError("media ${media.id} size mismatch")
             }
-            if (sha256(content) != media.sha256) {
+            if (content.sha256 != media.sha256) {
                 throw PhysicalObjectExportIntegrityError("media ${media.id} SHA-256 mismatch")
             }
         }
@@ -93,6 +93,4 @@ internal object PhysicalObjectExportValidator {
 
     private fun invalid(message: String): Nothing = throw InvalidPhysicalObjectExport(message)
 
-    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
-        .digest(bytes).joinToString("") { "%02x".format(it) }
 }

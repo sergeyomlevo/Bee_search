@@ -1,7 +1,7 @@
 package org.beesearch.app.data.pointexport
 
-import java.security.MessageDigest
 import java.util.UUID
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.WeatherStatus
@@ -10,7 +10,7 @@ import org.beesearch.app.domain.model.WeatherStatus
 internal object ObservationPointExportValidator {
     private val hashPattern = Regex("[0-9a-f]{64}")
 
-    fun validate(graph: ObservationPointExportGraph, bytes: Map<UUID, ByteArray>) {
+    fun validate(graph: ObservationPointExportGraph, payloads: Map<UUID, ArchivePayload>) {
         val point = graph.point
         if (point.territoryId != graph.territory.id) invalid("territory context mismatch")
         if (point.observerId != graph.observer.id) invalid("observer context mismatch")
@@ -59,15 +59,13 @@ internal object ObservationPointExportValidator {
             if (attachment.byteSize <= 0 || attachment.byteSize > ObservationPointExportContract.MAX_ENTRY_BYTES) invalid("invalid attachment size")
             if (!attachment.sha256.matches(hashPattern)) invalid("invalid attachment hash")
         }
-        if (bytes.keys != attachmentIds) invalid("attachment blob set mismatch")
+        if (payloads.keys != attachmentIds) invalid("attachment blob set mismatch")
         graph.attachments.forEach { attachment ->
-            val content = bytes.getValue(attachment.id)
-            if (content.size.toLong() != attachment.byteSize) throw ObservationPointExportIntegrityError("attachment ${attachment.id} size mismatch")
-            if (sha256(content) != attachment.sha256) throw ObservationPointExportIntegrityError("attachment ${attachment.id} SHA-256 mismatch")
+            val payload = payloads.getValue(attachment.id)
+            if (payload.size != attachment.byteSize) throw ObservationPointExportIntegrityError("attachment ${attachment.id} size mismatch")
+            if (payload.sha256 != attachment.sha256) throw ObservationPointExportIntegrityError("attachment ${attachment.id} SHA-256 mismatch")
         }
     }
 
     private fun invalid(message: String): Nothing = throw InvalidObservationPointExport(message)
-    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
-        .digest(bytes).joinToString("") { "%02x".format(it) }
 }

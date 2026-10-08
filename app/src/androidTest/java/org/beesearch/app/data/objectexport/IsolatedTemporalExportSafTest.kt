@@ -123,7 +123,7 @@ class IsolatedTemporalExportSafTest {
                 val pointEntries = verifyManifest(pointBytes,"SINGLE_OBSERVATION_POINT")
                 assertEquals(date.toString(),json(pointEntries.getValue("point.json")).getValue("point")
                     .jsonObject.getValue("observationDate").jsonPrimitive.content)
-                val decodedPoint = ObservationPointExportCodec.decode(pointBytes.inputStream()).graph
+                val decodedPoint = ObservationPointExportCodec.decode(pointBytes.inputStream()).use { it.graph }
                 assertEquals(points.getObservationPointDetail(point)!!.point,decodedPoint.point)
                 assertEquals(date,decodedPoint.point.observationDate)
                 assertNotEquals(control,decodedPoint.point.observationDate)
@@ -141,9 +141,10 @@ class IsolatedTemporalExportSafTest {
                     assertTrue(objectJson.containsKey("fixationDate"))
                     assertEquals(original.fixationDate?.let { JsonPrimitive(it.toString()) } ?: JsonNull,
                         objectJson.getValue("fixationDate"))
-                    val restored = PhysicalObjectExportCodec.decode(value.inputStream()).graph
-                    assertEquals(original,restored)
-                    println("RT4 SINGLE id=$id type=${restored.type} uri=$uri bytes=${value.size} version=2 before=${original.fixationDate} after=${restored.fixationDate}")
+                    PhysicalObjectExportCodec.decode(value.inputStream()).use { decoded ->
+                        assertEquals(original,decoded.graph)
+                        println("RT4 SINGLE id=$id type=${decoded.graph.type} uri=$uri bytes=${value.size} version=2 before=${original.fixationDate} after=${decoded.graph.fixationDate}")
+                    }
                 }
                 val collectionExporter = SafPhysicalObjectCollectionDocumentExporter(
                     PhysicalObjectCollectionExportService(collectionSource,media),context.contentResolver,scratch)
@@ -154,13 +155,14 @@ class IsolatedTemporalExportSafTest {
                     collectionExporter.export(territory,type,uri)
                     val value = bytes(uri)
                     val wire = verifyManifest(value,"PHYSICAL_OBJECT_COLLECTION")
-                    val restored = PhysicalObjectCollectionExportCodec.decode(value.inputStream()).graph
-                    assertEquals(original.objects.associateBy { it.id },restored.objects.associateBy { it.id })
+                    PhysicalObjectCollectionExportCodec.decode(value.inputStream()).use { decoded ->
+                    assertEquals(original.objects.associateBy { it.id },decoded.graph.objects.associateBy { it.id })
                     for(obj in original.objects) {
                         val row = json(wire.getValue(PhysicalObjectCollectionExportContract.objectEntry(obj.id))).getValue("object").jsonObject
                         assertTrue(row.containsKey("fixationDate"))
                         assertEquals(obj.fixationDate?.let { JsonPrimitive(it.toString()) } ?: JsonNull,row.getValue("fixationDate"))
-                        println("RT4 COLLECTION type=$type uri=$uri id=${obj.id} version=2 before=${obj.fixationDate} after=${restored.objects.single { it.id == obj.id }.fixationDate}")
+                        println("RT4 COLLECTION type=$type uri=$uri id=${obj.id} version=2 before=${obj.fixationDate} after=${decoded.graph.objects.single { it.id == obj.id }.fixationDate}")
+                    }
                     }
                 }
                 // D093: exports are one supported concrete type; Apiary is intentionally unavailable.

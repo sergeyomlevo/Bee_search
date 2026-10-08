@@ -10,6 +10,7 @@ import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import java.nio.file.Files
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.Bee
@@ -32,6 +33,21 @@ import org.junit.Test
 
 class ObservationPointExportCodecTest {
     @Test
+    fun `file backed attachment streams across multiple buffers`() {
+        val base = fixture()
+        val content = ByteArray(3 * 8192 + 17) { index -> (index * 31).toByte() }
+        val attachment = base.graph.attachments.single().copy(byteSize = content.size.toLong(), sha256 = sha(content))
+        val graph = base.graph.copy(attachments = listOf(attachment))
+        val archive = withPayloads(mapOf(attachment.id to content)) { payloads ->
+            ByteArrayOutputStream().also { ObservationPointExportCodec.encode(graph, payloads, it) }.toByteArray()
+        }
+        ObservationPointExportCodec.decode(archive.inputStream()).use { decoded ->
+            assertEquals(content.size.toLong(), decoded.attachmentPayloads.getValue(attachment.id).size)
+            assertArrayEquals(content, decoded.attachmentPayloads.getValue(attachment.id).readMetadata(content.size.toLong()))
+        }
+    }
+
+    @Test
     fun `round trip preserves one complete point graph and excludes anything else`() {
         val fixture = fixture()
         val archive = encode(fixture.graph, fixture.blobs)
@@ -48,7 +64,8 @@ class ObservationPointExportCodecTest {
             decoded.graph.beeHistories,
         )
         assertEquals(fixture.graph.attachments, decoded.graph.attachments)
-        fixture.blobs.forEach { (id, bytes) -> assertArrayEquals(bytes, decoded.attachmentBytes.getValue(id)) }
+        fixture.blobs.forEach { (id, bytes) -> assertArrayEquals(bytes, decoded.attachmentPayloads.getValue(id).readMetadata(ObservationPointExportContract.MAX_ENTRY_BYTES)) }
+        decoded.close()
         assertFalse(archive.toString(Charsets.ISO_8859_1).contains(UUID.randomUUID().toString()))
     }
 
@@ -75,7 +92,7 @@ class ObservationPointExportCodecTest {
             beeHistories = listOf(base.beeHistories.first().copy(flightCycles = listOf(open))),
             attachments = emptyList(),
         )
-        val decoded = ObservationPointExportCodec.decode(encode(graph, emptyMap()).inputStream()).graph
+        val decoded = decodeGraph(encode(graph, emptyMap()))
 
         assertNull(decoded.point.description)
         assertEquals(WeatherStatus.PENDING, decoded.weather?.status)
@@ -95,7 +112,7 @@ class ObservationPointExportCodecTest {
         val second = encode(reversed, fixture.blobs)
 
         assertArrayEquals(first, second)
-        val decoded = ObservationPointExportCodec.decode(first.inputStream()).graph
+        val decoded = decodeGraph(first)
         assertEquals(listOf(1, 2), decoded.beeHistories.first().flightCycles.map { it.sequenceNumber })
         assertTrue(decoded.attachments.any { it.originalFileName == "пчёлы у дуба.jpg" })
         assertEquals(setOf(MarkPosition.THORAX, MarkPosition.ABDOMEN), decoded.beeHistories.map { it.bee.markPosition }.toSet())
@@ -161,7 +178,7 @@ class ObservationPointExportCodecTest {
         val fixture = fixture()
         val original = entries(encode(fixture.graph, fixture.blobs))
         val reordered = writeEntries(original.entries.reversed().associate { it.toPair() })
-        assertEquals(fixture.graph.point, ObservationPointExportCodec.decode(reordered.inputStream()).graph.point)
+        assertEquals(fixture.graph.point, decodeGraph(reordered).point)
 
         assertIntegrityFailure("point.json size mismatch") {
             ObservationPointExportCodec.decode(writeEntries(original.mapValues { (name, bytes) ->
@@ -208,7 +225,7 @@ class ObservationPointExportCodecTest {
             val pointJson = Json.parseToJsonElement(entries(archive).getValue("point.json").toString(Charsets.UTF_8)).jsonObject.getValue("point").jsonObject
             assertEquals(JsonPrimitive("2026-09-28"), pointJson.getValue("observationDate"))
             TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"))
-            assertEquals(point, ObservationPointExportCodec.decode(archive.inputStream()).graph.point)
+            assertEquals(point, decodeGraph(archive).point)
         } finally { TimeZone.setDefault(originalZone) }
     }
 
@@ -237,7 +254,7 @@ class ObservationPointExportCodecTest {
         val originalZone = TimeZone.getDefault()
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-            val archive = ByteArrayOutputStream().also { ObservationPointExportCodec.encode(fixture.graph, fixture.blobs, it, formatVersion = 1) }.toByteArray()
+            val archive = encode(fixture.graph, fixture.blobs, formatVersion = 1)
             val original = entries(archive)
             val root = Json.parseToJsonElement(original.getValue("point.json").toString(Charsets.UTF_8)).jsonObject
             val fields = root.getValue("point").jsonObject
@@ -245,7 +262,7 @@ class ObservationPointExportCodecTest {
             assertTrue(original.getValue("manifest.json").toString(Charsets.UTF_8).contains("\"formatVersion\":1"))
             val bytes = JsonObject(root + ("point" to JsonObject(fields + mapOf("unknownLegacyField" to JsonPrimitive("accepted"), "observationDate" to JsonPrimitive("2025-01-01"))))).toString().toByteArray()
             val updated = original + ("point.json" to bytes) + ("manifest.json" to updatePointDescriptor(original.getValue("manifest.json"), bytes))
-            assertEquals(fixture.graph.point, ObservationPointExportCodec.decode(writeEntries(updated).inputStream()).graph.point)
+            assertEquals(fixture.graph.point, decodeGraph(writeEntries(updated)).point)
         } finally { TimeZone.setDefault(originalZone) }
     }
 
@@ -255,10 +272,10 @@ class ObservationPointExportCodecTest {
         val graph = fixture.graph.copy(point = fixture.graph.point.copy(observationDate = LocalDate.of(2026, 9, 18)))
         val output = ByteArrayOutputStream().apply { write(byteArrayOf(7, 8, 9)) }
         var thrown: Throwable? = null
-        try { ObservationPointExportCodec.encode(graph, fixture.blobs, output, formatVersion = 1) } catch (e: Throwable) { thrown = e }
+        try { withPayloads(fixture.blobs) { payloads -> ObservationPointExportCodec.encode(graph, payloads, output, formatVersion = 1) } } catch (e: Throwable) { thrown = e }
         assertTrue(thrown is LegacyObservationPointExportNotRepresentable)
         assertArrayEquals(byteArrayOf(7, 8, 9), output.toByteArray())
-        assertEquals(graph.point, ObservationPointExportCodec.decode(encode(graph, fixture.blobs).inputStream()).graph.point)
+        assertEquals(graph.point, decodeGraph(encode(graph, fixture.blobs)).point)
     }
 
     @Test
@@ -266,7 +283,7 @@ class ObservationPointExportCodecTest {
         val fixture = fixture()
         val graph = fixture.graph.copy(point = fixture.graph.point.copy(observationDate = LocalDate.of(10000, 1, 1)))
         val output = ByteArrayOutputStream().apply { write(byteArrayOf(7, 8, 9)) }
-        assertInvalid { ObservationPointExportCodec.encode(graph, fixture.blobs, output) }
+        assertInvalid { withPayloads(fixture.blobs) { payloads -> ObservationPointExportCodec.encode(graph, payloads, output) } }
         assertArrayEquals(byteArrayOf(7, 8, 9), output.toByteArray())
     }
 
@@ -277,7 +294,7 @@ class ObservationPointExportCodecTest {
         val manifest = Json.parseToJsonElement(original.getValue("manifest.json").toString(Charsets.UTF_8)).jsonObject
         val updated = original + ("manifest.json" to JsonObject(manifest + ("formatVersion" to JsonPrimitive(3))).toString().toByteArray())
         assertInvalid { ObservationPointExportCodec.decode(writeEntries(updated).inputStream()) }
-        assertInvalid { ObservationPointExportCodec.encode(fixture.graph, fixture.blobs, ByteArrayOutputStream(), formatVersion = 3) }
+        assertInvalid { withPayloads(fixture.blobs) { payloads -> ObservationPointExportCodec.encode(fixture.graph, payloads, ByteArrayOutputStream(), formatVersion = 3) } }
     }
 
     private fun fixture(twoPhotos: Boolean = false): Fixture {
@@ -318,8 +335,21 @@ class ObservationPointExportCodecTest {
         Instant.parse("2026-09-20T10:10:00Z"), Instant.parse("2026-09-20T10:15:12Z"),
     )
 
-    private fun encode(graph: ObservationPointExportGraph, blobs: Map<UUID, ByteArray>): ByteArray =
-        ByteArrayOutputStream().also { ObservationPointExportCodec.encode(graph, blobs, it) }.toByteArray()
+    private fun encode(graph: ObservationPointExportGraph, blobs: Map<UUID, ByteArray>, formatVersion: Int = ObservationPointExportContract.FORMAT_VERSION): ByteArray =
+        withPayloads(blobs) { payloads -> ByteArrayOutputStream().also { ObservationPointExportCodec.encode(graph, payloads, it, formatVersion) }.toByteArray() }
+
+    private fun decodeGraph(archive: ByteArray): ObservationPointExportGraph =
+        ObservationPointExportCodec.decode(archive.inputStream()).use { it.graph }
+
+    private fun <T> withPayloads(blobs: Map<UUID, ByteArray>, block: (Map<UUID, org.beesearch.app.data.zip.ArchivePayload>) -> T): T {
+        val directory = Files.createTempDirectory("point-export-test-").toFile()
+        return try {
+            block(blobs.mapValues { (id, bytes) ->
+                java.io.File(directory, id.toString()).also { it.writeBytes(bytes) }
+                    .let { org.beesearch.app.data.zip.ArchivePayload.fromFile(it) }
+            })
+        } finally { directory.deleteRecursively() }
+    }
 
     private fun entries(archive: ByteArray): LinkedHashMap<String, ByteArray> {
         val result = linkedMapOf<String, ByteArray>()
