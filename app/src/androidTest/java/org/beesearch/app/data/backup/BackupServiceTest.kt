@@ -240,6 +240,10 @@ class BackupServiceTest {
     /** Compiled here; runtime execution is a separate owner-authorized Android gate. */
     @Test fun v7StreamingMediaRoundTripUsesPublicServiceAndRestoresManagedFiles() = runBlocking {
         val ids = seed(source)
+        // Match the established backup contract: points without weather carry PENDING rows.
+        source.backupDao().insertObservationPointWeather(source.backupDao().observationPoints().map { point ->
+            ObservationPointWeatherEntity(point.id, WeatherStatus.PENDING, null, null, null, null, null, null)
+        })
         val sourceRoot = temp("streaming-source-files")
         val targetRoot = temp("streaming-target-files")
         val cacheRoot = temp("streaming-cache")
