@@ -13,6 +13,7 @@ import java.security.MessageDigest
 import java.time.ZoneId
 import java.util.UUID
 import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -27,10 +28,10 @@ class PreservedDatabaseMigrationRehearsalTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val args = InstrumentationRegistry.getArguments()
+        assumeTrue("opt-in preserved database migration rehearsal", args.getString("migrationRehearsal") == "true")
         assertEquals("org.beesearch.app.dev", context.packageName)
         assertEquals(29, Build.VERSION.SDK_INT)
         assertEquals("Android SDK built for x86_64", Build.MODEL)
-        assertEquals("true", args.getString("migrationRehearsal"))
         val qemu = Runtime.getRuntime().exec(arrayOf("/system/bin/getprop", "ro.kernel.qemu"))
         assertEquals("1", qemu.inputStream.bufferedReader().use { it.readText().trim() })
         assertEquals(0, qemu.waitFor())
