@@ -73,6 +73,7 @@ data class VerificationReport(val inputPath: String, var fileSize: Long? = null,
     var snapshotProfile: String? = null
     var evidencePolicy: String? = null
     var creationResult: String? = null
+    var snapshotFormatVersion: Long? = null
 
     /**
      * True when the snapshot declares the local full-evidence profile: standalone inspection can prove

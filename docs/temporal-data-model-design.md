@@ -3,8 +3,9 @@
 Статус: APPROVED · 2026-10-03
 
 Утверждён владельцем как design research dates: schema-направление, migration policy и invariants
-ниже. I1 committed как f4f5105; I2 implemented in worktree, verification status — в handoff.
-I3–I7 не начаты. **I2 NOT DEPLOYABLE until I3 + I4 carriage.**
+ниже. I1 committed/pushed (f4f5105); I2 committed locally, not pushed (bd977b3),
+Room/device verification pending; I3 implemented in worktree. I4–I7 pending.
+**I2 + I3 + I4 — одна deployment unit; Samsung остаётся на I1 до I4 + device verification.**
 Документ остаётся нормативным design, а не заявлением о завершении всех increments.
 
 Ревизия после owner review: внесены два owner decisions — legacy Hollow/LogHive/Apiary получают
@@ -723,6 +724,14 @@ research date, и подменять её датой фиксации в име�
 
 ## 15. Backup / restore consequences
 
+Owner I3 execution · 2026-10-08 supersedes the optional-key evolution recommendation below:
+Complete Backup **V7** / archive schema **7** and Snapshot **V2** carry REQUIRED canonical
+observationDate and REQUIRED nullable fixationDate as ISO YYYY-MM-DD. New-version readers use
+only those explicit fields; missing/malformed/wrong-type fields fail closed, never legacy fallback.
+V1–V6 Complete Backup and V1 Snapshot keep one-time legacy ObservationPoint reconstruction and
+NULL physical fixationDate. See [Complete Backup contract](backup-format-v1.md) and
+[Snapshot V2](snapshot-v2-wire-schema.md). The code audit below describes the pre-I3 baseline.
+
 Backup — другая система, чем export: полный архив research-базы с манифестом, 15 обязательными
 коллекциями и SHA-256 каждого payload (`BackupCore.kt:390-397`).
 
@@ -967,7 +976,7 @@ I2  Physical object fixation date (Hollow/LogHive)
     nullable column + migration (legacy → NULL, без backfill)
     + заполнение при создании новых Hollow/LogHive
     (T3, T6, T7)                                        ← независим от I1
-I3  Backup: опциональный ключ + чтение старых архивов   ← зависит от I1, I2
+I3  Versioned Backup V7 / Snapshot V2: required canonical dates + legacy readers ← зависит от I1, I2
 I4  Export: версия формата + чтение старых пакетов      ← зависит от I1, I2
 I5  Query/filter support: интервальный запрос по research date
     + запись без research date (legacy fixation_date IS NULL) не попадает в ограниченный период

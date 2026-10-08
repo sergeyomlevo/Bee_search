@@ -21,10 +21,10 @@ class PhysicalObjectLegacyDateGuardTest {
     @Test fun legacyNullObjectsRemainRepresentableAndSnapshotReadersMaterializeNull() {
         val graph = graph(null)
         validateLegacyPhysicalObjectDates(graph)
-        val entries = SnapshotDomainCodec.encode(graph, settings)
+        val entries = SnapshotDomainCodec.encode(graph, settings, version = 1)
         val rows = entries.records.filterKeys { it != "settings/map-coverage.jsonl" }
             .mapValues { (_, lines) -> lines.map { SnapshotJson.parse(it.toByteArray(), false).jsonObject } }
-        assertTrue(snapshotGraphFromRows(rows).physicalObjects.all { it.fixationDate == null })
+        assertTrue(snapshotGraphFromRows(rows, version = 1).physicalObjects.all { it.fixationDate == null })
         val directory = Files.createTempDirectory("physical-legacy-date").toFile()
         try {
             val output = File(directory, "snapshot.zip")
@@ -50,7 +50,7 @@ class PhysicalObjectLegacyDateGuardTest {
                 val graph = original.copy(physicalObjects = original.physicalObjects.map { if (it.objectType == type) it.copy(fixationDate = date) else it })
                 val output = File(directory, type.name + ".zip")
                 val error = assertThrows(SnapshotException::class.java) {
-                    SnapshotArchive().build(output, identity(), SnapshotDomainCodec.encode(graph, settings))
+                    SnapshotArchive().build(output, identity(), SnapshotDomainCodec.encode(graph, settings, version = 1))
                 }
                 assertEquals(SnapshotError.LOGICAL_STATE_INCONSISTENT, error.error)
                 assertTrue(error.category.contains("fixationDate"))
@@ -58,11 +58,22 @@ class PhysicalObjectLegacyDateGuardTest {
                 val previous = "existing snapshot".toByteArray()
                 output.writeBytes(previous)
                 assertThrows(SnapshotException::class.java) {
-                    SnapshotArchive().build(output, identity(), SnapshotDomainCodec.encode(graph, settings))
+                    SnapshotArchive().build(output, identity(), SnapshotDomainCodec.encode(graph, settings, version = 1))
                 }
                 assertTrue(previous.contentEquals(output.readBytes()))
             }
         } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun v2PreservesNonNullFixationDateThroughProductionBridge() {
+        val source = graph(date)
+        val entries = SnapshotDomainCodec.encode(source, settings)
+        val rows = entries.records
+            .filterKeys { it != "settings/map-coverage.jsonl" }
+            .mapValues { (_, lines) -> lines.map { SnapshotJson.parse(it.toByteArray(), false).jsonObject } }
+        val restored = snapshotGraphFromRows(rows, version = 2)
+        assertEquals(listOf(date), restored.physicalObjects.map { it.fixationDate }.distinct())
+        assertEquals(source.physicalObjects.map { it.fixationDate }, restored.physicalObjects.map { it.fixationDate })
     }
 
     private fun identity() = SnapshotIdentity(UUID.randomUUID(), UUID.randomUUID(), "Dev", at.toEpochMilli())

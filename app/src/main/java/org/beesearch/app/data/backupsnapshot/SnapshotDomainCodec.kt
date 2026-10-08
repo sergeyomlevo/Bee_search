@@ -35,6 +35,7 @@ internal data class SnapshotDomainEntries(
     val records: Map<String, List<String>>,
     val portable: ByteArray,
     val references: List<SnapshotMediaReference>,
+    val formatVersion: Int = SnapshotContract.VERSION,
 )
 
 /** Pure, metadata-only domain bridge. It never opens or reads a media file. */
@@ -49,22 +50,25 @@ internal object SnapshotDomainCodec {
     )
     private val allExpected = expected + "settings/portable.json" + "references/media-blobs.jsonl"
 
-    fun encode(graph: Graph, settings: PortableSettingsSnapshot): SnapshotDomainEntries {
+    fun encode(graph: Graph, settings: PortableSettingsSnapshot, version: Int = SnapshotContract.VERSION): SnapshotDomainEntries {
+        if (version !in SnapshotContract.supportedVersions) throw SnapshotException(SnapshotError.INVALID_FORMAT, "VERSION")
         validateGraphForSnapshot(graph, settings)
         try {
-            validateLegacyObservationDates(graph)
-            validateLegacyPhysicalObjectDates(graph)
+            if (version == 1) {
+                validateLegacyObservationDates(graph)
+                validateLegacyPhysicalObjectDates(graph)
+            }
         }
         catch (e: BackupDomainInvariantViolation) { logical(e.message ?: "legacy date not representable", e) }
-        val records = snapshotRows(graph).toMutableMap()
+        val records = snapshotRows(graph, version).toMutableMap()
         records["settings/map-coverage.jsonl"] = settings.coverage.entries.sortedBy { it.key.toString() }
             .map { "{\"territoryId\":${quote(it.key.toString())},\"encoded\":${quote(it.value)}}" }
         val portable = snapshotPortableJson(settings).toByteArray(StandardCharsets.UTF_8)
         val parsed = records.mapValues { (_, rows) -> rows.map {
             SnapshotJson.parse(it.toByteArray(StandardCharsets.UTF_8), false).jsonObject
         } }
-        val references = validateWireState(parsed, SnapshotJson.parse(portable, false).jsonObject, SnapshotLimits())
-        return SnapshotDomainEntries(records, portable, references)
+        val references = validateWireState(parsed, SnapshotJson.parse(portable, false).jsonObject, SnapshotLimits(), version)
+        return SnapshotDomainEntries(records, portable, references, version)
     }
 
     /** Only fixed, integrity-checked files supplied by the archive reader. Returns the wire references. */
@@ -72,6 +76,7 @@ internal object SnapshotDomainCodec {
         entries: Map<String, File>,
         check: () -> Unit = {},
         limits: SnapshotLimits = SnapshotLimits(),
+        version: Int = SnapshotContract.VERSION,
     ): List<SnapshotMediaReference> {
         if (entries.keys != allExpected) logical("entry set mismatch")
         try {
@@ -79,7 +84,7 @@ internal object SnapshotDomainCodec {
                 readRows(entries.getValue(path), limits, check)
             }
             val portable = SnapshotJson.parse(entries.getValue("settings/portable.json").readBytes(), false, limits).jsonObject
-            val expectedReferences = validateWireState(parsed, portable, limits)
+            val expectedReferences = validateWireState(parsed, portable, limits, version)
             val actual = readReferences(entries.getValue("references/media-blobs.jsonl"), limits, check)
             if (actual != expectedReferences) logical("media reference set mismatch")
             check()
@@ -134,12 +139,12 @@ internal object SnapshotDomainCodec {
     private val mediaPaths = setOf("data/physical-object-media.jsonl", "data/observation-point-attachments.jsonl")
 
     /** Shared raw wire boundary: unknown media identity never needs fabricated Room fields. */
-    private fun validateWireState(rows: Map<String, List<JsonObject>>, portable: JsonObject, limits: SnapshotLimits): List<SnapshotMediaReference> {
-        rows.forEach { (path, records) -> SnapshotRecordSchema.validateRows(path, records) }
+    private fun validateWireState(rows: Map<String, List<JsonObject>>, portable: JsonObject, limits: SnapshotLimits, version: Int): List<SnapshotMediaReference> {
+        rows.forEach { (path, records) -> SnapshotRecordSchema.validateRows(path, records, version) }
         SnapshotRecordSchema.validatePortable(portable)
         // The legacy entity bridge cannot represent absent/null media SHA/size.
         // Validate those raw records below instead; their original bytes stay untouched.
-        val graph = snapshotGraphFromRows(rows.filterKeys { it !in mediaPaths && it != "settings/map-coverage.jsonl" })
+        val graph = snapshotGraphFromRows(rows.filterKeys { it !in mediaPaths && it != "settings/map-coverage.jsonl" }, version)
         val coverage = rows.getValue("settings/map-coverage.jsonl")
         val settings = PortableSettingsSnapshot(
             portable.nullableString("currentTerritoryId")?.let(UUID::fromString),

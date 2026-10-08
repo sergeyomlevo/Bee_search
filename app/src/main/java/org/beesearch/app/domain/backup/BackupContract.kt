@@ -126,6 +126,16 @@ internal object BackupContractV6 {
     const val ATTACHMENT_PREFIX = BackupContractV5.ATTACHMENT_PREFIX
     const val OBJECT_MEDIA_PREFIX = BackupContractV5.OBJECT_MEDIA_PREFIX
 }
+/** Versioned canonical research-date carriage; legacy collections and media paths are retained. */
+internal object BackupContractV7 {
+    const val FORMAT = 7
+    const val SCHEMA = 7
+    const val PROFILE = BackupContractV6.PROFILE
+    val collections = BackupContractV6.collections
+    const val ATTACHMENT_PREFIX = BackupContractV6.ATTACHMENT_PREFIX
+    const val OBJECT_MEDIA_PREFIX = BackupContractV6.OBJECT_MEDIA_PREFIX
+}
+
 internal sealed class BackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
 internal class UnsupportedBackupFormat(message: String) : BackupException(message)
 internal class UnsupportedArchiveSchema(message: String) : BackupException(message)

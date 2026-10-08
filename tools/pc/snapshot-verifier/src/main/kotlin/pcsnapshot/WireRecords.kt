@@ -8,11 +8,11 @@ import java.util.Locale
 
 /** Raw JSONL framing, normative schemas and metadata-only reachability. */
 internal object WireRecords {
-    fun validate(files: Map<String, Path>, report: VerificationReport) {
+    fun validate(files: Map<String, Path>, report: VerificationReport, version: Long) {
         val graph = mutableMapOf<String, List<JsonObject>>()
         for (path in Contract.paths.filter { it.startsWith("data/") }) {
             val found = mutableListOf<JsonObject>()
-            orderedRecords(files.getValue(path), path) { record ->
+            orderedRecords(files.getValue(path), path, version = version) { record ->
                 found += record
             }
             graph[path] = found
@@ -98,12 +98,12 @@ internal object WireRecords {
         if (row.keySet() != fields) reject("WIRE_SCHEMA_INVALID",scope)
     }
 
-    private fun orderedRecords(file: Path, scope: String, canonical: Boolean = false,
+    private fun orderedRecords(file: Path, scope: String, canonical: Boolean = false, version: Long = 1L,
         consume: (JsonObject) -> Unit) {
         var previous: List<String>? = null
         forEachRecord(file, scope) { bytes ->
             val record = objectValue(bytes, scope, canonical)
-            if (scope.startsWith("data/")) try { RecordSchema.validate(record,scope) }
+            if (scope.startsWith("data/")) try { RecordSchema.validate(record,scope,version) }
             catch (e: CheckFailure) { throw CheckFailure(e.issue.copy(scope = scope)) }
             if (canonical && !bytes.contentEquals(SafeJson.encode(record))) reject("JSONL_NOT_CANONICAL", scope)
             val keys = Contract.keys[scope] ?: listOf("id")

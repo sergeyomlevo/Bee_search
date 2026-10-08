@@ -162,7 +162,9 @@ class Verifier {
         val o = obj.asJsonObject
         requiredKeys(o, setOf("snapshotFormat", "snapshotFormatVersion", "snapshotId", "repositoryId", "variant", "createdAtEpochMs", "snapshotProfile", "creationResult", "evidencePolicy", "entries", "mediaReferences", "creationIssues"), "manifest", report)
         text(o, "snapshotFormat")?.let { if (it != "beesearch-snapshot") report.issues += Issue("MANIFEST_INVALID") } ?: run { report.issues += Issue("MANIFEST_INVALID") }
-        if (number(o, "snapshotFormatVersion") != 1L) report.issues += Issue("UNSUPPORTED_FORMAT_VERSION")
+        val formatVersion = number(o, "snapshotFormatVersion")
+        if (formatVersion !in setOf(1L, 2L)) report.issues += Issue("UNSUPPORTED_FORMAT_VERSION")
+        else report.snapshotFormatVersion = formatVersion
         val id = text(o, "snapshotId"); val repo = text(o, "repositoryId")
         if (id == null || repo == null || !validUuid(id) || !validUuid(repo)) report.issues += Issue("MANIFEST_INVALID")
         if (id != report.filenameSnapshotId) report.issues += Issue("SNAPSHOT_ID_MISMATCH")
@@ -206,7 +208,7 @@ class Verifier {
         for (path in Contract.paths) if (!view.entries.containsKey(path)) report.issues += Issue("MISSING_ENTRY", path)
         for (path in view.entries.keys) if (path !in Contract.paths) report.issues += Issue("UNEXPECTED_ENTRY", path)
         if (report.issues.isNotEmpty()) return
-        WireRecords.validate(view.entries.mapValues { it.value.spool!! }, report)
+        WireRecords.validate(view.entries.mapValues { it.value.spool!! }, report, report.snapshotFormatVersion ?: 1L)
         if (report.issues.isEmpty()) report.verifiedEntries = view.entries.size
     }
     private fun checkPath(e: ZipEntry, current: Map<String, Entry>) { val n = e.name; if (e.isDirectory || n.isEmpty() || n.contains('\\') || n.startsWith('/') || n.contains("../") || n == ".." || n.split('/').any { it == ".." }) reject("ZIP_PATH_INVALID", n); if (n !in Contract.paths) reject("UNEXPECTED_ENTRY", n); if (current.containsKey(n)) reject("DUPLICATE_ENTRY", n) }

@@ -1932,10 +1932,12 @@ Subtype dates, date editor и explicit date creation override не добавл�
 
 Для establishment date и Inspection конкретные поля, identifiers и migration не определяются.
 
-I2 implemented in worktree; **NOT DEPLOYABLE until I3 + I4 carriage**. Legacy V6 Backup,
-Snapshot V1 и single/collection physical-object Export V1 fail closed при non-null fixationDate;
-legacy readers materialize NULL. Payload/version/layout не меняются. I3 должен переносить canonical
-research dates в Backup/Snapshot, I4 — в export. Промежуточный I2 APK на рабочий Samsung не ставится.
+I2 committed locally (bd977b3); I3 implemented in worktree: Complete Backup V7 и Snapshot V2
+переносят explicit canonical observationDate и REQUIRED nullable fixationDate. Legacy V1–V6 Backup /
+Snapshot V1 materialize fixationDate NULL; legacy ObservationPoint reconstruction остаётся только
+в старых formats. Single/collection physical-object Export V1 по-прежнему fail closed при non-null
+fixationDate. **I2 + I3 + I4 — одна deployment unit; I4 и Room/device verification PENDING**.
+Samsung остаётся на I1; промежуточный APK не устанавливается.
 
 ## Миграция и исторические rows
 

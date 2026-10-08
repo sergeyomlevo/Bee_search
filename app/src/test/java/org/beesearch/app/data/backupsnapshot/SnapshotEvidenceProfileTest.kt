@@ -144,7 +144,7 @@ class SnapshotEvidenceProfileTest {
         assertTrue(text.contains("\"evidencePolicy\":\"LOCAL_VERIFIED\""))
         assertTrue(text.contains("\"creationResult\":\"COMPLETE\""))
         assertTrue(text.contains("\"creationIssues\":[]"))
-        assertTrue(text.contains("\"snapshotFormatVersion\":1"))
+        assertTrue(text.contains("\"snapshotFormatVersion\":2"))
         val decoded = SnapshotManifest.decode(text.toByteArray())
         assertEquals(SnapshotEvidenceProfile.FULL_LOCAL_VERIFIED, decoded.evidenceProfile)
         assertTrue(decoded.evidenceProfile.requiresRepositoryMediaEvidence)

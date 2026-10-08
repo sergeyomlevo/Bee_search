@@ -1,5 +1,9 @@
 # Repository Snapshot V1 — Slice 2B
 
+Temporal I3: V1 remains readable under its frozen schema. New snapshots use
+[V2 canonical date carriage](snapshot-v2-wire-schema.md); inventory, evidence
+profiles and publication/discovery safety below also apply to V2.
+
 Owner-approved metadata profile; implementation pending final Slice 2B acceptance.
 No format freeze is inferred from compilation. Independent contract:
 [snapshot-2b-contract-preflight.md](snapshot-2b-contract-preflight.md).

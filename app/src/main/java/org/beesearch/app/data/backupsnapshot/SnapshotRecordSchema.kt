@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /** Closed, lexical V1 wire schemas for JSONL records and portable settings. */
 internal object SnapshotRecordSchema {
-    private enum class Kind { S, U, I, L, T, D, B, E, H }
+    private enum class Kind { S, U, I, L, T, D, B, E, H, DATE }
     private data class Field(val kind: Kind, val nullable: Boolean = false, val optional: Boolean = false)
 
     private val uuid = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -94,8 +94,14 @@ internal object SnapshotRecordSchema {
         "settings/map-coverage.jsonl" to listOf("territoryId"), "references/media-blobs.jsonl" to listOf("sha256"),
     )
 
-    fun validateRows(path: String, rows: List<JsonObject>) {
-        val expected = schemas[path] ?: invalid("UNKNOWN_RECORD_PATH")
+    fun validateRows(path: String, rows: List<JsonObject>, version: Int = 1) {
+        if (version !in SnapshotContract.supportedVersions) invalid("VERSION")
+        val legacy = schemas[path] ?: invalid("UNKNOWN_RECORD_PATH")
+        val expected = if (version == 2) when (path) {
+            "data/observation-points.jsonl" -> legacy + ("observationDate" to f(Kind.DATE))
+            "data/physical-objects.jsonl" -> legacy + ("fixationDate" to f(Kind.DATE, true))
+            else -> legacy
+        } else legacy
         var previous: List<String>? = null
         rows.forEach { row ->
             validateObject(path, row, expected)
@@ -122,6 +128,11 @@ internal object SnapshotRecordSchema {
     private fun validateValue(path: String, name: String, value: JsonElement, kind: Kind) {
         val primitive = value as? JsonPrimitive ?: invalid("TYPE_$name")
         when (kind) {
+            Kind.DATE -> {
+                if (!primitive.isString) invalid("TYPE_$name")
+                try { org.beesearch.app.data.backup.parseCanonicalResearchDate(primitive.content) }
+                catch (_: org.beesearch.app.domain.backup.MalformedBackup) { invalid("DATE_$name") }
+            }
             Kind.S -> if (!primitive.isString) invalid("TYPE_$name")
             Kind.U -> if (!primitive.isString || !uuid.matches(primitive.content)) invalid("UUID_$name")
             Kind.H -> if (!primitive.isString || !sha.matches(primitive.content)) invalid("SHA_$name")

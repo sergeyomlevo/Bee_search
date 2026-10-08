@@ -26,7 +26,7 @@ class PhysicalObjectLegacyBackupTest {
         val output = File(context.cacheDir, UUID.randomUUID().toString() + ".zip")
         try {
             seed(source)
-            service(source).export(output)
+            service(source).export(output, format = 6)
             service(target).restore(output)
             assertEquals(source.backupDao().physicalObjects(), target.backupDao().physicalObjects())
             assertEquals(3, target.backupDao().physicalObjects().size)
@@ -41,12 +41,12 @@ class PhysicalObjectLegacyBackupTest {
             seed(source)
             for (point in source.backupDao().physicalObjects()) {
                 source.openHelper.writableDatabase.execSQL("UPDATE physical_objects SET fixation_date = '2026-08-20' WHERE id = ?", arrayOf(point.id.toString()))
-                val error = assertThrows(BackupDomainInvariantViolation::class.java) { runBlocking { service(source).export(output) } }
+                val error = assertThrows(BackupDomainInvariantViolation::class.java) { runBlocking { service(source).export(output, format = 6) } }
                 assertTrue(error.message!!.contains("fixationDate"))
                 assertFalse(output.exists())
                 val previous = "existing correct output".toByteArray()
                 output.writeBytes(previous)
-                assertThrows(BackupDomainInvariantViolation::class.java) { runBlocking { service(source).export(output) } }
+                assertThrows(BackupDomainInvariantViolation::class.java) { runBlocking { service(source).export(output, format = 6) } }
                 assertTrue(previous.contentEquals(output.readBytes()))
                 output.delete()
                 source.openHelper.writableDatabase.execSQL("UPDATE physical_objects SET fixation_date = NULL WHERE id = ?", arrayOf(point.id.toString()))

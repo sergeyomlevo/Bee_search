@@ -52,7 +52,8 @@
 Design APPROVED · 2026-10-03: `docs/temporal-data-model-design.md`. Закрыт design: schema-направление,
 migration policy и invariants. За пределами утверждённого minimal scope остаются future concerns —
 establishment-date precision, схема Inspection, late-entry/weather design. I1 committed (f4f5105);
-I2 implemented in worktree, owner review pending. I3–I7 не начаты; I2 NOT DEPLOYABLE until I3 + I4 carriage.
+I2 committed locally (bd977b3), isolated Room/device verification pending. I3 implemented in worktree,
+owner review pending; I4–I7 pending. I2 + I3 + I4 — одна deployment unit; I4 + device gate блокируют Samsung.
 
 ## Overlay architecture evidence
 
@@ -70,9 +71,10 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 
 - [ ] Implement required Room/data-model/migration changes.
       I1 committed (f4f5105): Room v12, canonical ObservationPoint date и atomic correction без user caller.
-      I2 implemented in worktree: Room v13 nullable fixationDate, legacy NULL, new Hollow/LogHive dates,
-      legacy writer fail-closed guards. Owner review и isolated Android verification остаются pending.
-      **NOT DEPLOYABLE until I3 + I4 carriage**; общий temporal stage не закрыт. I3 + I4 также обязательны
+      I2 committed locally: Room v13 nullable fixationDate, legacy NULL, new Hollow/LogHive dates.
+      I3 implemented in worktree: Backup V7 / Snapshot V2 explicit dates, legacy readers retained.
+      Owner I3 review, I4 и isolated Android verification остаются pending.
+      **NOT DEPLOYABLE until I4 + device gate**; общий temporal stage не закрыт. I3 + I4 также обязательны
       до I6 или любого user-reachable explicit/corrected research-date path.
 - [ ] Implement Layers/Filters from the approved UI spec.
 - [ ] Implement MapLibre runtime overlay registry/restoration where required.

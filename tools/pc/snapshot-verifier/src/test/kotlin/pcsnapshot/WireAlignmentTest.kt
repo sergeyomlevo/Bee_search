@@ -29,6 +29,80 @@ class WireAlignmentTest {
         assertTrue("expected $expected: ${report.issues}",report.issues.any { it.code == expected })
     }
 
+    @Test fun v2ManifestSelectsDateAwareSchemaAndPassesEmptyCorpus() {
+        val files = Fixture.entries(Fixture.validBytes())
+        files["manifest.json"] = Fixture.manifest(files).toString(Charsets.UTF_8)
+            .replace("\"snapshotFormatVersion\":1", "\"snapshotFormatVersion\":2").toByteArray()
+        val report = Verifier().verify(Fixture.canonicalCopy(temp.root.toPath(), Fixture.zip(files)))
+        assertEquals("PASS", report.verdict)
+        assertEquals(2L, report.snapshotFormatVersion)
+    }
+
+    @Test fun v2DatesAreCanonicalCalendarValuesAndRequired() {
+        val point = JsonParser.parseString(NonEmptyFixture.entries()["data/observation-points.jsonl"]!!.toString(Charsets.UTF_8).lineSequence().first()).asJsonObject
+        val physical = JsonParser.parseString(NonEmptyFixture.entries()["data/physical-objects.jsonl"]!!.toString(Charsets.UTF_8).lineSequence().first()).asJsonObject
+        point.addProperty("observationDate", "2024-02-29")
+        physical.addProperty("fixationDate", "2020-01-31")
+        RecordSchema.validate(point, "data/observation-points.jsonl", 2L)
+        RecordSchema.validate(physical, "data/physical-objects.jsonl", 2L)
+    }
+
+    @Test fun v2DatesRejectMissingWrongTypeAndInvalidCalendarDate() {
+        val point = JsonParser.parseString(NonEmptyFixture.entries()["data/observation-points.jsonl"]!!.toString(Charsets.UTF_8).lineSequence().first()).asJsonObject
+        val physical = JsonParser.parseString(NonEmptyFixture.entries()["data/physical-objects.jsonl"]!!.toString(Charsets.UTF_8).lineSequence().first()).asJsonObject
+        val missing = point.deepCopy()
+        val wrongType = point.deepCopy().also { it.addProperty("observationDate", 20240229) }
+        val invalid = point.deepCopy().also { it.addProperty("observationDate", "2023-02-29") }
+        val missingFixation = physical.deepCopy()
+        val wrongFixation = physical.deepCopy().also { it.addProperty("fixationDate", 1) }
+        for ((row, path) in listOf(missing to "data/observation-points.jsonl", wrongType to "data/observation-points.jsonl", invalid to "data/observation-points.jsonl", missingFixation to "data/physical-objects.jsonl", wrongFixation to "data/physical-objects.jsonl")) {
+            assertEquals("WIRE_SCHEMA_INVALID", assertThrows(CheckFailure::class.java) { RecordSchema.validate(row, path, 2L) }.issue.code)
+        }
+    }
+
+    @Test fun v1RejectsV2DateKeys() {
+        val point = JsonParser.parseString(NonEmptyFixture.entries()["data/observation-points.jsonl"]!!.toString(Charsets.UTF_8).lineSequence().first()).asJsonObject
+        point.addProperty("observationDate", "2024-02-29")
+        assertEquals("WIRE_SCHEMA_INVALID", assertThrows(CheckFailure::class.java) {
+            RecordSchema.validate(point, "data/observation-points.jsonl", 1L)
+        }.issue.code)
+    }
+
+    private fun verifyV2(change: (LinkedHashMap<String, ByteArray>) -> Unit = {}): VerificationReport {
+        val files = NonEmptyFixture.entries()
+        edit(files, "data/observation-points.jsonl") { it.addProperty("observationDate", "2024-02-29") }
+        edit(files, "data/physical-objects.jsonl") { it.add("fixationDate", JsonNull.INSTANCE) }
+        change(files)
+        files["manifest.json"] = Fixture.manifest(files).toString(Charsets.UTF_8)
+            .replace("\"snapshotFormatVersion\":1", "\"snapshotFormatVersion\":2").toByteArray()
+        return Verifier().verify(Fixture.canonicalCopy(temp.root.toPath(), Fixture.zip(files)))
+    }
+
+    @Test fun nonEmptyV2ArchiveValidatesExplicitAndNullableDatesThroughWholePipeline() {
+        val report = verifyV2 { files -> edit(files, "data/physical-objects.jsonl") {
+            it.addProperty("fixationDate", "2020-01-31")
+        } }
+        assertEquals("PASS", report.verdict)
+        assertEquals(17, report.verifiedEntries)
+        assertEquals("PASS", verifyV2().verdict)
+    }
+
+    @Test fun malformedV2DatesFailWholePipelineWithUpdatedIntegrityDescriptors() {
+        for ((path, key) in listOf("data/observation-points.jsonl" to "observationDate",
+            "data/physical-objects.jsonl" to "fixationDate")) {
+            for (bad in listOf("missing", "type", "calendar", "spelling")) {
+                code(verifyV2 { files -> edit(files, path) { row ->
+                    when (bad) {
+                        "missing" -> row.remove(key)
+                        "type" -> row.addProperty(key, 1)
+                        "calendar" -> row.addProperty(key, "2023-02-29")
+                        else -> row.addProperty(key, "2026-8-20")
+                    }
+                } }, "WIRE_SCHEMA_INVALID")
+            }
+        }
+    }
+
     @Test fun everyCollectionRejectsUnknownMissingAndWrongTypedFields() {
         for ((path,bytes) in NonEmptyFixture.entries().filterKeys { it.startsWith("data/") }) {
             val base = JsonParser.parseString(bytes.toString(Charsets.UTF_8).lineSequence().first()).asJsonObject

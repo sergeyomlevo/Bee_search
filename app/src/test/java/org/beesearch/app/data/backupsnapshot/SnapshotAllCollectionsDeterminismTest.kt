@@ -136,23 +136,23 @@ class SnapshotAllCollectionsDeterminismTest {
         val encoded = SnapshotDomainCodec.encode(graph(), settings(false))
         encoded.records.forEach { (path, records) ->
             val rows = records.map { SnapshotJson.parse(it.toByteArray(), false).jsonObject }
-            SnapshotRecordSchema.validateRows(path, rows)
+            SnapshotRecordSchema.validateRows(path, rows, version = 2)
             val first = rows.first()
             val unknown = JsonObject(first + ("unexpected" to JsonPrimitive("value")))
             assertEquals(SnapshotError.INVALID_FORMAT, assertThrows(SnapshotException::class.java) {
-                SnapshotRecordSchema.validateRows(path, listOf(unknown))
+                SnapshotRecordSchema.validateRows(path, listOf(unknown), version = 2)
             }.error)
             // All emitted non-media fields are required, including nullable fields.
             val required = first.keys.first { it != "sha256" && it != "byteSize" }
             assertEquals(SnapshotError.INVALID_FORMAT, assertThrows(SnapshotException::class.java) {
-                SnapshotRecordSchema.validateRows(path, listOf(JsonObject(first - required)))
+                SnapshotRecordSchema.validateRows(path, listOf(JsonObject(first - required)), version = 2)
             }.error)
             assertEquals(SnapshotError.LOGICAL_STATE_INCONSISTENT, assertThrows(SnapshotException::class.java) {
-                SnapshotRecordSchema.validateRows(path, listOf(first, first))
+                SnapshotRecordSchema.validateRows(path, listOf(first, first), version = 2)
             }.error)
             if (rows.size > 1) assertEquals(SnapshotError.LOGICAL_STATE_INCONSISTENT,
                 assertThrows(SnapshotException::class.java) {
-                    SnapshotRecordSchema.validateRows(path, rows.asReversed())
+                    SnapshotRecordSchema.validateRows(path, rows.asReversed(), version = 2)
                 }.error)
         }
     }

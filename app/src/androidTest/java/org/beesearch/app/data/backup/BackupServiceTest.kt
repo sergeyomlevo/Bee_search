@@ -162,7 +162,7 @@ class BackupServiceTest {
 
     @Test fun v1RestoreCreatesPendingWeatherAndNoProperties() = runBlocking {
         seed(source)
-        service(source, sourceStore).export(archive)
+        service(source, sourceStore).export(archive, format = 6)
         val v1 = convertV3ToV1(zipEntries(archive))
         service(target, targetStore).restore(v1)
         assertTrue(target.backupDao().observationPoints().all { it.description == null })
@@ -190,7 +190,7 @@ class BackupServiceTest {
     }
 
     @Test fun manifestContainsAllV6RequiredCollections() = runBlocking {
-        seed(source); service(source, sourceStore).export(archive)
+        seed(source); service(source, sourceStore).export(archive, format = 6)
         val manifest = String(zipEntries(archive).getValue("manifest.json"))
         BackupContractV6.collections.forEach { (name, path) ->
             assertTrue(manifest.contains("\"name\":\"$name\"")); assertTrue(manifest.contains("\"path\":\"$path\""))
@@ -199,6 +199,42 @@ class BackupServiceTest {
         assertTrue(manifest.contains("\"backupFormatVersion\":6"))
         assertTrue(manifest.contains("\"archiveSchemaVersion\":6"))
         assertTrue(manifest.contains("\"roomSchemaVersion\":11"))
+    }
+
+    @Test fun v7RoundTripPreservesCorrectedPointAndNullablePhysicalFixationDates() = runBlocking {
+        val ids = seed(source)
+        val hollowId = UUID.randomUUID()
+        val logHiveId = UUID.randomUUID()
+        val apiaryId = UUID.randomUUID()
+        val fixation = java.time.LocalDate.of(2026, 9, 12)
+        source.openHelper.writableDatabase.execSQL(
+            "UPDATE observation_points SET observation_date = '2026-09-11' WHERE code = 'P2'",
+        )
+        source.backupDao().insertPhysicalObjects(
+            listOf(
+                PhysicalObjectEntity(hollowId, ids.territory2, PhysicalObjectType.HOLLOW, 1, 56.3, 42.9, NOW, ids.observer2, fixation),
+                PhysicalObjectEntity(logHiveId, ids.territory2, PhysicalObjectType.LOG_HIVE, 1, 56.4, 43.0, NOW, ids.observer2, fixation),
+                PhysicalObjectEntity(apiaryId, ids.territory2, PhysicalObjectType.APIARY, 1, 56.5, 43.1, NOW, ids.observer2, null),
+            ),
+        )
+        source.backupDao().insertHollows(listOf(HollowEntity(hollowId, null, null, null, null, null, null)))
+        source.backupDao().insertLogHives(listOf(LogHiveEntity(logHiveId, null, null, null, null, null, null, null, null)))
+        source.backupDao().insertApiaries(listOf(ApiaryEntity(apiaryId, null)))
+
+        service(source, sourceStore).export(archive)
+        val manifest = String(zipEntries(archive).getValue("manifest.json"))
+        assertTrue(manifest.contains("\"backupFormatVersion\":7"))
+        val pointJson = String(zipEntries(archive).getValue("research/observation-points.json"))
+        assertTrue(pointJson.contains("\"observationDate\":\"2026-09-11\""))
+        val objectsJson = String(zipEntries(archive).getValue("research/physical-objects.json"))
+        assertEquals(2, Regex("\"fixationDate\":\"2026-09-12\"").findAll(objectsJson).count())
+        assertEquals(1, Regex("\"fixationDate\":null").findAll(objectsJson).count())
+
+        service(target, targetStore).restore(archive)
+        assertEquals(java.time.LocalDate.of(2026, 9, 11), target.backupDao().observationPoints().single { it.code == "P2" }.observationDate)
+        assertEquals(fixation, target.backupDao().physicalObjects().single { it.id == hollowId }.fixationDate)
+        assertEquals(fixation, target.backupDao().physicalObjects().single { it.id == logHiveId }.fixationDate)
+        assertNull(target.backupDao().physicalObjects().single { it.id == apiaryId }.fixationDate)
     }
 
     @Test fun v3RoundTripPreservesPhysicalObjectsApiaryAndBeeAssociation() = runBlocking {
@@ -218,7 +254,7 @@ class BackupServiceTest {
         source.backupDao().insertApiaries(listOf(ApiaryEntity(apiaryId, "Пасека Иванова")))
         source.beeDao().setSourceObject(bee.id, hollowId)
 
-        service(source, sourceStore).export(archive)
+        service(source, sourceStore).export(archive, format = 6)
         service(target, targetStore).restore(convertV4ToV3(zipEntries(archive)))
 
         assertEquals(source.backupDao().physicalObjects(), target.backupDao().physicalObjects())
@@ -254,7 +290,7 @@ class BackupServiceTest {
         val bee = source.backupDao().bees().first()
         source.beeDao().setSourceObject(bee.id, hollowId)
         val objectTargetStore = PhysicalObjectMediaFileStore(temp("object-target-files"), temp("object-target-cache"))
-        service(source, sourceStore, objectMediaStore = mediaStore).export(archive)
+        service(source, sourceStore, objectMediaStore = mediaStore).export(archive, format = 6)
         val manifest = String(zipEntries(archive).getValue("manifest.json"))
         assertTrue(manifest.contains("\"backupFormatVersion\":6"))
         service(target, targetStore, objectMediaStore = objectTargetStore).restore(archive)
@@ -307,7 +343,7 @@ class BackupServiceTest {
         source.backupDao().insertHollows(listOf(HollowEntity(hollowId, "дуб", 180.0, 123, 40.0, 25.0, null, "У старого дуба")))
         source.backupDao().insertLogHives(listOf(LogHiveEntity(logHiveId, "сосна", 150.0, 90, 50.0, "липа", 30.0, 80.0, null, "Лесная")))
 
-        service(source, sourceStore).export(archive)
+        service(source, sourceStore).export(archive, format = 6)
         service(target, targetStore).restore(archive)
         assertEquals("У старого дуба", target.backupDao().hollows().single().name)
         assertEquals("Лесная", target.backupDao().logHives().single().name)
@@ -330,7 +366,7 @@ class BackupServiceTest {
             listOf(PhysicalObjectSequenceEntity(ids.territory2, PhysicalObjectType.HOLLOW, 7)),
         )
 
-        service(source, sourceStore).export(archive)
+        service(source, sourceStore).export(archive, format = 6)
         service(target, targetStore).restore(convertV5ToV4(zipEntries(archive)))
 
         assertTrue(target.backupDao().physicalObjectSequences().isEmpty())
@@ -374,7 +410,7 @@ class BackupServiceTest {
         )
         source.backupDao().insertHollows(listOf(HollowEntity(hollowId, "дуб", 180.0, 123, 40.0, 25.0, "note")))
         source.beeDao().setSourceObject(bee.id, hollowId)
-        service(source, sourceStore).export(archive)
+        service(source, sourceStore).export(archive, format = 6)
         service(target, targetStore).restore(convertV4ToV3(zipEntries(archive)))
         assertEquals(hollowId, target.backupDao().bees().single { it.id == bee.id }.sourceObjectId)
         val restored = target.backupDao().hollows().single { it.physicalObjectId == hollowId }
@@ -385,7 +421,7 @@ class BackupServiceTest {
 
     @Test fun v2RestoreRemainsCompatibleAndHasNoPhysicalObjectFacts() = runBlocking {
         seed(source)
-        service(source, sourceStore).export(archive)
+        service(source, sourceStore).export(archive, format = 6)
         service(target, targetStore).restore(convertV3ToV2(zipEntries(archive)))
 
         assertTrue(target.backupDao().physicalObjects().isEmpty())
@@ -539,7 +575,7 @@ class BackupServiceTest {
     }
 
     @Test fun formatEvolutionFailuresAreExplicit() = runBlocking {
-        seed(source); service(source, sourceStore).export(archive); val base = zipEntries(archive)
+        seed(source); service(source, sourceStore).export(archive, format = 6); val base = zipEntries(archive)
         assertFailure<UnsupportedBackupFormat>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"backupFormatVersion\":6", "\"backupFormatVersion\":7").toByteArray() })
         assertFailure<UnsupportedArchiveSchema>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"archiveSchemaVersion\":6", "\"archiveSchemaVersion\":7").toByteArray() })
         assertFailure<MissingBackupCollection>(mutate(base) { it.remove("research/bees.json") })
@@ -547,6 +583,41 @@ class BackupServiceTest {
             val text = String(it.getValue("manifest.json")); val descriptor = "{\"name\":\"future\",\"path\":\"future.json\",\"collectionSchemaVersion\":1,\"required\":true,\"recordCount\":0,\"byteLength\":0,\"sha256\":\"${"0".repeat(64)}\"}"
             it["manifest.json"] = text.replace("\"collections\":[", "\"collections\":[$descriptor,").toByteArray()
         })
+    }
+
+    @Test fun malformedV7TemporalFieldsFailBeforeRestoreMutation() = runBlocking {
+        val ids = seed(source)
+        val hollowId = UUID.randomUUID()
+        source.backupDao().insertPhysicalObjects(
+            listOf(PhysicalObjectEntity(hollowId, ids.territory2, PhysicalObjectType.HOLLOW, 1, 56.3, 42.9, NOW, ids.observer2, null)),
+        )
+        source.backupDao().insertHollows(listOf(HollowEntity(hollowId, null, null, null, null, null, null)))
+        service(source, sourceStore).export(archive)
+        val base = zipEntries(archive)
+        val pointRows = String(base.getValue(BackupContractV5.collections.getValue("observation-points")))
+        val physicalRows = String(base.getValue(BackupContractV5.collections.getValue("physical-objects")))
+        val protectedAttachmentRoot = temp("v7-rejected-attachment-files").also { it.mkdirs() }
+        val protectedObjectRoot = temp("v7-rejected-object-files").also { it.mkdirs() }
+        val attachmentMarker = File(protectedAttachmentRoot, "existing-file").also { it.writeText("keep attachment") }
+        val objectMarker = File(protectedObjectRoot, "existing-file").also { it.writeText("keep object media") }
+        val protectedAttachmentStore = ObservationAttachmentFileStore(protectedAttachmentRoot, temp("v7-rejected-attachment-cache"))
+        val protectedObjectStore = PhysicalObjectMediaFileStore(protectedObjectRoot, temp("v7-rejected-object-cache"))
+        val cases = listOf(
+            replaceCollection(base, "observation-points", pointRows.replace(Regex(",\"observationDate\":\"[^\"]+\""), "")),
+            replaceCollection(base, "observation-points", pointRows.replaceFirst("\"observationDate\":\"", "\"observationDate\":123,\"_old\":\"")),
+            replaceCollection(base, "physical-objects", physicalRows.replaceFirst("\"fixationDate\":null", "\"fixationDate\":123")),
+        )
+        cases.forEach { malformed ->
+            val fake = FakeSettings(PortableSettingsSnapshot(null, null, emptyMap()))
+            assertThrows(MalformedBackup::class.java) { runBlocking { BackupService(target, fake, attachmentStore = protectedAttachmentStore,
+                objectMediaStore = protectedObjectStore).restore(malformed) } }
+            assertEquals(0, target.backupDao().total())
+            assertEquals(0, fake.replaceCalls)
+            assertEquals("keep attachment", attachmentMarker.readText())
+            assertEquals("keep object media", objectMarker.readText())
+            assertEquals(listOf("existing-file"), protectedAttachmentRoot.list()!!.toList())
+            assertEquals(listOf("existing-file"), protectedObjectRoot.list()!!.toList())
+        }
     }
 
     @Test fun enumsRangesTimestampsAndFlightInvariantsAreRejected() = runBlocking {

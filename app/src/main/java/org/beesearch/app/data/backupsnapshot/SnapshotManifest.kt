@@ -39,6 +39,7 @@ internal data class ValidatedSnapshot(
     val evidenceProfile: SnapshotEvidenceProfile = SnapshotEvidenceProfile.METADATA_ONLY,
     /** The decoded `references/media-blobs.jsonl` of this same snapshot, in wire order. */
     val references: List<SnapshotMediaReference> = emptyList(),
+    val formatVersion: Int = SnapshotContract.VERSION,
 )
 
 /** One decoded manifest: identity, descriptors, declared reference count and declared profile. */
@@ -47,6 +48,7 @@ internal data class DecodedSnapshotManifest(
     val descriptors: List<SnapshotEntryDescriptor>,
     val mediaReferenceCount: Long,
     val evidenceProfile: SnapshotEvidenceProfile,
+    val formatVersion: Int,
 )
 
 internal object SnapshotManifest {
@@ -55,14 +57,16 @@ internal object SnapshotManifest {
         descriptors: List<SnapshotEntryDescriptor>,
         mediaReferenceCount: Long = 0,
         evidenceProfile: SnapshotEvidenceProfile = SnapshotEvidenceProfile.METADATA_ONLY,
+        formatVersion: Int = SnapshotContract.VERSION,
     ): ByteArray {
         validateIdentity(identity)
+        if (formatVersion !in SnapshotContract.supportedVersions) invalid()
         if (mediaReferenceCount < 0) invalid()
         if (!evidenceProfile.supported) invalid()
         val sorted = descriptors.sortedBy { it.path }
         val json = buildJsonObject {
             put("snapshotFormat", SnapshotContract.FORMAT)
-            put("snapshotFormatVersion", SnapshotContract.VERSION)
+            put("snapshotFormatVersion", formatVersion)
             put("snapshotId", identity.snapshotId.toString())
             put("repositoryId", identity.repositoryId.toString())
             put("variant", identity.variant)
@@ -90,7 +94,8 @@ internal object SnapshotManifest {
         val root = SnapshotJson.parse(bytes, integerOnly = true, limits = limits) as? JsonObject ?: invalid()
         val required = setOf("snapshotFormat", "snapshotFormatVersion", "snapshotId", "repositoryId", "variant", "createdAtEpochMs", "snapshotProfile", "creationResult", "evidencePolicy", "entries", "creationIssues", "mediaReferences")
         if (root.keys != required) invalid()
-        if (root.string("snapshotFormat") != SnapshotContract.FORMAT || root.long("snapshotFormatVersion") != SnapshotContract.VERSION.toLong()) invalid()
+        val version = root.long("snapshotFormatVersion")
+        if (root.string("snapshotFormat") != SnapshotContract.FORMAT || version !in SnapshotContract.supportedVersions.map { it.toLong() }) invalid()
         val evidenceProfile = SnapshotEvidenceProfile.parse(
             root.string("snapshotProfile"),
             root.string("evidencePolicy"),
@@ -110,7 +115,7 @@ internal object SnapshotManifest {
         if (references.keys != setOf("path", "recordCount") || references.string("path") != "references/media-blobs.jsonl") invalid()
         val count = references.long("recordCount")
         if (count < 0) invalid()
-        return DecodedSnapshotManifest(identity, descriptors.sortedBy { it.path }, count, evidenceProfile)
+        return DecodedSnapshotManifest(identity, descriptors.sortedBy { it.path }, count, evidenceProfile, version.toInt())
     }
 
     private fun validateIdentity(identity: SnapshotIdentity) {

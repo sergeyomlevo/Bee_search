@@ -25,13 +25,20 @@ class SnapshotLegacyDateGuardTest {
     private val settings = PortableSettingsSnapshot(null, null, emptyMap())
 
     @Test fun representableDateProducesValidSnapshot() = inUtc { output ->
-        SnapshotArchive().build(output, identity(), SnapshotDomainCodec.encode(graph(legacyObservationDate(at)), settings))
+        SnapshotArchive().build(output, identity(), SnapshotDomainCodec.encode(graph(legacyObservationDate(at)), settings, version = 1))
+        assertTrue(output.isFile)
+    }
+
+    @Test fun v2PreservesCorrectedObservationDate() = inUtc { output ->
+        val corrected = LocalDate.of(2026, 8, 19)
+        val entries = SnapshotDomainCodec.encode(graph(corrected), settings)
+        SnapshotArchive().build(output, identity(), entries)
         assertTrue(output.isFile)
     }
 
     @Test fun divergentDateRejectsSnapshotBeforeArtifactCreation() = inUtc { output ->
         val error = assertThrows(SnapshotException::class.java) {
-            SnapshotArchive().build(output, identity(), SnapshotDomainCodec.encode(graph(LocalDate.of(2026, 8, 19)), settings))
+            SnapshotArchive().build(output, identity(), SnapshotDomainCodec.encode(graph(LocalDate.of(2026, 8, 19)), settings, version = 1))
         }
         assertEquals(SnapshotError.LOGICAL_STATE_INCONSISTENT, error.error)
         assertTrue(error.category.contains("not representable"))
@@ -43,7 +50,7 @@ class SnapshotLegacyDateGuardTest {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+03:00"))
         assertEquals(LocalDate.of(2026, 8, 21), legacyObservationDate(at))
         val error = assertThrows(SnapshotException::class.java) {
-            SnapshotArchive().build(output, identity(), SnapshotDomainCodec.encode(source, settings))
+            SnapshotArchive().build(output, identity(), SnapshotDomainCodec.encode(source, settings, version = 1))
         }
         assertEquals(SnapshotError.LOGICAL_STATE_INCONSISTENT, error.error)
         assertFalse(output.exists())

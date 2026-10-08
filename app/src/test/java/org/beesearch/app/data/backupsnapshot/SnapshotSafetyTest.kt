@@ -94,7 +94,7 @@ class SnapshotSafetyTest {
         val root = Files.createTempDirectory("snapshot-safety").toFile()
         try {
             val source = valid(root)
-            listOf("METADATA_ONLY" to "UNKNOWN_PROFILE", "COMPLETE" to "DEGRADED", "NO_MEDIA_EVIDENCE" to "UNKNOWN_POLICY", "snapshotFormatVersion\":1" to "snapshotFormatVersion\":2").forEachIndexed { n, (from, to) ->
+            listOf("METADATA_ONLY" to "UNKNOWN_PROFILE", "COMPLETE" to "DEGRADED", "NO_MEDIA_EVIDENCE" to "UNKNOWN_POLICY", "snapshotFormatVersion\":2" to "snapshotFormatVersion\":3").forEachIndexed { n, (from, to) ->
                 val out = File(root, "manifest$n.zip")
                 rewrite(source, out) { name, bytes -> if (name == "manifest.json") name to String(bytes).replace(from, to).toByteArray() else name to bytes }
                 expectInvalid(out)

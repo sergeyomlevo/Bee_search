@@ -79,7 +79,7 @@ class TemporalLegacyCompatibilityTest {
             assertEquals(expected, created.observationDate)
             assertEquals(expected, persisted.observationDate)
 
-            BackupService(source, EmptySettings, ClockForTest, "test").export(archive)
+            BackupService(source, EmptySettings, ClockForTest, "test").export(archive, format = 6)
             val pointRecord = zipLines(archive).getValue("research/observation-points.json").joinToString("\n")
             assertFalse(pointRecord.contains("observationDate"))
             BackupService(target, EmptySettings, ClockForTest, "test").restore(archive)
@@ -93,7 +93,7 @@ class TemporalLegacyCompatibilityTest {
                 cycles = emptyList(),
                 weather = listOf(fixture.weather),
             )
-            val entries = SnapshotDomainCodec.encode(graph, PortableSettingsSnapshot(null, null, emptyMap()))
+            val entries = SnapshotDomainCodec.encode(graph, PortableSettingsSnapshot(null, null, emptyMap()), version = 1)
             val snapshotPointRecord = entries.records.getValue("data/observation-points.jsonl").single()
             assertFalse(snapshotPointRecord.contains("observationDate"))
             val parsedRows = entries.records
@@ -141,6 +141,7 @@ class TemporalLegacyCompatibilityTest {
                 weather = listOf(fixture.weather),
             ),
             PortableSettingsSnapshot(null, null, emptyMap()),
+            version = 1,
         )
         val point = entries.records.getValue("data/observation-points.jsonl").single()
         assertTrue(point.contains("createdAt"))
@@ -160,11 +161,11 @@ class TemporalLegacyCompatibilityTest {
             source.backupDao().insertObservers(listOf(fixture.observer))
             source.backupDao().insertObservationPoints(listOf(fixture.point))
             val service = BackupService(source, EmptySettings, ClockForTest, "test")
-            assertThrows(BackupDomainInvariantViolation::class.java) { runBlocking { service.export(output) } }
+            assertThrows(BackupDomainInvariantViolation::class.java) { runBlocking { service.export(output, format = 6) } }
             assertFalse(output.exists())
             val existing = "existing output must stay untouched".toByteArray()
             output.writeBytes(existing)
-            assertThrows(BackupDomainInvariantViolation::class.java) { runBlocking { service.export(output) } }
+            assertThrows(BackupDomainInvariantViolation::class.java) { runBlocking { service.export(output, format = 6) } }
             assertTrue(existing.contentEquals(output.readBytes()))
         } finally {
             source.close()
@@ -188,7 +189,7 @@ class TemporalLegacyCompatibilityTest {
             TimeZone.setDefault(TimeZone.getTimeZone("GMT+03:00"))
             assertEquals(LocalDate.of(2026, 8, 21), legacyObservationDate(createdAt))
             assertThrows(BackupDomainInvariantViolation::class.java) {
-                runBlocking { BackupService(source, EmptySettings, ClockForTest, "test").export(output) }
+                runBlocking { BackupService(source, EmptySettings, ClockForTest, "test").export(output, format = 6) }
             }
             assertFalse(output.exists())
         } finally {

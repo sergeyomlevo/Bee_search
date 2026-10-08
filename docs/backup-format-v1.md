@@ -85,3 +85,30 @@ invented. PMTiles/device-local map packages remain excluded.
 
 All existing archive limits remain unchanged: at most 64 entries, 16 MiB per entry and 64 MiB
 total uncompressed payload. Track/GPX and Inspection data are not part of v4.
+
+
+## Temporal I3 — Complete Backup V7 (2026-10-08)
+
+The current writer emits `backupFormatVersion=7`, `archiveSchemaVersion=7`
+and records `roomSchemaVersion=13`. V7 retains V6's fifteen required collection
+paths, media file paths, descriptor inventory, `collectionSchemaVersion=1`,
+settings, identity, ordering, ZIP limits, graph validation and restore safety.
+The format/archive version selects the new record representation.
+
+V7 ObservationPoint records add REQUIRED `observationDate`: a valid ISO calendar
+date spelled exactly `YYYY-MM-DD`. PhysicalObject records add REQUIRED
+`fixationDate`: the same string representation or explicit JSON null. Missing
+keys, invalid dates or wrong types fail closed before DB/media/settings restore.
+Values come directly from persisted canonical dates and never from createdAt,
+current date, import time or the reader's timezone.
+
+Readers retain Complete Backup V1–V6. Only those historical formats reconstruct
+ObservationPoint dates once from createdAt in the approved legacy local-calendar
+convention; physical-object fixation dates materialize as NULL. The accepted
+legacy timezone caveat remains. A guarded explicit V6 serialization path remains
+for compatibility tests; it rejects corrected/unrepresentable point dates or
+non-null object dates before writing. The default V7 path does not use those
+legacy representability guards.
+
+No Export wire evolution is included. I2 + I3 + I4 remain one deployment unit;
+I4 carriage and pending isolated Room/device verification block Samsung install.

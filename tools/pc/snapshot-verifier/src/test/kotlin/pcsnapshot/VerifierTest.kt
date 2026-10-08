@@ -100,7 +100,7 @@ class VerifierTest {
         }
         assertEquals("FAIL", verify(altered("METADATA_ONLY", "UNKNOWN")).verdict)
         assertEquals("FAIL", verify(altered("NO_MEDIA_EVIDENCE", "LOCAL_VERIFIED")).verdict)
-        assertEquals("FAIL", verify(altered("\"snapshotFormatVersion\":1", "\"snapshotFormatVersion\":2")).verdict)
+        assertEquals("PASS", verify(altered("\"snapshotFormatVersion\":1", "\"snapshotFormatVersion\":2")).verdict)
         assertEquals("FAIL", verify(altered("\"creationResult\":\"COMPLETE\"", "\"creationResult\":\"DEGRADED\"")).verdict)
         assertEquals("FAIL", verify(altered("\"creationIssues\":[]", "\"creationIssues\":[{}]")).verdict)
     }

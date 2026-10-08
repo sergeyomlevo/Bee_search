@@ -1,4 +1,4 @@
-# Independent Snapshot V1 verifier
+# Independent Snapshot V1/V2 verifier
 
 Standalone Kotlin/JVM boundary; no dependency on Android code or root Android build.
 JDK 17, cached Kotlin 2.2.10, Gson 2.11.0 and JUnit 4.13.2. No network required.
@@ -24,7 +24,7 @@ spools are separate from the input and removed; generated corpus stays outside G
 
 ## Evidence profiles and exit codes
 
-Snapshot V1 accepts exactly two evidence tuples (wire schema §7.1):
+Snapshot V1 and V2 accept exactly two evidence tuples (wire schema §7.1):
 `METADATA_ONLY`/`NO_MEDIA_EVIDENCE`/`COMPLETE` and `FULL`/`LOCAL_VERIFIED`/`COMPLETE`.
 The archive structure is the same for both: metadata and references only, no payload
 bytes and no `Media/*` entry.
@@ -88,6 +88,12 @@ See [ALIGNMENT-REPORT.md](ALIGNMENT-REPORT.md) for current acceptance and mappin
 All 13 collections, named-target FKs/subtypes/lifecycle, settings, exact v1/v2
 geometry and recomputed eligible media references are verified. No media bytes
 are required for METADATA_ONLY / NO_MEDIA_EVIDENCE / COMPLETE.
+
+The manifest `snapshotFormatVersion` selects the closed domain schema. V1 keeps
+the frozen field inventories. V2 additionally requires `observationDate` on
+observation points and nullable `fixationDate` on physical objects; both are
+validated as exact, real `YYYY-MM-DD` calendar dates. Dates are read as stored
+values and are never derived from timestamps.
 
 V1 objects are closed; UUID/SHA/enums are exact lexical identities. Domain member
 order is irrelevant, JSONL record order is not. Optional/nullable media identity

@@ -12,9 +12,9 @@ import org.junit.rules.TemporaryFolder
 
 class RepositorySnapshotsTest {
     @get:Rule val temp = TemporaryFolder()
-    private fun entries() = SnapshotDomainCodec.encode(Graph(emptyList(), emptyList(),
+    private fun entries(version: Int = 2) = SnapshotDomainCodec.encode(Graph(emptyList(), emptyList(),
         points = emptyList(), bees = emptyList(), cycles = emptyList()),
-        PortableSettingsSnapshot(null, null, emptyMap()))
+        PortableSettingsSnapshot(null, null, emptyMap()), version = version)
     private suspend fun setup(): Triple<MemoryRepositoryStorage, RepositoryFoundation, UUID> {
         val s = MemoryRepositoryStorage()
         val f = RepositoryFoundation(s, "Dev")
@@ -32,6 +32,19 @@ class RepositorySnapshotsTest {
         assertEquals(2, discovery.candidates.count { it.snapshot != null })
         assertEquals(second.snapshot.identity.snapshotId, discovery.latest!!.identity.snapshotId)
         assertTrue(s.list("Staging").isEmpty())
+    }
+
+    @Test fun mixedV1AndV2DiscoveryKeepsBothValidAndSelectsLatest() = runBlocking {
+        val (s, f, id) = setup()
+        val v1 = f.createMetadataSnapshot(id, temp.root, { entries(version = 1) }, createdAtEpochMs = 30).valueOrThrow()
+        val v2 = f.createMetadataSnapshot(id, temp.root, { entries(version = 2) }, createdAtEpochMs = 20).valueOrThrow()
+        val discovery = RepositoryFoundation(s, "Dev").discoverSnapshots(id, temp.root).valueOrThrow()
+        assertEquals(2, discovery.candidates.count { it.snapshot != null })
+        assertEquals(1, discovery.candidates.count { it.snapshot?.formatVersion == 1 })
+        assertEquals(1, discovery.candidates.count { it.snapshot?.formatVersion == 2 })
+        assertEquals(v1.snapshot.identity.snapshotId, discovery.latest!!.identity.snapshotId)
+        assertEquals(1, discovery.latest!!.formatVersion)
+        assertEquals(v2.snapshot.identity.snapshotId, discovery.candidates.first { it.snapshot?.formatVersion == 2 }.snapshot!!.identity.snapshotId)
     }
     @Test fun allStorageFailuresPreservePriorHistory() = runBlocking {
         for (fault in listOf(RepositoryError.WRITE_FAILED, RepositoryError.SYNC_FAILED,

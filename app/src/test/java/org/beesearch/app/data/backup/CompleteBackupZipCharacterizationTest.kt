@@ -90,7 +90,7 @@ class CompleteBackupZipCharacterizationTest {
     @Test fun parseRejectsVersionSchemaProfileAndCollectionDescriptors() {
         val base = validEntries(1)
         fun fail(manifest: String, type: Class<out Throwable>, message: String) = assertParseFailure(base + (MANIFEST to manifest.toByteArray()), type, message)
-        fail(manifest(7, CONTRACTS[1]!!.toList(), base), UnsupportedBackupFormat::class.java, "unsupported backup format")
+        fail(manifest(8, CONTRACTS[1]!!.toList(), base), UnsupportedBackupFormat::class.java, "unsupported backup format")
         fail(manifest(1, CONTRACTS[1]!!.toList(), base).replace("\"archiveSchemaVersion\":1", "\"archiveSchemaVersion\":2"), UnsupportedArchiveSchema::class.java, "unsupported archive schema")
         fail(manifest(1, CONTRACTS[1]!!.toList(), base).replace("COMPLETE_BACKUP", "WRONG"), UnsupportedBackupFormat::class.java, "unsupported profile")
         val unknown = manifest(1, CONTRACTS[1]!!.toList(), base).replace(

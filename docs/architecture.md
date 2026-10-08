@@ -1690,6 +1690,10 @@ Snapshot UI/restore/FULL/offload remain unimplemented. Slice 2A adds an install-
 writes require durable expected UUID + actual header match; startup probe never auto-adopts or initializes.
 Контракт и ограничения: [Repository V1 foundation](repository-v1-foundation.md), D095/D096.
 Snapshot contract: [Repository Snapshot V1](repository-snapshot-v1.md), D097.
+Temporal I3 adds [Snapshot V2](snapshot-v2-wire-schema.md): current writer uses V2,
+readers/discovery validate V1 and V2 by manifest version. Complete Backup current writer is V7
+([format contract](backup-format-v1.md#temporal-i3--complete-backup-v7-2026-10-08)); V1–V6 readers remain.
+New formats carry explicit canonical research dates without createdAt derivation; Room stays v13.
 
 Доступ пользователя к резервным копиям (D098) отделён от хранения: `BackupLocation` — единственный
 источник фиксированного пути `Download/BeeSearch/<variant>/Backup` и его SAF document id,

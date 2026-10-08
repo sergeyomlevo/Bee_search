@@ -47,8 +47,9 @@ internal class SnapshotArchive(private val limits: SnapshotLimits = SnapshotLimi
                 }
                 files[path] = file
             }
+            SnapshotDomainCodec.validate(files, check, limits, domainEntries.formatVersion)
             val descriptors = files.map { (path, file) -> SnapshotEntryDescriptor(path, file.length(), hash(file, check)) }
-            val manifest = SnapshotManifest.encode(identity, descriptors, domainEntries.references.size.toLong(), evidenceProfile)
+            val manifest = SnapshotManifest.encode(identity, descriptors, domainEntries.references.size.toLong(), evidenceProfile, domainEntries.formatVersion)
             addBound(0, manifest.size.toLong(), limits.manifestBytes, "manifest.json")
             addBound(total, manifest.size.toLong(), limits.totalBytes, "totalBytes")
             ZipOutputStream(BoundedOutput(target.outputStream(), limits.zipBytes, "zipBytes", check)).use { zip ->
@@ -132,7 +133,7 @@ internal class SnapshotArchive(private val limits: SnapshotLimits = SnapshotLimi
                     (expectedSnapshotId != null && identity.snapshotId != expectedSnapshotId)) {
                     throw SnapshotException(SnapshotError.SNAPSHOT_ID_CONFLICT, "IDENTITY")
                 }
-                if (!SnapshotManifest.encode(identity, descriptors, referenceCount, manifest.evidenceProfile)
+                if (!SnapshotManifest.encode(identity, descriptors, referenceCount, manifest.evidenceProfile, manifest.formatVersion)
                         .contentEquals(manifestBytes)) invalid("NONCANONICAL_MANIFEST")
                 val descriptorMap = descriptors.associateBy { it.path }
                 if (descriptorMap.keys != SnapshotContract.paths.drop(1).toSet()) invalid("MANIFEST_ENTRIES")
@@ -146,10 +147,10 @@ internal class SnapshotArchive(private val limits: SnapshotLimits = SnapshotLimi
                 }
                 if (counts["references/media-blobs.jsonl"] != referenceCount)
                     throw SnapshotException(SnapshotError.LOGICAL_STATE_INCONSISTENT, "REFERENCE_COUNT")
-                val references = SnapshotDomainCodec.validate(verifiedFiles, check, limits)
+                val references = SnapshotDomainCodec.validate(verifiedFiles, check, limits, manifest.formatVersion)
                 if (hash(file, check) != whole) throw SnapshotException(SnapshotError.WHOLE_DIGEST_MISMATCH, "SOURCE_CHANGED")
                 return ValidatedSnapshot(identity, whole, file.length(), SnapshotMetrics(counts, bytes,
-                    maxima.values.maxOrNull() ?: 0, file.length(), total, maxima), manifest.evidenceProfile, references)
+                    maxima.values.maxOrNull() ?: 0, file.length(), total, maxima), manifest.evidenceProfile, references, manifest.formatVersion)
             }
         } catch (e: CancellationException) { throw e }
         catch (e: SnapshotException) { throw e }

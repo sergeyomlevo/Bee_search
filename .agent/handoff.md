@@ -1,6 +1,40 @@
 # Bee Search handoff
 
-## Current continuation — Temporal I2 implemented in worktree, pending owner review (2026-10-08)
+## Current continuation — Temporal I3 implemented in worktree, owner review required (2026-10-08)
+
+I1 committed/pushed (`f4f51051b49a357237a7f95e7d581d175e87adcf` = origin/main).
+I2 committed locally, not pushed (`bd977b393619ab1bccb837a8f0d8c5b297305d50` = HEAD);
+I2 isolated Room/device verification remains PENDING. I3 is unstaged/uncommitted; I4 is pending.
+
+Current writers: Complete Backup V7 / archive schema 7 (Room provenance 13), Repository Snapshot V2.
+Both carry REQUIRED canonical observationDate and REQUIRED nullable fixationDate as ISO YYYY-MM-DD.
+Readers use explicit new-format dates, never createdAt derivation; missing/malformed/wrong-type dates
+fail closed. Complete Backup V1–V6 / Snapshot V1 retain one-time legacy ObservationPoint reconstruction
+and physical fixationDate NULL. Snapshot V1 closed keys and golden vectors remain unchanged.
+V6/V1 legacy writer paths retain representability guards; current V7/V2 paths do not call them.
+Single/collection Physical Object Export V1 guards remain until I4; Export wire was not changed.
+
+Snapshot inventory stays 17 entries; profiles, media protection, restricted canonical JSON, digests,
+limits, binding, immutable staging/publication and latest-valid discovery remain. V1 and V2 coexist.
+Snapshot domain entries are validated before opening the output, then final archive validation runs.
+Complete Backup still validates the entire graph before media/DB/settings restore and targets an
+empty research database. PC verifier supports both versions, including strict V2 date key/type rules.
+No Room migration/schema, numbering, date UI/callers, query/index, weather, map or Dxxx changes.
+Normative version additions: `docs/snapshot-v2-wire-schema.md`, `docs/backup-format-v1.md`.
+
+Executed JVM gate: 778/778 PASS; independent PC verifier: 99/99 PASS. assembleDebug,
+assembleDebugAndroidTest and lintDebug PASS (0 errors, 23 warnings). Exact commands/counts are
+recorded under ignored `app/build/reports/temporal-i3/`.
+Android tests compile but instrumentation is **PENDING**: isolated emulator-5554 shell timed out after
+8 seconds. Existing Samsung/old connected results are not I3 evidence. No Samsung install or ADB
+operation; DEV DB, DataStore, maps, repository binding/directory and Stable/Beta remain untouched.
+
+**I2 + I3 + I4 form one deployment unit. NOT DEPLOYABLE until I4 + Room/device verification.**
+Samsung remains on I1. I4 must carry canonical dates in exports before deployment/exposure;
+Room 12→13 migration requires actual isolated Room validation before future deployment. I5–I7 not
+started. No staging/commit/push; unrelated TOML byte fingerprint preserved.
+
+## Historical continuation — Temporal I2 verification (subsequently committed locally as bd977b3)
 
 Baseline HEAD/origin: `f4f51051b49a357237a7f95e7d581d175e87adcf` (I1 committed).
 Room v13 adds nullable ISO LocalDate `physical_objects.fixation_date`; migration 12→13 leaves
