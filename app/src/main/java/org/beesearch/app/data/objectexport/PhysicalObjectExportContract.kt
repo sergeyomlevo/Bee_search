@@ -28,7 +28,8 @@ import org.beesearch.app.domain.model.PhysicalObjectType
  */
 internal object PhysicalObjectExportContract {
     const val PROFILE = "SINGLE_PHYSICAL_OBJECT"
-    const val FORMAT_VERSION = 1
+    const val FORMAT_VERSION = 2
+    const val LEGACY_FORMAT_VERSION = 1
     const val MANIFEST_ENTRY = "manifest.json"
     const val OBJECT_ENTRY = "object.json"
     const val MEDIA_PREFIX = "media/"
@@ -113,6 +114,9 @@ internal sealed class PhysicalObjectExportException(message: String, cause: Thro
 /** The package itself is malformed, unsafe or does not match this profile. */
 internal class InvalidPhysicalObjectExport(message: String, cause: Throwable? = null) :
     PhysicalObjectExportException(message, cause)
+
+internal class LegacyPhysicalObjectExportNotRepresentable(message: String) :
+    PhysicalObjectExportException(message)
 
 /** The stored data and its bytes disagree; the package must not look successful. */
 internal class PhysicalObjectExportIntegrityError(message: String) :

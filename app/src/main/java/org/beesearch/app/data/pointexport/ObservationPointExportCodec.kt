@@ -46,8 +46,9 @@ import org.beesearch.app.domain.model.ObservationPointWeather
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.model.legacyObservationDate
+import org.beesearch.app.domain.model.parseResearchDate
 
-/** Pure v1 ZIP encoder/decoder. It does not access Room, files, DataStore, or the network. */
+/** Pure versioned ZIP encoder/decoder. It does not access Room, files, DataStore, or the network. */
 internal object ObservationPointExportCodec {
     private val json = Json { isLenient = false; ignoreUnknownKeys = false }
     private val hashPattern = Regex("[0-9a-f]{64}")
@@ -56,10 +57,15 @@ internal object ObservationPointExportCodec {
         graph: ObservationPointExportGraph,
         attachmentBytes: Map<UUID, ByteArray>,
         output: OutputStream,
+        formatVersion: Int = ObservationPointExportContract.FORMAT_VERSION,
     ) {
+        requireVersion(formatVersion)
         val canonical = canonicalize(graph)
         ObservationPointExportValidator.validate(canonical, attachmentBytes)
-        val pointBytes = pointJson(canonical).toString().toByteArray(StandardCharsets.UTF_8)
+        if (formatVersion == 1 && canonical.point.observationDate != legacyObservationDate(canonical.point.createdAt)) {
+            throw LegacyObservationPointExportNotRepresentable("legacy format cannot represent canonical observationDate")
+        }
+        val pointBytes = pointJson(canonical, formatVersion).toString().toByteArray(StandardCharsets.UTF_8)
         requireEntrySize(pointBytes.size.toLong())
         val attachmentDescriptors = canonical.attachments.map { attachment ->
             val bytes = attachmentBytes.getValue(attachment.id)
@@ -73,7 +79,7 @@ internal object ObservationPointExportCodec {
         }
         val manifestBytes = buildJsonObject {
             put("profile", ObservationPointExportContract.PROFILE)
-            put("formatVersion", ObservationPointExportContract.FORMAT_VERSION)
+            put("formatVersion", formatVersion)
             put("observationPointId", canonical.point.id.toString())
             put("pointEntry", ObservationPointExportContract.POINT_ENTRY)
             put("pointByteLength", pointBytes.size)
@@ -100,9 +106,7 @@ internal object ObservationPointExportCodec {
         if (manifest.string("profile") != ObservationPointExportContract.PROFILE) {
             throw InvalidObservationPointExport("unsupported profile")
         }
-        if (manifest.int("formatVersion") != ObservationPointExportContract.FORMAT_VERSION) {
-            throw InvalidObservationPointExport("unsupported formatVersion")
-        }
+        val formatVersion = requireVersion(manifest.int("formatVersion"))
         val pointId = manifest.uuid("observationPointId")
         val pointEntry = manifest.string("pointEntry")
         if (pointEntry != ObservationPointExportContract.POINT_ENTRY) {
@@ -135,7 +139,7 @@ internal object ObservationPointExportCodec {
         }
         if (entries.keys != expectedEntries) throw InvalidObservationPointExport("unexpected ZIP entry")
 
-        val graph = parseGraph(parseObject(pointBytes, "point.json"))
+        val graph = parseGraph(parseObject(pointBytes, "point.json"), formatVersion)
         if (graph.point.id != pointId) throw InvalidObservationPointExport("manifest point id mismatch")
         ObservationPointExportValidator.validate(graph, bytesById)
         if (graph.attachments.map { it.id }.toSet() != describedIds) {
@@ -159,8 +163,8 @@ internal object ObservationPointExportCodec {
         ),
     )
 
-    private fun pointJson(graph: ObservationPointExportGraph): JsonObject = buildJsonObject {
-        put("point", pointJson(graph.point))
+    private fun pointJson(graph: ObservationPointExportGraph, formatVersion: Int): JsonObject = buildJsonObject {
+        put("point", pointJson(graph.point, formatVersion))
         put("territory", territoryJson(graph.territory))
         put("observer", observerJson(graph.observer))
         put("weather", graph.weather?.let(::weatherJson) ?: JsonNull)
@@ -175,13 +179,14 @@ internal object ObservationPointExportCodec {
         put("attachments", buildJsonArray { graph.attachments.forEach { add(attachmentJson(it)) } })
     }
 
-    private fun pointJson(value: ObservationPoint) = buildJsonObject {
+    private fun pointJson(value: ObservationPoint, formatVersion: Int) = buildJsonObject {
         put("id", value.id.toString()); put("territoryId", value.territoryId.toString()); put("observerId", value.observerId.toString())
         put("observationYear", value.observationYear); put("pointNumber", value.pointNumber); putNullable("beePresenceResult", value.beePresenceResult?.name)
         putNullable("code", value.code); put("latitude", value.latitude); put("longitude", value.longitude)
         putNullable("gpsLatitude", value.gpsLatitude); putNullable("gpsLongitude", value.gpsLongitude); putNullable("gpsAccuracyM", value.gpsAccuracyM)
         put("createdAt", value.createdAt.toString()); putNullable("initialGroupReleaseAt", value.initialGroupReleaseAt?.toString())
         putNullable("completedAt", value.completedAt?.toString()); putNullable("description", value.description)
+        if (formatVersion == 2) put("observationDate", researchDate(value.observationDate.toString()).toString())
     }
 
     private fun territoryJson(value: Territory) = buildJsonObject {
@@ -221,8 +226,8 @@ internal object ObservationPointExportCodec {
         put("packageEntry", ObservationPointExportContract.attachmentEntry(value.id))
     }
 
-    private fun parseGraph(root: JsonObject): ObservationPointExportGraph {
-        val point = root.obj("point").toPoint()
+    private fun parseGraph(root: JsonObject, formatVersion: Int): ObservationPointExportGraph {
+        val point = root.obj("point").toPoint(formatVersion)
         return ObservationPointExportGraph(
             point = point,
             territory = root.obj("territory").toTerritory(),
@@ -236,8 +241,17 @@ internal object ObservationPointExportCodec {
         )
     }
 
-    private fun JsonObject.toPoint() = ObservationPoint(
-        legacyObservationDate(instant("createdAt")), uuid("id"), uuid("territoryId"), uuid("observerId"), int("observationYear"), int("pointNumber"),
+    private fun JsonObject.toPoint(formatVersion: Int) = ObservationPoint(
+        when (formatVersion) {
+            1 -> legacyObservationDate(instant("createdAt"))
+            2 -> {
+                val value = element("observationDate") as? JsonPrimitive
+                    ?: throw InvalidObservationPointExport("invalid observationDate")
+                if (!value.isString) throw InvalidObservationPointExport("invalid observationDate")
+                researchDate(value.content)
+            }
+            else -> throw InvalidObservationPointExport("unsupported formatVersion")
+        }, uuid("id"), uuid("territoryId"), uuid("observerId"), int("observationYear"), int("pointNumber"),
         nullableString("beePresenceResult")?.let { enum<BeePresenceResult>(it, "beePresenceResult") }, nullableString("code"),
         double("latitude"), double("longitude"), nullableDouble("gpsLatitude"), nullableDouble("gpsLongitude"), nullableDouble("gpsAccuracyM"),
         instant("createdAt"), nullableInstant("initialGroupReleaseAt"), nullableInstant("completedAt"), nullableString("description"),
@@ -369,4 +383,14 @@ internal object ObservationPointExportCodec {
 
     private fun JsonObjectBuilder.putNullable(name: String, value: String?) { put(name, value?.let(::JsonPrimitive) ?: JsonNull) }
     private fun JsonObjectBuilder.putNullable(name: String, value: Double?) { put(name, value?.let(::JsonPrimitive) ?: JsonNull) }
+
+    private fun requireVersion(version: Int): Int = when (version) {
+        1 -> 1
+        2 -> 2
+        else -> throw InvalidObservationPointExport("unsupported formatVersion")
+    }
+
+    private fun researchDate(value: String) = try { parseResearchDate(value) } catch (error: Exception) {
+        throw InvalidObservationPointExport("invalid observationDate", error)
+    }
 }

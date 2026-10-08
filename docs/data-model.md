@@ -1932,11 +1932,12 @@ Subtype dates, date editor и explicit date creation override не добавл�
 
 Для establishment date и Inspection конкретные поля, identifiers и migration не определяются.
 
-I2 committed locally (bd977b3); I3 implemented in worktree: Complete Backup V7 и Snapshot V2
+I2 committed locally (bd977b3); I3 committed locally (ac6c7d1): Complete Backup V7 и Snapshot V2
 переносят explicit canonical observationDate и REQUIRED nullable fixationDate. Legacy V1–V6 Backup /
 Snapshot V1 materialize fixationDate NULL; legacy ObservationPoint reconstruction остаётся только
-в старых formats. Single/collection physical-object Export V1 по-прежнему fail closed при non-null
-fixationDate. **I2 + I3 + I4 — одна deployment unit; I4 и Room/device verification PENDING**.
+в старых formats. I4 implemented in worktree, owner review required: три Export V2 profiles
+переносят canonical dates явно; guards остаются только на V1 writer paths.
+**I2 + I3 + I4 — одна deployment unit; Android/Room/device verification PENDING**.
 Samsung остаётся на I1; промежуточный APK не устанавливается.
 
 ## Миграция и исторические rows
@@ -2040,7 +2041,8 @@ media path трактуется как неполный cleanup, а не как 
 ## Экспорт одного физического объекта
 
 Экспорт одного объекта — отдельный переносимый профиль `SINGLE_PHYSICAL_OBJECT`
-`formatVersion = 1` (D093); полевая схема зафиксирована в `docs/physical-object-export-v1.md`.
+`formatVersion = 2`; V1 foundation — D093. Контракты: `docs/physical-object-export-v1.md` и
+`docs/temporal-export-v2.md`. V2 содержит required nullable fixationDate; V1 materialize NULL.
 Пакет содержит object-owned данные (identity, subtype properties, media metadata и app-owned bytes)
 и минимальный read-only labelling/provenance snapshot Territory и creator Observer; внешние
 record-bearing сущности (Bee, FlightCycle, ObservationPoint, weather и attachments
@@ -2050,7 +2052,8 @@ ObservationPoint) в пакет не входят. Наличие `bees.source_o
 ## Экспорт коллекции физических объектов
 
 Экспорт всех Дупел или всех Колод текущей Territory использует отдельный профиль
-`PHYSICAL_OBJECT_COLLECTION`, `formatVersion = 1` (D093). Это read-only snapshot существующих
+`PHYSICAL_OBJECT_COLLECTION`, `formatVersion = 2` (V1 foundation — D093). Required nullable
+fixationDate переносится для каждого объекта; V1 materialize NULL. Это read-only snapshot существующих
 строк, а не новая persisted сущность и не изменение Room schema. Пакет содержит только один
 concrete `object_type`, один Territory snapshot, дедуплицированные snapshots реально используемых
 creator Observer, persisted payload каждого объекта и принадлежащие ему media metadata/bytes.

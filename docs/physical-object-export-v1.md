@@ -1,5 +1,9 @@
 # Physical Object Export V1 — individual и collection profiles
 
+Historical V1 contract remains readable and unchanged. Current writers use
+[V2 temporal carriage](temporal-export-v2.md). V1 has no fixationDate field and materializes NULL;
+explicit V1 writers refuse non-null canonical fixationDate.
+
 Документ фиксирует переносимый формат пакета одного Physical Object (решение D093). Это формат
 **одного объекта**, а не complete backup и не ObservationPoint package.
 

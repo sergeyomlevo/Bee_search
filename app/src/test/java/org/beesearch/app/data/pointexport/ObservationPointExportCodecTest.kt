@@ -3,6 +3,9 @@ package org.beesearch.app.data.pointexport
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.time.Instant
+import java.time.LocalDate
+import java.util.TimeZone
+import kotlinx.serialization.json.*
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -50,13 +53,13 @@ class ObservationPointExportCodecTest {
     }
 
     @Test
-    fun `manifest identifies format one selected point and binary entries`() {
+    fun `manifest identifies format two selected point and binary entries`() {
         val fixture = fixture()
         val entries = entries(encode(fixture.graph, fixture.blobs))
         val manifest = entries.getValue("manifest.json").toString(Charsets.UTF_8)
 
         assertTrue(manifest.contains("\"profile\":\"SINGLE_OBSERVATION_POINT\""))
-        assertTrue(manifest.contains("\"formatVersion\":1"))
+        assertTrue(manifest.contains("\"formatVersion\":2"))
         assertTrue(manifest.contains(fixture.graph.point.id.toString()))
         fixture.graph.attachments.forEach { assertTrue(manifest.contains("attachments/${it.id}")) }
         assertTrue(entries.keys.containsAll(listOf("manifest.json", "point.json")))
@@ -131,7 +134,7 @@ class ObservationPointExportCodecTest {
         val archive = encode(fixture().graph, fixture().blobs)
         val original = entries(archive)
         assertInvalid { ObservationPointExportCodec.decode(writeEntries(original.mapValues { (name, bytes) ->
-            if (name == "manifest.json") bytes.toString(Charsets.UTF_8).replace("\"formatVersion\":1", "\"formatVersion\":9").toByteArray() else bytes
+            if (name == "manifest.json") bytes.toString(Charsets.UTF_8).replace("\"formatVersion\":2", "\"formatVersion\":9").toByteArray() else bytes
         }).inputStream()) }
         assertInvalid { ObservationPointExportCodec.decode(writeEntries(original - "point.json").inputStream()) }
         val malformed = "{".toByteArray()
@@ -188,6 +191,93 @@ class ObservationPointExportCodecTest {
         assertTrue(name.startsWith("Лес-Юг--point-16--2026-09-20--"))
         assertTrue(name.endsWith("${fixture.point.id.toString().replace("-", "").take(8)}.zip"))
         assertFalse(name.contains('/')); assertFalse(name.contains(':')); assertFalse(name.contains('*'))
+    }
+
+    @Test
+    fun `V2 corrected date survives a different reader timezone`() {
+        val fixture = fixture()
+        val point = fixture.graph.point.copy(
+            createdAt = Instant.parse("2026-10-01T00:30:00Z"), observationDate = LocalDate.of(2026, 9, 28),
+            beePresenceResult = BeePresenceResult.NO_BEES_FOUND, initialGroupReleaseAt = null,
+            completedAt = Instant.parse("2026-10-01T01:30:00Z"),
+        )
+        val originalZone = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+            val archive = encode(fixture.graph.copy(point = point, beeHistories = emptyList(), attachments = emptyList(), weather = null), emptyMap())
+            val pointJson = Json.parseToJsonElement(entries(archive).getValue("point.json").toString(Charsets.UTF_8)).jsonObject.getValue("point").jsonObject
+            assertEquals(JsonPrimitive("2026-09-28"), pointJson.getValue("observationDate"))
+            TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"))
+            assertEquals(point, ObservationPointExportCodec.decode(archive.inputStream()).graph.point)
+        } finally { TimeZone.setDefault(originalZone) }
+    }
+
+    @Test
+    fun `V2 requires string real canonical date and rejects every invalid spelling and type`() {
+        val fixture = fixture()
+        val original = entries(encode(fixture.graph, fixture.blobs))
+        val invalidValues = listOf<JsonElement?>(null, JsonNull, JsonPrimitive(1), JsonPrimitive(true), JsonObject(emptyMap()), JsonArray(emptyList())) +
+            listOf("2026-2-03", "2026-02-3", "2026-13-01", "2026-02-30", "2026-09-20T00:00:00Z", "2026-09-20+03:00").map(::JsonPrimitive)
+        invalidValues.forEach { value ->
+            val root = Json.parseToJsonElement(original.getValue("point.json").toString(Charsets.UTF_8)).jsonObject
+            val fields = root.getValue("point").jsonObject.toMutableMap().apply {
+                if (value == null) remove("observationDate") else put("observationDate", value)
+            }
+            val bytes = JsonObject(root + ("point" to JsonObject(fields))).toString().toByteArray()
+            val updated = original + ("point.json" to bytes) + ("manifest.json" to updatePointDescriptor(original.getValue("manifest.json"), bytes))
+            var thrown: Throwable? = null
+            try { ObservationPointExportCodec.decode(writeEntries(updated).inputStream()) } catch (e: Throwable) { thrown = e }
+            assertTrue("value=$value error=$thrown", thrown is InvalidObservationPointExport)
+        }
+    }
+
+    @Test
+    fun `legacy V1 date reconstruction and historical unknown key policy remain readable`() {
+        val fixture = fixture()
+        val originalZone = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+            val archive = ByteArrayOutputStream().also { ObservationPointExportCodec.encode(fixture.graph, fixture.blobs, it, formatVersion = 1) }.toByteArray()
+            val original = entries(archive)
+            val root = Json.parseToJsonElement(original.getValue("point.json").toString(Charsets.UTF_8)).jsonObject
+            val fields = root.getValue("point").jsonObject
+            assertFalse(fields.containsKey("observationDate"))
+            assertTrue(original.getValue("manifest.json").toString(Charsets.UTF_8).contains("\"formatVersion\":1"))
+            val bytes = JsonObject(root + ("point" to JsonObject(fields + mapOf("unknownLegacyField" to JsonPrimitive("accepted"), "observationDate" to JsonPrimitive("2025-01-01"))))).toString().toByteArray()
+            val updated = original + ("point.json" to bytes) + ("manifest.json" to updatePointDescriptor(original.getValue("manifest.json"), bytes))
+            assertEquals(fixture.graph.point, ObservationPointExportCodec.decode(writeEntries(updated).inputStream()).graph.point)
+        } finally { TimeZone.setDefault(originalZone) }
+    }
+
+    @Test
+    fun `legacy V1 refuses corrected date before output while V2 accepts it`() {
+        val fixture = fixture()
+        val graph = fixture.graph.copy(point = fixture.graph.point.copy(observationDate = LocalDate.of(2026, 9, 18)))
+        val output = ByteArrayOutputStream().apply { write(byteArrayOf(7, 8, 9)) }
+        var thrown: Throwable? = null
+        try { ObservationPointExportCodec.encode(graph, fixture.blobs, output, formatVersion = 1) } catch (e: Throwable) { thrown = e }
+        assertTrue(thrown is LegacyObservationPointExportNotRepresentable)
+        assertArrayEquals(byteArrayOf(7, 8, 9), output.toByteArray())
+        assertEquals(graph.point, ObservationPointExportCodec.decode(encode(graph, fixture.blobs).inputStream()).graph.point)
+    }
+
+    @Test
+    fun `V2 rejects a LocalDate outside canonical four digit wire spelling before writing`() {
+        val fixture = fixture()
+        val graph = fixture.graph.copy(point = fixture.graph.point.copy(observationDate = LocalDate.of(10000, 1, 1)))
+        val output = ByteArrayOutputStream().apply { write(byteArrayOf(7, 8, 9)) }
+        assertInvalid { ObservationPointExportCodec.encode(graph, fixture.blobs, output) }
+        assertArrayEquals(byteArrayOf(7, 8, 9), output.toByteArray())
+    }
+
+    @Test
+    fun `version dispatch rejects future version three for reader and writer`() {
+        val fixture = fixture()
+        val original = entries(encode(fixture.graph, fixture.blobs))
+        val manifest = Json.parseToJsonElement(original.getValue("manifest.json").toString(Charsets.UTF_8)).jsonObject
+        val updated = original + ("manifest.json" to JsonObject(manifest + ("formatVersion" to JsonPrimitive(3))).toString().toByteArray())
+        assertInvalid { ObservationPointExportCodec.decode(writeEntries(updated).inputStream()) }
+        assertInvalid { ObservationPointExportCodec.encode(fixture.graph, fixture.blobs, ByteArrayOutputStream(), formatVersion = 3) }
     }
 
     private fun fixture(twoPhotos: Boolean = false): Fixture {

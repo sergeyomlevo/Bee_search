@@ -20,7 +20,8 @@ import org.junit.Test
 class ObservationPointExportServiceTest {
     @Test
     fun `service asks for only selected point and creates read-only package`() = withService { store ->
-        val selected = detail(UUID.fromString("11111111-1111-1111-1111-111111111111"))
+        val base = detail(UUID.fromString("11111111-1111-1111-1111-111111111111"))
+        val selected = base.copy(point = base.point.copy(observationDate = java.time.LocalDate.of(2026, 9, 18)))
         val other = detail(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
         val calls = mutableListOf<UUID>()
         val available = mapOf(selected.point.id to selected, other.point.id to other)

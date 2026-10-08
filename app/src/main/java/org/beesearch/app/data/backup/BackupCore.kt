@@ -761,8 +761,7 @@ private fun cycle(o: JsonObject) = FlightCycleEntity(o.uuid("id"), o.uuid("beeId
 
 
 internal fun parseCanonicalResearchDate(value: String): LocalDate {
-    if (!value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"))) throw MalformedBackup("invalid research date")
-    return try { LocalDate.parse(value) } catch (e: java.time.format.DateTimeParseException) {
+    return try { org.beesearch.app.domain.model.parseResearchDate(value) } catch (e: IllegalArgumentException) {
         throw MalformedBackup("invalid research date", e)
     }
 }

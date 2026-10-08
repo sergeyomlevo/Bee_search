@@ -4,8 +4,9 @@
 
 Утверждён владельцем как design research dates: schema-направление, migration policy и invariants
 ниже. I1 committed/pushed (f4f5105); I2 committed locally, not pushed (bd977b3),
-Room/device verification pending; I3 implemented in worktree. I4–I7 pending.
-**I2 + I3 + I4 — одна deployment unit; Samsung остаётся на I1 до I4 + device verification.**
+Room/device verification pending; I3 committed locally (ac6c7d1); I4 implemented in worktree,
+owner review required. I5–I7 pending. **I2 + I3 + I4 — одна deployment unit; Samsung остаётся
+на I1 до отдельного Android/Room/device verification gate.**
 Документ остаётся нормативным design, а не заявлением о завершении всех increments.
 
 Ревизия после owner review: внесены два owner decisions — legacy Hollow/LogHive/Apiary получают
@@ -691,6 +692,14 @@ UUID               := не меняется
 
 ## 14. Export consequences
 
+Owner I4 execution · 2026-10-08: все три portable export profiles используют versioned **V2**.
+SINGLE_OBSERVATION_POINT требует explicit canonical observationDate; SINGLE_PHYSICAL_OBJECT и
+PHYSICAL_OBJECT_COLLECTION требуют nullable fixationDate key для каждого объекта. Новые readers
+не выводят dates из createdAt; missing/malformed/wrong-type dates отвергаются. V1 readers сохраняют
+legacy semantics (point reconstruction / physical NULL), V1 writer paths сохраняют loss-prevention
+guards. Это заменяет рекомендацию optional-key evolution для ObservationPoint ниже; code audit
+ниже описывает pre-I4 V1. [Export V2 contract](temporal-export-v2.md).
+
 ### 14.1 Single physical object (`SINGLE_PHYSICAL_OBJECT` v1)
 
 - `object.json` содержит `object.createdAt`; читатель **строгий**: полный key set, любой новый ключ —
@@ -952,7 +961,7 @@ ambiguity не вводится, поэтому отдельного вопро�
 
 Новых вопросов ради сохранения раздела не добавляется. Документ утверждён 2026-10-03 (APPROVED).
 
-I2 execution gate · 2026-10-08: NEW Hollow/LogHive получают fixationDate при создании;
+Historical I2 execution gate (current V7/V2 writers now carry dates; device gate remains) · 2026-10-08: NEW Hollow/LogHive получают fixationDate при создании;
 LEGACY Hollow/LogHive/Apiary и технический createApiary сохраняют NULL. Legacy V6 Backup,
 Snapshot V1 и single/collection physical-object Export V1 отказывают до успешной публикации при
 любом serialized object с non-null fixationDate; это временная loss-prevention защита без wire
@@ -977,7 +986,7 @@ I2  Physical object fixation date (Hollow/LogHive)
     + заполнение при создании новых Hollow/LogHive
     (T3, T6, T7)                                        ← независим от I1
 I3  Versioned Backup V7 / Snapshot V2: required canonical dates + legacy readers ← зависит от I1, I2
-I4  Export: версия формата + чтение старых пакетов      ← зависит от I1, I2
+I4  Export V2: required canonical dates + legacy V1 readers      ← зависит от I1, I2
 I5  Query/filter support: интервальный запрос по research date
     + запись без research date (legacy fixation_date IS NULL) не попадает в ограниченный период
     + решение по индексу по измерению                   ← зависит от I1, I2

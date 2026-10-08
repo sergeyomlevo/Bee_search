@@ -52,8 +52,8 @@
 Design APPROVED · 2026-10-03: `docs/temporal-data-model-design.md`. Закрыт design: schema-направление,
 migration policy и invariants. За пределами утверждённого minimal scope остаются future concerns —
 establishment-date precision, схема Inspection, late-entry/weather design. I1 committed (f4f5105);
-I2 committed locally (bd977b3), isolated Room/device verification pending. I3 implemented in worktree,
-owner review pending; I4–I7 pending. I2 + I3 + I4 — одна deployment unit; I4 + device gate блокируют Samsung.
+I2 committed locally (bd977b3), isolated Room/device verification pending. I3 committed locally (ac6c7d1); I4 implemented in worktree, owner review required. I5–I7 pending.
+I2 + I3 + I4 — одна deployment unit; отдельный Android/Room/device gate блокирует Samsung.
 
 ## Overlay architecture evidence
 
@@ -72,9 +72,10 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 - [ ] Implement required Room/data-model/migration changes.
       I1 committed (f4f5105): Room v12, canonical ObservationPoint date и atomic correction без user caller.
       I2 committed locally: Room v13 nullable fixationDate, legacy NULL, new Hollow/LogHive dates.
-      I3 implemented in worktree: Backup V7 / Snapshot V2 explicit dates, legacy readers retained.
-      Owner I3 review, I4 и isolated Android verification остаются pending.
-      **NOT DEPLOYABLE until I4 + device gate**; общий temporal stage не закрыт. I3 + I4 также обязательны
+      I3 committed locally: Backup V7 / Snapshot V2 explicit dates, legacy readers retained.
+      I4 implemented in worktree: три Export V2 profiles, legacy V1 readers/guards retained.
+      Owner I4 review и isolated Android/Room verification остаются pending.
+      **NOT DEPLOYABLE until device gate**; общий temporal stage не закрыт. I3 + I4 также обязательны
       до I6 или любого user-reachable explicit/corrected research-date path.
 - [ ] Implement Layers/Filters from the approved UI spec.
 - [ ] Implement MapLibre runtime overlay registry/restoration where required.

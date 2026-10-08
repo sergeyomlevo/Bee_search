@@ -16,10 +16,14 @@ import org.beesearch.app.domain.model.PhysicalObjectType
 internal object PhysicalObjectExportValidator {
     private val hashPattern = Regex("[0-9a-f]{64}")
 
-    fun validate(graph: PhysicalObjectExportGraph, mediaBytes: Map<UUID, ByteArray>) {
+    fun validate(
+        graph: PhysicalObjectExportGraph,
+        mediaBytes: Map<UUID, ByteArray>,
+        allowFixationDate: Boolean = true,
+    ) {
         validateSupportedType(graph.type)
-        if (graph.fixationDate != null) {
-            throw InvalidPhysicalObjectExport(
+        if (!allowFixationDate && graph.fixationDate != null) {
+            throw LegacyPhysicalObjectExportNotRepresentable(
                 "legacy physical-object export cannot represent fixationDate",
             )
         }

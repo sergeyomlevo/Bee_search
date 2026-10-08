@@ -9,7 +9,7 @@ import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
 
 internal object ObservationPointExportContract {
-    const val FORMAT_VERSION = 1
+    const val FORMAT_VERSION = 2
     const val PROFILE = "SINGLE_OBSERVATION_POINT"
     const val MANIFEST_ENTRY = "manifest.json"
     const val POINT_ENTRY = "point.json"
@@ -45,4 +45,7 @@ internal class ObservationPointExportIntegrityError(message: String) :
     ObservationPointExportException(message)
 
 internal class ObservationPointExportSourceMissing(message: String) :
+    ObservationPointExportException(message)
+
+internal class LegacyObservationPointExportNotRepresentable(message: String) :
     ObservationPointExportException(message)

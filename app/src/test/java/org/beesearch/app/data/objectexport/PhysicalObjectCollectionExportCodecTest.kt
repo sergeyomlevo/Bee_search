@@ -5,11 +5,13 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
+import java.util.TimeZone
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
 import org.beesearch.app.domain.model.HollowProperties
 import org.beesearch.app.domain.model.LogHiveProperties
@@ -24,12 +26,86 @@ import org.junit.Test
 
 class PhysicalObjectCollectionExportCodecTest {
     @Test
+    fun `v2 collection fixation dates are unchanged across timezone changes`() {
+        val graph = collection(PhysicalObjectType.LOG_HIVE, listOf(
+            objectGraph(PhysicalObjectType.LOG_HIVE, 1).copy(fixationDate = LocalDate.of(2026, 12, 31)),
+        ))
+        val original = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Kiritimati"))
+            val archive = encode(graph, blobs(graph))
+            TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Honolulu"))
+            assertEquals(LocalDate.of(2026, 12, 31), decode(archive).graph.objects.single().fixationDate)
+        } finally {
+            TimeZone.setDefault(original)
+        }
+    }
+
+    @Test
+    fun `v2 collection writer refuses noncanonical LocalDate spelling before touching output`() {
+        val graph = collection(
+            PhysicalObjectType.HOLLOW,
+            listOf(objectGraph(PhysicalObjectType.HOLLOW, 1).copy(fixationDate = LocalDate.of(10000, 1, 1))),
+        )
+        val output = ByteArrayOutputStream().apply { write("existing".toByteArray()) }
+        assertLegacyOrInvalid { PhysicalObjectCollectionExportCodec.encode(graph, blobs(graph), output) }
+        assertEquals("existing", output.toString(Charsets.UTF_8.name()))
+    }
+
+    @Test
+    fun `v2 carries nullable and non-null dates for three objects of each same type`() {
+        listOf(PhysicalObjectType.HOLLOW, PhysicalObjectType.LOG_HIVE).forEach { type ->
+            val graph = collection(type, listOf(
+                objectGraph(type, 1),
+                objectGraph(type, 2).copy(fixationDate = LocalDate.of(2026, 10, 4)),
+                objectGraph(type, 3).copy(fixationDate = LocalDate.of(2026, 10, 5), observer = objectGraph(type, 1).observer),
+            ))
+            val archive = encode(graph, blobs(graph))
+            val entries = zip(archive)
+            val manifest = Json.parseToJsonElement(entries.getValue("manifest.json").decodeToString()).jsonObject
+            assertEquals("\"PHYSICAL_OBJECT_COLLECTION\"", manifest.getValue("profile").toString())
+            assertEquals("2", manifest.getValue("formatVersion").toString())
+            graph.objects.forEach { value ->
+                val root = Json.parseToJsonElement(entries.getValue(PhysicalObjectCollectionExportContract.objectEntry(value.id)).decodeToString()).jsonObject
+                assertEquals(setOf("object", "properties", "media"), root.keys)
+                val identity = root.getValue("object").jsonObject
+                assertEquals(setOf("id", "territoryId", "type", "sequenceNumber", "latitude", "longitude", "createdAt", "creatorObserverId", "name", "fixationDate"), identity.keys)
+                val expectedDate = value.fixationDate?.let { "\"$it\"" } ?: "null"
+                assertEquals(expectedDate, identity.getValue("fixationDate").toString())
+            }
+            val decoded = decode(archive).graph.objects.sortedBy { it.sequenceNumber }
+            assertNull(decoded[0].fixationDate)
+            assertEquals(LocalDate.of(2026, 10, 4), decoded[1].fixationDate)
+            assertEquals(LocalDate.of(2026, 10, 5), decoded[2].fixationDate)
+        }
+    }
+
+    @Test
+    fun `v2 collection rejects missing and wrong fixation date on one record`() {
+        val first = objectGraph(PhysicalObjectType.HOLLOW, 1).copy(fixationDate = LocalDate.of(2026, 10, 4))
+        val second = objectGraph(PhysicalObjectType.HOLLOW, 2).copy(fixationDate = LocalDate.of(2026, 10, 5))
+        val graph = collection(PhysicalObjectType.HOLLOW, listOf(first, second))
+        val good = encode(graph, blobs(graph))
+        assertInvalid(replaceCollectionObject(good, first.id) { it.replace(",\"fixationDate\":\"2026-10-04\"", "") })
+        assertInvalid(replaceCollectionObject(good, second.id) { it.replace("\"fixationDate\":\"2026-10-05\"", "\"fixationDate\":true") })
+        listOf("2026-02-30", "2026-01-01T00:00:00Z").forEach { invalidDate ->
+            assertInvalid(replaceCollectionObject(good, second.id) { it.replace("\"fixationDate\":\"2026-10-05\"", "\"fixationDate\":\"$invalidDate\"") })
+        }
+    }
+
+    @Test
     fun `legacy collection export accepts null fixation dates and refuses any non-null date before writing`() {
         val graph = collection(PhysicalObjectType.HOLLOW, listOf(objectGraph(PhysicalObjectType.HOLLOW, 1)))
         val blobs = blobs(graph)
         val output = ByteArrayOutputStream()
-        PhysicalObjectCollectionExportCodec.encode(graph, blobs, output)
+        PhysicalObjectCollectionExportCodec.encodeV1(graph, blobs, output)
         assertTrue(output.size() > 0)
+        val legacy = output.toByteArray()
+        val manifest = Json.parseToJsonElement(zip(legacy).getValue("manifest.json").decodeToString()).jsonObject
+        assertEquals("1", manifest.getValue("formatVersion").toString())
+        assertInvalid(replaceCollectionObject(legacy, graph.objects.single().id) {
+            it.replace("\"name\":null", "\"name\":null,\"fixationDate\":null")
+        })
         assertNull(
             PhysicalObjectCollectionExportCodec.decode(output.toByteArray().inputStream())
                 .graph.objects.single().fixationDate,
@@ -40,7 +116,7 @@ class PhysicalObjectCollectionExportCodecTest {
             listOf(graph.objects.single().copy(fixationDate = LocalDate.parse("2026-10-03"))),
         )
         val untouched = ByteArrayOutputStream().apply { write("existing".toByteArray()) }
-        assertEncodeInvalid(divergent, blobs(divergent), untouched)
+        assertLegacyNotRepresentable(divergent, blobs(divergent), untouched)
         assertArrayEquals("existing".toByteArray(), untouched.toByteArray())
     }
     @Test
@@ -109,7 +185,7 @@ class PhysicalObjectCollectionExportCodecTest {
         assertInvalid(mutate(good) { it[manifest] = it.getValue(manifest).decodeToString()
             .replace(PhysicalObjectCollectionExportContract.PROFILE, "WRONG").encodeToByteArray() })
         assertInvalid(mutate(good) { it[manifest] = it.getValue(manifest).decodeToString()
-            .replace("\"formatVersion\":1", "\"formatVersion\":2").encodeToByteArray() })
+            .replace("\"formatVersion\":2", "\"formatVersion\":3").encodeToByteArray() })
         assertInvalid(mutate(good) { it.remove(PhysicalObjectCollectionExportContract.objectEntry(graph.objects.single().id)) })
         assertInvalid(mutate(good) { it["extra.json"] = "{}".encodeToByteArray() })
         assertInvalid(mutate(good) { it["../unsafe"] = byteArrayOf(1) })
@@ -263,10 +339,43 @@ class PhysicalObjectCollectionExportCodecTest {
         }.toByteArray()
     }
 
+    private fun replaceCollectionObject(
+        bytes: ByteArray,
+        objectId: UUID,
+        transform: (String) -> String,
+    ): ByteArray {
+        val entries = zip(bytes)
+        val entry = PhysicalObjectCollectionExportContract.objectEntry(objectId)
+        val original = entries.getValue(entry)
+        val changed = transform(original.decodeToString()).encodeToByteArray()
+        val manifest = entries.getValue(PhysicalObjectCollectionExportContract.MANIFEST_ENTRY).decodeToString()
+            .replace(
+                "\"entry\":\"$entry\",\"byteLength\":${original.size},\"sha256\":\"${sha(original)}\"",
+                "\"entry\":\"$entry\",\"byteLength\":${changed.size},\"sha256\":\"${sha(changed)}\"",
+            )
+        entries[entry] = changed
+        entries[PhysicalObjectCollectionExportContract.MANIFEST_ENTRY] = manifest.encodeToByteArray()
+        return ByteArrayOutputStream().also { output ->
+            ZipOutputStream(output).use { zip ->
+                entries.forEach { (name, content) ->
+                    zip.putNextEntry(ZipEntry(name).apply { time = 0L })
+                    zip.write(content)
+                    zip.closeEntry()
+                }
+            }
+        }.toByteArray()
+    }
+
     private fun assertEncodeInvalid(graph: PhysicalObjectCollectionExportGraph) {
         var thrown: Throwable? = null
         try { encode(graph, blobs(graph)) } catch (error: Throwable) { thrown = error }
         assertTrue("expected collection validation failure, got $thrown", thrown is PhysicalObjectExportException)
+    }
+
+    private fun assertLegacyOrInvalid(block: () -> Unit) {
+        var thrown: Throwable? = null
+        try { block() } catch (error: Throwable) { thrown = error }
+        assertTrue("expected invalid export, got $thrown", thrown is InvalidPhysicalObjectExport)
     }
 
     private fun assertEncodeInvalid(
@@ -277,6 +386,16 @@ class PhysicalObjectCollectionExportCodecTest {
         var thrown: Throwable? = null
         try { PhysicalObjectCollectionExportCodec.encode(graph, mediaBytes, output) } catch (error: Throwable) { thrown = error }
         assertTrue("expected collection validation failure, got $thrown", thrown is PhysicalObjectExportException)
+    }
+
+    private fun assertLegacyNotRepresentable(
+        graph: PhysicalObjectCollectionExportGraph,
+        mediaBytes: Map<UUID, ByteArray>,
+        output: ByteArrayOutputStream,
+    ) {
+        var thrown: Throwable? = null
+        try { PhysicalObjectCollectionExportCodec.encodeV1(graph, mediaBytes, output) } catch (error: Throwable) { thrown = error }
+        assertTrue("expected LegacyPhysicalObjectExportNotRepresentable, got $thrown", thrown is LegacyPhysicalObjectExportNotRepresentable)
     }
 
     private fun assertInvalid(bytes: ByteArray) {

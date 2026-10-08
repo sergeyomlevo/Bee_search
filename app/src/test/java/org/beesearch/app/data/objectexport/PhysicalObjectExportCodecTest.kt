@@ -5,10 +5,13 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
+import java.util.TimeZone
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.beesearch.app.data.media.PhysicalObjectMediaFileStore
 import org.beesearch.app.domain.model.HollowProperties
 import org.beesearch.app.domain.model.LogHiveProperties
@@ -28,15 +31,72 @@ import org.junit.Test
  */
 class PhysicalObjectExportCodecTest {
     @Test
+    fun `v2 fixation date is unchanged across timezone changes`() {
+        val fixture = fixture(PhysicalObjectType.HOLLOW).graph.copy(fixationDate = LocalDate.of(2026, 12, 31))
+        val original = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Kiritimati"))
+            val archive = encode(fixture, fixture(PhysicalObjectType.HOLLOW).blobs)
+            TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Honolulu"))
+            assertEquals(fixture.fixationDate, decode(archive).graph.fixationDate)
+        } finally {
+            TimeZone.setDefault(original)
+        }
+    }
+
+    @Test
+    fun `v2 writer refuses noncanonical LocalDate spelling before touching output`() {
+        val fixture = fixture(PhysicalObjectType.HOLLOW)
+        val output = ByteArrayOutputStream().apply { write("existing".toByteArray()) }
+        assertInvalid {
+            PhysicalObjectExportCodec.encode(
+                fixture.graph.copy(fixationDate = LocalDate.of(10000, 1, 1)), fixture.blobs, output,
+            )
+        }
+        assertEquals("existing", output.toString(Charsets.UTF_8.name()))
+    }
+
+    @Test
+    fun `v2 carries canonical fixation date including null without deriving from createdAt`() {
+        val fixture = fixture(PhysicalObjectType.HOLLOW)
+        val dated = fixture.graph.copy(fixationDate = LocalDate.of(2026, 9, 21))
+        assertEquals(dated, PhysicalObjectExportCodec.decode(encode(dated, fixture.blobs).inputStream()).graph)
+        assertNull(PhysicalObjectExportCodec.decode(encode(fixture.graph, fixture.blobs).inputStream()).graph.fixationDate)
+
+        val original = entries(encode(dated, fixture.blobs))
+        assertInvalid {
+            decode(replaceObjectDescriptor(original, "\"fixationDate\":\"2026-09-21\"", "\"fixationDate\":\"2026-9-21\""))
+        }
+        listOf("123", "true", "{}", "[]").forEach { wrongType ->
+            assertInvalid {
+                decode(replaceObjectDescriptor(original, "\"fixationDate\":\"2026-09-21\"", "\"fixationDate\":$wrongType"))
+            }
+        }
+        assertInvalid {
+            decode(replaceObjectDescriptor(original, ",\"fixationDate\":\"2026-09-21\"", ""))
+        }
+        listOf("2026-02-30", "2026-01-01T00:00:00Z").forEach { invalidDate ->
+            assertInvalid {
+                decode(replaceObjectDescriptor(original, "\"fixationDate\":\"2026-09-21\"", "\"fixationDate\":\"$invalidDate\""))
+            }
+        }
+    }
+
+    @Test
     fun `legacy single export accepts null fixation date and refuses a non-null date before writing`() {
         val fixture = fixture(PhysicalObjectType.HOLLOW)
         val output = ByteArrayOutputStream()
-        PhysicalObjectExportCodec.encode(fixture.graph, fixture.blobs, output)
+        PhysicalObjectExportCodec.encodeV1(fixture.graph, fixture.blobs, output)
         assertNull(PhysicalObjectExportCodec.decode(output.toByteArray().inputStream()).graph.fixationDate)
+        assertFalse(entries(output.toByteArray()).getValue("object.json").decodeToString().contains("fixationDate"))
+        assertInvalid {
+            val legacy = entries(output.toByteArray())
+            decode(replaceObjectDescriptor(legacy, "\"createdAt\":\"2026-09-20T10:00:00Z\"", "\"createdAt\":\"2026-09-20T10:00:00Z\",\"fixationDate\":null"))
+        }
 
         val divergent = fixture.graph.copy(fixationDate = LocalDate.parse("2026-09-21"))
         val untouched = ByteArrayOutputStream().apply { write("existing".toByteArray()) }
-        assertInvalid { PhysicalObjectExportCodec.encode(divergent, fixture.blobs, untouched) }
+        assertLegacyNotRepresentable { PhysicalObjectExportCodec.encodeV1(divergent, fixture.blobs, untouched) }
         assertArrayEquals("existing".toByteArray(), untouched.toByteArray())
     }
 
@@ -86,9 +146,14 @@ class PhysicalObjectExportCodecTest {
         val fixture = fixture(PhysicalObjectType.HOLLOW)
         val entries = entries(encode(fixture.graph, fixture.blobs))
         val manifest = entries.getValue("manifest.json").toString(Charsets.UTF_8)
+        val manifestObject = Json.parseToJsonElement(manifest).jsonObject
+        assertEquals(
+            setOf("profile", "formatVersion", "physicalObjectId", "physicalObjectType", "objectEntry", "objectByteLength", "objectSha256", "media"),
+            manifestObject.keys,
+        )
 
         assertTrue(manifest.contains("\"profile\":\"SINGLE_PHYSICAL_OBJECT\""))
-        assertTrue(manifest.contains("\"formatVersion\":1"))
+        assertTrue(manifest.contains("\"formatVersion\":2"))
         assertTrue(manifest.contains("\"physicalObjectType\":\"HOLLOW\""))
         assertTrue(manifest.contains(fixture.graph.id.toString()))
         assertTrue(manifest.contains("\"objectEntry\":\"object.json\""))
@@ -98,6 +163,10 @@ class PhysicalObjectExportCodecTest {
             assertTrue(manifest.contains(media.sha256))
         }
         assertEquals(setOf("manifest.json", "object.json") + fixture.blobs.keys.map { "media/$it" }, entries.keys)
+        val objectRoot = Json.parseToJsonElement(entries.getValue("object.json").decodeToString()).jsonObject
+        assertEquals(setOf("object", "properties", "media", "territory", "observer"), objectRoot.keys)
+        assertTrue(objectRoot.getValue("object").jsonObject.keys.contains("fixationDate"))
+        assertEquals("null", objectRoot.getValue("object").jsonObject.getValue("fixationDate").toString())
     }
 
     @Test
@@ -135,7 +204,7 @@ class PhysicalObjectExportCodecTest {
             decode(replace(original, "manifest.json") { it.replace("SINGLE_PHYSICAL_OBJECT", "SINGLE_OBSERVATION_POINT") })
         }
         assertInvalid {
-            decode(replace(original, "manifest.json") { it.replace("\"formatVersion\":1", "\"formatVersion\":2") })
+            decode(replace(original, "manifest.json") { it.replace("\"formatVersion\":2", "\"formatVersion\":3") })
         }
     }
 
@@ -422,6 +491,12 @@ class PhysicalObjectExportCodecTest {
             thrown = error
         }
         assertTrue("expected InvalidPhysicalObjectExport, got $thrown", thrown is InvalidPhysicalObjectExport)
+    }
+
+    private fun assertLegacyNotRepresentable(block: () -> Unit) {
+        var thrown: Throwable? = null
+        try { block() } catch (error: Throwable) { thrown = error }
+        assertTrue("expected LegacyPhysicalObjectExportNotRepresentable, got $thrown", thrown is LegacyPhysicalObjectExportNotRepresentable)
     }
 
     private fun assertIntegrity(block: () -> Unit) {

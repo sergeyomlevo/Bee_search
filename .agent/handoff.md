@@ -1,6 +1,35 @@
 # Bee Search handoff
 
-## Current continuation — Temporal I3 implemented in worktree, owner review required (2026-10-08)
+## Current continuation — Temporal I4 implemented in worktree, owner review required (2026-10-08)
+
+I1 pushed (f4f5105 = origin/main); I2 committed locally (bd977b3); I3 committed locally
+(ac6c7d1 = HEAD). I4 is unstaged/uncommitted; I5–I7 not started. Room stays 13; no migration change.
+
+Current portable writers: SINGLE_OBSERVATION_POINT V2 (required observationDate),
+SINGLE_PHYSICAL_OBJECT V2 and PHYSICAL_OBJECT_COLLECTION V2 (required nullable fixationDate per
+object). Explicit canonical dates never derive from createdAt/timezone. All three V1 readers
+remain compatible: legacy point reconstruction / physical NULL. Internal V1 writers retain typed
+representability refusals; current V2 user paths have no legacy guard. Collection keeps D093:
+one concrete type of one Territory. No UI/date editor/import-to-Room or caller correction change.
+
+Shared canonical date parser now lives in domain/model/ResearchDate.kt; I3 typed Backup/Snapshot
+boundary delegates to the same rule. Backup V7 / Snapshot V2 wire and PC verifier are unchanged.
+V1 export contracts are historical; current versioned contract: docs/temporal-export-v2.md.
+analysis-evidence-explorer stays V1-only and unchanged.
+
+Current I4 gate: JVM 791/791 PASS; fresh PC Snapshot verifier 99/99 PASS.
+assembleDebug, assembleDebugAndroidTest, lintDebug PASS (0 errors/fatal, 23 warnings, 2 hints).
+Evidence: ignored app/build/reports/temporal-i4/ (commands, exact suite counts, final worktree).
+Android instrumentation PENDING: isolated emulator-5554 read-only getprop timed out after 8s.
+No APK installed; no Samsung operation. An initial new three-object test fixture used inconsistent
+snapshots for the same Observer UUID; fixed the fixture, preserved validation, reran full gate.
+**I2 + I3 + I4 remain one deployment unit. Samsung remains on I1; no I4 install.**
+Temporal carriage is implemented; deployment still requires actual Room 12→13 migration,
+Android end-to-end V7 restore, Snapshot V2 SAF publication/read-back, V2 export integration and
+preservation of existing DEV DB/DataStore/maps/repository. I5/I6 are not this deployment gate.
+Do not use old Samsung results as new evidence. No staging/commit/push; unrelated TOML preserved.
+
+## Historical continuation — Temporal I3 (subsequently committed locally as ac6c7d1)
 
 I1 committed/pushed (`f4f51051b49a357237a7f95e7d581d175e87adcf` = origin/main).
 I2 committed locally, not pushed (`bd977b393619ab1bccb837a8f0d8c5b297305d50` = HEAD);

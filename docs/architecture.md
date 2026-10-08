@@ -1762,7 +1762,7 @@ Single ObservationPoint export отделён от logical backup пакетом
 `data/pointexport`. Транзакционный `getObservationPointDetail(pointId)` является
 единственным source read: он возвращает выбранную Point, Territory/Observer context,
 weather, Bee/FlightCycle и attachment metadata, после чего exporter сверяет app-owned
-photo bytes с size/SHA metadata. Pure codec пишет и валидирует format v1 ZIP с
+photo bytes с size/SHA metadata. Pure codec пишет format v2 и читает v1/v2 ZIP с
 `manifest.json`, `point.json` и `attachments/<attachmentId>`. Он не читает DataStore,
 Area, карты или сеть и не имеет restore/import side effects. UI только запускает
 существующий `CreateExchangeDocument` с начальным `Exchange/Data` и передаёт выбранный
@@ -1775,7 +1775,7 @@ DataStore settings и map packages не входят в эту транзакц�
 маршрутизатором существующего route mechanism.
 
 Single Physical Object export отделён от logical backup и от ObservationPoint export пакетом
-`data/objectexport` с собственным профилем `SINGLE_PHYSICAL_OBJECT` v1 (D093). Профиль
+`data/objectexport` с собственным профилем `SINGLE_PHYSICAL_OBJECT` v2 (V1 foundation — D093). Профиль
 реализован изолированно: ZIP/hash/JSON механика повторена локально, потому что ObservationPoint
 export уже проверен и общий export framework в это решение не входит. Source read возвращает
 объект, его subtype properties и его media из `PhysicalObjectRepository`, у которого нет пути чтения
@@ -1784,10 +1784,10 @@ Bee, ObservationPoint и их attachments, поэтому «только object-
 попадают в пакет только как минимальный read-only labelling/provenance snapshot. Apiary
 отклоняется fail-closed, так как у него нет пользовательского жизненного цикла. Пакет собирается и
 проверяется в app cache, и в выбранный SAF destination копируется только целый архив. Field-level
-контракт — `docs/physical-object-export-v1.md`.
+контракты — `docs/physical-object-export-v1.md` и `docs/temporal-export-v2.md`.
 
 Тот же изолированный feature boundary содержит отдельный collection-профиль
-`PHYSICAL_OBJECT_COLLECTION` v1 для всех Hollow либо всех LogHive текущей Territory. Collection
+`PHYSICAL_OBJECT_COLLECTION` v2 для всех Hollow либо всех LogHive текущей Territory. Collection
 source использует только `PhysicalObjectRepository.listForTerritory`, Territory/Observer
 repositories и object-owned `PhysicalObjectMediaFileStore`: Territory snapshot записывается один
 раз, используемые Observer snapshots дедуплицируются, а paths media включают object UUID. Codec

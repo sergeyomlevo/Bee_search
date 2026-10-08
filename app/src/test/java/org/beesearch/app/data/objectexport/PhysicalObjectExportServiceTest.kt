@@ -6,6 +6,7 @@ import java.io.IOException
 import java.io.OutputStream
 import java.nio.file.Files
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonObject
@@ -29,7 +30,7 @@ class PhysicalObjectExportServiceTest {
     @Test
     fun `hollow and log hive export their own object owned data and media`() = withStore { store ->
         listOf(PhysicalObjectType.HOLLOW, PhysicalObjectType.LOG_HIVE).forEach { type ->
-            val graph = graph(type)
+            val graph = graph(type).copy(fixationDate = LocalDate.of(2026, 10, 6))
             val mediaFile = storeFile(store, graph)
             val calls = mutableListOf<UUID>()
             val service = PhysicalObjectExportService(
