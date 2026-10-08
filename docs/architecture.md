@@ -895,7 +895,7 @@ workflow для georeferenced raster imagery с validation, reprojection/mosaic,
 metadata/manifest. Production import/acquisition, package management и final
 compatibility contract пока не определены. GPS, crosshair, ObservationPoints и
 app-generated research overlays не зависят от выбранной base-map composition; механизм отображения
-overlays и layers — design proposal в разделе 73.3.
+overlays и layers принят в разделе 73.3 (D102).
 
 ---
 
@@ -2216,12 +2216,15 @@ persisted типом без пользовательского жизненно�
 удаление и экспорт для него не реализуются, а экспорт отказывает для этого типа fail-closed. Это не
 создаёт отдельной архитектуры для Пасеки: решение потребуется вместе с её UI.
 
-## 73.3. Map overlays и layers: design proposal
+## 73.3. Map overlays и layers: принятое разделение
 
-**Статус:** design proposal, а **не** accepted decision: направление предложено, но не принято и не
-реализовано. Причина разделения — разные свойства двух механизмов: MapLibre style/source/layer живёт
-внутри style JSON и заменяется целиком при смене basemap, а Compose overlays рисуются поверх карты и
-от смены style не зависят.
+**Статус:** ACCEPTED · owner approval 2026-10-08 · [D102](decisions.md#d102--map-overlay-rendering-split-и-lifecycle-safety).
+Основание — два Samsung DEV/device spike и последующий review:
+[durable evidence summary](map-overlay-lifecycle-evidence.md). Принято архитектурное разделение и
+lifecycle/safety contract; production runtime overlay registry и общая карта данных не реализованы.
+Причина разделения — разные свойства механизмов: runtime MapLibre Source/Layer принадлежит текущему
+Style, который заменяется при смене basemap; Compose overlays рисуются поверх карты и не требуют
+MapLibre style restoration. Координатные markers продолжают использовать projection текущей карты.
 
 ```text
 MAPLIBRE SOURCES / LAYERS
@@ -2230,6 +2233,7 @@ MAPLIBRE SOURCES / LAYERS
     GPX и другая bulk geometry (I011)
     user field lines / polygons / areas
     статическая analytical geometry: distance bands, probable nest zones, apiary-radius aids
+    другие overlays, которым нужны MapLibre ordering и взаимодействие с basemap/style layers
 
 COMPOSE OVERLAYS
     маркеры ObservationPoint, Hollow, LogHive, Apiary, будущий Inspection
@@ -2247,9 +2251,70 @@ marker path и независимость от смены style; MapLibre даё
 вопрос масштаба Compose markers решается по реальным device measurements, конкретные performance
 limits сейчас не устанавливаются.
 
-Design requirement для будущих MapLibre-side overlays: они должны детерминированно восстанавливаться
-после смены style (`setStyle(...)` → style loaded → active MapLibre-side overlays restored), а
-registry/lifecycle должен жить вне конкретного style. Детальный дизайн — open implementation design.
+### Runtime MapLibre lifecycle и safety invariants
+
+После `setStyle()` прежние runtime Source/Layer отсутствуют, старый Style invalid. Restore создаёт
+новые SDK Source/Layer в новом current fully-loaded Style; registry/lifecycle owner живёт вне
+конкретного Style. Минимальный контракт будущей реализации:
+
+```text
+requested basemap/profile identity
+→ increment/store request generation BEFORE setStyle()
+→ setStyle()
+→ callback / deferred work
+→ reject stale generation/request identity
+→ require current fully-loaded Style
+→ validate owned IDs / collision policy
+→ pre-add existence checks
+→ add Sources
+→ add dependent Layers in deterministic order
+→ complete for current request
+```
+
+Generation и immutable request/profile identity записываются **до** `setStyle()`: callback может
+быть synchronous. Current Style сам по себе не доказывает request identity: controlled pending A,
+superseded B, дал deferred/getStyle callback с current B Style и stale контекстом A. Stale production
+callback в сегодняшних четырёх локальных JSON basemap profiles не обнаружен; это защитный invariant
+для deferred work, будущих медленных paths и изменения SDK/lifecycle, а не заявление о текущем
+пользовательском race bug.
+
+Requests и mutations сериализуются на main thread. Request validation → existence checks → SDK add
+выполняются одним непрерывным main-thread блоком без suspension и вложенного style switch. Любая
+deferred work перед mutation повторно валидирует generation/request identity, current Style и его
+loaded state. Superseded setter callback может не прийти: нельзя ждать completion каждого request.
+
+Runtime Source/Layer IDs имеют собственный явно app-owned namespace; ownership определяется по
+конструкции. Presence ID не доказывает совместимость Source/Layer с ожидаемым owned overlay.
+Неожиданная collision с чужим/style-defined ID вызывает явный typed/fail-closed отказ соответствующей
+overlay operation, а не `skip и продолжить`. Duplicate prevention выполняется **до** SDK add call.
+`try add → catch duplicate → continue` запрещён: после duplicate SDK exceptions в первом spike
+наблюдался asynchronous native SIGSEGV; Java exception не является безопасной recovery boundary.
+Точная native причинность не установлена, crash-class safety requirement принят владельцем.
+
+### OPEN implementation/device verification (не блокирует принятие)
+
+- Compose scale/performance: перед rollout общей карты Samsung benchmark синтетического набора
+  ориентировочно 200–1000 markers; frame time, gesture smoothness, projection update cost.
+  Performance limit не устанавливается до измерения.
+- Style failure/cancellation: final visible basemap и active overlay state должны быть согласованы.
+- Activity/Map lifecycle: recreation, return-to-map, registry lifecycle owner и stale/deferred work
+  после lifecycle transition.
+- Frame budget: continuous main-thread mutation block не разрешает неограниченную работу в одном
+  frame; restore нескольких Sources/Layers должен укладываться в измеренный budget.
+- Layer ordering: Sources before dependent Layers; deterministic ordering; конкретные anchors/order
+  относительно каждого basemap проверяются при реализации.
+- Visual transition/flicker: окно style replacement → restore остаётся UX/device verification;
+  masking/transition mechanism сейчас не выбран.
+- MapLibre upgrade: существенное обновление требует релевантного lifecycle regression test.
+
+### Research marker visual follow-up
+
+ObservationPoint, Hollow и LogHive различаются прежде всего формой/пиктограммой, не только цветом.
+Selected object сохраняет type pictogram; selection добавляет отдельный halo/ring/highlight/scale,
+не заменяет тип общей selected-иконкой. Type symbol используется последовательно там, где уместно.
+Перед production markers обязателен отдельный небольшой Samsung visual pass: различимость формы и
+контраст на vector, Sentinel/raster и Hybrid. Точные icons/colors/sizes и selected treatment не
+утверждены; assets этим решением не создаются.
 
 Territory Data Map, независимое включение слоёв и Layers/Filters UI остаются идеей I016
 (`docs/ideas.md`).

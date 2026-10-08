@@ -1,6 +1,28 @@
 # Bee Search handoff
 
-## Current continuation — single-button backup implementation (working tree, not committed)
+## Current continuation — Map overlay architecture accepted (2026-10-08)
+
+Owner accepted `docs/architecture.md` §73.3 as D102 after the initial Samsung DEV spike,
+targeted lifecycle closure and review. Both architecture-evidence checklist items are closed.
+Durable summary: `docs/map-overlay-lifecycle-evidence.md`; raw evidence remains ignored under
+`app/build/reports/unified-map-overlay-spike/` and `unified-map-overlay-closure/`.
+
+Future restore requires generation/request identity recorded BEFORE setStyle, stale-work rejection,
+current fully-loaded Style, uninterrupted main-thread validation/checks/adds, app-owned ID namespace,
+typed/fail-closed unexpected collisions and pre-add duplicate prevention; Sources before Layers.
+Generation guard is preventive: no stale production callback was observed in today's local profiles.
+Production registry/guard/IDs and Layers/Filters have not been implemented. No further architecture
+spikes are required; scale, failures/cancellation, recreation, frame budget, ordering, flicker and
+MapLibre upgrade regression remain implementation/device verification in §73.3.
+
+Before production research markers: separate Samsung pictogram visual pass remains mandatory
+(shape-first, selected retains type, contrast on vector/Sentinel/raster/Hybrid); exact art is undecided.
+Next production stage: **TEMPORAL DATA MODEL IMPLEMENTATION** according to the approved
+`docs/temporal-data-model-design.md`. Not started in this docs-only acceptance slice.
+Baseline was `8f0ee48e04eb6226e3e4c7b1374a3a1bd53c78ac`; pre-existing dirty
+`.codex/agents/luna-verifier.toml` belongs to other work, was preserved and excluded from the commit.
+
+## Historical continuation — single-button backup implementation (subsequently committed as 8f0ee48)
 
 Owner-approved post-device-test UX correction: the owner manually verified the new backup operation
 on Samsung and replaced informational-only path behavior with a link opening the current bound

@@ -3090,7 +3090,7 @@ destination document в момент подтверждения имени по�
   трактуется как неполный cleanup (`Объект удалён, но не все файлы медиа удалось удалить`), а не как
   неудачное удаление. Path safety при этом не ослабляется: небезопасный путь не разрешается и не
   удаляется.
-- Следующий свободный номер durable decision: **D102** (D098 — доступ к фиксированной папке резервных копий, D099 — ручная резервная копия METADATA_ONLY в UI, D100 — защита медиа в репозитории, D101 — профиль FULL / LOCAL_VERIFIED).
+- Historical numbering note: после D101 свободным был **D102**; 2026-10-08 он занят решением о Map overlay lifecycle ниже.
 
 ---
 
@@ -3323,7 +3323,8 @@ Approved limits and publication/discovery contract:
 Success requires validated candidate, fresh bound UUID check adjacent to same-storage move,
 and independent reopened final whole/entry SHA+ZIP/semantic validation. Invalid history is surfaced.
 FULL/LOCAL_VERIFIED, DEGRADED creation, restore, coverage/handoff/offload/UI not implemented.
-Final format acceptance still requires representative aggregate DEV sizing. Next decision: D102.
+Final format acceptance still requires representative aggregate DEV sizing. Historical next-number
+note: D102 was free at this stage; it is now allocated to Map overlay lifecycle below.
 
 ---
 
@@ -3539,3 +3540,56 @@ evidence. Кандидат, объявивший FULL, считается при
 только после проверки заголовка, структуры, UUID/варианта, объявленного набора и фактических байтов
 каждого требуемого блоба; для `METADATA_ONLY` он по-прежнему может показать, что текущие байты
 удовлетворяют ссылкам, но не описывает сам snapshot как FULL или LOCAL_VERIFIED.
+
+---
+
+# D102 — Map overlay rendering split и lifecycle safety
+
+**Статус:** ACCEPTED · owner approval 2026-10-08.
+**Основание:** initial Samsung DEV spike, targeted closure spike и последующий review;
+[durable evidence summary](map-overlay-lifecycle-evidence.md).
+**Принимает:** `architecture.md` §73.3. D094 temporal semantics, UI specification и mockups не меняются.
+
+MapLibre Sources/Layers используются для style-owned/bulk/static content: basemap composition,
+raster/user raster, GPX/bulk geometry, field lines/polygons/areas, static analytical geometry и
+overlays, которым нужны MapLibre ordering/масштабируемость/взаимодействие со style layers.
+Compose остаётся механизмом интерактивных research/UI overlays: ObservationPoint, Hollow, LogHive,
+будущие research markers, selection, GPS, map-centre target, direction guide и temporary handles.
+Существующие research markers не переносятся в MapLibre ради технологической унификации.
+
+**Обязательные safety invariants будущего restore:**
+
+- Runtime Source/Layer принадлежат Style; после replacement создаются новые SDK objects только в
+  current fully-loaded Style. Lifecycle owner хранится вне конкретного Style.
+- Immutable requested basemap/profile identity и generation записываются **до** setStyle, поскольку
+  callback может быть synchronous. Callback/deferred work отвергает stale generation/request
+  identity; current Style сам по себе не доказывает актуальность request context.
+- Validation → existence checks → SDK adds выполняются непрерывным main-thread блоком без suspension
+  и вложенного style switch. Deferred work повторно валидируется непосредственно перед mutation.
+- Source/Layer IDs имеют явно app-owned namespace и ownership по конструкции. Неожиданная collision
+  с чужим/style-defined ID вызывает typed/fail-closed отказ overlay operation, а не skip. Presence ID
+  не доказывает совместимость. Duplicate prevention выполняется до SDK add call.
+- Exception-driven idempotency (`try add → catch duplicate → continue`) запрещена: Java duplicate
+  exception не является безопасной recovery boundary после наблюдённого asynchronous native crash.
+- Sources добавляются до dependent Layers; порядок deterministic; completion относится к current
+  request. Superseded setter callback не гарантирован.
+
+Controlled closure доказал stale request context при current B Style, но stale production callback
+в сегодняшних четырёх быстро загружаемых local-JSON profiles не обнаружен. Generation guard принят
+как защитный invariant для deferred work/медленных paths/изменения lifecycle, не как описание
+обнаруженного пользовательского race bug. Конкретные Kotlin APIs/registry этим решением не задаются.
+
+**OPEN implementation/device verification, не блокеры принятия:** Samsung synthetic 200–1000 Compose
+markers (frame time, gestures, projection cost; limit после измерения); style failure/cancellation и
+согласованность visible basemap/active overlays; recreation/return-to-map, lifecycle owner и stale
+work; bounded restore frame budget; basemap-specific layer anchors/order; transition/flicker UX;
+релевантный regression test после существенного MapLibre upgrade. Детали — §73.3.
+
+**Marker follow-up:** ObservationPoint/Hollow/LogHive различаются прежде всего формой/пиктограммой,
+не только цветом. Selection сохраняет type symbol и добавляет отдельный highlight. До production
+markers обязателен небольшой Samsung visual pass с проверкой формы и контраста на vector,
+Sentinel/raster и Hybrid; точные icons/colors/sizes/selected treatment не утверждены.
+
+Принятие не реализует registry, generation guard, ID namespace, Layers/Filters, temporal model или
+marker assets. Следующий отдельный production stage — temporal data model по уже утверждённому
+`temporal-data-model-design.md`; в этом docs-only slice implementation не начинается.

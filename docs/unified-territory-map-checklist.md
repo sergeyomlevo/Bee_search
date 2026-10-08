@@ -3,8 +3,8 @@
 Операционный checklist работ по I016. Это **не** specification и **не** источник project truth: он не
 заменяет и не переопределяет accepted decisions, requirements, domain или data model. Authoritative
 остаётся в `docs/decisions.md`, `docs/architecture.md`, `docs/data-model.md`,
-`docs/product-requirements.md`, `docs/user-workflows.md` и `docs/ideas.md`; checklist только
-ссылается на них и фиксирует порядок этапов.
+`docs/product-requirements.md` и `docs/user-workflows.md`; `docs/ideas.md` — non-authoritative backlog
+и контекст объёма. Checklist только ссылается на них и фиксирует порядок этапов.
 
 Продолжение работ по текущему milestone остаётся в `.agent/handoff.md`.
 
@@ -12,7 +12,7 @@
 
 - I016 — `docs/ideas.md` (Status: `idea`) — цель и объём Unified Territory Data Map;
 - D094 — `docs/decisions.md` — временная семантика и семантика обычного фильтра по периоду;
-- `docs/architecture.md` §73.3 — MapLibre/Compose split как design proposal;
+- `docs/architecture.md` §73.3 / D102 — ACCEPTED MapLibre/Compose split и lifecycle safety;
 - `docs/data-model.md` §22, §63, §71.1 — что из временных фактов записано в модели сейчас;
 - I014 — user georeferenced rasters; I011 — GPX и пользовательские полевые данные; I001 —
   аналитические overlays.
@@ -22,7 +22,7 @@
 - [x] I016 сформулирована и temporal section reconciled.
 - [x] D094 ACCEPTED.
 - [x] research date отделена концептуально от technical created_at.
-- [x] MapLibre/Compose class-based split записан как design proposal.
+- [x] MapLibre/Compose class-based split принят владельцем как D102 (2026-10-08).
 
 ## UI: Layers/Filters (mockup-first)
 
@@ -55,9 +55,15 @@ establishment-date precision, схема Inspection, late-entry/weather design. 
 
 ## Overlay architecture evidence
 
-- [ ] Run a small DEV/device spike for runtime MapLibre overlay lifecycle across `setStyle()`.
-- [ ] Based on evidence, review §73.3 overlay proposal and decide whether it can become an accepted
+- [x] Run a small DEV/device spike for runtime MapLibre overlay lifecycle across `setStyle()`.
+- [x] Based on evidence, review §73.3 overlay proposal and decide whether it can become an accepted
       decision.
+
+Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner accepted §73.3 /
+[D102](decisions.md#d102--map-overlay-rendering-split-и-lifecycle-safety).
+[Durable evidence summary](map-overlay-lifecycle-evidence.md). Implementation и её device verification
+остаются OPEN. Следующий отдельный production stage — temporal data model по утверждённому
+`docs/temporal-data-model-design.md`; не начат.
 
 ## Implementation
 
