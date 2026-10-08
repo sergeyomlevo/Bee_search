@@ -34,6 +34,8 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
+import java.time.ZoneId
+import org.beesearch.app.domain.model.legacyObservationDate
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -107,6 +109,7 @@ internal class BackupService(
     suspend fun export(output: File): UUID {
         val graph = database.withTransaction { database.backupDao().snapshot() }
         validateGraph(graph)
+        validateLegacyObservationDates(graph)
         val portable = settings.snapshot()
         validateSettings(portable, graph)
         val blobs = blobsV6(graph, portable, attachmentStore, objectMediaStore)
@@ -603,6 +606,15 @@ private fun validateObjectMedia(graph: Graph, blobs: Map<String, Blob>) {
     blobs.keys.filter { it.startsWith("object-media-file:") }.forEach { if (it !in ids.map { id -> "object-media-file:$id" }) throw MalformedBackup("unlisted object media file") }
 }
 
+internal fun validateLegacyObservationDates(graph: Graph) {
+    val zone = ZoneId.systemDefault()
+    graph.points.forEach { point ->
+        if (point.observationDate != legacyObservationDate(point.createdAt, zone)) {
+            throw BackupDomainInvariantViolation("ObservationPoint ${point.id}: canonical observationDate is not representable in legacy format at $zone")
+        }
+    }
+}
+
 internal fun validateGraph(g: Graph, globalIdentityUniqueness: Boolean = true) {
     // Legacy formats keep their original global scope; Repository Snapshot V1
     // explicitly permits the same UUID in unrelated entity collections.
@@ -726,8 +738,8 @@ private fun logHive(o: JsonObject, hasName: Boolean) = LogHiveEntity(o.uuid("phy
 private fun objectMedia(o: JsonObject) = PhysicalObjectMediaEntity(o.uuid("id"), o.uuid("physicalObjectId"), o.enum("type"), o.string("relativePath"), o.optionalString("originalFileName"), o.optionalString("mimeType"), o.long("byteSize"), o.string("sha256"), o.instant("createdAt"))
 private fun apiary(o: JsonObject) = ApiaryEntity(o.uuid("physicalObjectId"), o.optionalString("name"))
 private fun sequence(o: JsonObject) = PhysicalObjectSequenceEntity(o.uuid("territoryId"), o.enum("objectType"), o.int("lastIssued"))
-private fun point(o: JsonObject) = ObservationPointEntity(o.uuid("id"), o.uuid("territoryId"), o.uuid("observerId"), o.int("observationYear"), o.int("pointNumber"), o.optionalEnum<BeePresenceResult>("beePresenceResult"), o.optionalString("code"), o.double("latitude"), o.double("longitude"), o.optionalDouble("gpsLatitude"), o.optionalDouble("gpsLongitude"), o.optionalDouble("gpsAccuracyM"), o.instant("createdAt"), o.optionalInstant("initialGroupReleaseAt"), o.optionalInstant("completedAt"))
-private fun pointV2(o: JsonObject) = ObservationPointEntity(o.uuid("id"), o.uuid("territoryId"), o.uuid("observerId"), o.int("observationYear"), o.int("pointNumber"), o.optionalEnum<BeePresenceResult>("beePresenceResult"), o.optionalString("code"), o.double("latitude"), o.double("longitude"), o.optionalDouble("gpsLatitude"), o.optionalDouble("gpsLongitude"), o.optionalDouble("gpsAccuracyM"), o.instant("createdAt"), o.optionalInstant("initialGroupReleaseAt"), o.optionalInstant("completedAt"), o.optionalString("description"))
+private fun point(o: JsonObject) = ObservationPointEntity(legacyObservationDate(o.instant("createdAt")), o.uuid("id"), o.uuid("territoryId"), o.uuid("observerId"), o.int("observationYear"), o.int("pointNumber"), o.optionalEnum<BeePresenceResult>("beePresenceResult"), o.optionalString("code"), o.double("latitude"), o.double("longitude"), o.optionalDouble("gpsLatitude"), o.optionalDouble("gpsLongitude"), o.optionalDouble("gpsAccuracyM"), o.instant("createdAt"), o.optionalInstant("initialGroupReleaseAt"), o.optionalInstant("completedAt"))
+private fun pointV2(o: JsonObject) = ObservationPointEntity(legacyObservationDate(o.instant("createdAt")), o.uuid("id"), o.uuid("territoryId"), o.uuid("observerId"), o.int("observationYear"), o.int("pointNumber"), o.optionalEnum<BeePresenceResult>("beePresenceResult"), o.optionalString("code"), o.double("latitude"), o.double("longitude"), o.optionalDouble("gpsLatitude"), o.optionalDouble("gpsLongitude"), o.optionalDouble("gpsAccuracyM"), o.instant("createdAt"), o.optionalInstant("initialGroupReleaseAt"), o.optionalInstant("completedAt"), o.optionalString("description"))
 private fun weather(o: JsonObject) = ObservationPointWeatherEntity(o.uuid("observationPointId"), o.enum<WeatherStatus>("status"), o.optionalDouble("temperatureC"), o.optionalDouble("windSpeedMps"), o.optionalDouble("windDirectionDeg"), o.optionalInstant("sampleAt"), o.optionalInstant("fetchedAt"), o.optionalString("source"))
 private fun attachment(o: JsonObject) = ObservationPointAttachmentEntity(o.uuid("id"), o.uuid("observationPointId"), o.enum<AttachmentType>("type"), o.string("relativePath"), o.optionalString("originalFileName"), o.optionalString("mimeType"), o.long("byteSize"), o.string("sha256"), o.instant("createdAt"))
 private fun bee(o: JsonObject) = BeeEntity(o.uuid("id"), o.uuid("observationPointId"), o.string("markColor"), o.markPosition("markPosition"), o.instant("createdAt"))

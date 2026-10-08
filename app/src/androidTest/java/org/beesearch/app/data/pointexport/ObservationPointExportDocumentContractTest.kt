@@ -38,7 +38,7 @@ class ObservationPointExportDocumentContractTest {
         val territoryId = UUID.fromString("22222222-2222-2222-2222-222222222222")
         val observerId = UUID.fromString("33333333-3333-3333-3333-333333333333")
         return ObservationPointDetail(
-            ObservationPoint(UUID.fromString("11111111-1111-1111-1111-111111111111"), territoryId, observerId, 2026, 16, null, null, 0.0, 0.0, null, null, null, at, null, null),
+            ObservationPoint(java.time.LocalDate.of(2026, 1, 1), UUID.fromString("11111111-1111-1111-1111-111111111111"), territoryId, observerId, 2026, 16, null, null, 0.0, 0.0, null, null, null, at, null, null),
             Territory(territoryId, "DEV", "Territory", "Region", "District", at, at),
             Observer(observerId, "O1", "Last", "First", null, null, at, at),
             emptyList(),

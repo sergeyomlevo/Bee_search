@@ -29,6 +29,7 @@ import org.beesearch.app.domain.model.ObservationPointSummary
 import org.beesearch.app.domain.model.ObservationPointDetail
 import org.beesearch.app.domain.model.PhysicalObjectType
 import java.util.UUID
+import java.time.LocalDate
 
 interface SettingsRepository {
     val settings: Flow<AppSettings>
@@ -162,6 +163,8 @@ interface ObservationRepository : ObservationPointPreparationCreator, Observatio
     suspend fun recordNoBeesFound(pointId: UUID): ObservationPoint
 
     fun observeObservationPointProperties(pointId: UUID): Flow<ObservationPointDetail?>
+    /** Not user-wired until I3 Backup/Snapshot and I4 Export carriage are complete. */
+    suspend fun updateObservationDate(pointId: UUID, newDate: LocalDate): ObservationPoint
     suspend fun updateObservationPointDescription(pointId: UUID, description: String?): ObservationPoint
     suspend fun listObservationPointAttachments(pointId: UUID): List<ObservationPointAttachment>
     suspend fun listAllObservationPointAttachments(): List<ObservationPointAttachment>

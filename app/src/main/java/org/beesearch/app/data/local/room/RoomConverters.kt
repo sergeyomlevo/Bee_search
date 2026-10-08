@@ -5,10 +5,17 @@ import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.WeatherStatus
+import java.time.LocalDate
 import java.time.Instant
 import java.util.UUID
 
 internal class RoomConverters {
+    @TypeConverter
+    fun localDateToString(value: LocalDate): String = value.toString()
+
+    @TypeConverter
+    fun stringToLocalDate(value: String): LocalDate = LocalDate.parse(value)
+
     @TypeConverter
     fun uuidToString(value: UUID): String = value.toString()
 

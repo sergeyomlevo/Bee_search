@@ -8,12 +8,14 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 import org.beesearch.app.domain.model.BeePresenceResult
+import java.time.LocalDate
 import java.time.Instant
 import java.util.UUID
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.WeatherStatus
 
 internal data class CompletedObservationPointRow(
+    @ColumnInfo(name = "observation_date") val observationDate: LocalDate,
     @ColumnInfo(name = "id") val id: UUID,
     @ColumnInfo(name = "created_at") val createdAt: Instant,
     @ColumnInfo(name = "observation_year") val observationYear: Int,
@@ -24,6 +26,7 @@ internal data class CompletedObservationPointRow(
 )
 
 internal data class ObservationPointSummaryRow(
+    @ColumnInfo(name = "observation_date") val observationDate: LocalDate,
     @ColumnInfo(name = "id") val id: UUID,
     @ColumnInfo(name = "territory_id") val territoryId: UUID,
     @ColumnInfo(name = "observation_year") val observationYear: Int,
@@ -292,12 +295,15 @@ internal interface ObservationPointDao {
     @Query("SELECT * FROM observation_points WHERE id = :id")
     fun observeById(id: UUID): Flow<ObservationPointEntity?>
 
+    @Query("UPDATE observation_points SET observation_date = :date, observation_year = :year, point_number = :number WHERE id = :id")
+    suspend fun updateObservationDate(id: UUID, date: LocalDate, year: Int, number: Int): Int
+
     @Query("UPDATE observation_points SET description = :description WHERE id = :id")
     suspend fun updateDescription(id: UUID, description: String?): Int
 
     @Query(
         """
-        SELECT p.id, p.territory_id, p.observation_year, p.point_number, p.code,
+        SELECT p.observation_date, p.id, p.territory_id, p.observation_year, p.point_number, p.code,
                p.bee_presence_result, p.latitude, p.longitude, p.gps_accuracy_m,
                p.created_at, p.completed_at,
                COUNT(DISTINCT b.id) AS bee_count,
@@ -327,7 +333,7 @@ internal interface ObservationPointDao {
 
     @Query(
         """
-        SELECT observation_points.id,
+        SELECT observation_points.observation_date, observation_points.id,
                observation_points.created_at,
                observation_points.observation_year,
                observation_points.point_number,

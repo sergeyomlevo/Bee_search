@@ -25,7 +25,7 @@ class SnapshotWeatherMatrixTest {
     private val secondPoint = UUID.fromString("44444444-4444-4444-8444-444444444444")
 
     private fun point(id: UUID, number: Int = 1, completedAt: Instant? = null, presence: BeePresenceResult? = null) = ObservationPointEntity(
-        id, territory, observer, 2026, number, presence, null,
+        java.time.LocalDate.of(2026, 1, 1), id, territory, observer, 2026, number, presence, null,
         55.7, 37.6, null, null, null, at, null, completedAt,
     )
 

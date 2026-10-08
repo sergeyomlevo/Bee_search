@@ -411,6 +411,7 @@ class CleanStartupIntegrationTest {
         database.backupDao().insertObservationPoints(
             listOf(
                 ObservationPointEntity(
+                    java.time.LocalDate.of(2026, 9, 24),
                     pointId, territory.id, observer.id, 2026, 1, BeePresenceResult.BEES_FOUND,
                     null, 56.0, 42.0, null, null, null, Instant.parse("2026-09-24T08:00:00Z"), null, null,
                 ),

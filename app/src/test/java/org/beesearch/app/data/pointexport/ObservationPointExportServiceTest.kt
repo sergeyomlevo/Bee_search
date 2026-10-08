@@ -72,7 +72,7 @@ class ObservationPointExportServiceTest {
         val observerId = UUID.fromString("33333333-3333-3333-3333-333333333333")
         val timestamp = Instant.parse("2026-09-20T10:00:00Z")
         return ObservationPointDetail(
-            point = ObservationPoint(pointId, territoryId, observerId, 2026, 16, null, null, 56.1, 43.2, null, null, null, timestamp, null, null, "Описание"),
+            point = ObservationPoint(java.time.LocalDate.of(2026, 9, 20), pointId, territoryId, observerId, 2026, 16, null, null, 56.1, 43.2, null, null, null, timestamp, null, null, "Описание"),
             territory = Territory(territoryId, "DEV", "Территория", "Регион", "Район", timestamp, timestamp),
             observer = Observer(observerId, "O1", "Иванов", "Иван", null, null, timestamp, timestamp),
             beeHistories = emptyList(),

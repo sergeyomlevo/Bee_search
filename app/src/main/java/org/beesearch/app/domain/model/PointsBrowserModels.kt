@@ -1,10 +1,12 @@
 package org.beesearch.app.domain.model
 
+import java.time.LocalDate
 import java.time.Instant
 import java.util.UUID
 
 /** Read models for the saved ObservationPoint browser. */
 data class ObservationPointSummary(
+    val observationDate: LocalDate,
     val id: UUID,
     val territoryId: UUID,
     val observationYear: Int,

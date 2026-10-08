@@ -334,6 +334,7 @@ class PointsScreenTest {
         result: BeePresenceResult? = BeePresenceResult.BEES_FOUND,
         beeCount: Int = 1,
     ) = ObservationPointSummary(
+        observationDate = java.time.LocalDate.of(2026, 9, 17),
         id = UUID.randomUUID(), territoryId = devTerritory.id, observationYear = 2026,
         pointNumber = number, code = null, beePresenceResult = result,
         latitude = 56.0, longitude = 43.0, gpsAccuracyM = 4.0,

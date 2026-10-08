@@ -86,6 +86,7 @@ class InitialSetupStateTest {
 
     @Test fun `active observation recovery keeps priority over the checklist`() {
         val activePoint = ObservationPoint(
+            observationDate = java.time.LocalDate.of(1970, 1, 1),
             id = UUID.randomUUID(),
             territoryId = territory.id,
             observerId = observer.id,

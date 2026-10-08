@@ -27,7 +27,7 @@ class SnapshotReaderAlignmentTest {
     private val snapshot = UUID.fromString("70000000-0000-4000-8000-000000000006")
 
     private fun graph(count: Int, completed: Boolean = false): Graph {
-        val points = listOf(ObservationPointEntity(point, t, o, 2026, 1,
+        val points = listOf(ObservationPointEntity(java.time.LocalDate.of(2026, 1, 1), point, t, o, 2026, 1,
             if (count == 0) BeePresenceResult.NO_BEES_FOUND else BeePresenceResult.BEES_FOUND,
             "P", 55.0, 37.0, null, null, null, at, null, if (completed) at else null, null))
         val bees = (1..count).map { n -> BeeEntity(UUID.fromString("70000000-0000-4000-8000-%012d".format(10L + n)), point, "c$n", MarkPosition.THORAX, at, objectId) }
@@ -82,7 +82,7 @@ class SnapshotReaderAlignmentTest {
     @Test fun completedSecondPointWithTenBeesIsAccepted() {
         val first = graph(10, completed = true)
         val secondPoint = UUID.fromString("70000000-0000-4000-8000-000000000030")
-        val second = first.copy(points = first.points + ObservationPointEntity(secondPoint, t, o, 2026, 2,
+        val second = first.copy(points = first.points + ObservationPointEntity(java.time.LocalDate.of(2026, 1, 1), secondPoint, t, o, 2026, 2,
             BeePresenceResult.BEES_FOUND, "P2", 55.1, 37.1, null, null, null, at, null, at, null),
             bees = first.bees + (1..10).map { n -> BeeEntity(UUID.fromString("70000000-0000-4000-8000-%012d".format(40L + n)), secondPoint, "d$n", MarkPosition.ABDOMEN, at, objectId) },
             weather = first.weather + ObservationPointWeatherEntity(secondPoint, WeatherStatus.UNAVAILABLE, null, null, null, null, null, null))

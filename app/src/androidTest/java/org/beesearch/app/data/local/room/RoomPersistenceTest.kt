@@ -48,6 +48,7 @@ import org.junit.Before
 import org.junit.Test
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
@@ -139,7 +140,8 @@ class RoomPersistenceTest {
             ),
         )
 
-        assertEquals(2027, point.observationYear)
+        assertEquals(LocalDate.of(2027, 1, 1), point.observationDate)
+        assertEquals(point.observationDate.year, point.observationYear)
         assertEquals(creationInstant, point.createdAt)
     }
 
@@ -171,6 +173,7 @@ class RoomPersistenceTest {
     fun pointNumberUniqueConstraintIsAuthoritative() = runBlocking {
         val point = createPoint()
         val duplicate = ObservationPointEntity(
+            observationDate = point.observationDate,
             id = UUID.randomUUID(),
             territoryId = point.territoryId,
             observerId = point.observerId,
@@ -1011,6 +1014,61 @@ class RoomPersistenceTest {
             runBlocking { territoryRepository.createTerritory("KLYAZMA-01", "Дубликат", "Область", "Район") }
         }
         Unit
+    }
+
+    @Test
+    fun observationDateCorrectionWithinYearKeepsIdentityAndNumber() = runBlocking {
+        val point = createPoint()
+        val corrected = observationRepository.updateObservationDate(point.id, LocalDate.of(2026, 7, 20))
+        assertEquals(point.copy(observationDate = LocalDate.of(2026, 7, 20)), corrected)
+        assertEquals(corrected, observationRepository.observeActivePoint().first())
+        assertEquals(corrected.observationDate, observationRepository.getObservationPointDetail(point.id)!!.point.observationDate)
+        assertEquals(corrected.observationDate, observationRepository.observeObservationPointSummaries(territoryId).first().single().observationDate)
+    }
+
+    @Test
+    fun crossYearCorrectionAllocatesAfterOccupiedScopeAndPreservesRelationships() = runBlocking {
+        clock.set(Instant.parse("2025-08-26T08:00:00Z"))
+        val occupied = createPoint()
+        observationRepository.recordNoBeesFound(occupied.id)
+        val occupiedTwo = createPoint()
+        observationRepository.recordNoBeesFound(occupiedTwo.id)
+        clock.set(Instant.parse("2026-08-26T08:00:00Z"))
+        val point = createPoint()
+        val started = observationRepository.startFirstFlight(point.id, "WHITE", MarkPosition.THORAX)
+        clock.advanceSeconds(60)
+        val returned = observationRepository.registerBeeReturn(started.bee.id)
+        val completed = observationRepository.completeObservationPoint(point.id)
+        val attachment = ObservationPointAttachmentEntity(UUID.randomUUID(), point.id,
+            org.beesearch.app.domain.model.AttachmentType.PHOTO, "test", null, null, 1, "a".repeat(64), point.createdAt)
+        database.observationPointAttachmentDao().insert(attachment)
+        val weather = database.observationPointWeatherDao().getByPointId(point.id)
+        val before = database.observationPointDao().getById(point.id)!!
+        val corrected = observationRepository.updateObservationDate(point.id, LocalDate.of(2025, 8, 20))
+        assertEquals(completed.copy(observationDate = LocalDate.of(2025, 8, 20), observationYear = 2025, pointNumber = 3), corrected)
+        assertEquals(before.copy(observationDate = corrected.observationDate, observationYear = 2025, pointNumber = 3), database.observationPointDao().getById(point.id))
+        assertEquals(1, database.observationPointDao().getById(occupied.id)!!.pointNumber)
+        assertEquals(2, database.observationPointDao().getById(occupiedTwo.id)!!.pointNumber)
+        assertEquals(started.bee, observationRepository.observeBees(point.id).first().single())
+        assertEquals(returned, observationRepository.observeFlightCyclesForPoint(point.id).first().single())
+        assertEquals(listOf(attachment), database.observationPointAttachmentDao().getForPoint(point.id))
+        assertEquals(weather, database.observationPointWeatherDao().getByPointId(point.id))
+        assertEquals(corrected.observationDate, observationRepository.getCompletedObservationPoints().single { it.id == point.id }.observationDate)
+        assertEquals(1, createPoint().pointNumber)
+    }
+
+    @Test
+    fun dateCorrectionConstraintFailureIsAtomic() = runBlocking {
+        val point = createPoint()
+        database.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER reject_date BEFORE UPDATE OF observation_date ON observation_points BEGIN SELECT RAISE(ABORT, 'test rejection'); END",
+        )
+        assertThrows(SQLiteException::class.java) {
+            runBlocking { observationRepository.updateObservationDate(point.id, LocalDate.of(2025, 8, 20)) }
+        }
+        assertEquals(point, database.observationPointDao().getById(point.id)!!.toDomain())
+        database.openHelper.writableDatabase.execSQL("DROP TRIGGER reject_date")
+        assertEquals(1, observationRepository.updateObservationDate(point.id, LocalDate.of(2025, 8, 20)).pointNumber)
     }
 
     private suspend fun createPoint(

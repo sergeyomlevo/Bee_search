@@ -54,6 +54,7 @@ import org.beesearch.app.domain.model.PendingWeatherRequest
 import org.beesearch.app.domain.model.WeatherStatus
 import org.beesearch.app.domain.repository.ObservationRepository
 import java.time.Clock
+import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 
@@ -98,6 +99,7 @@ internal class RoomObservationRepository(
         .map { rows ->
             rows.map { row ->
                 ObservationPointSummary(
+                    observationDate = row.observationDate,
                     id = row.id,
                     territoryId = row.territoryId,
                     observationYear = row.observationYear,
@@ -144,6 +146,18 @@ internal class RoomObservationRepository(
             weatherDao.observeByPointId(pointId),
         ) { point, _, _ ->
             if (point == null) null else getObservationPointDetail(pointId)
+        }
+
+    override suspend fun updateObservationDate(pointId: UUID, newDate: LocalDate): ObservationPoint =
+        database.withTransaction {
+            val point = pointDao.getById(pointId) ?: throw EntityNotFoundException("ObservationPoint")
+            val sameYear = point.observationDate.year == newDate.year
+            val year = if (sameYear) point.observationYear else newDate.year
+            val number = if (sameYear) point.pointNumber else pointDao.getNextPointNumber(
+                point.territoryId, year, point.observerId,
+            )
+            check(pointDao.updateObservationDate(pointId, newDate, year, number) == 1)
+            pointDao.getById(pointId)!!.toDomain()
         }
 
     override suspend fun updateObservationPointDescription(pointId: UUID, description: String?): ObservationPoint =
@@ -218,6 +232,7 @@ internal class RoomObservationRepository(
     override suspend fun getCompletedObservationPoints(): List<CompletedObservationPointSummary> =
         pointDao.getCompletedSummaries().map { point ->
             CompletedObservationPointSummary(
+                observationDate = point.observationDate,
                 id = point.id,
                 createdAt = point.createdAt,
                 observationYear = point.observationYear,
@@ -296,13 +311,15 @@ internal class RoomObservationRepository(
         }
 
         val createdAt = clock.instant()
-        val observationYear = createdAt.atZone(observationZoneIdProvider()).year
+        val observationDate = createdAt.atZone(observationZoneIdProvider()).toLocalDate()
+        val observationYear = observationDate.year
         val pointNumber = pointDao.getNextPointNumber(
             territoryId = point.territoryId,
             observationYear = observationYear,
             observerId = point.observerId,
         )
         val entity = ObservationPointEntity(
+            observationDate = observationDate,
             id = point.id,
             territoryId = point.territoryId,
             observerId = point.observerId,

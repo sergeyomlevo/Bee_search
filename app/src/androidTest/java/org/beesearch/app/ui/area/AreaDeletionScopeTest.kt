@@ -100,6 +100,7 @@ class AreaDeletionScopeTest {
         database.backupDao().insertObservationPoints(
             listOf(
                 ObservationPointEntity(
+                    observationDate = java.time.LocalDate.of(2026, 9, 24),
                     id = pointId,
                     territoryId = territoryId,
                     observerId = observerId,

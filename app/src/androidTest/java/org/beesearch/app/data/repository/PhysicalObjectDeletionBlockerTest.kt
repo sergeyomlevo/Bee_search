@@ -210,6 +210,7 @@ class PhysicalObjectDeletionBlockerTest {
         database.backupDao().insertObservationPoints(
             listOf(
                 ObservationPointEntity(
+                    java.time.LocalDate.of(2026, 9, 24),
                     pointId, territoryId, observerId, 2026, pointNumber, BeePresenceResult.BEES_FOUND,
                     null, 56.0, 42.0, null, null, null, NOW, NOW, null,
                 ),

@@ -1,5 +1,6 @@
 package org.beesearch.app.domain.model
 
+import java.time.LocalDate
 import java.time.Instant
 import java.util.UUID
 
@@ -13,6 +14,7 @@ data class ObservationDataCounts(
 }
 
 data class CompletedObservationPointSummary(
+    val observationDate: LocalDate,
     val id: UUID,
     val createdAt: Instant,
     val observationYear: Int,

@@ -398,6 +398,7 @@ class PointDetailScreenTest {
         historiesOverride: List<BeeObservationHistory>? = null,
     ) = ObservationPointDetail(
         point = ObservationPoint(
+            observationDate = java.time.LocalDate.of(2026, 9, 17),
             id = pointId,
             territoryId = devTerritory.id,
             observerId = observer.id,

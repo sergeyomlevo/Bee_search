@@ -1,5 +1,6 @@
 package org.beesearch.app.domain.model
 
+import java.time.LocalDate
 import java.time.Instant
 import java.util.UUID
 
@@ -34,6 +35,7 @@ data class Observer(
 }
 
 data class ObservationPoint(
+    val observationDate: LocalDate,
     val id: UUID,
     val territoryId: UUID,
     val observerId: UUID,

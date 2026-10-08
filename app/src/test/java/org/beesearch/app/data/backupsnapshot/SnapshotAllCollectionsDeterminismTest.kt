@@ -41,8 +41,8 @@ class SnapshotAllCollectionsDeterminismTest {
             PhysicalObjectEntity(id(26), id(2), PhysicalObjectType.LOG_HIVE, 1, 55.75, 37.65, at, id(12)),
         )
         val points = listOf(
-            ObservationPointEntity(id(31), id(1), id(11), 2026, 1, BeePresenceResult.BEES_FOUND, "P1", 55.80, 37.70, null, null, null, at, at, at.plusSeconds(60), "one"),
-            ObservationPointEntity(id(32), id(2), id(12), 2026, 1, BeePresenceResult.BEES_FOUND, "P2", 55.81, 37.71, null, null, null, at, null, null, "two"),
+            ObservationPointEntity(java.time.LocalDate.of(2026, 1, 1), id(31), id(1), id(11), 2026, 1, BeePresenceResult.BEES_FOUND, "P1", 55.80, 37.70, null, null, null, at, at, at.plusSeconds(60), "one"),
+            ObservationPointEntity(java.time.LocalDate.of(2026, 1, 1), id(32), id(2), id(12), 2026, 1, BeePresenceResult.BEES_FOUND, "P2", 55.81, 37.71, null, null, null, at, null, null, "two"),
         )
         val bees = listOf(
             BeeEntity(id(41), id(31), "red", MarkPosition.THORAX, at, id(21)),

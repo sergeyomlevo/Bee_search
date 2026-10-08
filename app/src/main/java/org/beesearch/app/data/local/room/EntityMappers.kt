@@ -30,6 +30,7 @@ internal fun ObserverEntity.toDomain(): Observer = Observer(
 )
 
 internal fun ObservationPointEntity.toDomain(): ObservationPoint = ObservationPoint(
+    observationDate = observationDate,
     id = id,
     territoryId = territoryId,
     observerId = observerId,

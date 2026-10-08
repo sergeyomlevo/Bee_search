@@ -59,6 +59,7 @@ class CreateObservationPointTest {
 
         private fun NewObservationPoint.toObservationPoint(): ObservationPoint {
             return ObservationPoint(
+                observationDate = java.time.LocalDate.of(1970, 1, 1),
                 id = UUID.randomUUID(), territoryId = territoryId, observerId = observerId,
                 observationYear = 2026, pointNumber = 1, beePresenceResult = null, code = null,
                 latitude = latitude, longitude = longitude, gpsLatitude = null,

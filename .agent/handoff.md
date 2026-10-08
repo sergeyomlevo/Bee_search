@@ -1,6 +1,42 @@
 # Bee Search handoff
 
-## Current continuation — Map overlay architecture accepted (2026-10-08)
+## Current continuation — Temporal I1 implemented, pending owner commit review (2026-10-08)
+
+Working tree on HEAD/origin `0686e09124434bd7eaef1f6482d5206d319d662c`: Room v12 adds REQUIRED
+ObservationPoint `observation_date` as ISO LocalDate. Migration 11→12 reconstructs legacy dates once
+from created_at/systemDefault, preserving old columns, numbering and relationships. Creation derives
+observationYear from canonical date; correction API supports same-year preservation and transactional
+cross-year MAX+1 renumbering. Correction has no UI/ViewModel/use-case caller; NewObservationPoint
+has no explicit date override.
+
+Shared legacy reconstruction adapts Complete Backup V1–V6, Snapshot V1 and export reader constructors.
+Complete Backup V6 / Snapshot V1 / export wire inventories and versions remain unchanged; PC verifier
+unchanged.
+
+Owner ratified REQUIRED ObservationPoint legacy reconstruction. V6/Snapshot V1 writers now reject
+unrepresentable canonical dates before artifact writing. Legacy archives still reconstruct in the
+materialization timezone: a different timezone near midnight can change the reconstructed date;
+this is an accepted legacy limitation, not fixed by the writer guard. Future versioned I3 formats
+MUST carry explicit canonical observationDate; reader MUST use that required field without derivation
+from createdAt and fail closed on missing/malformed values. No arbitrary extra-key extension of V1.
+
+These formats do not carry future corrected dates. **I3 + I4 MUST complete before I6 or any
+user-reachable explicit/corrected research-date path.** I2 is not started; next temporal increment is I2
+only after owner review of I1. No Dxxx was added or altered; no staging/commit/push performed.
+
+Final corrective verification: 755 JVM tests PASS (including 3 Snapshot guard tests);
+assembleDebug/assembleDebugAndroidTest/lintDebug gates recorded in ignored evidence.
+Samsung SM-S938B: 91 focused tests PASS (14 migration, 45 Room persistence, 28 BackupService,
+4 legacy compatibility/Backup guard). DEV update-in-place; corrective-pass pre/post fingerprints
+identical for database files, domain tables, DataStore/binding and fingerprinted map packages.
+Read-only `device-observation-dates.json` records UUID/created_at/stored/expected/equal for all
+five real DEV points: 5/5 equal=true at Europe/Moscow. Current installed I1 DEV APK matches build:
+lastUpdateTime 2026-10-08 12:53:50, SHA-256
+`B63BE6F2B86524A97DD5A6E375727B889B7D52CD0C586FCE3B6E78F4DDD6D8B8`.
+Ignored evidence: `app/build/reports/temporal-i1/`. Full future UI/device acceptance (I7) is not claimed.
+Pre-existing `.codex/agents/luna-verifier.toml` remains byte-identical and excluded from I1.
+
+## Historical continuation — Map overlay architecture accepted (2026-10-08)
 
 Owner accepted `docs/architecture.md` §73.3 as D102 after the initial Samsung DEV spike,
 targeted lifecycle closure and review. Both architecture-evidence checklist items are closed.

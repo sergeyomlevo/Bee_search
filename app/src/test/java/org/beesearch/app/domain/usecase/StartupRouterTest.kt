@@ -30,6 +30,7 @@ class StartupRouterTest {
 
     @Test fun `active observation recovery has priority over invalid selections`() {
         val activePoint = ObservationPoint(
+            observationDate = java.time.LocalDate.of(1970, 1, 1),
             id = UUID.randomUUID(),
             territoryId = territory.id,
             observerId = observer.id,

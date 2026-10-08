@@ -1604,6 +1604,7 @@ class BeeObservationScreenTest {
     }
 
     private fun point() = ObservationPoint(
+        observationDate = java.time.LocalDate.of(2026, 8, 28),
         id = pointId,
         territoryId = UUID.randomUUID(),
         observerId = UUID.randomUUID(),

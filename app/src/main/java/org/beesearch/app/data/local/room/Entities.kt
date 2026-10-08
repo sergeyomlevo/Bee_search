@@ -11,6 +11,7 @@ import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.WeatherStatus
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.domain.model.PhysicalObjectMediaType
+import java.time.LocalDate
 import java.time.Instant
 import java.util.UUID
 
@@ -215,6 +216,7 @@ internal data class ApiaryEntity(
     ],
 )
 internal data class ObservationPointEntity(
+    @ColumnInfo(name = "observation_date") val observationDate: LocalDate,
     @PrimaryKey val id: UUID,
     @ColumnInfo(name = "territory_id") val territoryId: UUID,
     @ColumnInfo(name = "observer_id") val observerId: UUID,

@@ -45,6 +45,7 @@ import org.beesearch.app.domain.model.ObservationPointAttachment
 import org.beesearch.app.domain.model.ObservationPointWeather
 import org.beesearch.app.domain.model.Observer
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.domain.model.legacyObservationDate
 
 /** Pure v1 ZIP encoder/decoder. It does not access Room, files, DataStore, or the network. */
 internal object ObservationPointExportCodec {
@@ -236,7 +237,7 @@ internal object ObservationPointExportCodec {
     }
 
     private fun JsonObject.toPoint() = ObservationPoint(
-        uuid("id"), uuid("territoryId"), uuid("observerId"), int("observationYear"), int("pointNumber"),
+        legacyObservationDate(instant("createdAt")), uuid("id"), uuid("territoryId"), uuid("observerId"), int("observationYear"), int("pointNumber"),
         nullableString("beePresenceResult")?.let { enum<BeePresenceResult>(it, "beePresenceResult") }, nullableString("code"),
         double("latitude"), double("longitude"), nullableDouble("gpsLatitude"), nullableDouble("gpsLongitude"), nullableDouble("gpsAccuracyM"),
         instant("createdAt"), nullableInstant("initialGroupReleaseAt"), nullableInstant("completedAt"), nullableString("description"),

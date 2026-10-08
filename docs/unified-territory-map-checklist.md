@@ -51,7 +51,8 @@
 
 Design APPROVED · 2026-10-03: `docs/temporal-data-model-design.md`. Закрыт design: schema-направление,
 migration policy и invariants. За пределами утверждённого minimal scope остаются future concerns —
-establishment-date precision, схема Inspection, late-entry/weather design. Implementation не начата.
+establishment-date precision, схема Inspection, late-entry/weather design. I1 реализован в working tree;
+I2–I7 не начаты, owner review I1 diff остаётся pending.
 
 ## Overlay architecture evidence
 
@@ -63,11 +64,15 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 [D102](decisions.md#d102--map-overlay-rendering-split-и-lifecycle-safety).
 [Durable evidence summary](map-overlay-lifecycle-evidence.md). Implementation и её device verification
 остаются OPEN. Следующий отдельный production stage — temporal data model по утверждённому
-`docs/temporal-data-model-design.md`; не начат.
+`docs/temporal-data-model-design.md`; текущий I1 slice указан ниже.
 
 ## Implementation
 
 - [ ] Implement required Room/data-model/migration changes.
+      I1 ObservationPoint slice реализован в working tree (2026-10-08): Room v12, canonical date,
+      atomic correction API без user caller, legacy reader adaptation; 752 JVM / 91 Samsung tests PASS.
+      Owner diff review pending; I2 physical-object fixation date остаётся OPEN. I3 + I4 обязательны
+      до I6 или любого user-reachable explicit/corrected research-date path.
 - [ ] Implement Layers/Filters from the approved UI spec.
 - [ ] Implement MapLibre runtime overlay registry/restoration where required.
 - [ ] Connect Compose research markers to common layer/date filtering.

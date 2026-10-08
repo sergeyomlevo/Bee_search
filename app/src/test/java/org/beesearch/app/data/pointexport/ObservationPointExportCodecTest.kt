@@ -208,7 +208,7 @@ class ObservationPointExportCodecTest {
         }
         return Fixture(
             ObservationPointExportGraph(
-                point = ObservationPoint(pointId, territoryId, observerId, 2026, 16, BeePresenceResult.BEES_FOUND, "P-16", 56.1, 43.2, 56.1001, 43.2001, 3.5, Instant.parse("2026-09-20T10:00:00Z"), Instant.parse("2026-09-20T10:01:00Z"), Instant.parse("2026-09-20T11:00:00Z"), "Описание точки"),
+                point = ObservationPoint(java.time.LocalDate.of(2026, 9, 20), pointId, territoryId, observerId, 2026, 16, BeePresenceResult.BEES_FOUND, "P-16", 56.1, 43.2, 56.1001, 43.2001, 3.5, Instant.parse("2026-09-20T10:00:00Z"), Instant.parse("2026-09-20T10:01:00Z"), Instant.parse("2026-09-20T11:00:00Z"), "Описание точки"),
                 territory = Territory(territoryId, "DEV-BENCH2", "Тестовая территория", "Нижегородская область", "Бор", Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z")),
                 observer = Observer(observerId, "O1", "Иванов", "Иван", "Иванович", null, Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z")),
                 weather = ObservationPointWeather(pointId, WeatherStatus.LOADED, 18.4, 2.1, 247.0, Instant.parse("2026-09-20T10:00:00Z"), Instant.parse("2026-09-20T10:05:00Z"), "Open-Meteo"),

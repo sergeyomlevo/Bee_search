@@ -289,6 +289,7 @@ class RoomPhysicalObjectRepositoryTest {
         database.backupDao().insertObservationPoints(
             listOf(
                 ObservationPointEntity(
+                    java.time.LocalDate.of(2026, 9, 22),
                     pointId, territory1, observerId, 2026, 1, BeePresenceResult.BEES_FOUND,
                     null, 56.0, 42.0, null, null, null, NOW, NOW, null,
                 ),

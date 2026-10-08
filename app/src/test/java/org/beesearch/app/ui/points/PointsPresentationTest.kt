@@ -142,6 +142,7 @@ class PointsPresentationTest {
         number: Int,
         territoryId: UUID = devTerritory,
     ) = ObservationPointSummary(
+        observationDate = java.time.LocalDate.of(year, 1, 1),
         id = UUID.randomUUID(),
         territoryId = territoryId,
         observationYear = year,

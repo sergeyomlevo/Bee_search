@@ -2,6 +2,7 @@ package org.beesearch.app.data.local.room
 
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import org.beesearch.app.domain.model.legacyObservationDate
 import java.time.Instant
 import java.time.ZoneId
 
@@ -475,6 +476,42 @@ internal val MIGRATION_10_11 = object : Migration(10, 11) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE hollows ADD COLUMN name TEXT")
         db.execSQL("ALTER TABLE log_hives ADD COLUMN name TEXT")
+    }
+}
+
+
+/** Adds the canonical date without a default. Child snapshots keep RESTRICT FKs valid while
+ * rebuilding the parent inside Room's migration transaction; no persistent row is lost.
+ */
+internal val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        check(db.inTransaction()) { "Date migration requires an atomic migration transaction" }
+        val children = listOf("flight_cycles", "bees", "observation_point_attachments", "observation_point_weather")
+        children.forEach { table ->
+            db.execSQL("CREATE TEMP TABLE temporal_copy_$table AS SELECT * FROM $table")
+            db.execSQL("DELETE FROM $table")
+        }
+        db.execSQL("CREATE TABLE IF NOT EXISTS `observation_points_v12` (`observation_date` TEXT NOT NULL, `id` TEXT NOT NULL, `territory_id` TEXT NOT NULL, `observer_id` TEXT NOT NULL, `observation_year` INTEGER NOT NULL DEFAULT 0, `point_number` INTEGER NOT NULL DEFAULT 0, `bee_presence_result` TEXT, `code` TEXT, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `gps_latitude` REAL, `gps_longitude` REAL, `gps_accuracy_m` REAL, `created_at` INTEGER NOT NULL, `initial_group_release_at` INTEGER, `completed_at` INTEGER, `description` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`territory_id`) REFERENCES `territories`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`observer_id`) REFERENCES `observers`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )")
+        val zone = ZoneId.systemDefault()
+        db.query("SELECT id, created_at FROM observation_points").use { cursor ->
+            while (cursor.moveToNext()) {
+                val date = legacyObservationDate(Instant.ofEpochMilli(cursor.getLong(1)), zone)
+                db.execSQL(
+                    "INSERT INTO observation_points_v12 (observation_date, `id`, `territory_id`, `observer_id`, `observation_year`, `point_number`, `bee_presence_result`, `code`, `latitude`, `longitude`, `gps_latitude`, `gps_longitude`, `gps_accuracy_m`, `created_at`, `initial_group_release_at`, `completed_at`, `description`) SELECT ?, `id`, `territory_id`, `observer_id`, `observation_year`, `point_number`, `bee_presence_result`, `code`, `latitude`, `longitude`, `gps_latitude`, `gps_longitude`, `gps_accuracy_m`, `created_at`, `initial_group_release_at`, `completed_at`, `description` FROM observation_points WHERE id = ?",
+                    arrayOf<Any>(date.toString(), cursor.getString(0)),
+                )
+            }
+        }
+        db.execSQL("DROP TABLE observation_points")
+        db.execSQL("ALTER TABLE observation_points_v12 RENAME TO observation_points")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_observation_points_territory_id` ON `observation_points` (`territory_id`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_observation_points_observer_id` ON `observation_points` (`observer_id`)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_observation_points_territory_id_observation_year_observer_id_point_number` ON `observation_points` (`territory_id`, `observation_year`, `observer_id`, `point_number`)")
+        children.asReversed().forEach { table ->
+            db.execSQL("INSERT INTO $table SELECT * FROM temporal_copy_$table")
+            db.execSQL("DROP TABLE temporal_copy_$table")
+        }
+        db.query("PRAGMA foreign_key_check").use { check(!it.moveToFirst()) { "Foreign keys changed during date migration" } }
     }
 }
 

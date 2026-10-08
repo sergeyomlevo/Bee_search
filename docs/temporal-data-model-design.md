@@ -3,7 +3,8 @@
 Статус: APPROVED · 2026-10-03
 
 Утверждён владельцем как design research dates: schema-направление, migration policy и invariants
-ниже. Документ описывает утверждённый design, а не реализованный код: implementation не начата.
+ниже. I1 реализуется отдельным increment в working tree и проходит verification; I2–I7 не начаты.
+Документ остаётся нормативным design, а не заявлением о завершении всех increments.
 
 Ревизия после owner review: внесены два owner decisions — legacy Hollow/LogHive/Apiary получают
 `fixation_date = NULL` без backfill (§11.2) и исправление `observation_date` через границу года
@@ -26,8 +27,9 @@ migration assumption (не математическая гарантия). До�
 каждого research-data type по его canonical research date — и чтобы `created_at` не приходилось
 использовать как суррогат исследовательской даты.
 
-Документ ничего не реализует: Room schema, migrations, Kotlin, UI и Help не меняются. Никаких новых
-`Dxxx` здесь не создаётся.
+Первоначальное утверждение этого design не меняло Room/Kotlin/UI. Текущий I1 меняет только
+ObservationPoint persistence/domain и legacy materialization; UI/Help остаются без изменений.
+Новых `Dxxx` здесь не создаётся.
 
 ## 1. Scope / non-scope
 
@@ -450,6 +452,26 @@ observation_date = source of truth для research calendar date точки
 created_at       = database creation time (техническое время, как и было)
 ```
 
+Owner-ratified execution clarification · 2026-10-08: то же единое legacy reconstruction rule применяется
+при materialization Complete Backup V1–V6 и Snapshot V1, где ObservationPoint observationDate
+исторически отсутствовала: LocalDate один раз выводится из persisted createdAt по прежней local
+calendar convention. Для ObservationPoint результат всегда non-null; после materialization это
+canonical date. Это не general fallback для будущих formats, обязанных переносить explicit date.
+
+Accepted legacy archive limitation: архив без observationDate реконструирует дату в legacy
+local-calendar convention timezone при materialization. При чтении в другом timezone около
+границы суток результат теоретически может отличаться. Это compatibility limitation старого
+format, а не новая canonical semantics. V6/Snapshot V1 writers fail closed, если canonical date
+не равна legacy derivation createdAt в текущем timezone; guard не устраняет timezone limitation
+последующего чтения архива.
+
+I3 acceptance criterion для **versioned future format**: writer переносит explicit canonical
+observationDate; reader использует это required поле, не пересчитывая его из createdAt;
+malformed/missing required field → fail closed. Legacy derivation разрешена только для historical
+formats без поля и только при one-time materialization. Это не правило «extra key wins» для
+legacy format: Snapshot V1 остаётся closed schema без несанкционированного расширения.
+
+
 Ни `created_at`, ни момент миграции не становятся исследовательской датой сами по себе: миграция лишь
 переносит в новое поле то, что текущий workflow уже использовал как дату наблюдения. Тот же rationale
 **не распространяется** на Hollow / LogHive / Apiary — там эквивалентного evidence нет (§11.2).
@@ -715,9 +737,12 @@ Backup — другая система, чем export: полный архив r
 
 Следствия для нового поля:
 
-- достаточно добавить ключ в запись коллекции и читать его как **опциональный**: старый архив (ключа
-  нет) восстанавливается с `NULL`/«неизвестно», новый архив читается старым приложением с
-  игнорированием ключа;
+- legacy physical-object fixation date без ключа восстанавливается с `NULL`/«неизвестно».
+  ObservationPoint — отдельное REQUIRED правило: старые representations без observationDate
+  materialize с legacy reconstruction из persisted createdAt (§11.1), не с NULL. В I1 writers
+  остаются прежними; explicit date carriage и compatibility будущих formats относятся к I3.
+  Возможность добавлять optional keys в Complete Backup не распространяется на frozen closed
+  Snapshot V1: его wire evolution требует отдельного I3 решения;
 - поднимать `collectionSchemaVersion` **не требуется** (и это важно: значение ≠ 1 сейчас фатально,
   `BackupCore.kt:453`); поднимать `backupFormatVersion` тоже не требуется, поскольку запись
   становится шире, а не другой;
@@ -942,6 +967,14 @@ I6  UI integration: период в «Данные на карте» + ввод 
     (по утверждённой UI specification)                  ← зависит от I5
 I7  Device verification: Samsung, офлайн, смена пояса, границы месяца/года ← последний
 ```
+
+Owner execution clarification · 2026-10-08: I1 остаётся самостоятельным increment; correction API
+реализуется и тестируется без user-facing caller. Normal creation не принимает explicit date.
+**I3 Backup/Snapshot carriage + I4 Export carriage MUST complete before I6 или любым другим
+user-reachable explicit/corrected research-date path**, способным создать дату, отличающуюся от
+legacy local date(createdAt). До этого запрещены UI/ViewModel/use-case/import/deep-link callers
+correction и explicit late-entry creation. I1 legacy reader adaptation лишь materialize REQUIRED
+entity; не реализует I3/I4 wire carriage. Physical-object legacy NULL policy не меняется.
 
 Weather и late-entry-время в increments **не входят**: это отдельный future
 late-entry/weather design concern (§12, §24), который должен планироваться собственной задачей и не

@@ -11,6 +11,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Instant
+import java.time.ZoneId
 import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
@@ -764,6 +765,140 @@ class BeeSearchMigrationTest {
             assertEquals(15, cursor.getInt(0))
         }
         migrated.close()
+    }
+
+    @Test
+    fun migrationFromElevenToTwelveBackfillsObservationDateAndPreservesResearchGraph() {
+        val databaseName = "$DATABASE_NAME-11-12-observation-date"
+        val territoryId = UUID.randomUUID().toString()
+        val observerId = UUID.randomUUID().toString()
+        val pointId = UUID.randomUUID().toString()
+        val beeId = UUID.randomUUID().toString()
+        val cycleId = UUID.randomUUID().toString()
+        val attachmentId = UUID.randomUUID().toString()
+        val objectId = UUID.randomUUID().toString()
+        val createdAt = Instant.parse("2026-09-27T12:34:56Z").toEpochMilli()
+        val beforeRows = linkedMapOf<String, List<List<String?>>>()
+
+        migrationHelper.createDatabase(databaseName, 11).apply {
+            execSQL("INSERT INTO territories VALUES (?, 'TA', 'Territory', 'R', 'D', ?, ?)", arrayOf<Any>(territoryId, createdAt, createdAt))
+            execSQL("INSERT INTO observers VALUES (?, 'OBS', 'Last', 'First', NULL, NULL, ?, ?)", arrayOf<Any>(observerId, createdAt, createdAt))
+            execSQL(
+                """
+                INSERT INTO observation_points (
+                    id, territory_id, observer_id, observation_year, point_number,
+                    bee_presence_result, code, latitude, longitude, gps_latitude,
+                    gps_longitude, gps_accuracy_m, created_at, initial_group_release_at,
+                    completed_at, description
+                ) VALUES (?, ?, ?, 2026, 7, 'BEES_FOUND', 'P7', 56.1, 42.7,
+                    56.11, 42.71, 4.0, ?, ?, ?, 'migration fixture')
+                """.trimIndent(),
+                arrayOf<Any?>(pointId, territoryId, observerId, createdAt, createdAt - 10_000, createdAt + 60_000),
+            )
+            execSQL("INSERT INTO physical_objects VALUES (?, ?, 'HOLLOW', 7, 56.2, 42.8, ?, ?)", arrayOf<Any>(objectId, territoryId, createdAt, observerId))
+            execSQL("INSERT INTO bees VALUES (?, ?, 'WHITE', 'THORAX', ?, ?)", arrayOf<Any>(beeId, pointId, createdAt, objectId))
+            execSQL(
+                "INSERT INTO flight_cycles VALUES (?, ?, 1, ?, ?, 247.0, 1, 1, 1, ?, ?)",
+                arrayOf<Any>(cycleId, beeId, createdAt, createdAt + 30_000, createdAt, createdAt),
+            )
+            execSQL(
+                "INSERT INTO observation_point_attachments VALUES (?, ?, 'PHOTO', ?, 'bee.jpg', 'image/jpeg', 3, ?, ?)",
+                arrayOf<Any>(attachmentId, pointId, "observation-attachments/$pointId/$attachmentId", "0".repeat(64), createdAt),
+            )
+            execSQL(
+                "INSERT INTO observation_point_weather VALUES (?, 'LOADED', 18.0, 2.0, 247.0, ?, ?, 'Open-Meteo')",
+                arrayOf<Any>(pointId, createdAt, createdAt),
+            )
+            listOf(
+                "territories", "observers", "observation_points", "physical_objects", "bees",
+                "flight_cycles", "observation_point_attachments", "observation_point_weather",
+            ).forEach { table -> beforeRows[table] = snapshotRows(this, table) }
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(databaseName, 12, true, MIGRATION_11_12)
+        val expectedDate = Instant.ofEpochMilli(createdAt).atZone(ZoneId.systemDefault()).toLocalDate().toString()
+        migrated.query(
+            "SELECT observation_date, id, territory_id, observer_id, observation_year, point_number, created_at, initial_group_release_at, completed_at, description FROM observation_points WHERE id = ?",
+            arrayOf(pointId),
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(expectedDate, cursor.getString(0))
+            assertEquals(pointId, cursor.getString(1))
+            assertEquals(territoryId, cursor.getString(2))
+            assertEquals(observerId, cursor.getString(3))
+            assertEquals(2026, cursor.getInt(4))
+            assertEquals(7, cursor.getInt(5))
+            assertEquals(createdAt, cursor.getLong(6))
+            assertEquals(createdAt - 10_000, cursor.getLong(7))
+            assertEquals(createdAt + 60_000, cursor.getLong(8))
+            assertEquals("migration fixture", cursor.getString(9))
+        }
+        migrated.query("SELECT id FROM bees WHERE id = ? AND observation_point_id = ? AND source_object_id = ?", arrayOf(beeId, pointId, objectId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+        }
+        migrated.query("SELECT id FROM flight_cycles WHERE id = ? AND bee_id = ? AND departure_time = ? AND return_time = ?", arrayOf<Any>(cycleId, beeId, createdAt, createdAt + 30_000)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+        }
+        migrated.query("SELECT id FROM observation_point_attachments WHERE id = ? AND observation_point_id = ?", arrayOf(attachmentId, pointId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+        }
+        migrated.query("SELECT observation_point_id, status, sample_at, fetched_at FROM observation_point_weather WHERE observation_point_id = ?", arrayOf(pointId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("LOADED", cursor.getString(1))
+            assertEquals(createdAt, cursor.getLong(2))
+            assertEquals(createdAt, cursor.getLong(3))
+        }
+        migrated.query("SELECT id, object_type, sequence_number, created_at, creator_observer_id FROM physical_objects WHERE id = ?", arrayOf(objectId)).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(objectId, cursor.getString(0))
+            assertEquals("HOLLOW", cursor.getString(1))
+            assertEquals(7, cursor.getInt(2))
+            assertEquals(createdAt, cursor.getLong(3))
+            assertEquals(observerId, cursor.getString(4))
+        }
+        migrated.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
+        beforeRows.forEach { (table, expectedRows) ->
+            val actualRows = snapshotRows(migrated, table)
+            if (table == "observation_points") {
+                assertEquals(expectedRows, actualRows.map { it.drop(1) })
+            } else {
+                assertEquals(expectedRows, actualRows)
+            }
+        }
+        assertIndex(migrated, "observation_points", "index_observation_points_territory_id", false)
+        assertIndex(migrated, "observation_points", "index_observation_points_observer_id", false)
+        assertIndex(migrated, "observation_points", "index_observation_points_territory_id_observation_year_observer_id_point_number", true)
+        migrated.close()
+    }
+
+    private fun assertIndex(
+        db: androidx.sqlite.db.SupportSQLiteDatabase,
+        table: String,
+        expectedName: String,
+        expectedUnique: Boolean,
+    ) {
+        db.query("PRAGMA index_list(`$table`)").use { cursor ->
+            var found = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(1) == expectedName) {
+                    found = true
+                    assertEquals(if (expectedUnique) 1 else 0, cursor.getInt(2))
+                }
+            }
+            assertTrue("Missing index $expectedName", found)
+        }
+    }
+
+    private fun snapshotRows(
+        db: androidx.sqlite.db.SupportSQLiteDatabase,
+        table: String,
+    ): List<List<String?>> = db.query("SELECT * FROM `$table` ORDER BY 1").use { cursor ->
+        buildList {
+            while (cursor.moveToNext()) {
+                add(List(cursor.columnCount) { index -> if (cursor.isNull(index)) null else cursor.getString(index) })
+            }
+        }
     }
 
     private fun androidx.sqlite.db.SupportSQLiteDatabase.insertObject(
