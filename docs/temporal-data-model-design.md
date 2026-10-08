@@ -3,7 +3,8 @@
 Статус: APPROVED · 2026-10-03
 
 Утверждён владельцем как design research dates: schema-направление, migration policy и invariants
-ниже. I1 реализуется отдельным increment в working tree и проходит verification; I2–I7 не начаты.
+ниже. I1 committed как f4f5105; I2 implemented in worktree, verification status — в handoff.
+I3–I7 не начаты. **I2 NOT DEPLOYABLE until I3 + I4 carriage.**
 Документ остаётся нормативным design, а не заявлением о завершении всех increments.
 
 Ревизия после owner review: внесены два owner decisions — legacy Hollow/LogHive/Apiary получают
@@ -941,6 +942,14 @@ entity сейчас (§8); представление значения — ISO `
 ambiguity не вводится, поэтому отдельного вопроса нет).
 
 Новых вопросов ради сохранения раздела не добавляется. Документ утверждён 2026-10-03 (APPROVED).
+
+I2 execution gate · 2026-10-08: NEW Hollow/LogHive получают fixationDate при создании;
+LEGACY Hollow/LogHive/Apiary и технический createApiary сохраняют NULL. Legacy V6 Backup,
+Snapshot V1 и single/collection physical-object Export V1 отказывают до успешной публикации при
+любом serialized object с non-null fixationDate; это временная loss-prevention защита без wire
+carriage. **I2 APK нельзя устанавливать на рабочий Samsung до I3 + I4**: guard делает текущие
+backup/export paths недоступными для graphs с новыми dated objects. I3 должен переносить explicit
+canonical dates в versioned Backup/Snapshot; I4 — в versioned export, сохраняя legacy reader semantics.
 
 ## 23. Implementation sequence (design only)
 

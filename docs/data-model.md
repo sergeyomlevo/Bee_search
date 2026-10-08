@@ -1859,6 +1859,7 @@ sequence_number  Int       NOT NULL, >= 1, выделяется в scope Territo
 latitude         Double    фактические координаты объекта
 longitude        Double    фактические координаты объекта
 created_at       Instant
+fixation_date    LocalDate nullable, SQLite TEXT ISO YYYY-MM-DD; unknown = NULL
 creator_observer_id UUID nullable for historical foundation rows, FK → observers.id (RESTRICT)
 ```
 
@@ -1917,14 +1918,24 @@ Subtype-строки Дупла, Колоды и Пасеки собственн
 
 Исследовательская дата объекта — **дата фиксации**: когда исследователь зафиксировал объект в рамках
 исследования. Она независима от `created_at` и используется обычным фильтром карты по периоду
-(D094). В текущей schema отсутствуют:
+(D094). I2 / Room v13 хранит её в общей identity-таблице как `fixation_date TEXT NULL`,
+Kotlin `LocalDate?`, ISO YYYY-MM-DD, без DEFAULT/index и без timezone после сохранения.
+Новые Hollow/LogHive получают локальную календарную дату из того же единственного Instant,
+который сохраняется как createdAt; нумерация от даты не зависит. Все legacy Hollow/LogHive/Apiary
+после migration 12→13 имеют NULL без backfill. Технический createApiary также оставляет NULL.
+Subtype dates, date editor и explicit date creation override не добавлены.
 
-- дата фиксации объекта (`Hollow`, `LogHive`, `Apiary`);
+В текущей schema отсутствуют:
 - дата или год основания пасеки — характеристика реального объекта, отдельная от даты фиксации;
   может быть известна точно, только по году, приблизительно или неизвестна;
 - дата осмотра — временной факт самого Осмотра, а не объекта (D088, I009).
 
-Конкретные поля, identifiers и migration этим документом не определяются.
+Для establishment date и Inspection конкретные поля, identifiers и migration не определяются.
+
+I2 implemented in worktree; **NOT DEPLOYABLE until I3 + I4 carriage**. Legacy V6 Backup,
+Snapshot V1 и single/collection physical-object Export V1 fail closed при non-null fixationDate;
+legacy readers materialize NULL. Payload/version/layout не меняются. I3 должен переносить canonical
+research dates в Backup/Snapshot, I4 — в export. Промежуточный I2 APK на рабочий Samsung не ставится.
 
 ## Миграция и исторические rows
 

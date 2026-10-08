@@ -872,6 +872,179 @@ class BeeSearchMigrationTest {
         migrated.close()
     }
 
+    @Test
+    fun migrationFromTwelveToThirteenAddsNullableFixationDateAndPreservesPhysicalObjectGraph() {
+        val databaseName = "$DATABASE_NAME-12-13-fixation-date"
+        val territoryId = UUID.randomUUID().toString()
+        val observerId = UUID.randomUUID().toString()
+        val pointId = UUID.randomUUID().toString()
+        val hollowId = UUID.randomUUID().toString()
+        val logHiveId = UUID.randomUUID().toString()
+        val apiaryId = UUID.randomUUID().toString()
+        val beeId = UUID.randomUUID().toString()
+        val mediaId = UUID.randomUUID().toString()
+        val createdAt = Instant.parse("2026-08-27T12:34:56Z").toEpochMilli()
+        val graphTables = listOf(
+            "territories",
+            "observers",
+            "observation_points",
+            "physical_objects",
+            "hollows",
+            "log_hives",
+            "apiaries",
+            "physical_object_media",
+            "physical_object_sequences",
+            "bees",
+        )
+        val beforeRows = linkedMapOf<String, List<List<String?>>>()
+        val beforeIndexes = linkedMapOf<String, List<List<String?>>>()
+        val beforeForeignKeys = linkedMapOf<String, List<List<String?>>>()
+
+        migrationHelper.createDatabase(databaseName, 12).apply {
+            execSQL(
+                "INSERT INTO territories VALUES (?, 'TA', 'Territory', 'R', 'D', ?, ?)",
+                arrayOf<Any>(territoryId, createdAt, createdAt),
+            )
+            execSQL(
+                "INSERT INTO observers VALUES (?, 'OBS', 'Last', 'First', NULL, NULL, ?, ?)",
+                arrayOf<Any>(observerId, createdAt, createdAt),
+            )
+            execSQL(
+                """
+                INSERT INTO observation_points (
+                    id, territory_id, observer_id, observation_year, point_number,
+                    bee_presence_result, code, latitude, longitude, gps_latitude,
+                    gps_longitude, gps_accuracy_m, created_at, initial_group_release_at,
+                    completed_at, description, observation_date
+                ) VALUES (?, ?, ?, 2026, 1, 'BEES_FOUND', 'P1', 56.1, 42.7,
+                    56.11, 42.71, 4.0, ?, NULL, NULL, 'migration fixture', '2026-08-27')
+                """.trimIndent(),
+                arrayOf<Any>(pointId, territoryId, observerId, createdAt),
+            )
+            execSQL(
+                """
+                INSERT INTO physical_objects (
+                    id, territory_id, object_type, sequence_number, latitude, longitude,
+                    created_at, creator_observer_id
+                ) VALUES (?, ?, 'HOLLOW', 7, 56.2, 42.8, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any>(hollowId, territoryId, createdAt, observerId),
+            )
+            execSQL(
+                """
+                INSERT INTO physical_objects (
+                    id, territory_id, object_type, sequence_number, latitude, longitude,
+                    created_at, creator_observer_id
+                ) VALUES (?, ?, 'LOG_HIVE', 4, 56.3, 42.9, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any>(logHiveId, territoryId, createdAt + 1_000, observerId),
+            )
+            execSQL(
+                """
+                INSERT INTO physical_objects (
+                    id, territory_id, object_type, sequence_number, latitude, longitude,
+                    created_at, creator_observer_id
+                ) VALUES (?, ?, 'APIARY', 9, 56.4, 43.0, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any>(apiaryId, territoryId, createdAt + 2_000, observerId),
+            )
+            execSQL(
+                """
+                INSERT INTO hollows (
+                    physical_object_id, tree, entrance_height_cm, entrance_azimuth_deg,
+                    outer_diameter_cm, internal_diameter_cm, notes, name
+                ) VALUES (?, 'oak', 120.0, 90, 50.0, 30.0, 'old hollow', 'H-7')
+                """.trimIndent(),
+                arrayOf<Any>(hollowId),
+            )
+            execSQL(
+                """
+                INSERT INTO log_hives (
+                    physical_object_id, tree, entrance_height_cm, entrance_azimuth_deg,
+                    outer_diameter_cm, material, internal_diameter_cm, internal_height_cm,
+                    notes, name
+                ) VALUES (?, 'pine', 80.0, 180, 40.0, 'linden', 28.0, 90.0, 'old log hive', 'L-4')
+                """.trimIndent(),
+                arrayOf<Any>(logHiveId),
+            )
+            execSQL(
+                "INSERT INTO apiaries (physical_object_id, name) VALUES (?, 'Apiary A')",
+                arrayOf<Any>(apiaryId),
+            )
+            execSQL(
+                """
+                INSERT INTO physical_object_media (
+                    id, physical_object_id, media_type, relative_path, original_file_name,
+                    mime_type, byte_size, sha256, created_at
+                ) VALUES (?, ?, 'IMAGE', 'objects/hollow.jpg', 'hollow.jpg', 'image/jpeg', 3, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any>(mediaId, hollowId, "0".repeat(64), createdAt),
+            )
+            execSQL(
+                "INSERT INTO bees (id, observation_point_id, mark_color, mark_position, created_at, source_object_id) VALUES (?, ?, 'WHITE', 'THORAX', ?, ?)",
+                arrayOf<Any>(beeId, pointId, createdAt, hollowId),
+            )
+            execSQL(
+                "INSERT INTO physical_object_sequences VALUES (?, 'HOLLOW', 7)",
+                arrayOf<Any>(territoryId),
+            )
+            execSQL(
+                "INSERT INTO physical_object_sequences VALUES (?, 'LOG_HIVE', 4)",
+                arrayOf<Any>(territoryId),
+            )
+            execSQL(
+                "INSERT INTO physical_object_sequences VALUES (?, 'APIARY', 9)",
+                arrayOf<Any>(territoryId),
+            )
+            graphTables.forEach { table ->
+                beforeRows[table] = snapshotRows(this, table)
+                beforeIndexes[table] = pragmaRows(this, "PRAGMA index_list(`$table`)")
+                beforeForeignKeys[table] = pragmaRows(this, "PRAGMA foreign_key_list(`$table`)")
+            }
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(
+            databaseName,
+            13,
+            true,
+            MIGRATION_12_13,
+        )
+
+        migrated.query("PRAGMA table_info(physical_objects)").use { cursor ->
+            var fixationColumnFound = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(1) == "fixation_date") {
+                    fixationColumnFound = true
+                    assertEquals("TEXT", cursor.getString(2))
+                    assertEquals(0, cursor.getInt(3))
+                    assertTrue(cursor.isNull(4))
+                }
+            }
+            assertTrue("Missing fixation_date column", fixationColumnFound)
+        }
+        migrated.query("SELECT id, fixation_date FROM physical_objects ORDER BY id").use { cursor ->
+            var rowCount = 0
+            while (cursor.moveToNext()) {
+                assertTrue(cursor.isNull(1))
+                rowCount++
+            }
+            assertEquals(3, rowCount)
+        }
+        graphTables.forEach { table ->
+            val actualRows = snapshotRows(migrated, table)
+            if (table == "physical_objects") {
+                assertEquals(beforeRows.getValue(table), actualRows.map { it.dropLast(1) })
+            } else {
+                assertEquals(beforeRows.getValue(table), actualRows)
+            }
+            assertEquals(beforeIndexes.getValue(table), pragmaRows(migrated, "PRAGMA index_list(`$table`)"))
+            assertEquals(beforeForeignKeys.getValue(table), pragmaRows(migrated, "PRAGMA foreign_key_list(`$table`)"))
+        }
+        migrated.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
+        migrated.close()
+    }
+
     private fun assertIndex(
         db: androidx.sqlite.db.SupportSQLiteDatabase,
         table: String,
@@ -894,6 +1067,17 @@ class BeeSearchMigrationTest {
         db: androidx.sqlite.db.SupportSQLiteDatabase,
         table: String,
     ): List<List<String?>> = db.query("SELECT * FROM `$table` ORDER BY 1").use { cursor ->
+        buildList {
+            while (cursor.moveToNext()) {
+                add(List(cursor.columnCount) { index -> if (cursor.isNull(index)) null else cursor.getString(index) })
+            }
+        }
+    }
+
+    private fun pragmaRows(
+        db: androidx.sqlite.db.SupportSQLiteDatabase,
+        pragma: String,
+    ): List<List<String?>> = db.query(pragma).use { cursor ->
         buildList {
             while (cursor.moveToNext()) {
                 add(List(cursor.columnCount) { index -> if (cursor.isNull(index)) null else cursor.getString(index) })

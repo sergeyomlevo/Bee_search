@@ -77,6 +77,7 @@ internal data class PhysicalObjectEntity(
     val longitude: Double,
     @ColumnInfo(name = "created_at") val createdAt: Instant,
     @ColumnInfo(name = "creator_observer_id") val creatorObserverId: UUID? = null,
+    @ColumnInfo(name = "fixation_date") val fixationDate: LocalDate? = null,
 )
 
 /**

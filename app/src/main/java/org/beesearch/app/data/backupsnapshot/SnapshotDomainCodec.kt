@@ -14,6 +14,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.JsonNull
 import org.beesearch.app.data.backup.validateGraph
 import org.beesearch.app.data.backup.validateLegacyObservationDates
+import org.beesearch.app.data.backup.validateLegacyPhysicalObjectDates
 import org.beesearch.app.domain.backup.BackupDomainInvariantViolation
 import org.beesearch.app.data.backup.snapshotGraphFromRows
 import java.io.BufferedInputStream
@@ -50,7 +51,10 @@ internal object SnapshotDomainCodec {
 
     fun encode(graph: Graph, settings: PortableSettingsSnapshot): SnapshotDomainEntries {
         validateGraphForSnapshot(graph, settings)
-        try { validateLegacyObservationDates(graph) }
+        try {
+            validateLegacyObservationDates(graph)
+            validateLegacyPhysicalObjectDates(graph)
+        }
         catch (e: BackupDomainInvariantViolation) { logical(e.message ?: "legacy date not representable", e) }
         val records = snapshotRows(graph).toMutableMap()
         records["settings/map-coverage.jsonl"] = settings.coverage.entries.sortedBy { it.key.toString() }

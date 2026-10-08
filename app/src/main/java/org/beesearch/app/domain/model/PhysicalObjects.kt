@@ -1,6 +1,7 @@
 package org.beesearch.app.domain.model
 
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 enum class PhysicalObjectType(val designationPrefix: String) {
@@ -102,6 +103,7 @@ data class Hollow(
     val properties: HollowProperties?,
     val media: List<PhysicalObjectMedia> = emptyList(),
     val name: String? = null,
+    val fixationDate: LocalDate? = null,
 ) {
     val designation: String get() = PhysicalObjectType.HOLLOW.designation(sequenceNumber)
 }
@@ -117,6 +119,7 @@ data class LogHive(
     val properties: LogHiveProperties?,
     val media: List<PhysicalObjectMedia> = emptyList(),
     val name: String? = null,
+    val fixationDate: LocalDate? = null,
 ) {
     val designation: String get() = PhysicalObjectType.LOG_HIVE.designation(sequenceNumber)
 }
@@ -130,6 +133,7 @@ data class Apiary(
     val createdAt: Instant,
     val name: String?,
     val creatorObserverId: UUID? = null,
+    val fixationDate: LocalDate? = null,
 ) {
     val designation: String get() = PhysicalObjectType.APIARY.designation(sequenceNumber)
 }

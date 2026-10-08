@@ -3,6 +3,7 @@ package org.beesearch.app.data.objectexport
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
@@ -26,6 +27,19 @@ import org.junit.Test
  * the reader is about a file that claims this profile.
  */
 class PhysicalObjectExportCodecTest {
+    @Test
+    fun `legacy single export accepts null fixation date and refuses a non-null date before writing`() {
+        val fixture = fixture(PhysicalObjectType.HOLLOW)
+        val output = ByteArrayOutputStream()
+        PhysicalObjectExportCodec.encode(fixture.graph, fixture.blobs, output)
+        assertNull(PhysicalObjectExportCodec.decode(output.toByteArray().inputStream()).graph.fixationDate)
+
+        val divergent = fixture.graph.copy(fixationDate = LocalDate.parse("2026-09-21"))
+        val untouched = ByteArrayOutputStream().apply { write("existing".toByteArray()) }
+        assertInvalid { PhysicalObjectExportCodec.encode(divergent, fixture.blobs, untouched) }
+        assertArrayEquals("existing".toByteArray(), untouched.toByteArray())
+    }
+
     @Test
     fun `hollow round trip preserves the object its properties its media and its context`() {
         val fixture = fixture(PhysicalObjectType.HOLLOW)

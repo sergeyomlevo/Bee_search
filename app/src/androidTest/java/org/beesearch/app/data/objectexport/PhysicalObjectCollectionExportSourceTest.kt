@@ -79,6 +79,8 @@ class PhysicalObjectCollectionExportSourceTest {
         assertTrue(hollows.objects.all { it.type == PhysicalObjectType.HOLLOW && it.territoryId == TERRITORY_A })
         assertTrue(otherTerritory.id !in hollows.objects.map { it.id })
         assertEquals(listOf(logHive.id), logHives.objects.map { it.id })
+        assertTrue(hollows.objects.all { it.fixationDate == NOW.atZone(ZoneOffset.UTC).toLocalDate() })
+        assertTrue(logHives.objects.all { it.fixationDate == NOW.atZone(ZoneOffset.UTC).toLocalDate() })
         assertTrue(logHives.objects.none { it.id == a1.id || it.id == a2.id })
         assertEquals(setOf(OBSERVER_A, OBSERVER_B), hollows.objects.mapNotNull { it.creatorObserverId }.toSet())
 

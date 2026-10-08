@@ -3,6 +3,7 @@ package org.beesearch.app.data.objectexport
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -17,10 +18,31 @@ import org.beesearch.app.domain.model.PhysicalObjectMediaType
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PhysicalObjectCollectionExportCodecTest {
+    @Test
+    fun `legacy collection export accepts null fixation dates and refuses any non-null date before writing`() {
+        val graph = collection(PhysicalObjectType.HOLLOW, listOf(objectGraph(PhysicalObjectType.HOLLOW, 1)))
+        val blobs = blobs(graph)
+        val output = ByteArrayOutputStream()
+        PhysicalObjectCollectionExportCodec.encode(graph, blobs, output)
+        assertTrue(output.size() > 0)
+        assertNull(
+            PhysicalObjectCollectionExportCodec.decode(output.toByteArray().inputStream())
+                .graph.objects.single().fixationDate,
+        )
+
+        val divergent = collection(
+            PhysicalObjectType.HOLLOW,
+            listOf(graph.objects.single().copy(fixationDate = LocalDate.parse("2026-10-03"))),
+        )
+        val untouched = ByteArrayOutputStream().apply { write("existing".toByteArray()) }
+        assertEncodeInvalid(divergent, blobs(divergent), untouched)
+        assertArrayEquals("existing".toByteArray(), untouched.toByteArray())
+    }
     @Test
     fun `multiple hollows and log hives round trip`() {
         listOf(PhysicalObjectType.HOLLOW, PhysicalObjectType.LOG_HIVE).forEach { type ->
@@ -244,6 +266,16 @@ class PhysicalObjectCollectionExportCodecTest {
     private fun assertEncodeInvalid(graph: PhysicalObjectCollectionExportGraph) {
         var thrown: Throwable? = null
         try { encode(graph, blobs(graph)) } catch (error: Throwable) { thrown = error }
+        assertTrue("expected collection validation failure, got $thrown", thrown is PhysicalObjectExportException)
+    }
+
+    private fun assertEncodeInvalid(
+        graph: PhysicalObjectCollectionExportGraph,
+        mediaBytes: Map<UUID, ByteArray>,
+        output: ByteArrayOutputStream,
+    ) {
+        var thrown: Throwable? = null
+        try { PhysicalObjectCollectionExportCodec.encode(graph, mediaBytes, output) } catch (error: Throwable) { thrown = error }
         assertTrue("expected collection validation failure, got $thrown", thrown is PhysicalObjectExportException)
     }
 

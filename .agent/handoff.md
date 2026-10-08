@@ -1,6 +1,32 @@
 # Bee Search handoff
 
-## Current continuation — Temporal I1 implemented, pending owner commit review (2026-10-08)
+## Current continuation — Temporal I2 implemented in worktree, pending owner review (2026-10-08)
+
+Baseline HEAD/origin: `f4f51051b49a357237a7f95e7d581d175e87adcf` (I1 committed).
+Room v13 adds nullable ISO LocalDate `physical_objects.fixation_date`; migration 12→13 leaves
+every legacy Hollow/LogHive/Apiary NULL and preserves existing columns, relationships and numbering.
+New Hollow/LogHive derive fixationDate from the same single clock Instant as createdAt, using the
+local device zone (injectable in tests). Technical createApiary continues to store NULL.
+No explicit date input, correction API, date UI, date index or temporal queries were added.
+
+**I2 implemented in worktree. NOT DEPLOYABLE until I3 + I4 carriage.** Do not install the intermediate
+APK on the working Samsung: new Hollow/LogHive dates cannot be carried by current legacy formats.
+Complete Backup V6, Snapshot V1, single and collection Physical Object Export V1 now fail closed
+before publication when a serialized physical object has non-null fixationDate. Legacy NULL graphs
+remain representable; readers materialize NULL without deriving from createdAt. Wire fields,
+versions, layouts, manifests and PC verifier remain unchanged. Existing I1 date guards remain.
+I3 must carry canonical dates in versioned Backup/Snapshot formats; I4 must carry them in exports.
+Both remain mandatory before deployment/exposure; neither increment has been implemented here.
+
+Verification: 760/760 JVM tests PASS; assembleDebug, assembleDebugAndroidTest and lintDebug PASS.
+New migration, persistence/creation, repository-export-source and BackupService instrumentation
+tests compile, but execution is **PENDING**: isolated emulator shell times out. No I2 APK was installed
+on Samsung; Samsung DEV data/settings/maps and Stable/Beta were not touched. Host SQLite/schema
+comparison is supplementary evidence, not Android Room migration validation.
+Ignored evidence: `app/build/reports/temporal-i2/`. I7 acceptance is not claimed.
+No staging/commit/push; unrelated `.codex/agents/luna-verifier.toml` remains byte-identical.
+
+## Historical continuation — Temporal I1 verification before commit (subsequently committed as f4f5105)
 
 Working tree on HEAD/origin `0686e09124434bd7eaef1f6482d5206d319d662c`: Room v12 adds REQUIRED
 ObservationPoint `observation_date` as ISO LocalDate. Migration 11→12 reconstructs legacy dates once

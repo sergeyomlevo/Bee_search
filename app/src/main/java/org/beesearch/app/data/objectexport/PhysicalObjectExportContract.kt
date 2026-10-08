@@ -1,6 +1,7 @@
 package org.beesearch.app.data.objectexport
 
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import org.beesearch.app.domain.model.HollowProperties
 import org.beesearch.app.domain.model.LogHiveProperties
@@ -97,6 +98,8 @@ internal data class PhysicalObjectExportGraph(
     val media: List<PhysicalObjectMedia>,
     val territory: TerritoryExportSnapshot,
     val observer: ObserverExportSnapshot?,
+    /** I2 canonical date; V1 payloads deliberately cannot carry non-null values. */
+    val fixationDate: LocalDate? = null,
 )
 
 internal data class DecodedPhysicalObjectExport(

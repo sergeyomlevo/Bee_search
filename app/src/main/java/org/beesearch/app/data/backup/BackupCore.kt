@@ -110,6 +110,7 @@ internal class BackupService(
         val graph = database.withTransaction { database.backupDao().snapshot() }
         validateGraph(graph)
         validateLegacyObservationDates(graph)
+        validateLegacyPhysicalObjectDates(graph)
         val portable = settings.snapshot()
         validateSettings(portable, graph)
         val blobs = blobsV6(graph, portable, attachmentStore, objectMediaStore)
@@ -606,6 +607,12 @@ private fun validateObjectMedia(graph: Graph, blobs: Map<String, Blob>) {
     blobs.keys.filter { it.startsWith("object-media-file:") }.forEach { if (it !in ids.map { id -> "object-media-file:$id" }) throw MalformedBackup("unlisted object media file") }
 }
 
+internal fun validateLegacyPhysicalObjectDates(graph: Graph) {
+    graph.physicalObjects.firstOrNull { it.fixationDate != null }?.let {
+        throw BackupDomainInvariantViolation("PhysicalObject ${it.id}: fixationDate is not representable in legacy format")
+    }
+}
+
 internal fun validateLegacyObservationDates(graph: Graph) {
     val zone = ZoneId.systemDefault()
     graph.points.forEach { point ->
@@ -730,8 +737,8 @@ internal fun validateGraph(g: Graph, globalIdentityUniqueness: Boolean = true) {
 
 private fun territory(o: JsonObject) = TerritoryEntity(o.uuid("id"), o.string("code"), o.string("name"), o.string("region"), o.string("district"), o.instant("createdAt"), o.instant("updatedAt"))
 private fun observer(o: JsonObject) = ObserverEntity(o.uuid("id"), o.string("code"), o.string("lastName"), o.string("firstName"), o.optionalString("middleName"), o.optionalString("contact"), o.instant("createdAt"), o.instant("updatedAt"))
-private fun physicalObject(o: JsonObject) = PhysicalObjectEntity(o.uuid("id"), o.uuid("territoryId"), o.enum("objectType"), o.int("sequenceNumber"), o.double("latitude"), o.double("longitude"), o.instant("createdAt"))
-private fun physicalObjectV4(o: JsonObject) = PhysicalObjectEntity(o.uuid("id"), o.uuid("territoryId"), o.enum("objectType"), o.int("sequenceNumber"), o.double("latitude"), o.double("longitude"), o.instant("createdAt"), o.optionalUuid("creatorObserverId"))
+private fun physicalObject(o: JsonObject) = PhysicalObjectEntity(o.uuid("id"), o.uuid("territoryId"), o.enum("objectType"), o.int("sequenceNumber"), o.double("latitude"), o.double("longitude"), o.instant("createdAt"), fixationDate = null)
+private fun physicalObjectV4(o: JsonObject) = PhysicalObjectEntity(o.uuid("id"), o.uuid("territoryId"), o.enum("objectType"), o.int("sequenceNumber"), o.double("latitude"), o.double("longitude"), o.instant("createdAt"), o.optionalUuid("creatorObserverId"), fixationDate = null)
 private fun nullablePositive(o: JsonObject, name: String): Double? = o.optionalDouble(name)
 private fun hollow(o: JsonObject, hasName: Boolean) = HollowEntity(o.uuid("physicalObjectId"), o.optionalString("tree"), nullablePositive(o, "entranceHeightCm"), o.field("entranceAzimuthDeg").let { if (it is JsonNull) null else o.int("entranceAzimuthDeg") }, nullablePositive(o, "outerDiameterCm"), nullablePositive(o, "internalDiameterCm"), o.optionalString("notes"), if (hasName) o.optionalString("name") else null)
 private fun logHive(o: JsonObject, hasName: Boolean) = LogHiveEntity(o.uuid("physicalObjectId"), o.optionalString("tree"), nullablePositive(o, "entranceHeightCm"), o.field("entranceAzimuthDeg").let { if (it is JsonNull) null else o.int("entranceAzimuthDeg") }, nullablePositive(o, "outerDiameterCm"), o.optionalString("material"), nullablePositive(o, "internalDiameterCm"), nullablePositive(o, "internalHeightCm"), o.optionalString("notes"), if (hasName) o.optionalString("name") else null)

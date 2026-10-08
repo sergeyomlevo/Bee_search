@@ -18,6 +18,11 @@ internal object PhysicalObjectExportValidator {
 
     fun validate(graph: PhysicalObjectExportGraph, mediaBytes: Map<UUID, ByteArray>) {
         validateSupportedType(graph.type)
+        if (graph.fixationDate != null) {
+            throw InvalidPhysicalObjectExport(
+                "legacy physical-object export cannot represent fixationDate",
+            )
+        }
         validateProperties(graph)
         if (graph.territoryId != graph.territory.id) invalid("territory context mismatch")
         if (graph.creatorObserverId == null) {

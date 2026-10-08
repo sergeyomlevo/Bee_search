@@ -515,6 +515,13 @@ internal val MIGRATION_11_12 = object : Migration(11, 12) {
     }
 }
 
+internal val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE physical_objects ADD COLUMN fixation_date TEXT")
+        db.query("PRAGMA foreign_key_check").use { check(!it.moveToFirst()) { "Foreign keys changed during fixation date migration" } }
+    }
+}
+
 private data class LegacyObservationPoint(
     val id: String,
     val territoryId: String,

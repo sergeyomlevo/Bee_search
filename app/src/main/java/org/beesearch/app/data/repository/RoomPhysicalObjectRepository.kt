@@ -32,6 +32,7 @@ import org.beesearch.app.domain.model.TerritoryPhysicalObjects
 import org.beesearch.app.domain.repository.PhysicalObjectDeletion
 import org.beesearch.app.domain.repository.PhysicalObjectRepository
 import java.time.Clock
+import java.time.ZoneId
 import java.util.UUID
 
 internal class RoomPhysicalObjectRepository(
@@ -42,6 +43,7 @@ internal class RoomPhysicalObjectRepository(
     private val observerDao: ObserverDao,
     private val beeDao: BeeDao,
     private val clock: Clock,
+    private val fixationZoneIdProvider: () -> ZoneId = { ZoneId.systemDefault() },
 ) : PhysicalObjectRepository {
 
     override suspend fun createHollow(value: NewHollow): Hollow = database.withTransaction {
@@ -288,6 +290,7 @@ internal class RoomPhysicalObjectRepository(
         }
         require(latitude.isFinite() && latitude in -90.0..90.0) { "Latitude is out of range" }
         require(longitude.isFinite() && longitude in -180.0..180.0) { "Longitude is out of range" }
+        val createdAt = clock.instant()
         return PhysicalObjectEntity(
             id = id,
             territoryId = territoryId,
@@ -295,7 +298,8 @@ internal class RoomPhysicalObjectRepository(
             sequenceNumber = allocateSequenceNumber(territoryId, type),
             latitude = latitude,
             longitude = longitude,
-            createdAt = clock.instant(),
+            createdAt = createdAt,
+            fixationDate = if (type == PhysicalObjectType.APIARY) null else createdAt.atZone(fixationZoneIdProvider()).toLocalDate(),
             creatorObserverId = creatorObserverId,
         )
     }
@@ -381,12 +385,12 @@ private fun LogHiveEntity.toProperties(): LogHiveProperties? {
 }
 
 private fun PhysicalObjectEntity.toHollow(subtype: HollowEntity, media: List<PhysicalObjectMedia>) =
-    Hollow(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media, subtype.name)
+    Hollow(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media, subtype.name, fixationDate)
 
 private fun PhysicalObjectEntity.toLogHive(subtype: LogHiveEntity, media: List<PhysicalObjectMedia>) =
-    LogHive(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media, subtype.name)
+    LogHive(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media, subtype.name, fixationDate)
 
 private fun PhysicalObjectEntity.toApiary(subtype: ApiaryEntity) =
-    Apiary(id, territoryId, sequenceNumber, latitude, longitude, createdAt, subtype.name, creatorObserverId)
+    Apiary(id, territoryId, sequenceNumber, latitude, longitude, createdAt, subtype.name, creatorObserverId, fixationDate)
 
 private fun normalizeName(value: String?): String? = value?.trim()?.ifEmpty { null }
