@@ -39,30 +39,22 @@ internal class PhysicalObjectMediaFileStore(
         mimeType: String?,
         createdAt: Instant,
         source: () -> InputStream,
-    ): StagedPhysicalObjectMedia = withContext(Dispatchers.IO) {
+    ): StagedPhysicalObjectMedia {
         val relativePath = draftRelativePath(draftSessionId, mediaId)
-        val destination = requireDraftFile(relativePath)
+        val destination = withContext(Dispatchers.IO) { requireDraftFile(relativePath) }
         val partial = File(destination.parentFile, "${destination.name}.part")
-        destination.parentFile?.mkdirs()
-        try {
-            val stored = writeValidated(partial, source)
-            if (destination.exists() || !partial.renameTo(destination)) {
-                throw AttachmentStorageException("Не удалось подготовить медиа")
-            }
-            StagedPhysicalObjectMedia(
-                id = mediaId,
-                draftSessionId = draftSessionId,
-                type = type,
-                relativePath = relativePath,
-                originalFileName = originalFileName,
-                mimeType = mimeType,
-                byteSize = stored.byteSize,
-                sha256 = stored.sha256,
-                createdAt = createdAt,
-            )
-        } finally {
-            partial.delete()
-        }
+        val stored = writeAndPublishMediaFile(partial, destination, source, "Не удалось подготовить медиа")
+        return StagedPhysicalObjectMedia(
+            id = mediaId,
+            draftSessionId = draftSessionId,
+            type = type,
+            relativePath = relativePath,
+            originalFileName = originalFileName,
+            mimeType = mimeType,
+            byteSize = stored.byteSize,
+            sha256 = stored.sha256,
+            createdAt = createdAt,
+        )
     }
 
     fun resolveDraft(relativePath: String): File = requireDraftFile(relativePath)
@@ -127,21 +119,14 @@ internal class PhysicalObjectMediaFileStore(
         physicalObjectId: UUID,
         mediaId: UUID,
         source: () -> InputStream,
-    ): StoredAttachmentFile = withContext(Dispatchers.IO) {
+    ): StoredAttachmentFile {
         val finalPath = relativePath(physicalObjectId, mediaId)
-        val destination = requireManagedFile(finalPath)
+        val destination = withContext(Dispatchers.IO) { requireManagedFile(finalPath) }
         val partial = File(stagingRoot, "import-$mediaId.part")
-        partial.parentFile?.mkdirs()
-        destination.parentFile?.mkdirs()
-        try {
-            val stored = writeValidated(partial, source)
-            if (destination.exists() || !partial.renameTo(destination)) {
-                throw AttachmentStorageException("Не удалось восстановить медиа объекта")
-            }
-            StoredAttachmentFile(finalPath, stored.byteSize, stored.sha256)
-        } finally {
-            partial.delete()
-        }
+        val stored = writeAndPublishMediaFile(
+            partial, destination, source, "Не удалось восстановить медиа объекта",
+        )
+        return stored.copy(relativePath = finalPath)
     }
 
     fun resolve(relativePath: String): File = requireManagedFile(relativePath)
@@ -172,27 +157,6 @@ internal class PhysicalObjectMediaFileStore(
         it.parentFile?.mkdirs()
     }
 
-    private fun writeValidated(target: File, source: () -> InputStream): StoredAttachmentFile {
-        val digest = MessageDigest.getInstance("SHA-256")
-        var size = 0L
-        source().use { input ->
-            target.outputStream().buffered().use { output ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    if (read == 0) continue
-                    size += read
-                    if (size > MAX_MEDIA_BYTES) throw PhysicalObjectMediaTooLargeException(MAX_MEDIA_BYTES)
-                    digest.update(buffer, 0, read)
-                    output.write(buffer, 0, read)
-                }
-            }
-        }
-        if (size == 0L) throw EmptyAttachmentException()
-        return StoredAttachmentFile(target.name, size, digest.digest().toHexString())
-    }
-
     private fun requireDraftFile(relativePath: String): File = requireSafeFile(
         root = draftRoot,
         base = requireNotNull(draftRoot.parentFile),
@@ -214,7 +178,6 @@ internal class PhysicalObjectMediaFileStore(
     internal companion object {
         const val MEDIA_DIRECTORY = "physical-object-media"
         const val MEDIA_STAGING_DIRECTORY = "physical-object-media-staging"
-        const val MAX_MEDIA_BYTES = 16L * 1024 * 1024
 
         fun relativePath(physicalObjectId: UUID, mediaId: UUID): String =
             "$MEDIA_DIRECTORY/$physicalObjectId/$mediaId"
@@ -244,9 +207,6 @@ internal class PhysicalObjectMediaActivation(
         }
     }
 }
-
-internal class PhysicalObjectMediaTooLargeException(maxBytes: Long) :
-    AttachmentStorageException("Медиа превышает допустимый размер ${maxBytes / (1024 * 1024)} МБ")
 
 private fun requireSafeFile(root: File, base: File, relativePath: String, description: String): File {
     require(relativePath.isNotBlank() && !relativePath.contains('\\')) { "Invalid $description path" }

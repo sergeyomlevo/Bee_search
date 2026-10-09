@@ -43,29 +43,21 @@ internal class ObservationAttachmentFileStore(
         mimeType: String?,
         createdAt: Instant,
         source: () -> InputStream,
-    ): StagedObservationPointPhoto = withContext(Dispatchers.IO) {
+    ): StagedObservationPointPhoto {
         val relativePath = draftRelativePath(draftSessionId, attachmentId)
-        val destination = requireDraftFile(relativePath)
+        val destination = withContext(Dispatchers.IO) { requireDraftFile(relativePath) }
         val partial = File(destination.parentFile, "${destination.name}.part")
-        destination.parentFile?.mkdirs()
-        val stored = writeValidatedPhoto(partial, source)
-        try {
-            if (destination.exists() || !partial.renameTo(destination)) {
-                throw AttachmentStorageException("Не удалось подготовить фотографию")
-            }
-            StagedObservationPointPhoto(
-                id = attachmentId,
-                draftSessionId = draftSessionId,
-                relativePath = relativePath,
-                originalFileName = originalFileName,
-                mimeType = mimeType,
-                byteSize = stored.byteSize,
-                sha256 = stored.sha256,
-                createdAt = createdAt,
-            )
-        } finally {
-            partial.delete()
-        }
+        val stored = writeAndPublishMediaFile(partial, destination, source, "Не удалось подготовить фотографию")
+        return StagedObservationPointPhoto(
+            id = attachmentId,
+            draftSessionId = draftSessionId,
+            relativePath = relativePath,
+            originalFileName = originalFileName,
+            mimeType = mimeType,
+            byteSize = stored.byteSize,
+            sha256 = stored.sha256,
+            createdAt = createdAt,
+        )
     }
 
     fun resolveDraftPhoto(relativePath: String): File = requireDraftFile(relativePath)
@@ -129,21 +121,12 @@ internal class ObservationAttachmentFileStore(
         observationPointId: UUID,
         attachmentId: UUID,
         source: () -> InputStream,
-    ): StoredAttachmentFile = withContext(Dispatchers.IO) {
+    ): StoredAttachmentFile {
         val relativePath = relativePath(observationPointId, attachmentId)
-        val destination = requireManagedFile(relativePath)
+        val destination = withContext(Dispatchers.IO) { requireManagedFile(relativePath) }
         val staging = File(stagingRoot, "import-$attachmentId.part")
-        staging.parentFile?.mkdirs()
-        destination.parentFile?.mkdirs()
-        try {
-            val stored = writeValidatedPhoto(staging, source)
-            if (destination.exists() || !staging.renameTo(destination)) {
-                throw AttachmentStorageException("Не удалось сохранить фотографию")
-            }
-            StoredAttachmentFile(relativePath, stored.byteSize, stored.sha256)
-        } finally {
-            staging.delete()
-        }
+        val stored = writeAndPublishMediaFile(staging, destination, source, "Не удалось сохранить фотографию")
+        return stored.copy(relativePath = relativePath)
     }
 
     fun resolve(relativePath: String): File = requireManagedFile(relativePath)
@@ -181,27 +164,6 @@ internal class ObservationAttachmentFileStore(
 
     fun cameraCaptureFile(captureId: UUID): File = File(stagingRoot, "camera-$captureId.jpg").also {
         it.parentFile?.mkdirs()
-    }
-
-    private fun writeValidatedPhoto(target: File, source: () -> InputStream): StoredAttachmentFile {
-        val digest = MessageDigest.getInstance("SHA-256")
-        var size = 0L
-        source().use { input ->
-            target.outputStream().buffered().use { output ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    if (read == 0) continue
-                    size += read
-                    if (size > MAX_PHOTO_BYTES) throw AttachmentTooLargeException(MAX_PHOTO_BYTES)
-                    digest.update(buffer, 0, read)
-                    output.write(buffer, 0, read)
-                }
-            }
-        }
-        if (size == 0L) throw EmptyAttachmentException()
-        return StoredAttachmentFile(target.name, size, digest.digest().toHex())
     }
 
     private fun requireDraftFile(relativePath: String): File {
@@ -243,7 +205,6 @@ internal class ObservationAttachmentFileStore(
     internal companion object {
         const val ATTACHMENTS_DIRECTORY = "observation-attachments"
         const val ATTACHMENT_STAGING_DIRECTORY = "observation-attachments-staging"
-        const val MAX_PHOTO_BYTES = 16L * 1024 * 1024
 
         fun relativePath(observationPointId: UUID, attachmentId: UUID): String =
             "$ATTACHMENTS_DIRECTORY/$observationPointId/$attachmentId"
@@ -298,8 +259,6 @@ internal class AttachmentDeletionBatch(
 internal data class AttachmentFileMove(val original: File, val staged: File)
 
 internal open class AttachmentStorageException(message: String) : Exception(message)
-internal class AttachmentTooLargeException(maxBytes: Long) :
-    AttachmentStorageException("Фотография превышает допустимый размер ${maxBytes / (1024 * 1024)} МБ")
 internal class EmptyAttachmentException : AttachmentStorageException("Выбран пустой файл")
 
 private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

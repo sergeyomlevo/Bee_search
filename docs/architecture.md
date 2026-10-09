@@ -1778,7 +1778,12 @@ Compressed spool ограничен доступным storage; после inven
 check для extracted media. Restore дополнительно требует место для managed staging copy.
 Provider capacity неизвестна заранее: streaming write failure прерывает операцию и очищает
 workspace. Source, temp ZIP и SAF destination могут сосуществовать; raw restore/crash recovery
-не добавлены. Import caps остаются 16 MiB до M1; >=1000 MB runtime support ещё не доказана.
+не добавлены. Ingest фотографий точек и фото/видео физических объектов не имеет фиксированного
+application size cap: общий bounded-stream writer считает actual Long byte_size и SHA-256,
+проверяет overflow и cancellation, закрывает потоки перед публикацией через rename и очищает
+свои partial/new files при ошибке. Storage/provider I/O errors остаются реальным пределом;
+free-space preflight не гарантирует запись. Metadata/ZIP guards M2B не изменены.
+>=1000 MB end-to-end runtime support ещё не доказана.
 Direct-SAF Point export и возможность partial
 destination при SAF copy failure остаются прежними; filesystem/Room crash recovery не добавлен.
 

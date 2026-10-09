@@ -1,5 +1,40 @@
 # Bee Search handoff
 
+## Current continuation — Large Media Ingest (2026-10-09)
+
+Separate from the unfinished EXIF display work retained in the worktree. Its diff is preserved;
+no camera/full-view acceptance or EXIF commit is implied by this ingest milestone.
+The explicit ingest request supersedes the older operational instruction to retain caps.
+Removed the fixed 16 MiB limits from both media stores, for draft/import photo and physical
+photo/video. Shared MediaFileWriter retains bounded streaming, actual Long size/SHA,
+checked arithmetic, cooperative cancellation and close-before-rename publication.
+Cleanup also covers cancellation returning from the IO dispatcher; only new operation-owned
+files are removed. Observation draft's pre-try write cleanup gap is closed. Activation/rollback,
+Room, metadata/ZIP guards, MIME/name/type and original media bytes stay unchanged.
+
+Host gate PASS: 157 focused JVM tests, 0 failures/errors/skips, including 11 new generated
+ingest regressions (20 MiB items, 72 MiB aggregate, exact size/SHA, read/write/close errors,
+real Job cancellation and prompt cancellation after IO publication). assembleDebug and
+compileDebugAndroidTestKotlin PASS; diff check PASS. Fresh final independent read-only review:
+no BLOCKER/HIGH/MEDIUM. Post-review regression repeated: 157/157 PASS, 11 ingest tests;
+assembleDebug and compileDebugAndroidTestKotlin PASS. Evidence is ignored under
+app/build/reports/large-media-ingest/. LARGE MEDIA INGEST VERIFIED; narrow local commit only.
+
+SAMSUNG / OWNER VERIFIED: RFCY90MBYVZ / SM-S938B / API36, fresh DEV same-signer install -r,
+UID10156 and firstInstallTime preserved; all4073 persistent file hashes identical immediately
+after update. Research DB/WAL, settings, managed media and map packages retained after launch;
+five runtime-state files changed without loss evidence. Installed APK SHA256:
+E3AD2A64BF334270F3BB4270BF13D0E2999CBE7F2A086E9B13BE05E71DB909F6.
+Owner reported "Все нормально работает." for the agreed real video >16 MiB production-UI
+gate: gallery selection, no old cap rejection, object save, reopen, external ACTION_VIEW
+playback and persistence after restart. Exact video bytes/SHA were not recorded; do not invent
+them. This owner evidence is distinct from generated host fixtures.
+
+Known boundaries (not milestone defects): no maximum size/1GB ingest claim; real ENOSPC,
+process kill during copy, cancellation of a permanently blocked provider before it returns,
+and all possible Android providers are not verified. EXIF physical gate remains separate.
+Finalization performs no device action; one ingest-only local commit, no push.
+
 ## Current continuation — Large media M2B (2026-10-09)
 
 Temporal work and M2A are owner-accepted CLOSED / PASS / PUSHED. M2A runtime gates
