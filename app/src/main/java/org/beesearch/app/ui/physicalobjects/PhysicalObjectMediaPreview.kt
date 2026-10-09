@@ -1,7 +1,6 @@
 package org.beesearch.app.ui.physicalobjects
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -23,6 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.beesearch.app.ui.media.decodePhotoPreview
 import java.io.File
 
 @Composable
@@ -83,12 +83,6 @@ private fun loadMediaPreview(file: File, isVideo: Boolean): Bitmap? = runCatchin
             retriever.release()
         }
     } else {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, bounds)
-        var sample = 1
-        while (bounds.outWidth / sample > 1024 || bounds.outHeight / sample > 1024) {
-            sample *= 2
-        }
-        BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
+        decodePhotoPreview(file, maxEdge = 1024)
     }
 }.getOrNull()

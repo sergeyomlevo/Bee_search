@@ -1,7 +1,6 @@
 package org.beesearch.app.ui.properties
 
 import android.content.ContentResolver
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -29,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -42,6 +42,8 @@ import org.beesearch.app.domain.model.ObservationPointAttachment
 import org.beesearch.app.domain.model.ObservationPointDetail
 import org.beesearch.app.domain.model.ObservationPointWeather
 import org.beesearch.app.domain.model.WeatherStatus
+import org.beesearch.app.ui.media.decodePhotoPreview
+import org.beesearch.app.ui.media.openObservationPointPhoto
 
 /**
  * Reusable ObservationPoint property sections.
@@ -165,6 +167,7 @@ internal fun AttachmentRow(
     fileStore: ObservationAttachmentFileStore?,
     onDelete: ((ObservationPointAttachment) -> Unit)? = null,
 ) {
+    val context = LocalContext.current
     val file = remember(attachment.relativePath, fileStore) {
         fileStore?.let { store -> runCatching { store.resolve(attachment.relativePath) }.getOrNull() }
     }
@@ -179,11 +182,26 @@ internal fun AttachmentRow(
                 Image(
                     bitmap!!,
                     contentDescription = "Фотография точки",
-                    modifier = Modifier.size(96.dp),
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clickable {
+                            openObservationPointPhoto(context, attachment, fileStore)
+                        }
+                        .semantics { role = Role.Button }
+                        .testTag("point-photo-preview-${attachment.id}"),
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 )
             } else {
-                Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) { Text("Фото") }
+                Box(
+                    Modifier
+                        .size(96.dp)
+                        .clickable {
+                            openObservationPointPhoto(context, attachment, fileStore)
+                        }
+                        .semantics { role = Role.Button }
+                        .testTag("point-photo-preview-${attachment.id}"),
+                    contentAlignment = Alignment.Center,
+                ) { Text("Фото") }
             }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(attachment.originalFileName ?: "Фотография")
@@ -247,18 +265,8 @@ internal fun ContentResolver.displayName(uri: Uri): String? =
         if (c.moveToFirst()) c.getString(0) else null
     }
 
-internal fun decodePhotoThumbnail(file: File): android.graphics.Bitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(file.absolutePath, bounds)
-    var sampleSize = 1
-    while (bounds.outWidth / sampleSize > 512 || bounds.outHeight / sampleSize > 512) {
-        sampleSize *= 2
-    }
-    return BitmapFactory.decodeFile(
-        file.absolutePath,
-        BitmapFactory.Options().apply { inSampleSize = sampleSize },
-    )
-}
+internal fun decodePhotoThumbnail(file: File): android.graphics.Bitmap? =
+    decodePhotoPreview(file, maxEdge = 512)
 
 private fun formatDecimal(value: Double?): String =
     value?.let { String.format(Locale.ROOT, "%.1f", it) } ?: "—"

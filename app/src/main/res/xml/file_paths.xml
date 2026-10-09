@@ -9,6 +9,9 @@
     <files-path
         name="physical_object_media"
         path="physical-object-media/" />
+    <files-path
+        name="observation_attachments"
+        path="observation-attachments/" />
     <cache-path
         name="area_share"
         path="area-share/" />

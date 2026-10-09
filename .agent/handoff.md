@@ -35,6 +35,79 @@ process kill during copy, cancellation of a permanently blocked provider before 
 and all possible Android providers are not verified. EXIF physical gate remains separate.
 Finalization performs no device action; one ingest-only local commit, no push.
 
+## Current continuation — M1 photo EXIF display (2026-10-09)
+
+Baseline: main/origin/main 0ddd676; M2B is closed and published. M1 changes only photo
+display: raw BitmapFactory preview decoding ignored EXIF, while ingestion retained original
+JPEG bytes. Shared ImageDecoder preview decoding now honors orientations 1–8, including
+reflections, with pre-decode output bounds of 512/1024 px. Existing photos with retained
+EXIF benefit without rewriting/migration; missing orientation is not guessed. Physical-object
+editor/detail/thumbnails and point preparation/detail previews use the common decoder.
+Full physical-object viewing remains the external ACTION_VIEW consumer of original bytes.
+
+Focused JVM tests: 16 PASS. Samsung SM-S938B/API 36: 6 new native/Compose orientation
+tests PASS and 21 existing physical-object cards/editor tests PASS. Synthetic portrait and
+landscape rendered correctly in thumbnail/enlarged production preview. Same-signer DEV
+install -r succeeded; all 4067 private file hashes matched immediately after installation.
+No user DB/settings/maps/media cleared. Cache fixtures cleaned. Independent review found
+no BLOCKER/HIGH/MEDIUM. Evidence: ignored app/build/reports/media-m1/.
+
+Initial camera/external-viewer acceptance was pending after the synthetic tests above;
+the owner physical gate is now closed by the evidence recorded below. Original bytes,
+video, M2B, archives and temporal semantics are unchanged by M1. The later Large Media
+Ingest milestone is separate. Protected unrelated TOML stays untouched.
+
+### M1 ObservationPoint external viewer continuation — 2026-10-09
+
+Continuation baseline HEAD/origin/main: 270fc743055aafaff78c4adc6b5c4ff206ff1ebc
+(`fix: support large media ingest`). Existing M1 decoder diff retained. Owner previously
+confirmed Hollow portrait/landscape previews and external viewing, plus point portrait
+preview; point tap failed because AttachmentRow had no click handler. FileProvider also
+lacked the persisted observation-attachments root. Point image/fallback now opens the
+managed original via content URI, image MIME, ACTION_VIEW, read grant and matching ClipData;
+only that narrow files-path was added. Originals/EXIF/storage/video/ingest unchanged.
+
+Fresh host gate: 27 focused JVM tests PASS (including 11 existing LargeMediaIngest tests),
+assembleDebug, compileDebugAndroidTestKotlin, assembleDebugAndroidTest, diff check PASS.
+Fresh independent read-only review: no BLOCKER/HIGH/MEDIUM. Samsung SM-S938B/API36:
+same-signer DEV install -r PASS, UID10156 and firstInstallTime2026-09-16 08:13:50 preserved.
+All 4076 private and 2128 external file hashes identical immediately after install.
+47/47 scoped instrumentation tests PASS, including real point Image click/intent/URI
+regression and existing native EXIF/UI tests. MainActivity launch PASS. After runtime,
+research DB/WAL, settings/binding, original media, map-packages/map-poc and external files
+unchanged; seven runtime files changed (SHM, WorkManager, mbgl cache, profile/ActivityThread),
+no added/deleted files. Read-only host DB/WAL copy: integrity ok, zero FK violations.
+Evidence: ignored app/build/reports/media-m1-viewer/.
+DEV APK SHA256: 67AAE9FB3A3698BF938ADD624C31D63BFDF30DA5E8ECD918A4DB97E8CD619654.
+
+### M1 owner physical device gate — 2026-10-09
+
+Owner tested real new camera photos on Samsung SM-S938B, using the DEV APK identified
+above. Complete physical matrix:
+
+1. PhysicalObject / Hollow — portrait preview: PASS.
+2. PhysicalObject / Hollow — portrait external viewer: PASS.
+3. PhysicalObject / Hollow — landscape preview: PASS.
+4. PhysicalObject / Hollow — landscape external viewer: PASS.
+5. ObservationPoint / Point — portrait preview: PASS.
+6. ObservationPoint / Point — portrait external viewer: PASS.
+7. ObservationPoint / Point — landscape preview: PASS.
+8. ObservationPoint / Point — landscape external viewer: PASS.
+
+M1 owner device gate CLOSED / PASS, including actual ObservationPoint portrait and
+landscape external viewing. This is owner camera/viewer evidence, separate from fixtures.
+No implementation changes after owner PASS; the eight M1 code/test/XML files match the
+source hashes recorded for the tested APK. Finalization is limited to M1 evidence and
+one authorized isolated commit; no push. Protected verifier TOML remains excluded
+(SHA2567388F2F233AB86694C69F15CB0BF8076C39A65932D2248D44046CFE2E46A1F31).
+
+Finalization host regression (2026-10-09), fresh execution with --rerun-tasks: 27/27
+focused JVM tests PASS, including 11/11 LargeMediaIngest tests; assembleDebug and
+compileDebugAndroidTestKotlin PASS. No failures/errors/skips. No second device install.
+Fresh final independent read-only review: 0 BLOCKER / 0 HIGH / 0 MEDIUM; final diff
+check PASS. Verdict: M1 PHOTO ORIENTATION VERIFIED. Finalization uses one isolated M1
+commit; no push. No further implementation or device work is pending for this gate.
+
 ## Current continuation — Large media M2B (2026-10-09)
 
 Temporal work and M2A are owner-accepted CLOSED / PASS / PUSHED. M2A runtime gates
