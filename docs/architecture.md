@@ -1766,9 +1766,20 @@ M2A media I/O boundary: Complete Backup и три portable export profiles ис�
 Known bounded JSON остаётся memory-resident. Decoded export result является Closeable:
 caller обязан закрыть его после работы с graph/media; validation failure закрывает workspace.
 Collection temp-ZIP read-back использует тот же staged reader и закрывает result перед SAF copy.
-Wire versions, paths/order, legacy semantics и все прежние archive/import caps сохранены.
-Это изменение памяти, не обещание >=1000 MB support: изменение payload budgets относится
-к будущему M2B, снятие import cap — к M1. Direct-SAF Point export и возможность partial
+M2B разделяет archive policy: metadata ограничена 16 MiB на entry и 64 MiB суммарно
+(collection — 128 MiB); entry limits остаются 64 / 1024 и collection максимум 256 objects.
+Media не имеет фиксированного application cap: bounded metadata/full domain validation
+авторизует точные paths, ownership, Long byte_size и SHA; actual streamed size должен точно
+совпасть, overflow и hash mismatch отклоняются. Reader сначала spool-ит compressed ZIP на
+диск, ограничивает central index до открытия ZipFile и читает bounded metadata; только затем
+извлекает media. Проверяются central и local records, duplicates, CRC и inventory. ZIP без
+полного central directory теперь malformed; валидные wire versions/paths/order сохранены.
+Compressed spool ограничен доступным storage; после inventory выполняется advisory free-space
+check для extracted media. Restore дополнительно требует место для managed staging copy.
+Provider capacity неизвестна заранее: streaming write failure прерывает операцию и очищает
+workspace. Source, temp ZIP и SAF destination могут сосуществовать; raw restore/crash recovery
+не добавлены. Import caps остаются 16 MiB до M1; >=1000 MB runtime support ещё не доказана.
+Direct-SAF Point export и возможность partial
 destination при SAF copy failure остаются прежними; filesystem/Room crash recovery не добавлен.
 
 Single ObservationPoint export отделён от logical backup пакетом

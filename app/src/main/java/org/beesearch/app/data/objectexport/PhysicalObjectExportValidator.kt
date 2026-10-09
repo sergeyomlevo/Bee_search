@@ -48,7 +48,7 @@ internal object PhysicalObjectExportValidator {
             if (media.relativePath != PhysicalObjectMediaFileStore.relativePath(graph.id, media.id)) {
                 invalid("media storage path mismatch")
             }
-            if (media.byteSize <= 0 || media.byteSize > PhysicalObjectExportContract.MAX_ENTRY_BYTES) {
+            if (media.byteSize <= 0) {
                 invalid("invalid media size")
             }
             if (!media.sha256.matches(hashPattern)) invalid("invalid media hash")

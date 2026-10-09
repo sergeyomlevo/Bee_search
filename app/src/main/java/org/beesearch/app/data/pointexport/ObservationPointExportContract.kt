@@ -17,8 +17,8 @@ internal object ObservationPointExportContract {
     const val POINT_ENTRY = "point.json"
     const val ATTACHMENT_PREFIX = "attachments/"
     const val MAX_ENTRIES = 64
-    const val MAX_ENTRY_BYTES = 16L * 1024 * 1024
-    const val MAX_TOTAL_BYTES = 64L * 1024 * 1024
+    const val MAX_METADATA_ENTRY_BYTES = 16L * 1024 * 1024
+    const val MAX_TOTAL_METADATA_BYTES = 64L * 1024 * 1024
 
     fun attachmentEntry(id: UUID): String = "$ATTACHMENT_PREFIX$id"
 }

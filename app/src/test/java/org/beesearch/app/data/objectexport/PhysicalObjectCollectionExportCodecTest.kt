@@ -2,6 +2,9 @@ package org.beesearch.app.data.objectexport
 
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.nio.file.Files
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
@@ -60,6 +63,52 @@ class PhysicalObjectCollectionExportCodecTest {
         val output = ByteArrayOutputStream().apply { write("existing".toByteArray()) }
         assertLegacyOrInvalid { PhysicalObjectCollectionExportCodec.encode(graph, payloads(blobs(graph)), output) }
         assertEquals("existing", output.toString(Charsets.UTF_8.name()))
+    }
+
+    @Test
+    fun `collection media above historical aggregate cap remains file backed`() {
+        val root = Files.createTempDirectory("bee-collection-large-").toFile()
+        try {
+            val size = 33L * 1024 * 1024
+            val source = (1..4).map { sequence ->
+                val graph = objectGraph(PhysicalObjectType.HOLLOW, sequence).copy(
+                    creatorObserverId = OBSERVER,
+                    observer = objectGraph(PhysicalObjectType.HOLLOW, 1).observer,
+                )
+                val media = graph.media.single()
+                val file = File(root, "media-$sequence.bin")
+                val digest = MessageDigest.getInstance("SHA-256")
+                val buffer = ByteArray(64 * 1024) { index -> (index + sequence).toByte() }
+                FileOutputStream(file).use { output ->
+                    repeat((size / buffer.size).toInt()) {
+                        output.write(buffer)
+                        digest.update(buffer)
+                    }
+                }
+                val hash = digest.digest().joinToString("") { "%02x".format(it) }
+                graph.copy(media = listOf(media.copy(byteSize = size, sha256 = hash))) to
+                    (media.id to ArchivePayload.fromFile(file))
+            }
+            val graph = collection(PhysicalObjectType.HOLLOW, source.map { it.first })
+            val payloads = source.associate { it.second }
+            val archive = File(root, "collection.zip")
+            FileOutputStream(archive).use { output ->
+                PhysicalObjectCollectionExportCodec.encode(graph, payloads, output)
+            }
+            FileInputStream(archive).use { input ->
+                PhysicalObjectCollectionExportCodec.decode(input).use { decoded ->
+                    assertEquals(graph.objects.map { it.id }.toSet(), decoded.graph.objects.map { it.id }.toSet())
+                    graph.objects.forEach { value ->
+                        val media = value.media.single()
+                        val actual = decoded.mediaBytes.getValue(media.id)
+                        assertEquals(size, actual.size)
+                        assertEquals(media.sha256, actual.sha256)
+                    }
+                }
+            }
+        } finally {
+            root.deleteRecursively()
+        }
     }
 
     @Test

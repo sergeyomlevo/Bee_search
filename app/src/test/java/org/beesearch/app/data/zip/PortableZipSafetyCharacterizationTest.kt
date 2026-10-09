@@ -1,16 +1,18 @@
 package org.beesearch.app.data.zip
 
 import java.io.ByteArrayOutputStream
-import java.io.InputStream
-import java.lang.reflect.InvocationTargetException
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import org.beesearch.app.data.zip.ZipSafetyFailure
+import org.beesearch.app.data.zip.ZipSafetyPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Characterizes the three export codecs' pre-parser private ZIP readers. */
+/** Characterizes bounded ZIP mechanics with the profiles' metadata/count budgets.
+ * Full format authorization and large-media integration are tested by the codec suites.
+ */
 class PortableZipSafetyCharacterizationTest {
     @Test
     fun `reader accepts exact count entry and aggregate boundaries`() {
@@ -87,11 +89,19 @@ class PortableZipSafetyCharacterizationTest {
     }
 
     private fun read(reader: Reader, bytes: ByteArray): Map<String, Long> = try {
-        (reader.method.invoke(reader.instance, bytes.inputStream()) as StagedZipArchive).use { archive ->
+        if (bytes.isEmpty()) throw IllegalArgumentException("empty archive")
+        StagedZipArchive.read(bytes.inputStream(), reader.policy).use { archive ->
+            if (archive.entries.isEmpty()) throw IllegalArgumentException("empty archive")
             archive.entries.mapValues { it.value.size }
         }
-    } catch (error: InvocationTargetException) {
-        throw error.targetException
+    } catch (error: ZipSafetyException) {
+        throw IllegalArgumentException(zipMessage(error), error)
+    } catch (error: IllegalArgumentException) {
+        throw error
+    } catch (error: java.io.EOFException) {
+        throw IllegalArgumentException("malformed archive", error)
+    } catch (error: Exception) {
+        throw IllegalArgumentException("malformed archive", error)
     }
 
     private fun failure(reader: Reader, bytes: ByteArray, message: String) {
@@ -99,7 +109,7 @@ class PortableZipSafetyCharacterizationTest {
             read(reader, bytes)
             throw AssertionError("expected $message")
         } catch (error: Throwable) {
-            assertTrue("${reader.name}: $error", error.javaClass == reader.errorType)
+            assertTrue("${reader.name}: $error", error is IllegalArgumentException)
             assertTrue("${reader.name}: ${error.message}", error.message.orEmpty().contains(message))
         }
     }
@@ -173,9 +183,7 @@ class PortableZipSafetyCharacterizationTest {
 
     private data class Reader(
         val name: String,
-        val instance: Any,
-        val method: java.lang.reflect.Method,
-        val errorType: Class<out Throwable>,
+        val policy: ZipSafetyPolicy,
         val count: Int,
         val entryBytes: Long,
         val aggregateBytes: Long,
@@ -183,17 +191,21 @@ class PortableZipSafetyCharacterizationTest {
 
     private companion object {
         val READERS = listOf(
-            reader("point", "org.beesearch.app.data.pointexport.ObservationPointExportCodec", "org.beesearch.app.data.pointexport.InvalidObservationPointExport", 64, 16L * 1024 * 1024, 64L * 1024 * 1024),
-            reader("object", "org.beesearch.app.data.objectexport.PhysicalObjectExportCodec", "org.beesearch.app.data.objectexport.InvalidPhysicalObjectExport", 64, 16L * 1024 * 1024, 64L * 1024 * 1024),
-            reader("collection", "org.beesearch.app.data.objectexport.PhysicalObjectCollectionExportCodec", "org.beesearch.app.data.objectexport.InvalidPhysicalObjectExport", 1_024, 16L * 1024 * 1024, 128L * 1024 * 1024),
+            reader("point", 64, 16L * 1024 * 1024, 64L * 1024 * 1024),
+            reader("object", 64, 16L * 1024 * 1024, 64L * 1024 * 1024),
+            reader("collection", 1_024, 16L * 1024 * 1024, 128L * 1024 * 1024),
         )
 
-        private fun reader(name: String, className: String, errorName: String, count: Int, entry: Long, aggregate: Long): Reader {
-            val type = Class.forName(className)
-            val instance = type.getField("INSTANCE").get(null)
-            val method = type.getDeclaredMethod("readArchive", InputStream::class.java).also { it.isAccessible = true }
-            @Suppress("UNCHECKED_CAST")
-            return Reader(name, instance, method, Class.forName(errorName) as Class<out Throwable>, count, entry, aggregate)
+        private fun reader(name: String, count: Int, entry: Long, aggregate: Long) =
+            Reader(name, ZipSafetyPolicy(count, entry, aggregate), count, entry, aggregate)
+
+        private fun zipMessage(error: ZipSafetyException) = when (error.failure) {
+            ZipSafetyFailure.ENTRY_COUNT -> "too many ZIP entries"
+            ZipSafetyFailure.UNSAFE_PATH -> if (error.isDirectory) "directory ZIP entry is not allowed" else "unsafe ZIP entry"
+            ZipSafetyFailure.DUPLICATE -> "duplicate ZIP entry"
+            ZipSafetyFailure.ENTRY_BYTES -> "ZIP entry is too large"
+            ZipSafetyFailure.TOTAL_BYTES -> "archive is too large"
+            else -> "malformed archive"
         }
     }
 }

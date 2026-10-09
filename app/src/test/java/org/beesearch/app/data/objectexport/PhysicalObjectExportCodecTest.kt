@@ -269,7 +269,7 @@ class PhysicalObjectExportCodecTest {
         val original = entries(encode(fixture.graph, fixture.blobs))
         val mediaEntry = "media/${fixture.graph.media.single().id}"
 
-        assertIntegrity { decode(replaceBytes(original, mediaEntry, byteArrayOf(1, 2, 3))) }
+        assertInvalid { decode(replaceBytes(original, mediaEntry, byteArrayOf(1, 2, 3))) }
         assertIntegrity {
             decode(replace(original, "manifest.json") { it.replace(fixture.graph.media.single().sha256, "0".repeat(64)) })
         }
@@ -320,7 +320,7 @@ class PhysicalObjectExportCodecTest {
     fun `archive and entry limits are enforced`() {
         val fixture = fixture(PhysicalObjectType.HOLLOW)
         val mediaId = fixture.graph.media.single().id
-        val oversized = ByteArray((PhysicalObjectExportContract.MAX_ENTRY_BYTES + 1).toInt())
+        val oversized = ByteArray((PhysicalObjectExportContract.MAX_METADATA_ENTRY_BYTES + 1).toInt())
         val original = entries(encode(fixture.graph, fixture.blobs))
 
         assertInvalid { decode(writeEntries(original + ("media/$mediaId" to oversized))) }
@@ -328,6 +328,38 @@ class PhysicalObjectExportCodecTest {
         repeat(PhysicalObjectExportContract.MAX_ENTRIES + 1) { index -> manyEntries["media/$index"] = byteArrayOf(1) }
         assertInvalid { decode(writeEntries(manyEntries)) }
         assertInvalid { decode(ByteArray(0)) }
+    }
+
+    @Test
+    fun `single export rejects media inventory beyond entry budget before writing`() {
+        val base = fixture(PhysicalObjectType.HOLLOW)
+        val media = (1..(PhysicalObjectExportContract.MAX_ENTRIES - 1)).map { index ->
+            val id = UUID.nameUUIDFromBytes("oversized-media-$index".toByteArray())
+            base.graph.media.single().copy(
+                id = id,
+                relativePath = PhysicalObjectMediaFileStore.relativePath(base.graph.id, id),
+                byteSize = 1L,
+                sha256 = sha(byteArrayOf(1)),
+            )
+        }
+        val output = ByteArrayOutputStream().apply { write("sentinel".toByteArray()) }
+        assertInvalid { PhysicalObjectExportCodec.encode(base.graph.copy(media = media), emptyMap(), output) }
+        assertEquals("sentinel", output.toString(Charsets.UTF_8.name()))
+    }
+
+    @Test
+    fun `media above historical entry cap is accepted by the downstream archive`() {
+        val base = fixture(PhysicalObjectType.HOLLOW)
+        val media = base.graph.media.single()
+        val large = ByteArray((PhysicalObjectExportContract.MAX_METADATA_ENTRY_BYTES + 1).toInt()) { index ->
+            (index * 31).toByte()
+        }
+        val graph = base.graph.copy(media = listOf(media.copy(byteSize = large.size.toLong(), sha256 = sha(large))))
+        val archive = encode(graph, mapOf(media.id to large))
+        decode(archive).use { decoded ->
+            assertEquals(large.size.toLong(), decoded.mediaBytes.getValue(media.id).size)
+            assertEquals(sha(large), decoded.mediaBytes.getValue(media.id).sha256)
+        }
     }
 
     @Test

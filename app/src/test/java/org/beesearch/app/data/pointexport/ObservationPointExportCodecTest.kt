@@ -1,6 +1,8 @@
 package org.beesearch.app.data.pointexport
 
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
@@ -12,6 +14,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import java.nio.file.Files
 import org.beesearch.app.data.media.ObservationAttachmentFileStore
+import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.domain.model.AttachmentType
 import org.beesearch.app.domain.model.Bee
 import org.beesearch.app.domain.model.BeeObservationHistory
@@ -32,6 +35,65 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ObservationPointExportCodecTest {
+    @Test
+    fun `point writer rejects attachment count beyond archive entry budget before output`() {
+        val base = fixture().graph
+        val attachments = (0 until ObservationPointExportContract.MAX_ENTRIES - 1).map { index ->
+            val id = UUID.nameUUIDFromBytes("too-many-point-attachments-$index".toByteArray())
+            base.attachments.single().copy(
+                id = id,
+                relativePath = ObservationAttachmentFileStore.relativePath(base.point.id, id),
+            )
+        }
+        val output = ByteArrayOutputStream().apply { write(byteArrayOf(7, 8, 9)) }
+        var thrown: Throwable? = null
+        try {
+            ObservationPointExportCodec.encode(base.copy(attachments = attachments), emptyMap(), output)
+        } catch (error: Throwable) {
+            thrown = error
+        }
+        assertTrue(thrown is InvalidObservationPointExport)
+        assertEquals("too many ZIP entries", thrown?.message)
+        assertArrayEquals(byteArrayOf(7, 8, 9), output.toByteArray())
+    }
+
+    @Test
+    fun `downstream point archive accepts media beyond legacy entry and aggregate caps`() {
+        val base = fixture().graph
+        val root = Files.createTempDirectory("point-export-large-").toFile()
+        try {
+            val attachments = (0 until 4).map { index ->
+                val id = UUID.nameUUIDFromBytes("large-point-$index".toByteArray())
+                ObservationPointAttachment(
+                    id, base.point.id, AttachmentType.PHOTO,
+                    ObservationAttachmentFileStore.relativePath(base.point.id, id),
+                    null, "image/jpeg", 17L * 1024 * 1024, "0".repeat(64),
+                    Instant.parse("2026-09-20T10:2${index}:00Z"),
+                )
+            }
+            val payloads = attachments.associate { attachment ->
+                val file = File(root, attachment.id.toString())
+                FileOutputStream(file).use { output ->
+                    val chunk = ByteArray(8192) { (it * 17).toByte() }
+                    repeat((attachment.byteSize / chunk.size).toInt()) { output.write(chunk) }
+                }
+                val payload = ArchivePayload.fromFile(file)
+                attachment.copy(byteSize = payload.size, sha256 = payload.sha256) to payload
+            }
+            val graph = base.copy(attachments = payloads.keys.toList())
+            val archive = File(root, "large-point.zip")
+            archive.outputStream().use { output ->
+                ObservationPointExportCodec.encode(graph, payloads.mapKeys { it.key.id }, output)
+            }
+            ObservationPointExportCodec.decode(archive.inputStream()).use { decoded ->
+                assertEquals(4, decoded.attachmentPayloads.size)
+                decoded.attachmentPayloads.values.forEach { assertEquals(17L * 1024 * 1024, it.size) }
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun `file backed attachment streams across multiple buffers`() {
         val base = fixture()
@@ -64,7 +126,7 @@ class ObservationPointExportCodecTest {
             decoded.graph.beeHistories,
         )
         assertEquals(fixture.graph.attachments, decoded.graph.attachments)
-        fixture.blobs.forEach { (id, bytes) -> assertArrayEquals(bytes, decoded.attachmentPayloads.getValue(id).readMetadata(ObservationPointExportContract.MAX_ENTRY_BYTES)) }
+        fixture.blobs.forEach { (id, bytes) -> assertArrayEquals(bytes, decoded.attachmentPayloads.getValue(id).readMetadata(ObservationPointExportContract.MAX_METADATA_ENTRY_BYTES)) }
         decoded.close()
         assertFalse(archive.toString(Charsets.ISO_8859_1).contains(UUID.randomUUID().toString()))
     }

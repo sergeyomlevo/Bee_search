@@ -44,6 +44,8 @@ internal class ArchivePayload private constructor(
             null, bytes, bytes.size.toLong(), MessageDigest.getInstance("SHA-256").digest(bytes).hex(),
         )
         internal fun staged(file: File, result: ZipCopyResult) = ArchivePayload(file, null, result.byteCount, result.sha256)
+        /** Validation-only declaration; it cannot supply bytes. */
+        internal fun declared(expected: MediaExpectation) = ArchivePayload(null, null, expected.size, expected.sha256)
     }
 }
 
@@ -63,6 +65,16 @@ internal class StagedZipArchive private constructor(
     }
 
     companion object {
+        internal fun owned(entries: Map<String, ArchivePayload>, directory: File) = StagedZipArchive(entries, directory)
+
+        fun readAuthorized(
+            input: InputStream,
+            policy: ZipSafetyPolicy,
+            isMediaPath: (String) -> Boolean,
+            authorize: (Map<String, ArchivePayload>, Set<String>) -> Map<String, MediaExpectation>,
+            parent: File? = null,
+        ): StagedZipArchive = readAuthorizedArchive(input, policy, isMediaPath, authorize, parent)
+
         fun read(input: InputStream, policy: ZipSafetyPolicy, parent: File? = null): StagedZipArchive {
             val directory = if (parent == null) Files.createTempDirectory("bee-archive-").toFile()
             else Files.createTempDirectory(parent.toPath(), "bee-archive-").toFile()

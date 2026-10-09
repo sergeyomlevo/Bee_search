@@ -14,8 +14,8 @@ internal object PhysicalObjectCollectionExportContract {
     const val OBSERVERS_ENTRY = "observers.json"
     const val MAX_OBJECTS = 256
     const val MAX_ENTRIES = 1_024
-    const val MAX_ENTRY_BYTES = 16L * 1024 * 1024
-    const val MAX_TOTAL_BYTES = 128L * 1024 * 1024
+    const val MAX_METADATA_ENTRY_BYTES = 16L * 1024 * 1024
+    const val MAX_TOTAL_METADATA_BYTES = 128L * 1024 * 1024
 
     fun objectEntry(id: UUID): String = "objects/$id.json"
     fun mediaEntry(objectId: UUID, mediaId: UUID): String = "media/$objectId/$mediaId"

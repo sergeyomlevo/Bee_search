@@ -35,10 +35,10 @@ internal object PhysicalObjectExportContract {
     const val OBJECT_ENTRY = "object.json"
     const val MEDIA_PREFIX = "media/"
 
-    /** Caps mirror the ObservationPoint profile; one media item may not exceed the media store limit. */
+    /** Strict budgets apply to metadata only; media is bounded by its validated inventory. */
     const val MAX_ENTRIES = 64
-    const val MAX_ENTRY_BYTES = 16L * 1024 * 1024
-    const val MAX_TOTAL_BYTES = 64L * 1024 * 1024
+    const val MAX_METADATA_ENTRY_BYTES = 16L * 1024 * 1024
+    const val MAX_TOTAL_METADATA_BYTES = 64L * 1024 * 1024
 
     fun mediaEntry(id: UUID): String = "$MEDIA_PREFIX$id"
 }

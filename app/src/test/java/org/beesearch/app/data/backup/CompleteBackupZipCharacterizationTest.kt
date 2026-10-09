@@ -3,6 +3,9 @@ package org.beesearch.app.data.backup
 import org.beesearch.app.domain.backup.*
 import org.beesearch.app.data.zip.ArchivePayload
 import org.beesearch.app.data.zip.StagedZipArchive
+import org.beesearch.app.data.zip.ZipSafetyPolicy
+import org.beesearch.app.data.zip.ZipSafetyException
+import org.beesearch.app.data.zip.ZipSafetyFailure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -18,7 +21,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import java.util.zip.CRC32
 
-/** Characterization of the pre-refactor private ZIP reader and graph parser. */
+/** Metadata/structure limits and production legacy graph compatibility, separately from media budgets. */
 class CompleteBackupZipCharacterizationTest {
     @get:Rule val temporary = TemporaryFolder()
 
@@ -55,9 +58,9 @@ class CompleteBackupZipCharacterizationTest {
     @Test fun rejectsEmptyNonZipCrcDamageAndTruncation() {
         val empty = temporary.newFile("empty.zip")
         empty.writeBytes(byteArrayOf())
-        assertReadFailure(empty, MalformedBackup::class.java, "empty archive")
+        assertReadFailure(empty, MalformedBackup::class.java, "malformed archive")
         val nonZip = temporary.newFile("plain.zip"); nonZip.writeText("not a zip")
-        assertReadFailure(nonZip, MalformedBackup::class.java, "empty archive")
+        assertReadFailure(nonZip, MalformedBackup::class.java, "malformed archive")
         val valid = storedZip()
         val crcDamaged = temporary.newFile("crc.zip"); crcDamaged.writeBytes(valid.clone().also { it[33] = (it[33].toInt() xor 1).toByte() })
         assertReadFailure(crcDamaged, MalformedBackup::class.java, "malformed archive")
@@ -65,14 +68,12 @@ class CompleteBackupZipCharacterizationTest {
         assertReadFailure(truncated, MalformedBackup::class.java, "malformed archive")
     }
 
-    @Test fun truncatedCentralDirectoryIsAcceptedWhenLocalEntriesAreComplete() {
+    @Test fun truncatedCentralDirectoryCannotAuthorizeMedia() {
         val full = zipEntries(listOf("complete" to byteArrayOf(1, 2, 3)))
         val central = full.indexOfSignature(0x50, 0x4b, 0x01, 0x02)
         val file = temporary.newFile("central-truncated.zip")
         file.writeBytes(full.copyOfRange(0, central))
-        readArchive(file).use { archive ->
-            assertEquals(byteArrayOf(1, 2, 3).toList(), archive.entries.getValue("complete").readMetadata(16).toList())
-        }
+        assertReadFailure(file, MalformedBackup::class.java, "malformed archive")
     }
 
     @Test fun parseReportsRequiredMissingExtraMalformedAndIntegrityCases() {
@@ -127,7 +128,20 @@ class CompleteBackupZipCharacterizationTest {
         assertParseFailure(base - MANIFEST, MissingBackupCollection::class.java, MANIFEST)
     }
 
-    private fun readArchive(file: File): StagedZipArchive = invoke("readArchive", file)
+    // Raw metadata-only mechanics; the full format reader is exercised by parseArchive below.
+    private fun readArchive(file: File): StagedZipArchive = try {
+        file.inputStream().use { StagedZipArchive.readAuthorized(it, ZipSafetyPolicy(64, 16L * 1024 * 1024, 64L * 1024 * 1024),
+            { false }, { _, _ -> emptyMap() }) }
+    } catch (e: ZipSafetyException) {
+        throw MalformedBackup(when (e.failure) {
+            ZipSafetyFailure.ENTRY_COUNT -> "too many ZIP entries"
+            ZipSafetyFailure.UNSAFE_PATH -> "unsafe ZIP path"
+            ZipSafetyFailure.DUPLICATE -> "duplicate ZIP entry"
+            ZipSafetyFailure.ENTRY_BYTES -> "ZIP entry too large"
+            ZipSafetyFailure.TOTAL_BYTES -> "archive is too large"
+            else -> "malformed archive"
+        })
+    } catch (e: Exception) { throw MalformedBackup("malformed archive", e) }
     private fun assertReadFailure(bytes: ByteArray, type: Class<out Throwable>, message: String) =
         assertReadFailure(temporary.newFile().also { it.writeBytes(bytes) }, type, message)
     private fun parse(entries: Map<String, ByteArray>) {
@@ -135,7 +149,7 @@ class CompleteBackupZipCharacterizationTest {
     }
 
     private fun parseArchive(file: File) {
-        readArchive(file).use { archive -> invoke<Any>("parse", archive.entries) }
+        invoke<StagedZipArchive>("readArchive", file).use { archive -> invoke<Any>("parse", archive.entries) }
     }
 
     private inline fun <reified T> invoke(name: String, arg: Any): T {
@@ -186,11 +200,15 @@ class CompleteBackupZipCharacterizationTest {
         }
     }.toByteArray()
     private fun duplicateZip(name: String): File = temporary.newFile("duplicate.zip").also { file ->
-        val first = zipEntries(listOf(name to byteArrayOf(1)))
-        val second = zipEntries(listOf(name to byteArrayOf(2)))
-        val central = first.indexOfSignature(0x50, 0x4b, 0x01, 0x02)
-        val secondLocalEnd = second.indexOfSignature(0x50, 0x4b, 0x01, 0x02)
-        file.writeBytes(first.copyOfRange(0, central) + second.copyOfRange(0, secondLocalEnd) + first.copyOfRange(central, first.size))
+        val other = "x".repeat(name.length)
+        val bytes = zipEntries(listOf(name to byteArrayOf(1), other to byteArrayOf(2)))
+        val needle = other.toByteArray()
+        val replacement = name.toByteArray()
+        // Preserve valid offsets and central directory; duplicate both local and central names.
+        for (i in 0..bytes.size - needle.size) {
+            if (needle.indices.all { bytes[i + it] == needle[it] }) replacement.copyInto(bytes, i)
+        }
+        file.writeBytes(bytes)
     }
     private fun ByteArray.indexOfSignature(vararg signature: Int): Int {
         outer@ for (i in 0..size - signature.size) { for (j in signature.indices) if ((this[i + j].toInt() and 255) != signature[j]) continue@outer; return i }

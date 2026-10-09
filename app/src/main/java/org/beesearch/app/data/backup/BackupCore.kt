@@ -119,10 +119,12 @@ internal class BackupService(
         validateSettings(portable, graph)
         val blobs = blobsV7(graph, portable, attachmentStore, objectMediaStore, format)
         val id = UUID.randomUUID()
+        val manifestBytes = manifest(id, clock.instant(), sourceAppVersion, blobs, format)
+        validateBackupWriter(blobs, manifestBytes)
         output.parentFile?.mkdirs()
         try {
             ZipOutputStream(BufferedOutputStream(FileOutputStream(output))).use { zip ->
-                put(zip, MANIFEST, manifest(id, clock.instant(), sourceAppVersion, blobs, format))
+                put(zip, MANIFEST, manifestBytes)
                 blobs.forEach { put(zip, it.path, it.payload) }
             }
         } catch (error: Throwable) {
@@ -216,6 +218,9 @@ internal class BackupService(
         val blobs = parsed.blobs.associateBy { it.name }
         val stage = File(stagingRoot, "restore-${UUID.randomUUID()}")
         try {
+            stagingRoot.mkdirs()
+            requireArchiveSpace(stagingRoot, checkedMediaTotal(parsed.blobs.filter { isBackupMediaPath(it.path) }
+                .map { MediaExpectation(it.payload.size, it.payload.sha256) }))
             if (parsed.graph.attachments.isNotEmpty() && attachmentStore == null) {
                 throw MalformedBackup("attachment storage is not configured")
             }
@@ -299,8 +304,8 @@ private suspend fun BackupDao.totalCount() = territoryCount() + observerCount() 
 
 private const val MANIFEST = "manifest.json"
 private const val MAX_ENTRIES = 64
-private const val MAX_ENTRY_BYTES = 16L * 1024 * 1024
-private const val MAX_TOTAL_BYTES = 64L * 1024 * 1024
+private const val MAX_METADATA_ENTRY_BYTES = 16L * 1024 * 1024
+private const val MAX_TOTAL_METADATA_BYTES = 64L * 1024 * 1024
 private val JSON = Json { isLenient = false; ignoreUnknownKeys = false }
 
 internal class ZipEntryTracker {
@@ -430,7 +435,7 @@ private fun manifest(id: UUID, created: Instant, appVersion: String, blobs: List
 ).toByteArray(StandardCharsets.UTF_8)
 
 private fun parse(entries: Map<String, ArchivePayload>): Parsed {
-    val manifest = objectFrom((entries[MANIFEST] ?: throw MissingBackupCollection(MANIFEST)).readMetadata(MAX_ENTRY_BYTES), "manifest")
+    val manifest = objectFrom((entries[MANIFEST] ?: throw MissingBackupCollection(MANIFEST)).readMetadata(MAX_METADATA_ENTRY_BYTES), "manifest")
     val format = manifest.int("backupFormatVersion")
     val schema = manifest.int("archiveSchemaVersion")
     if (format !in 1..7) throw UnsupportedBackupFormat("unsupported backup format")
@@ -493,13 +498,13 @@ private fun parse(entries: Map<String, ArchivePayload>): Parsed {
         val expectedHash = item.string("sha256")
         if (!expectedHash.matches(Regex("[0-9a-f]{64}")) || bytes.sha256 != expectedHash) throw BackupIntegrityMismatch("sha256 mismatch for $name")
         val count = item.int("recordCount")
-        if (count < 0 || rows(bytes.readMetadata(MAX_ENTRY_BYTES), name).size != count) throw BackupIntegrityMismatch("recordCount mismatch for $name")
+        if (count < 0 || rows(bytes.readMetadata(MAX_METADATA_ENTRY_BYTES), name).size != count) throw BackupIntegrityMismatch("recordCount mismatch for $name")
         known[name] = Blob(name, path, bytes, count)
     }
     contract.keys.forEach { if (it !in known) throw MissingBackupCollection(it) }
     val listedPaths = known.values.mapTo(mutableSetOf(MANIFEST)) { it.path }.apply { addAll(optionalPaths) }
     if (entries.keys != listedPaths) throw MalformedBackup("unlisted ZIP entry")
-    fun objects(name: String) = rows(known.getValue(name).payload.readMetadata(MAX_ENTRY_BYTES), name).map { objectFrom(it.toByteArray(StandardCharsets.UTF_8), name) }
+    fun objects(name: String) = rows(known.getValue(name).payload.readMetadata(MAX_METADATA_ENTRY_BYTES), name).map { objectFrom(it.toByteArray(StandardCharsets.UTF_8), name) }
     val graph = Graph(
         territories = objects("territories").map(::territory),
         observers = objects("observers").map(::observer),
@@ -539,7 +544,7 @@ private fun parse(entries: Map<String, ArchivePayload>): Parsed {
 
 private fun readArchive(file: File): StagedZipArchive = try {
     val archive = backupZipMechanics {
-        file.inputStream().use { StagedZipArchive.read(it, ZipSafetyPolicy(MAX_ENTRIES, MAX_ENTRY_BYTES, MAX_TOTAL_BYTES)) }
+        file.inputStream().use { StagedZipArchive.readAuthorized(it, backupMetadataPolicy(), ::isBackupMediaPath, ::authorizeBackupMedia) }
     }
     if (archive.entries.isEmpty()) {
         archive.close()
@@ -547,6 +552,43 @@ private fun readArchive(file: File): StagedZipArchive = try {
     }
     archive
 } catch (e: BackupException) { throw e } catch (e: Exception) { throw MalformedBackup("malformed archive", e) }
+
+private fun backupMetadataPolicy() = ZipSafetyPolicy(MAX_ENTRIES, MAX_METADATA_ENTRY_BYTES, MAX_TOTAL_METADATA_BYTES)
+private fun isBackupMediaPath(path: String) = path.startsWith(BackupContractV2.ATTACHMENT_PREFIX) ||
+    path.startsWith(BackupContractV6.OBJECT_MEDIA_PREFIX)
+
+/** Runs the complete existing domain/manifest validator with unreadable media declarations first. */
+private fun authorizeBackupMedia(metadata: Map<String, ArchivePayload>, names: Set<String>): Map<String, MediaExpectation> {
+    val manifest = objectFrom((metadata[MANIFEST] ?: throw MissingBackupCollection(MANIFEST)).readMetadata(MAX_METADATA_ENTRY_BYTES), "manifest")
+    val format = manifest.int("backupFormatVersion")
+    val expected = linkedMapOf<String, MediaExpectation>()
+    val descriptors = try { manifest.field("collections").jsonArray } catch (e: Exception) { throw MalformedBackup("collections must be an array", e) }
+    descriptors.forEach { element ->
+        val item = try { element.jsonObject } catch (e: Exception) { throw MalformedBackup("invalid collection descriptor", e) }
+        val name = item.string("name")
+        if ((format >= 2 && name.startsWith("attachment-file:")) || (format >= 4 && name.startsWith("object-media-file:"))) {
+            val path = item.string("path")
+            if (expected.put(path, MediaExpectation(item.long("byteLength"), item.string("sha256"))) != null) {
+                throw MalformedBackup("duplicate collection path $path")
+            }
+        }
+    }
+    val declared = metadata + expected.mapValues { ArchivePayload.declared(it.value) }
+    if (declared.keys != names) throw MalformedBackup("unlisted or missing ZIP entry")
+    parse(declared) // Version, relationships, paths, sizes, hashes and inventory all validated before extraction.
+    checkedMediaTotal(expected.values)
+    return expected
+}
+
+private fun validateBackupWriter(blobs: List<Blob>, manifestBytes: ByteArray) = backupZipMechanics {
+    val entries = linkedMapOf(MANIFEST to ArchivePayload.metadata(manifestBytes))
+    blobs.forEach { if (entries.put(it.path, it.payload) != null) throw MalformedBackup("duplicate ZIP entry") }
+    if (entries.size > MAX_ENTRIES) throw ZipSafetyException(ZipSafetyFailure.ENTRY_COUNT)
+    entries.keys.forEach(::validatePathName)
+    validateMetadataBudget(entries.filterKeys { !isBackupMediaPath(it) }.values, backupMetadataPolicy())
+    checkedMediaTotal(entries.filterKeys(::isBackupMediaPath).values.map { MediaExpectation(it.size, it.sha256) })
+    parse(entries) // Keep current writer and reader semantics aligned, including normalized weather.
+}
 
 private fun validatePathName(name: String) = backupZipMechanics { validateZipRelativePath(name) }
 private inline fun <T> backupZipMechanics(block: () -> T): T = try { block() } catch (error: ZipSafetyException) {
@@ -619,7 +661,7 @@ private fun validateAttachments(graph: Graph, blobs: Map<String, Blob>) {
             ),
             "attachment path is not deterministic",
         )
-        domain(attachment.byteSize > 0 && attachment.byteSize <= MAX_PHOTO_BYTES, "invalid attachment size")
+        domain(attachment.byteSize > 0, "invalid attachment size")
         domain(attachment.sha256.matches(Regex("[0-9a-f]{64}")), "invalid attachment hash")
         val file = blobs["attachment-file:${attachment.id}"] ?: throw MissingBackupCollection("attachment file ${attachment.id}")
         val archivePath = "${BackupContractV2.ATTACHMENT_PREFIX}${attachment.observationPointId}/${attachment.id}"
@@ -637,7 +679,7 @@ private fun validateObjectMedia(graph: Graph, blobs: Map<String, Blob>) {
         val objectRow = objects[media.physicalObjectId] ?: throw BrokenBackupForeignKey("object media owner missing")
         domain(objectRow.objectType == org.beesearch.app.domain.model.PhysicalObjectType.HOLLOW || objectRow.objectType == org.beesearch.app.domain.model.PhysicalObjectType.LOG_HIVE, "object media owner type invalid")
         domain(media.relativePath == PhysicalObjectMediaFileStore.relativePath(media.physicalObjectId, media.id), "object media path is not deterministic")
-        domain(media.byteSize > 0 && media.byteSize <= MAX_ENTRY_BYTES, "invalid object media size")
+        domain(media.byteSize > 0, "invalid object media size")
         domain(media.sha256.matches(Regex("[0-9a-f]{64}")), "invalid object media hash")
         val blob = blobs["object-media-file:${media.id}"] ?: throw MissingBackupCollection("object media file ${media.id}")
         val expectedPath = "${BackupContractV5.OBJECT_MEDIA_PREFIX}${media.physicalObjectId}/${media.id}"
@@ -926,7 +968,6 @@ internal fun snapshotSettingsFromRows(portable: JsonObject, coverage: List<JsonO
     settings.coverage.values.forEach(MapCoverageValidator::validate)
     return settings
 }
-private const val MAX_PHOTO_BYTES = 16L * 1024 * 1024
 private fun ByteArray.hex() = joinToString("") { "%02x".format(it) }
 private fun <T, K> unique(values: List<T>, label: String, key: (T) -> K) { val seen = hashSetOf<K>(); values.forEach { if (!seen.add(key(it))) throw DuplicateBackupIdentity("duplicate $label") } }
 private fun domain(ok: Boolean, message: String) { if (!ok) throw BackupDomainInvariantViolation(message) }

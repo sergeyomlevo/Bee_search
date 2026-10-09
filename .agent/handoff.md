@@ -1,30 +1,33 @@
 # Bee Search handoff
 
-## Current continuation — Large media M2A (2026-10-08)
+## Current continuation — Large media M2B (2026-10-09)
 
-Temporal work is owner-accepted CLOSED / PASS / PUSHED at 0dca7b7; the older temporal
-sections below are historical and do not reopen that work.
+Temporal work and M2A are owner-accepted CLOSED / PASS / PUSHED. M2A runtime gates
+passed public BackupService media round-trip and three production export services through
+system SAF; these are historical evidence, not new M2B runtime evidence.
 
-M2A replaces Complete Backup and all three portable export media ByteArrays with
-file-backed ArchivePayload and isolated StagedZipArchive readers. Current Backup V7 /
-Export V2 and supported legacy readers retain versions, paths/order, validation and dates.
-Decoded export results must be closed; collection temp read-back closes the spool before
-SAF copy. Backup validates before managed-file activation / empty-destination Room restore.
-Cleanup errors are attached to failures rather than silently hiding staging/rollback failure.
+M2B separates finite metadata budgets (16 MiB per entry; 64 MiB total or collection
+128 MiB) and finite entry/object counts from declared media payloads. Media has no fixed
+application size cap: validated inventory authorizes exact Long size/SHA/path/ownership.
+Compressed ZIP is spooled without decompression, central index bounded before ZipFile,
+full existing format/domain validation runs before authorized media extraction. Actual
+size, SHA, CRC and local/central records are checked; overflow and unexpected entries fail.
+Missing/truncated central directories are now malformed; valid legacy formats unchanged.
+Closeable staging and validated restore activation/Room ordering remain. Advisory free-space
+checks never substitute a fixed media cap; streaming I/O errors clean staging best-effort.
 
-Fresh host gate: 802/802 JVM tests PASS (Backup 27, point export 20, physical/collection
-export 49, ZIP 29, Snapshot 77); assembleDebug and compileDebugAndroidTestKotlin PASS.
-Generated multi-buffer payload tests cover streamed copy, source changes, reader size/hash
-validation, truncation and staging cleanup. The new public BackupService Android round-trip
-test is COMPILED ONLY, NOT EXECUTED. No ADB, emulator/Samsung actions or APK installation.
-Independent read-only audit found no blocking production defect; root corrected compile
-integration and characterization-test adapters before the final passing gate.
+Host validation: 137/137 focused JVM tests PASS, assembleDebug and
+compileDebugAndroidTestKotlin PASS. Includes generated media above 16/64 MiB and collection
+132 MiB, metadata/count boundaries, exact size/hash, overflow and staging cleanup.
+Independent read-only review closed writer entry-count symmetry; no remaining blocking
+finding. Shared ZIP authorization infrastructure extracted into AuthorizedArchive.kt;
+large codecs/BackupCore retain cohesive format/domain responsibilities.
 
-Import 16 MiB caps and all archive safety caps remain. This is NOT >=1000 MB support.
-Next owner-scoped task: M2B payload budget policy / writer-reader alignment, then M1 import
-cap and cleanup; both must be ready before accepting large media. EXIF/M3 not started.
-Point direct-SAF partial-output limitation and untested process-kill recovery remain.
-M2A is retained as a local commit only; no push. Protected unrelated TOML remains unchanged.
+Import caps remain 16 MiB. No >=1,000,000,000-byte end-to-end or ZIP64 runtime claim.
+No ADB/emulator/Samsung actions. EXIF/M1 not started. Next gate: independent M2B review,
+then owner-authorized isolated large-media runtime gate; do not deploy M1 automatically.
+Direct-SAF Point partial destination and process-kill/disk-full runtime boundaries remain.
+Protected unrelated TOML unchanged; local M2B commit only, no push.
 
 ## Current continuation — Temporal I4 implemented in worktree, owner review required (2026-10-08)
 

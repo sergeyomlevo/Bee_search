@@ -56,7 +56,7 @@ internal object ObservationPointExportValidator {
             if (attachment.observationPointId != point.id) invalid("attachment belongs to another point")
             if (attachment.type != AttachmentType.PHOTO) invalid("unsupported attachment type")
             if (attachment.relativePath != ObservationAttachmentFileStore.relativePath(point.id, attachment.id)) invalid("attachment storage path mismatch")
-            if (attachment.byteSize <= 0 || attachment.byteSize > ObservationPointExportContract.MAX_ENTRY_BYTES) invalid("invalid attachment size")
+            if (attachment.byteSize <= 0) invalid("invalid attachment size")
             if (!attachment.sha256.matches(hashPattern)) invalid("invalid attachment hash")
         }
         if (payloads.keys != attachmentIds) invalid("attachment blob set mismatch")

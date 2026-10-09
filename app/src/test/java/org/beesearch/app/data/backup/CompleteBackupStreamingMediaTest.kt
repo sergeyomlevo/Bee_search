@@ -32,6 +32,34 @@ import org.junit.rules.TemporaryFolder
 class CompleteBackupStreamingMediaTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun downstreamV7AcceptsMediaAboveOldEntryAndTotalCapsWithWriterReaderSymmetry() {
+        val fixture = mediaFixture()
+        val size = 65L * 1024 * 1024 + 17
+        fixture.objectFile.outputStream().buffered().use { output ->
+            var left = size
+            val buffer = ByteArray(8192) { 7 }
+            while (left > 0) { val count = minOf(left, buffer.size.toLong()).toInt(); output.write(buffer, 0, count); left -= count }
+        }
+        val payload = ArchivePayload.fromFile(fixture.objectFile)
+        val media = fixture.graph.objectMedia.single().copy(byteSize = payload.size, sha256 = payload.sha256)
+        val graph = fixture.graph.copy(objectMedia = listOf(media))
+        val blobs = blobsV7(graph, PortableSettingsSnapshot(null, null, emptyMap()), fixture.attachments, fixture.objectMedia)
+        val manifestBytes = manifest(blobs)
+        invoke<Any>("validateBackupWriter", blobs, manifestBytes)
+        val file = temporary.newFile("large-v7.zip")
+        ZipOutputStream(file.outputStream().buffered()).use { zip ->
+            // Reordering remains valid: media may precede manifest/metadata.
+            blobs.reversed().forEach { put(zip, blobPath(it), blobPayload(it)) }
+            put(zip, MANIFEST, ArchivePayload.metadata(manifestBytes))
+        }
+        readArchive(file).use { archive ->
+            parse(archive.entries)
+            val actual = archive.entries.getValue(blobs.first { blobPath(it).startsWith("physical-object-media/") }.let(::blobPath))
+            assertEquals(size, actual.size)
+            assertEquals(payload.sha256, actual.sha256)
+        }
+    }
+
     @Test
     fun v7WriterStreamsPhotoAndPhysicalMediaThroughReaderAndParser() {
         val fixture = mediaFixture()
