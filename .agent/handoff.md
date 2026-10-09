@@ -29,6 +29,34 @@ then owner-authorized isolated large-media runtime gate; do not deploy M1 automa
 Direct-SAF Point partial destination and process-kill/disk-full runtime boundaries remain.
 Protected unrelated TOML unchanged; local M2B commit only, no push.
 
+### Samsung representative large-media runtime — 2026-10-09
+
+M2B LARGE-MEDIA RUNTIME VERIFIED on RFCY90MBYVZ / SM-S938B / API 36.
+Owner-authorized same-signer DEV `install -r` replaced the S3 APK with a fresh build
+from e708c50; UID/firstInstallTime and all 4067 persistent private file hashes were
+unchanged immediately after install. App startup succeeded. After startup/runtime,
+research DB/WAL/SHM, settings/binding and managed-media hashes remained unchanged;
+five runtime files changed (including WorkManager and mbgl-offline.db). Their exact
+internal change mechanisms were not established; no persistent-file removal was observed.
+Opt-in IsolatedLargeMediaArchiveTest uses only a unique cache fixture: production Single
+PhysicalObject Export V2 encode/decode/readAuthorized, four generated 20 MiB payloads,
+80 MiB aggregate, exact size/SHA, metadata-over-budget rejection and staging cleanup PASS.
+1 Android test PASS; fresh focused JVM regression 137/137 PASS. Other profiles were not
+rerun with large media on Samsung. Evidence: app/build/reports/media-m2b/samsung-runtime/.
+No import-cap/production change; no >=1GB, playback, SAF-publication, ZIP64 or kill/ENOSPC
+claim. M1/EXIF not started. This runtime fixture is retained as explicitly opt-in coverage.
+
+### Known limitations — no action now
+
+- `ArchivePayload.declared()` supplies only declared size/SHA for authorization;
+  current validators do not read media bytes before authorization. A future validator
+  calling a byte-reading API could receive a require/NPE failure rather than typed
+  `ZipSafetyException`. This is not a current M2B defect. A future defensive improvement
+  may provide an explicit typed fail-closed byte-reading rejection; no production change now.
+- Point export retains direct-SAF publication: failure may leave a partial destination.
+  M2B does not prove process-kill/ENOSPC durability. Cache/staging publication analogous
+  to physical exports is a possible separate milestone/decision, not a new M2B requirement.
+
 ## Current continuation — Temporal I4 implemented in worktree, owner review required (2026-10-08)
 
 I1 pushed (f4f5105 = origin/main); I2 committed locally (bd977b3); I3 committed locally
