@@ -2347,7 +2347,15 @@ Selected object сохраняет type pictogram; selection добавляет 
 не заменяет тип общей selected-иконкой. Type symbol используется последовательно там, где уместно.
 Перед production markers обязателен отдельный небольшой Samsung visual pass: различимость формы и
 контраст на vector, Sentinel/raster и Hybrid. Точные icons/colors/sizes и selected treatment не
-утверждены; assets этим решением не создаются.
+утверждены на момент принятия D102; assets этим решением не создавались.
+Owner approval 2026-10-09 закрывает semantic pictogram set и selected outline:
+[marker contract](ui/mockups/d102-marker-pictograms-v1.md). Последующий Samsung S25 Ultra
+owner approval фиксирует production normal size **32 dp** и подтверждает все пять пиктограмм.
+Selected state, близкие маркеры и контраст на доступных фонах при 32 dp остаются pending;
+DEBUG-only preview не меняет production marker path. Owner Samsung S25 Ultra visual pass · 2026-10-09
+закрыл этот gate, после чего production marker path (`SavedObjectMarkersOverlay` в просмотре «Точки»)
+переведён на утверждённую пиктограмму ObservationPoint 32 dp через `ResearchObjectMarker`, включая
+selected halo; Hollow/LogHive ждут своего экрана карты, Trap/Apiary остаются reserved definitions.
 
 Territory Data Map, независимое включение слоёв и Layers/Filters UI остаются идеей I016
 (`docs/ideas.md`).

@@ -76,7 +76,7 @@ internal const val BeeAbdomenCenterY = 0.760f
 private const val LegacyBodyScale = 0.72f
 private const val LegacyRingStrokeFraction = 0.030f
 
-private fun DrawScope.drawBeeMark(
+internal fun DrawScope.drawBeeMark(
     colors: BeeMarkSegmentColorSet,
     legacyMark: Boolean,
     accent: Color,

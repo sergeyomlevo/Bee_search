@@ -69,6 +69,27 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 
 ## Implementation
 
+- [x] D102 marker semantic pictograms OWNER APPROVED · 2026-10-09:
+      wingless existing bee / tree / cut trunk / box / reserved house.
+      [Contract and owner image](ui/mockups/d102-marker-pictograms-v1.md).
+- [x] Reusable presentation components and DEBUG-only actual-map visual preview implemented.
+      Production multi-object marker promotion and temporal I6 are not part of this slice.
+- [x] Samsung S25 Ultra owner approval: all five pictograms and **32 dp production normal size**.
+      24 dp is readable but less convenient in the field; 20 dp is not the normal size.
+- [x] Remaining Samsung owner visual approval at 32 dp: selected state, contrast on actual
+      vector / Sentinel raster / Hybrid backgrounds, nearby readability and operational-symbol
+      distinction — OWNER PASS · 2026-10-09.
+- [x] Production integration of the approved marker: `SavedObjectMarkersOverlay` (просмотр «Точки»)
+      draws ObservationPoint through `ResearchObjectMarker` at 32 dp with the approved selected
+      treatment and tip anchoring; mapping lives beside the overlay.
+      Hollow/LogHive have no map screen yet, Trap/Apiary stay reserved (no capability, no UI).
+- [x] Owner production-map verification: real saved points appear in the correct places, types and
+      selected state on the production map — OWNER PASS · 2026-10-09. Nearby markers may overlap at low
+      zoom (interacting touch targets); the owner accepted this, 32 dp stays unchanged and
+      clustering/spiderfy are out of D102 scope ([D102](../decisions.md)).
+      A type without a real record in the owner's database cannot be verified and must be reported as
+      an evidence limitation, not seeded with fake data.
+
 - [ ] Implement required Room/data-model/migration changes.
       I1 committed (f4f5105): Room v12, canonical ObservationPoint date и atomic correction без user caller.
       I2 committed locally: Room v13 nullable fixationDate, legacy NULL, new Hollow/LogHive dates.

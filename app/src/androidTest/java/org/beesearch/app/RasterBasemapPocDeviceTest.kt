@@ -13,6 +13,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.compose.ui.graphics.toArgb
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.CountDownLatch
@@ -26,8 +27,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.beesearch.app.ui.map.MapAreaReadResult
 import org.beesearch.app.ui.map.MapObjectMarker
-import org.beesearch.app.ui.map.MapObjectTone
 import org.beesearch.app.ui.map.MapPackageAvailability
+import org.beesearch.app.ui.map.ResearchMarkerCatalog
+import org.beesearch.app.ui.map.ResearchMarkerType
 import org.beesearch.app.ui.map.coverageFragments
 import org.beesearch.app.ui.map.observationPointMarkers
 import org.junit.Assert.assertEquals
@@ -608,14 +610,21 @@ class RasterBasemapPocDeviceTest {
                 it.getBoundsInScreen(bounds)
                 bounds
             }
-            val centroid = toneCentroid(screenshot, marker.tone, projected)
-            val centroidDelta = centroid?.let { max(abs(it.first - projected.first), abs(it.second - projected.second)) }
+            val centroid = markerCentroid(screenshot, projected)
+            val horizontalDelta = centroid?.let { abs(it.first - projected.first) }
+            val verticalDelta = centroid?.let { projected.second - it.second }
             evidence += "$label marker=${marker.label} projected=(${"%.0f".format(projected.first)},${"%.0f".format(projected.second)}) " +
-                "nodeBounds=$nodeCenter toneCentroid=$centroid centroidDeltaPx=${centroidDelta?.let { "%.1f".format(it) } ?: "not-found"}"
-            if (centroid == null || centroidDelta == null) continue
+                "nodeBounds=$nodeCenter markerCentroid=$centroid horizontalDeltaPx=${horizontalDelta?.let { "%.1f".format(it) } ?: "not-found"}"
+            if (centroid == null || horizontalDelta == null || verticalDelta == null) continue
+            // The approved production pin anchors its tip at the recorded position, so its painted
+            // glyph sits above the projection inside the marker box; the horizontal centre does not move.
             assertTrue(
-                "$label: marker ${marker.label} was drawn ${"%.0f".format(centroidDelta)}px away from its projected position over the raster",
-                centroidDelta <= MARKER_TOLERANCE_PX,
+                "$label: marker ${marker.label} was drawn ${"%.0f".format(horizontalDelta)}px sideways from its projected position over the raster",
+                horizontalDelta <= MARKER_TOLERANCE_PX,
+            )
+            assertTrue(
+                "$label: marker ${marker.label} was drawn ${"%.0f".format(verticalDelta)}px outside the pin box of its projected position over the raster",
+                verticalDelta >= -MARKER_TOLERANCE_PX && verticalDelta <= markerBoxPx,
             )
             val derived = deriveCoordinate(map, mapView, PointF(centroid.first - mapLocation[0], centroid.second - mapLocation[1]))
             evidence += "$label marker=${marker.label} derived=${"%.6f".format(derived.first)},${"%.6f".format(derived.second)}" +
@@ -631,16 +640,20 @@ class RasterBasemapPocDeviceTest {
     }
 
     /**
-     * Centroid of the pixels painted in the marker's own tone colour inside a window around the
-     * projected position of the marker. This reads the marker off the screen itself, so it is
+     * Approved D102 production marker appearance, read from the single presentation catalogue so the
+     * pixel search and the production marker cannot drift apart.
+     */
+    private val markerFamilyColor = ResearchMarkerType.OBSERVATION_POINT.familyColor.toArgb()
+    private val markerBoxPx = ResearchMarkerCatalog.TOUCH_TARGET_SIZE_DP *
+        instrumentation.targetContext.resources.displayMetrics.density
+
+    /**
+     * Centroid of the pixels painted in the marker's approved family colour inside a window around
+     * the projected position of the marker. This reads the marker off the screen itself, so it is
      * independent of how the accessibility tree reports Compose bounds.
      */
-    private fun toneCentroid(bitmap: Bitmap, tone: MapObjectTone, projected: Pair<Float, Float>): Pair<Float, Float>? {
-        val toneColor = when (tone) {
-            MapObjectTone.POSITIVE -> 0xFF1B5E20.toInt()
-            MapObjectTone.NEGATIVE -> 0xFFC62828.toInt()
-            MapObjectTone.UNRESOLVED -> 0xFFF9A825.toInt()
-        }
+    private fun markerCentroid(bitmap: Bitmap, projected: Pair<Float, Float>): Pair<Float, Float>? {
+        val markerColor = markerFamilyColor
         val left = (projected.first - TONE_WINDOW_PX).toInt().coerceAtLeast(0)
         val right = (projected.first + TONE_WINDOW_PX).toInt().coerceAtMost(bitmap.width - 1)
         val top = (projected.second - TONE_WINDOW_PX).toInt().coerceAtLeast(0)
@@ -652,9 +665,9 @@ class RasterBasemapPocDeviceTest {
             for (x in left..right) {
                 val color = bitmap.getPixel(x, y)
                 if (
-                    abs((color shr 16 and 0xFF) - (toneColor shr 16 and 0xFF)) <= 12 &&
-                    abs((color shr 8 and 0xFF) - (toneColor shr 8 and 0xFF)) <= 12 &&
-                    abs((color and 0xFF) - (toneColor and 0xFF)) <= 12
+                    abs((color shr 16 and 0xFF) - (markerColor shr 16 and 0xFF)) <= 12 &&
+                    abs((color shr 8 and 0xFF) - (markerColor shr 8 and 0xFF)) <= 12 &&
+                    abs((color and 0xFF) - (markerColor and 0xFF)) <= 12
                 ) {
                     sumX += x
                     sumY += y

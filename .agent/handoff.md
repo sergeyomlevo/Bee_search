@@ -1,6 +1,101 @@
 # Bee Search handoff
 
-## Current continuation — Temporal I5 query/filter support (2026-10-09)
+## Current continuation — D102 approved marker visual gate (2026-10-09)
+
+Baseline HEAD/main/origin/main: 3c2c4c349b78accaf0d0d1b8c9a21d3efbec1df5.
+Owner approved wingless existing Bee Search bee / tree / cut trunk / box / reserved house.
+Contract and approved source image: docs/ui/mockups/d102-marker-pictograms-v1.md / .png.
+ResearchObjectMarker reuses existing drawBeeMark geometry; colors reinforce distinct shapes.
+Selected outline preserves pictogram. Production normal marker size is **32 dp** (owner-approved on
+Samsung S25 Ultra, 2026-10-09); 24 dp reads but is less convenient in the field, and 20 dp is never a
+normal size. The DEBUG 20/24/32 physical-px candidates are diagnostic only (density comparison), and
+no px value defines a normal size. All interactive marker targets remain 48 dp.
+DEBUG-only main map entry: DEV: маркеры; specimen rows above actual basemap, no Room writes.
+Release/beta boundaries are no-op; the production SavedObjectMarkers path now uses the approved marker
+(see the latest continuation below).
+No reserved Trap/Apiary capability exposed. Temporal I6/I7, Room13, queries/wire/media unchanged.
+
+Continuation 2026-10-09 recovered intact source/tests; no Kotlin changes needed after the
+previous fontScale follow-up. Re-run focused marker/variant/map JVM 90/90 and full JVM 834/834 PASS.
+assembleDebug, assembleDebugAndroidTest, compileDebugAndroidTestKotlin, release/beta compile PASS;
+lintDebug 0 errors, 24 warnings, 3 hints. API29 emulator marker/preview/map tests 19/19 PASS,
+including fontScale1.7 regression after the measured-controls layout fix. git diff --check clean.
+Independent read-only full-diff review and follow-up: BLOCKER0/HIGH0/MEDIUM0.
+Candidate px means icon canvas including halo space; visible pin is about 81% of that height.
+Samsung SM-S938B / RFCY90MBYVZ in-place DEV install-r-t succeeded at 18:33:41 device time.
+APK SHA256: 68e8d6ffa070fb898dfe0937ac8005d097abef6e89ad9a14fe3dc595d2f9620d.
+UID10156, firstInstallTime 2026-09-16 08:13:50, CE438163/DE424656 unchanged;
+all 4077 private + 2128 external file hashes identical immediately before/after installation.
+No uninstall/clear or Samsung instrumentation. Technical Samsung screenshot at real fontScale1.7
+shows controls and specimens without overlap. Owner approval of pictograms and normal size (32 dp) is
+complete, and the remaining Samsung visual gate (selected state, nearby readability, contrast on the
+available Онлайн/Векторная/Спутник Sentinel/Гибрид backgrounds, operational-symbol distinction at
+32 dp) was accepted by the owner on Samsung S25 Ultra · 2026-10-09: OWNER PASS.
+Phone left on main map, vector source, preview open, 24px and nearby specimens enabled.
+Path: Bee Search DEV -> main map -> DEV: маркеры. First row tap changes selection;
+second row is selected examples; Рядом/Разнести toggles nearby group. Bottom-left stacked-layers
+button offers Онлайн карта / Векторная карта / Спутник Sentinel / Гибрид; no separate topo source.
+D102 MARKERS IMPLEMENTED — AWAITING OWNER SAMSUNG VISUAL APPROVAL.
+Do not resume I6 or claim D102 VERIFIED. No staging/commit/push; index empty.
+Protected TOML existing diff preserved; SHA256 remains
+7388F2F233AB86694C69F15CB0BF8076C39A65932D2248D44046CFE2E46A1F31.
+
+DeepSeek continuation · 2026-10-09 (recovery audit, no rewrite): Codex D102 work was found intact
+and was not restarted. Production: ResearchObjectMarker.kt + the guarded BeeMap hook and the
+drawBeeMark visibility change; DEBUG-only: src/debug MarkerVisualPreview.kt with no-op beta/release
+stubs; tests: 4 classes; docs: decisions/architecture/checklist/handoff + mockup md/png. Variant
+boundary verified (release/beta compile as no-ops, no ResearchMarkerType in BeeMap, reserved
+Trap/Apiary only in the catalog and preview), Room stays 13, no Temporal I6, no product capability added.
+Two real defects in the untracked androidTest were found and fixed (both inside D102 scope):
+ResearchObjectMarkerUiTest.kt did not compile (missing onNodeWithTag import), and
+defaultVisualSizeIs32dpAcrossDensities called setContent three times, which fails on any device
+(IllegalStateException; 4/5 passed, 1 failed before the fix). The stale claim in the earlier block
+(compileDebugAndroidTestKotlin and emulator 19/19 PASS) therefore no longer described this revision.
+Minimal corrections: px candidates are explicitly diagnostic (`GATE_*_PX`, `diagnosticSizesPx`) and
+only NORMAL_SIZE_DP = 32 defines a normal size (no behaviour change); ResearchObjectMarkerTest now
+asserts the approved 32 dp normal size; the mockup MD records that the PNG's "24 px recommended"
+caption is the pre-device recommendation; the size/gate statements in the block above were corrected.
+Gates after the fixes: full JVM 834/834 PASS (0 failures/errors/skips); focused API29 emulator
+MarkerVisualPreviewTest + ResearchObjectMarkerUiTest 5/5 PASS; assembleDebug, assembleDebugAndroidTest,
+compileDebugAndroidTestKotlin, compileBetaKotlin, compileReleaseKotlin PASS; lintDebug 0 errors,
+24 warnings, 3 hints; git diff --check clean. Independent read-only review of the whole D102 change:
+BLOCKER0/HIGH0/MEDIUM0 after the two fixes.
+Samsung install was NOT performed in this continuation: RFCY90MBYVZ was not attached (only
+emulator-5554). Ready DEBUG APK: app/build/outputs/apk/debug/app-debug.apk, 92,989,679 bytes,
+SHA-256 DDB08DEC9A0133C4D2A4A03F08ADF14F8BE6B94CFDA1572101133A4999A34E8A; the in-place install and
+preview preparation stay pending device attachment. The build already installed on the phone
+(68e8d6ff…) contains the same preview, so the remaining visual gate (select 32 dp, tap Рядом) can be
+performed without the new install. No uninstall/clear, no Samsung instrumentation.
+
+## Latest continuation — D102 production marker integration (2026-10-09)
+
+Baseline HEAD/main/origin/main: 3c2c4c349b78accaf0d0d1b8c9a21d3efbec1df5 (no commit in this step).
+Owner Samsung visual gate PASS: 32 dp normal size, all five pictograms, selected state, nearby
+readability, contrast on the available backgrounds and separation from operational symbols accepted.
+Production integration (narrow): `SavedObjectMarkersOverlay` — the map of the «Точки» browser in
+POINT_BROWSER mode — now draws each saved object with the approved `ResearchObjectMarker` at 32 dp
+instead of the generic circle, keeps the 48 dp target, the Russian accessibility label with the
+object's own state, and adds the approved selected halo for the object the host has selected
+(`BeeMap(selectedSavedObjectId = …)` from PointsScreen). `MapObjectType.researchMarkerType()` is the
+only record→marker mapping, so no colour/size is defined a second time, and pins now anchor by their
+tip (`ResearchMarkerCatalog.PIN_TIP_FRACTION`) so the recorded position stays under the tip; the old
+presence-tone circle colours were removed (state still announced in the label).
+Reserved: Hollow and LogHive have no map screen yet (no production marker surface, no new screen was
+created), Trap has no domain type at all, Apiary has no user-reachable lifecycle — none of them
+entered the production data flow, filters or UI. Room/schema/migrations, temporal I6, overlays and
+lifecycle safeguards are unchanged. The DEBUG preview stays as the visual regression surface.
+RasterBasemapPocDeviceTest now reads the approved family colour and the tip anchor instead of the
+removed tones.
+Owner production map verification · 2026-10-09: **PASS** — production markers on real ObservationPoints
+render correctly, 32 dp and the selected state are accepted, and changing the map background did not
+require any D102 change. Owner decision on nearby points: overlap at low zoom (including intersecting
+touch targets) is accepted behaviour for this version because zoom separates the points; 32 dp is not
+reduced, and clustering/spiderfy/auto-spacing stay out of D102 (see docs/decisions.md). Samsung DEV was
+updated in place (install -r; UID 10156 and firstInstallTime unchanged, DB/DataStore/binding hashes
+identical before/after). D102 CLOSED / VERIFIED / OWNER PASS; this finalization commit uses the message
+`feat: add research object map markers`. No push in this step; Temporal I6 not started.
+
+## Historical continuation — Temporal I5 query/filter support (2026-10-09)
 
 Baseline HEAD/main/origin/main: 61a6726109421e28b7860b3d7a9de7f02113b4e8.
 I1–I4 verified against current Room v13/repositories/date parser/versioned wire paths;

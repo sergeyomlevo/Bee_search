@@ -3588,7 +3588,32 @@ work; bounded restore frame budget; basemap-specific layer anchors/order; transi
 **Marker follow-up:** ObservationPoint/Hollow/LogHive различаются прежде всего формой/пиктограммой,
 не только цветом. Selection сохраняет type symbol и добавляет отдельный highlight. До production
 markers обязателен небольшой Samsung visual pass с проверкой формы и контраста на vector,
-Sentinel/raster и Hybrid; точные icons/colors/sizes/selected treatment не утверждены.
+Sentinel/raster и Hybrid. На момент принятия D102 точные icons/colors/sizes/selected treatment
+не были утверждены. Owner approval · 2026-10-09: утверждены существующая бескрылая Bee Search
+bee для ObservationPoint, дерево для Hollow, срез ствола для LogHive, ящик для Trap и reserved
+домик для Apiary; compact pin и светлый selected outline с сохранением pictogram.
+Owner Samsung S25 Ultra approval · 2026-10-09: **32 dp — production normal marker size**;
+24 dp читается, но менее удобен в поле, 20 dp не используется как normal size.
+Все пять пиктограмм подтверждены владельцем на устройстве; графика сохраняется.
+Selected state, близкие маркеры и контраст на доступных реальных фонах при 32 dp
+остаются отдельным pending Samsung visual gate.
+Контракт и owner reference: [D102 marker pictograms](ui/mockups/d102-marker-pictograms-v1.md).
+Presentation components и DEBUG-only preview не означают production multi-object map rollout.
+Production integration · 2026-10-09: существующий production marker path (`SavedObjectMarkersOverlay`
+в просмотре «Точки») рисует ObservationPoint утверждённой пиктограммой 32 dp с утверждённым selected
+treatment, а формы/цвета берутся только из каталога D102 (пиктограммы не переутверждаются — это
+применение уже принятого дизайна). Hollow/LogHive пока не имеют экрана карты, Trap и Apiary остаются
+reserved definitions без записи в production data flow, фильтрах и UI.
+Owner production map verification · 2026-10-09: **PASS** — production-маркеры на реальных
+ObservationPoint отображаются корректно, 32 dp подтверждён как правильный размер, форма
+ObservationPoint и selected state приняты, смена map background не потребовала изменений D102.
+Решение по перекрытию близких точек (владелец): при малом масштабе географически близкие research
+markers могут визуально перекрываться и их touch targets пересекаться; при увеличении масштаба точки
+пространственно разделяются и нормально выбираются. Это **принятое поведение** текущей версии, а не
+дефект. Уменьшать утверждённый normal marker size 32 dp ради overlap не нужно: это ухудшило бы
+полевую читаемость и не решало бы общий случай. Clustering, spiderfy, автоматическое раздвижение
+маркеров и любые иные новые механизмы разрешения overlap **не входят** в D102 и рассматриваются
+только как отдельная будущая задача при реальной эксплуатационной потребности.
 
 Принятие не реализует registry, generation guard, ID namespace, Layers/Filters, temporal model или
 marker assets. Следующий отдельный production stage — temporal data model по уже утверждённому

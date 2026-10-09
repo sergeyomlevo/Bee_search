@@ -1,14 +1,24 @@
 package org.beesearch.app.ui.points
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
 import java.time.Instant
 import java.util.UUID
@@ -20,6 +30,7 @@ import org.beesearch.app.ui.map.SavedObjectMarker
 import org.beesearch.app.ui.map.observationPointMarkers
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -74,6 +85,38 @@ class PointsScreenTest {
 
         composeRule.onNodeWithTag("point-marker-${point.id}").assertIsDisplayed().performClick()
         composeRule.runOnIdle { assertEquals(point.id, selected) }
+    }
+
+    @Test
+    fun productionMarkerUsesApprovedPresentationLabelAndSelectedTreatment() {
+        val point = summary(9, BeePresenceResult.BEES_FOUND, beeCount = 2)
+        val marker = observationPointMarkers(listOf(point)).single()
+
+        composeRule.setContent {
+            Bee_searchTheme {
+                Surface(color = Color.DarkGray) {
+                    Row {
+                        SavedObjectMarker(marker = marker, onClick = {})
+                        SavedObjectMarker(marker = marker, onClick = {}, selected = true)
+                    }
+                }
+            }
+        }
+
+        val markers = composeRule.onAllNodesWithTag("point-marker-${point.id}")
+        markers[0].assertContentDescriptionEquals(marker.label).assertHeightIsAtLeast(48.dp)
+        markers[1].assertIsSelected()
+        // The approved selected treatment is a light halo around the same type pictogram.
+        fun whitePixels(index: Int): Int {
+            val pixels = markers[index].captureToImage().toPixelMap()
+            return (0 until pixels.height).sumOf { y ->
+                (0 until pixels.width).count { x ->
+                    val color = pixels[x, y]
+                    color.red > .96f && color.green > .96f && color.blue > .96f
+                }
+            }
+        }
+        assertTrue("Selected production marker must add its halo", whitePixels(1) > whitePixels(0))
     }
 
     @Test

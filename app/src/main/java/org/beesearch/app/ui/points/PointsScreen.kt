@@ -206,6 +206,7 @@ internal fun PointsScreen(
                     onRequestCreateRecord = { _, _ -> },
                     mode = BeeMapMode.POINT_BROWSER,
                     savedObjectMarkers = observationPointMarkers(state.points),
+                    selectedSavedObjectId = state.selectedPoint?.id,
                     onSelectSavedObject = { marker -> onSelectPoint(marker.id) },
                     modifier = Modifier.fillMaxSize().testTag("points-map"),
                 )

@@ -119,6 +119,8 @@ internal fun BeeMap(
     mode: BeeMapMode = BeeMapMode.FIELD,
     /** Saved objects drawn in the browser mode. ObservationPoint is the only kind today. */
     savedObjectMarkers: List<MapObjectMarker> = emptyList(),
+    /** The saved object the host currently has selected; only it gets the selected treatment. */
+    selectedSavedObjectId: UUID? = null,
     onSelectSavedObject: (MapObjectMarker) -> Unit = {},
     /** Leaves the Ареал view mode; the host decides which screen that means. */
     onExitAreaView: () -> Unit = {},
@@ -869,7 +871,12 @@ internal fun BeeMap(
                 cameraRevision = mapCameraRevision,
                 onSelectMarker = onSelectSavedObject,
                 modifier = Modifier.fillMaxSize().zIndex(2f),
+                selectedObjectId = selectedSavedObjectId,
             )
+        }
+        // Source-set boundary: DEBUG specimens only, never research records or release navigation.
+        if (mode == BeeMapMode.FIELD && !coverageSelectionActive && locationSelectionLabel == null) {
+            MarkerVisualPreview(Modifier.fillMaxSize().zIndex(3f))
         }
     }
 
