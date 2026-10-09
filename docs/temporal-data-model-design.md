@@ -3,10 +3,11 @@
 Статус: APPROVED · 2026-10-03
 
 Утверждён владельцем как design research dates: schema-направление, migration policy и invariants
-ниже. I1 committed/pushed (f4f5105); I2 committed locally, not pushed (bd977b3),
-Room/device verification pending; I3 committed locally (ac6c7d1); I4 implemented in worktree,
-owner review required. I5–I7 pending. **I2 + I3 + I4 — одна deployment unit; Samsung остаётся
-на I1 до отдельного Android/Room/device verification gate.**
+ниже. I1–I4 реализованы в baseline `61a6726` (2026-10-09); прежние execution notes ниже
+сохраняются как исторические evidence соответствующих increments. I5 реализован и проверен:
+SQL/repository support независимых включительных интервалов, без UI и schema migration.
+I5: NO NEW INDEX по измерению; Room остаётся v13. I6 и I7 PENDING, этим increment
+не реализованы. Samsung verification для I5 не заявляется; общий I7 device gate не закрыт.
 Документ остаётся нормативным design, а не заявлением о завершении всех increments.
 
 Ревизия после owner review: внесены два owner decisions — legacy Hollow/LogHive/Apiary получают
@@ -800,6 +801,30 @@ sync-specific полей сейчас (`docs/ideas.md:690-722`).
 покажет необходимость. Основание: объёмы полевых данных на Territory таковы, что сканирование
 недорого, а индекс по дате без запроса — преждевременная оптимизация. Триггер для пересмотра
 зафиксирован здесь явно, чтобы решение не потерялось.
+
+### I5 execution — 2026-10-09
+
+`ResearchDateInterval(fromDate: LocalDate, toDate: LocalDate)` валидирует обе границы через
+существующий `parseResearchDate` и отвергает `fromDate > toDate` с `IllegalArgumentException`.
+`null` interval означает отсутствие temporal restriction; single-day interval допустим.
+Calendar dates сравниваются в SQL как сохранённые ISO YYYY-MM-DD TEXT, без Instant/timezone.
+
+- `ObservationRepository.observeObservationPointSummaries(territoryId, observationYear,
+  dateInterval)` сохраняет Territory/year predicates, JOIN/aggregate counts, Flow invalidation
+  и ordering `created_at DESC, id`. Бounded ветвь DAO использует только `observation_date >=
+  fromDate AND observation_date <= toDate`; unbounded ветвь сохраняет прежний SQL.
+- `PhysicalObjectRepository.listForTerritory(territoryId, hollowDateInterval,
+  logHiveDateInterval)` принимает независимые интервалы. Если оба null, сохраняется прежний
+  общий запрос. Иначе identities отбираются SQL отдельно по Territory/type, с прежним порядком
+  `sequence_number, id`, до subtype/media hydration в существующей transaction.
+  Бounded Hollow/LogHive используют `fixation_date`; NULL исключается сравнением SQL.
+  Unbounded тип сохраняет legacy NULL. Apiary остаётся на прежнем unbounded path, без новой
+  fixation-date capability; Inspection не создаётся. Kotlin `.filter` используется только для
+  прежней сборки subtype lists, не для temporal filtering.
+
+Новые intervals не подключены к UI, map overlays, сохранённому filter state или global period.
+Existing callers по умолчанию остаются unbounded. I1–I4 dates/numbering/wire semantics не меняются.
+Измерение и решение по индексу: [I5 query measurement](temporal-i5-query-measurement.md).
 
 ## 18. Design options
 

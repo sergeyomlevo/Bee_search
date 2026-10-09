@@ -95,7 +95,14 @@ internal class RoomObservationRepository(
     override fun observeObservationPointSummaries(
         territoryId: UUID,
         observationYear: Int?,
-    ): Flow<List<ObservationPointSummary>> = pointDao.observeSummaries(territoryId, observationYear)
+        dateInterval: org.beesearch.app.domain.model.ResearchDateInterval?,
+    ): Flow<List<ObservationPointSummary>> = (if (dateInterval == null) {
+        pointDao.observeSummaries(territoryId, observationYear)
+    } else {
+        pointDao.observeSummariesInDateInterval(
+            territoryId, observationYear, dateInterval.fromDate, dateInterval.toDate,
+        )
+    })
         .map { rows ->
             rows.map { row ->
                 ObservationPointSummary(

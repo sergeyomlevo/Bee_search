@@ -1,5 +1,38 @@
 # Bee Search handoff
 
+## Current continuation — Temporal I5 query/filter support (2026-10-09)
+
+Baseline HEAD/main/origin/main: 61a6726109421e28b7860b3d7a9de7f02113b4e8.
+I1–I4 verified against current Room v13/repositories/date parser/versioned wire paths;
+their accepted semantics are unchanged. Earlier temporal continuation entries below are
+historical execution evidence, not the current HEAD/deployment status.
+
+ResearchDateInterval validates canonical LocalDate bounds and rejects reversed ranges.
+ObservationPoint summaries accept an optional inclusive observation_date interval with
+existing Territory/year/Flow/aggregate/created_at ordering. Physical-object lists accept
+independent Hollow and LogHive fixation_date intervals, SQL-filtered before hydration.
+Bounded physical queries exclude NULL; all-time queries preserve legacy unknown dates.
+Apiary remains unbounded; no Inspection, I6 UI, global period or I7 Samsung gate added.
+
+Host: full JVM 829/829 PASS, including 4 interval tests; assembleDebug,
+compileDebugAndroidTestKotlin and assembleDebugAndroidTest PASS. Isolated emulator-5554
+API29: 86/86 Room/repository/temporal/migration tests PASS, including 4 new I5 tests.
+Initial new-test ordering assertion was corrected to match existing created_at order;
+final rerun PASS. No Samsung install or action. No schema/migration/index change.
+Measurement evidence and index decision: docs/temporal-i5-query-measurement.md.
+Final decision: NO NEW INDEX, based on representative/stress query plans and repeated
+timings; wide observation regression and write/storage costs outweigh sub-ms gains at
+1,000 rows/Territory. Fresh independent read-only review: B0 / H0 / M0. Diff check PASS.
+Finalization interval JVM rerun: 4/4 PASS; final audit/review B0 / H0 / M0.
+No production/test/tool code changed after the reviewed state. Collection export and
+all existing production consumers remain unbounded via default null intervals.
+Verdict: TEMPORAL I5 VERIFIED. I6 UI and I7 device gate remain PENDING.
+
+Owner authorized one isolated local I5 commit; no push or Samsung action.
+Protected pre-existing verifier TOML excluded and unchanged:
+SHA256 7388F2F233AB86694C69F15CB0BF8076C39A65932D2248D44046CFE2E46A1F31.
+I5 implementation is closed; I6/I7 require separate tasks.
+
 ## Current continuation — Large Media Ingest (2026-10-09)
 
 Separate from the unfinished EXIF display work retained in the worktree. Its diff is preserved;

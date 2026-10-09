@@ -28,6 +28,7 @@ import org.beesearch.app.domain.model.PhysicalObjectReference
 import org.beesearch.app.domain.model.PhysicalObjectReferenceKind
 import org.beesearch.app.domain.model.PhysicalObjectSequenceResetBlockedException
 import org.beesearch.app.domain.model.PhysicalObjectType
+import org.beesearch.app.domain.model.ResearchDateInterval
 import org.beesearch.app.domain.model.TerritoryPhysicalObjects
 import org.beesearch.app.domain.repository.PhysicalObjectDeletion
 import org.beesearch.app.domain.repository.PhysicalObjectRepository
@@ -105,8 +106,18 @@ internal class RoomPhysicalObjectRepository(
         identity.toApiary(subtype)
     }
 
-    override suspend fun listForTerritory(territoryId: UUID): TerritoryPhysicalObjects = database.withTransaction {
-        val identities = objectDao.getForTerritory(territoryId)
+    override suspend fun listForTerritory(
+        territoryId: UUID,
+        hollowDateInterval: ResearchDateInterval?,
+        logHiveDateInterval: ResearchDateInterval?,
+    ): TerritoryPhysicalObjects = database.withTransaction {
+        val identities = if (hollowDateInterval == null && logHiveDateInterval == null) {
+            objectDao.getForTerritory(territoryId)
+        } else {
+            objectDao.getForTerritoryByType(territoryId, PhysicalObjectType.APIARY) +
+                identitiesForPeriod(territoryId, PhysicalObjectType.HOLLOW, hollowDateInterval) +
+                identitiesForPeriod(territoryId, PhysicalObjectType.LOG_HIVE, logHiveDateInterval)
+        }
         val hollowIds = identities.filter { it.objectType == PhysicalObjectType.HOLLOW }.map { it.id }
         val logHiveIds = identities.filter { it.objectType == PhysicalObjectType.LOG_HIVE }.map { it.id }
         val apiaryIds = identities.filter { it.objectType == PhysicalObjectType.APIARY }.map { it.id }
@@ -133,6 +144,16 @@ internal class RoomPhysicalObjectRepository(
                 identity.toApiary(apiaries[identity.id] ?: error("Apiary subtype is missing for ${identity.id}"))
             },
         )
+    }
+
+    private suspend fun identitiesForPeriod(
+        territoryId: UUID,
+        type: PhysicalObjectType,
+        interval: ResearchDateInterval?,
+    ): List<PhysicalObjectEntity> = if (interval == null) {
+        objectDao.getForTerritoryByType(territoryId, type)
+    } else {
+        objectDao.getForTerritoryByTypeInDateInterval(territoryId, type, interval.fromDate, interval.toDate)
     }
 
     override suspend fun updateHollow(id: UUID, properties: HollowProperties, name: String?): Hollow = database.withTransaction {

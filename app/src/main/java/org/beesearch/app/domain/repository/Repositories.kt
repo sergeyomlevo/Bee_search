@@ -28,6 +28,7 @@ import org.beesearch.app.domain.model.PendingWeatherRequest
 import org.beesearch.app.domain.model.ObservationPointSummary
 import org.beesearch.app.domain.model.ObservationPointDetail
 import org.beesearch.app.domain.model.PhysicalObjectType
+import org.beesearch.app.domain.model.ResearchDateInterval
 import java.util.UUID
 import java.time.LocalDate
 
@@ -71,7 +72,12 @@ interface PhysicalObjectRepository {
     suspend fun getHollow(id: UUID): Hollow?
     suspend fun getLogHive(id: UUID): LogHive?
     suspend fun getApiary(id: UUID): Apiary?
-    suspend fun listForTerritory(territoryId: UUID): TerritoryPhysicalObjects
+    /** Each supported type has independent fixation-date bounds; null retains legacy unknown dates. */
+    suspend fun listForTerritory(
+        territoryId: UUID,
+        hollowDateInterval: ResearchDateInterval? = null,
+        logHiveDateInterval: ResearchDateInterval? = null,
+    ): TerritoryPhysicalObjects
     suspend fun updateHollow(id: UUID, properties: HollowProperties, name: String? = null): Hollow
     suspend fun updateLogHive(id: UUID, properties: LogHiveProperties, name: String? = null): LogHive
     suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double)
@@ -142,6 +148,7 @@ interface ObservationRepository : ObservationPointPreparationCreator, Observatio
     fun observeObservationPointSummaries(
         territoryId: UUID,
         observationYear: Int? = null,
+        dateInterval: ResearchDateInterval? = null,
     ): Flow<List<ObservationPointSummary>>
     suspend fun getObservationPointDetail(pointId: UUID): ObservationPointDetail?
     fun observeActivePoint(): Flow<ObservationPoint?>

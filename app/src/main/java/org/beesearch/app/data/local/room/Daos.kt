@@ -8,6 +8,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 import org.beesearch.app.domain.model.BeePresenceResult
+import org.beesearch.app.domain.model.PhysicalObjectType
 import java.time.LocalDate
 import java.time.Instant
 import java.util.UUID
@@ -124,6 +125,17 @@ internal interface PhysicalObjectDao {
 
     @Query("SELECT * FROM physical_objects WHERE territory_id = :territoryId ORDER BY object_type, sequence_number, id")
     suspend fun getForTerritory(territoryId: UUID): List<PhysicalObjectEntity>
+
+    @Query("SELECT * FROM physical_objects WHERE territory_id = :territoryId AND object_type = :objectType ORDER BY sequence_number, id")
+    suspend fun getForTerritoryByType(territoryId: UUID, objectType: PhysicalObjectType): List<PhysicalObjectEntity>
+
+    @Query("SELECT * FROM physical_objects WHERE territory_id = :territoryId AND object_type = :objectType AND fixation_date >= :fromDate AND fixation_date <= :toDate ORDER BY sequence_number, id")
+    suspend fun getForTerritoryByTypeInDateInterval(
+        territoryId: UUID,
+        objectType: PhysicalObjectType,
+        fromDate: LocalDate,
+        toDate: LocalDate,
+    ): List<PhysicalObjectEntity>
 
     @Query("SELECT * FROM apiaries WHERE physical_object_id = :id")
     suspend fun getApiary(id: UUID): ApiaryEntity?
@@ -320,6 +332,30 @@ internal interface ObservationPointDao {
     fun observeSummaries(
         territoryId: UUID,
         observationYear: Int?,
+    ): Flow<List<ObservationPointSummaryRow>>
+
+    @Query(
+        """
+        SELECT p.observation_date, p.id, p.territory_id, p.observation_year, p.point_number, p.code,
+               p.bee_presence_result, p.latitude, p.longitude, p.gps_accuracy_m,
+               p.created_at, p.completed_at,
+               COUNT(DISTINCT b.id) AS bee_count,
+               COUNT(CASE WHEN c.return_time IS NOT NULL THEN 1 END) AS completed_flight_cycle_count
+        FROM observation_points AS p
+        LEFT JOIN bees AS b ON b.observation_point_id = p.id
+        LEFT JOIN flight_cycles AS c ON c.bee_id = b.id
+        WHERE p.territory_id = :territoryId
+          AND (:observationYear IS NULL OR p.observation_year = :observationYear)
+          AND p.observation_date >= :fromDate AND p.observation_date <= :toDate
+        GROUP BY p.id
+        ORDER BY p.created_at DESC, p.id
+        """,
+    )
+    fun observeSummariesInDateInterval(
+        territoryId: UUID,
+        observationYear: Int?,
+        fromDate: LocalDate,
+        toDate: LocalDate,
     ): Flow<List<ObservationPointSummaryRow>>
 
     @Query("SELECT COUNT(*) FROM observation_points WHERE completed_at IS NULL")
