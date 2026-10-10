@@ -1,5 +1,36 @@
 # Bee Search handoff
 
+## Current task — Location OFF→ON recovery (2026-10-10)
+
+D105 OWNER PASS, committed/pushed separately at 85e384d2f845d72b83f8fb8b48e486d92f13d46e
+(`feat: move area management to settings`); main==origin/main. Known native MapLibre emulator M1
+is accepted D105 verification debt, not fixed by this GPS change. GPS recovery OWNER PASS;
+OWNER authorizes a separate GPS commit/push. Protected verifier TOML unchanged; no cleanup, no I7.
+
+Root cause observed in build/gps-startup-diagnostic/: disabled providers threw before listeners
+were registered, terminating callbackFlow; foreground OFF→ON had no restart trigger. Provider now
+keeps a foreground recovery collection, registers a context MODE_CHANGED/PROVIDERS_CHANGED receiver
+before querying, and reconciles GPS/NETWORK requests idempotently. Existing LocationUiState values
+flow to the ViewModel; OFF clears Available, ON waits for fix. Main-looper serialization, request
+generation checks and cancellation cleanup prevent duplicates/queued old callbacks/receiver leaks.
+LocationManager, 2s/1m, permissions and map/STARTED lifecycle unchanged; no Fused/polling/last-known
+fallback/manifest receiver, no D105/MapLibre/schema/map-package changes.
+
+Focused core tests10/10 PASS, full JVM897/897 PASS. Required assembleDebug, Android-test Kotlin,
+Beta/Release compile and lintDebug PASS (build/gps-recovery-quality-final.log); lint0errors42warnings6hints.
+Samsung DEV in-place install after ID/signature checks PASS; capture began before manual switching.
+Location ON19:26:22.9 → Bee Search GPS/NETWORK requests19:26:22.936/.940 → GNSS start19:26:23.000.
+Second ON19:36:27.262 → requests19:36:27.277/.279 → GNSS start19:36:27.291. No external map app.
+OFF showed Unavailable and removed requests. Objects and settled Home/background snapshots have
+zero requests/no Location receiver; map return has one GPS plus one NETWORK request. PID9025 unchanged,
+no crash; DataStore/manifest/PMTiles hashes identical. An immediate Home snapshot preceded onStop;
+use BACKGROUND-stable evidence for the completed lifecycle transition, not that transient snapshot.
+Phone indoors; Android had no fix, so actual first-callback/Available timing remains UNKNOWN.
+Autonomous OFF→ON request recovery VERIFIED; evidence build/gps-recovery-evidence/.
+Final GPS-only independent review: BLOCKER 0 / HIGH 0 / MEDIUM 0. OWNER PASS recorded.
+Physical-device T4/T5/T6 remain UNKNOWN because no indoor satellite fix was obtained; outdoor TTFF
+was not measured. This does not block the accepted recovery fix. Await a new task after commit/push.
+
 ## Current task — D105 Area management in Settings (2026-10-10)
 
 I6 CLOSED / COMMITTED / PUSHED at 5376e53478774734ea778157fb58c2e77143c937;

@@ -937,6 +937,32 @@ ViewModel, поэтому возврат на карту не изображае
 по-прежнему остановлена; уход приложения из foreground переводит UI в обычное ожидание нового
 fix.
 
+Location OFF→ON recovery (2026-10-10): Samsung diagnostic showed that the previous
+provider threw before registering listeners when all providers were disabled; the flow
+ended and an unchanged foreground map did not restart it after Location ON. Opening
+another map activated GNSS, and returning to Bee Search restarted tracking through lifecycle.
+
+The foreground `LocationProvider` now emits the existing `LocationUiState` values:
+disabled Location → `Unavailable`, enabled providers without a new fix → `WaitingForFix`,
+callback → `Available`. A collection-scoped context receiver observes `MODE_CHANGED_ACTION`
+and `PROVIDERS_CHANGED_ACTION`, registered before the first LocationManager query.
+Notifications reconcile the actual enabled GPS/NETWORK set idempotently; OFF removes requests
+and invalidates the displayed fix, ON requests updates at 2 seconds / 1 metre without navigation.
+Callbacks from removed request generations are ignored. Cancelling the tracking collection
+removes all listeners and unregisters the receiver; no manifest receiver, polling, fused-provider
+dependency or last-known-fix substitution is introduced. Existing map/STARTED lifecycle ownership
+and permissions remain unchanged. Ten behavioral JVM tests cover recovery, duplicate notifications,
+NETWORK-only fixes, permission absence, cancellation, registration/query ordering, partial request
+failure and stale callbacks; the full JVM suite passes 897/897. Samsung SM-S938B verification:
+startup OFF → ON automatically registered GPS/NETWORK and started GNSS without another map app;
+ON → OFF removed requests and showed Unavailable; a second ON restored exactly one request per
+provider. Leaving the map or reaching stopped/background lifecycle removed requests and the Location
+receiver; return restored them. DataStore and offline-package hashes were unchanged. The phone was
+indoors and Android obtained no fix during this run: first-callback/Available device timing remains
+unverified, while autonomous request recovery is verified (OWNER PASS). Outdoor TTFF was not
+measured; the indoor absence of a fix is not an unresolved recovery defect.
+Evidence: build/gps-recovery-evidence/.
+
 ---
 
 # 26. Location data

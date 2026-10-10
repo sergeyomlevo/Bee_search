@@ -27,5 +27,6 @@ internal fun LocationUiState.awaitingNextFix(preserveAvailable: Boolean): Locati
 class LocationUnavailableException(message: String) : IllegalStateException(message)
 
 interface LocationProvider {
-    fun updates(): Flow<LocationReading>
+    /** Availability changes are recoverable events in the same foreground tracking session. */
+    fun updates(): Flow<LocationUiState>
 }

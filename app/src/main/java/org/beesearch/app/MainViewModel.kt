@@ -1369,8 +1369,12 @@ internal class MainViewModel(
         _locationState.value = _locationState.value.awaitingNextFix(preserveAvailable = true)
         locationJob = viewModelScope.launch {
             try {
-                locationProvider.updates().collect { reading ->
-                    _locationState.value = LocationUiState.Available(reading)
+                locationProvider.updates().collect { state ->
+                    _locationState.value = if (state == LocationUiState.WaitingForFix) {
+                        _locationState.value.awaitingNextFix(preserveAvailable = true)
+                    } else {
+                        state
+                    }
                 }
             } catch (error: CancellationException) {
                 throw error
