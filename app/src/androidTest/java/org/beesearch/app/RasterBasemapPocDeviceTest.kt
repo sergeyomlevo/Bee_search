@@ -471,7 +471,7 @@ class RasterBasemapPocDeviceTest {
 
     /**
      * Overlay check over the offline raster basemap with the product's own user data: the saved
-     * observation points on «Объекты» → «Точки наблюдения» (mode POINT_BROWSER), i.e. the real Bee
+     * observation points on «Объекты» → «Точки наблюдения», i.e. the real Bee
      * Search marker overlay, not a new overlay kind.
      *
      * For every visible marker the screen bounds are compared with the map projection of that

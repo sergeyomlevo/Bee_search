@@ -20,11 +20,20 @@ internal object PhysicalObjectExportValidator {
         graph: PhysicalObjectExportGraph,
         mediaBytes: Map<UUID, ArchivePayload>,
         allowFixationDate: Boolean = true,
+        allowExtendedTemporal: Boolean = true,
     ) {
         validateSupportedType(graph.type)
+        if (graph.fixationAt != null && graph.fixationDate == null) {
+            invalid("fixationAt requires fixationDate")
+        }
         if (!allowFixationDate && graph.fixationDate != null) {
             throw LegacyPhysicalObjectExportNotRepresentable(
                 "legacy physical-object export cannot represent fixationDate",
+            )
+        }
+        if (!allowExtendedTemporal && (graph.fixationAt != null || graph.updatedAt != null)) {
+            throw LegacyPhysicalObjectExportNotRepresentable(
+                "legacy physical-object export cannot represent extended temporal fields",
             )
         }
         validateProperties(graph)

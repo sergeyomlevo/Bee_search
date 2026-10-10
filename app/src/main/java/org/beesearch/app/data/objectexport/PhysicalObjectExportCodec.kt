@@ -59,15 +59,24 @@ internal object PhysicalObjectExportCodec {
 
     private fun acceptsVersion(version: Int): Boolean = when (version) {
         PhysicalObjectExportContract.LEGACY_FORMAT_VERSION -> false
+        PhysicalObjectExportContract.TEMPORAL_FORMAT_VERSION -> true
         PhysicalObjectExportContract.FORMAT_VERSION -> true
         else -> throw InvalidPhysicalObjectExport("unsupported formatVersion")
     }
+
+    private fun acceptsExtendedTemporal(version: Int): Boolean = version >= PhysicalObjectExportContract.FORMAT_VERSION
 
     fun encode(
         graph: PhysicalObjectExportGraph,
         mediaBytes: Map<UUID, ArchivePayload>,
         output: OutputStream,
     ) = encodeVersion(graph, mediaBytes, output, PhysicalObjectExportContract.FORMAT_VERSION)
+
+    fun encodeV2(
+        graph: PhysicalObjectExportGraph,
+        mediaBytes: Map<UUID, ArchivePayload>,
+        output: OutputStream,
+    ) = encodeVersion(graph, mediaBytes, output, PhysicalObjectExportContract.TEMPORAL_FORMAT_VERSION)
 
     fun encodeV1(
         graph: PhysicalObjectExportGraph,
@@ -86,7 +95,7 @@ internal object PhysicalObjectExportCodec {
             throw InvalidPhysicalObjectExport("too many ZIP entries")
         }
         val allowFixationDate = acceptsVersion(version)
-        PhysicalObjectExportValidator.validate(canonical, mediaBytes, allowFixationDate)
+        PhysicalObjectExportValidator.validate(canonical, mediaBytes, allowFixationDate, acceptsExtendedTemporal(version))
         val objectBytes = objectJson(canonical, version).toString().toByteArray(StandardCharsets.UTF_8)
         requireMetadataSize(objectBytes.size.toLong())
         val mediaDescriptors = canonical.media.map { media ->
@@ -155,6 +164,7 @@ internal object PhysicalObjectExportCodec {
         }
         val version = manifest.int("formatVersion")
         val allowFixationDate = acceptsVersion(version)
+        val allowExtendedTemporal = acceptsExtendedTemporal(version)
         val objectId = manifest.uuid("physicalObjectId")
         val objectType = enum<PhysicalObjectType>(manifest.string("physicalObjectType"), "physicalObjectType")
         PhysicalObjectExportValidator.validateSupportedType(objectType)
@@ -194,7 +204,7 @@ internal object PhysicalObjectExportCodec {
         val graph = parseGraph(parseObject(objectBytes, "object.json"), version)
         if (graph.id != objectId) throw InvalidPhysicalObjectExport("manifest object id mismatch")
         if (graph.type != objectType) throw InvalidPhysicalObjectExport("manifest object type mismatch")
-        PhysicalObjectExportValidator.validate(graph, mediaBytes, allowFixationDate)
+        PhysicalObjectExportValidator.validate(graph, mediaBytes, allowFixationDate, allowExtendedTemporal)
         if (graph.media.map { it.id }.toSet() != describedIds) {
             throw InvalidPhysicalObjectExport("media manifest mismatch")
         }
@@ -216,7 +226,12 @@ internal object PhysicalObjectExportCodec {
             put("createdAt", graph.createdAt.toString())
             when (version) {
                 PhysicalObjectExportContract.LEGACY_FORMAT_VERSION -> Unit
-                PhysicalObjectExportContract.FORMAT_VERSION -> putNullable("fixationDate", canonicalFixationDate(graph.fixationDate))
+                PhysicalObjectExportContract.TEMPORAL_FORMAT_VERSION -> putNullable("fixationDate", canonicalFixationDate(graph.fixationDate))
+                PhysicalObjectExportContract.FORMAT_VERSION -> {
+                    putNullable("fixationDate", canonicalFixationDate(graph.fixationDate))
+                    putNullableEpochMs("fixationAt", graph.fixationAt)
+                    putNullableEpochMs("updatedAt", graph.updatedAt)
+                }
                 else -> throw InvalidPhysicalObjectExport("unsupported formatVersion")
             }
             putNullable("creatorObserverId", graph.creatorObserverId?.toString())
@@ -243,7 +258,12 @@ internal object PhysicalObjectExportCodec {
             put("createdAt", graph.createdAt.toString())
             when (version) {
                 PhysicalObjectExportContract.LEGACY_FORMAT_VERSION -> Unit
-                PhysicalObjectExportContract.FORMAT_VERSION -> putNullable("fixationDate", canonicalFixationDate(graph.fixationDate))
+                PhysicalObjectExportContract.TEMPORAL_FORMAT_VERSION -> putNullable("fixationDate", canonicalFixationDate(graph.fixationDate))
+                PhysicalObjectExportContract.FORMAT_VERSION -> {
+                    putNullable("fixationDate", canonicalFixationDate(graph.fixationDate))
+                    putNullableEpochMs("fixationAt", graph.fixationAt)
+                    putNullableEpochMs("updatedAt", graph.updatedAt)
+                }
                 else -> throw InvalidPhysicalObjectExport("unsupported formatVersion")
             }
             putNullable("creatorObserverId", graph.creatorObserverId?.toString())
@@ -313,6 +333,7 @@ internal object PhysicalObjectExportCodec {
     private fun parseGraph(root: JsonObject, version: Int): PhysicalObjectExportGraph {
         val hasFixationDate = when (version) {
             PhysicalObjectExportContract.LEGACY_FORMAT_VERSION -> false
+            PhysicalObjectExportContract.TEMPORAL_FORMAT_VERSION,
             PhysicalObjectExportContract.FORMAT_VERSION -> true
             else -> throw InvalidPhysicalObjectExport("unsupported formatVersion")
         }
@@ -322,6 +343,7 @@ internal object PhysicalObjectExportCodec {
             "id", "territoryId", "type", "sequenceNumber", "latitude", "longitude",
             "createdAt", "creatorObserverId", "name",
             *if (hasFixationDate) arrayOf("fixationDate") else emptyArray(),
+            *if (version >= PhysicalObjectExportContract.FORMAT_VERSION) arrayOf("fixationAt", "updatedAt") else emptyArray(),
         )
         val type = enum<PhysicalObjectType>(identity.string("type"), "type")
         return PhysicalObjectExportGraph(
@@ -333,6 +355,8 @@ internal object PhysicalObjectExportCodec {
             longitude = identity.double("longitude"),
             createdAt = identity.instant("createdAt"),
             fixationDate = if (hasFixationDate) identity.researchDate("fixationDate") else null,
+            fixationAt = if (version >= PhysicalObjectExportContract.FORMAT_VERSION) identity.nullableEpochMs("fixationAt") else null,
+            updatedAt = if (version >= PhysicalObjectExportContract.FORMAT_VERSION) identity.nullableEpochMs("updatedAt") else null,
             creatorObserverId = identity.nullableString("creatorObserverId")?.let(::uuid),
             name = identity.nullableString("name"),
             properties = root.nullableObject("properties")?.toProperties(type),
@@ -351,6 +375,7 @@ internal object PhysicalObjectExportCodec {
     ): PhysicalObjectExportGraph {
         val hasFixationDate = when (version) {
             PhysicalObjectCollectionExportContract.LEGACY_FORMAT_VERSION -> false
+            PhysicalObjectCollectionExportContract.TEMPORAL_FORMAT_VERSION,
             PhysicalObjectCollectionExportContract.FORMAT_VERSION -> true
             else -> throw InvalidPhysicalObjectExport("unsupported formatVersion")
         }
@@ -361,6 +386,7 @@ internal object PhysicalObjectExportCodec {
             "id", "territoryId", "type", "sequenceNumber", "latitude", "longitude",
             "createdAt", "creatorObserverId", "name",
             *if (hasFixationDate) arrayOf("fixationDate") else emptyArray(),
+            *if (version >= PhysicalObjectCollectionExportContract.FORMAT_VERSION) arrayOf("fixationAt", "updatedAt") else emptyArray(),
         )
         val id = identity.uuid("id")
         val type = enum<PhysicalObjectType>(identity.string("type"), "type")
@@ -374,6 +400,8 @@ internal object PhysicalObjectExportCodec {
             longitude = identity.double("longitude"),
             createdAt = identity.instant("createdAt"),
             fixationDate = if (hasFixationDate) identity.researchDate("fixationDate") else null,
+            fixationAt = if (version >= PhysicalObjectCollectionExportContract.FORMAT_VERSION) identity.nullableEpochMs("fixationAt") else null,
+            updatedAt = if (version >= PhysicalObjectCollectionExportContract.FORMAT_VERSION) identity.nullableEpochMs("updatedAt") else null,
             creatorObserverId = creatorId,
             name = identity.nullableString("name"),
             properties = root.nullableObject("properties")?.toProperties(type),
@@ -676,6 +704,15 @@ internal object PhysicalObjectExportCodec {
         throw InvalidPhysicalObjectExport("invalid $name", error)
     }
 
+    private fun JsonObject.nullableEpochMs(name: String): Instant? = element(name).let {
+        if (it is JsonNull) null else try {
+            if (it !is JsonPrimitive || it.isString) throw IllegalArgumentException()
+            Instant.ofEpochMilli(it.longOrNull ?: throw IllegalArgumentException())
+        } catch (error: Exception) {
+            throw InvalidPhysicalObjectExport("invalid $name", error)
+        }
+    }
+
     private fun JsonObject.array(name: String) = try {
         element(name).jsonArray
     } catch (error: Exception) {
@@ -706,5 +743,9 @@ internal object PhysicalObjectExportCodec {
 
     private fun JsonObjectBuilder.putNullable(name: String, value: Double?) {
         put(name, value?.let(::JsonPrimitive) ?: JsonNull)
+    }
+
+    private fun JsonObjectBuilder.putNullableEpochMs(name: String, value: Instant?) {
+        put(name, value?.toEpochMilli()?.let(::JsonPrimitive) ?: JsonNull)
     }
 }

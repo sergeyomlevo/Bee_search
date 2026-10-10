@@ -385,6 +385,14 @@ Owner подтвердил направление единой карты: те�
 
 Закрытие панели — `Готово`, свайп вниз, системный «назад» или тап по затемнению, то есть один жест.
 
+**Owner clarification 2026-10-10.** Панель — одна сессия настройки: ни одно изменение внутри неё
+(видимость, период, `Сбросить период`, `Сбросить фильтры`) её не закрывает. `Готово` на экране типа
+завершает настройку этого типа и возвращает к списку типов, а не на карту; закрывают панель только
+`Готово`/`✕` в самой панели, системный Back со списка типов, свайп и тап по затемнению. Поэтому в
+таблице ниже «закрыть» означает шаг из списка типов: со экрана типа перед ним стоит `Готово` или Back.
+Один корневой дефект этого поведения (панель закрывалась после каждого изменения) разобран в
+`.agent/handoff.md`.
+
 | Задача | Жесты | Разбор |
 |---|---|---|
 | Скрыть `Дупла` | 3 | действие · `switch` `Дупла` · закрыть |
@@ -467,3 +475,25 @@ storage/API-решением); состав Help; production map modes; текс
 
 Фон карты на кадрах — условная иллюстрация, а не выбор подложки: макет не назначает map mode по
 умолчанию.
+
+
+Final I6 owner correction 2026-10-10: period is one section of typed FilterSet. ObservationPoint adds Bee/total FlightCycle counts; Hollow/LogHive add existing entrance-height/outer-diameter measurements. Empty main summary is `Все данные`. Calendar one-unit/continuous-range rule at all levels and panel session semantics remain; final contract is in `../unified-territory-map-display-spec.md`.
+
+### Owner extension: marker → record
+
+Реальный marker ObservationPoint/Hollow/LogHive → selected halo + компактный preview →
+`Открыть запись` → существующая полная запись того же UUID. Back возвращает на прежнюю
+общую карту с camera/zoom/filters/selection. Preview не дублирует полную запись; закрытие
+меняет только selection. Полный контракт: unified-territory-map-display-spec.md.
+
+### Owner visual correction #2 — type editor and preview
+
+Один `Готово` принадлежит всему FilterSet: отдельный footer после divider, вне scroll content
+и любой accordion section. Header → scrollable sections с локальным reset → общий footer;
+footer занимает собственное место и остаётся доступным при IME/fontScale1.7.
+Immediate changes / Done / Back semantics сохраняются.
+ObservationPoint preview использует реальные Bee/ALL FlightCycle counts из единой query projection,
+русские quantity forms; zero Bee → `пчёлы не найдены`. Physical preview показывает только canonical
+fixation_date в dd.MM.yyyy. `Создано` полной карточки — отдельный технический created_at, который
+не заменяет unknown fixation_date. Дупло10/Колода1 на Samsung имеют NULL canonical date; изменения
+legacy data остановлены по owner rule. Evidence: docs/temporal-i6-owner-visual-corrections-2.md.

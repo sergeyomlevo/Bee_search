@@ -31,7 +31,7 @@ class SnapshotLegacyDateGuardTest {
 
     @Test fun v2PreservesCorrectedObservationDate() = inUtc { output ->
         val corrected = LocalDate.of(2026, 8, 19)
-        val entries = SnapshotDomainCodec.encode(graph(corrected), settings)
+        val entries = SnapshotDomainCodec.encode(graph(corrected), settings, version = 2)
         SnapshotArchive().build(output, identity(), entries)
         assertTrue(output.isFile)
     }

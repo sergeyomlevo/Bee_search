@@ -41,8 +41,6 @@ import org.beesearch.app.domain.model.LogHive
 import org.beesearch.app.domain.model.PhysicalObjectMedia
 import org.beesearch.app.domain.model.PhysicalObjectReference
 import org.beesearch.app.domain.model.PhysicalObjectType
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.io.File
 import java.util.Locale
 
@@ -118,7 +116,9 @@ fun HollowCard(
 ) = PhysicalObjectCard(
     typeLabel = "Дупло", territoryLabel = territoryLabel,
     deleteTitle = PhysicalObjectType.HOLLOW.deleteConfirmationTitle(value.sequenceNumber),
-    creatorLabel = creatorLabel, createdAt = value.createdAt.displayDateTime(), latitude = value.latitude,
+    creatorLabel = creatorLabel,
+    fixationText = physicalObjectFixationText(value.fixationAt, value.fixationDate),
+    latitude = value.latitude,
     longitude = value.longitude, properties = value.properties?.let {
             listOf("Дерево" to it.tree, "Высота летка" to "${it.entranceHeightCm.displayMeasurement()} см", "Направление летка" to "${it.entranceAzimuthDeg}° · ${azimuthSector(it.entranceAzimuthDeg)}", "Наружный диаметр" to "${it.outerDiameterCm.displayMeasurement()} см") +
             listOfNotNull(it.internalDiameterCm?.let { d -> "Внутренний диаметр" to "${d.displayMeasurement()} см" }, it.notes?.let { n -> "Дополнительно" to n })
@@ -138,7 +138,9 @@ fun LogHiveCard(
 ) = PhysicalObjectCard(
     typeLabel = "Колода", territoryLabel = territoryLabel,
     deleteTitle = PhysicalObjectType.LOG_HIVE.deleteConfirmationTitle(value.sequenceNumber),
-    creatorLabel = creatorLabel, createdAt = value.createdAt.displayDateTime(), latitude = value.latitude,
+    creatorLabel = creatorLabel,
+    fixationText = physicalObjectFixationText(value.fixationAt, value.fixationDate),
+    latitude = value.latitude,
     longitude = value.longitude, properties = value.properties?.let {
             listOf("Дерево" to it.tree, "Высота летка" to "${it.entranceHeightCm.displayMeasurement()} см", "Направление летка" to "${it.entranceAzimuthDeg}° · ${azimuthSector(it.entranceAzimuthDeg)}", "Наружный диаметр" to "${it.outerDiameterCm.displayMeasurement()} см", "Материал" to it.material, "Внутренний диаметр" to "${it.internalDiameterCm.displayMeasurement()} см", "Высота внутреннего объёма" to "${it.internalHeightCm.displayMeasurement()} см") + listOfNotNull(it.notes?.let { n -> "Дополнительно" to n })
     } ?: emptyList(), media = value.media, onEdit = onEdit,
@@ -150,7 +152,7 @@ fun LogHiveCard(
 @Composable
 private fun PhysicalObjectCard(
     typeLabel: String, territoryLabel: String, creatorLabel: String, deleteTitle: String,
-    createdAt: String, latitude: Double, longitude: Double, properties: List<Pair<String, String>>,
+    fixationText: String, latitude: Double, longitude: Double, properties: List<Pair<String, String>>,
     media: List<PhysicalObjectMedia>, onEdit: () -> Unit,
     onEditCoordinates: () -> Unit, onShowOnMap: () -> Unit, onDelete: () -> Unit,
     onExport: () -> Unit,
@@ -228,7 +230,7 @@ private fun PhysicalObjectCard(
                 HorizontalDivider()
                 PropertyRow("Создал", creatorLabel)
                 HorizontalDivider()
-                PropertyRow("Создано", createdAt)
+                PropertyRow("Зафиксировано", fixationText)
             }
         }
         OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth().testTag("physical-object-edit")) { Text("Редактировать характеристики") }
@@ -347,9 +349,6 @@ private fun AdaptiveDetailActions(
         }
     }
 }
-
-private fun java.time.Instant.displayDateTime(): String = atZone(ZoneId.systemDefault())
-    .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
 
 /**
  * The delete confirmation title in the grammatical form the phrase needs.

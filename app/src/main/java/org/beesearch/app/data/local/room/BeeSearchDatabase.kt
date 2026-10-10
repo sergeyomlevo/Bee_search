@@ -22,7 +22,7 @@ import androidx.room.TypeConverters
         ObservationPointAttachmentEntity::class,
         ObservationPointWeatherEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -59,6 +59,7 @@ internal abstract class BeeSearchDatabase : RoomDatabase() {
                 MIGRATION_10_11,
                 MIGRATION_11_12,
                 MIGRATION_12_13,
+                MIGRATION_13_14,
             )
             .build()
     }

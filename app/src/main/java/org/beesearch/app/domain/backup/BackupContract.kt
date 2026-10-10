@@ -136,6 +136,16 @@ internal object BackupContractV7 {
     const val OBJECT_MEDIA_PREFIX = BackupContractV6.OBJECT_MEDIA_PREFIX
 }
 
+/** Complete backup schema carrying the physical-object instant temporal facts. */
+internal object BackupContractV8 {
+    const val FORMAT = 8
+    const val SCHEMA = 8
+    const val PROFILE = BackupContractV1.PROFILE
+    val collections = BackupContractV7.collections
+    const val ATTACHMENT_PREFIX = BackupContractV7.ATTACHMENT_PREFIX
+    const val OBJECT_MEDIA_PREFIX = BackupContractV7.OBJECT_MEDIA_PREFIX
+}
+
 internal sealed class BackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
 internal class UnsupportedBackupFormat(message: String) : BackupException(message)
 internal class UnsupportedArchiveSchema(message: String) : BackupException(message)

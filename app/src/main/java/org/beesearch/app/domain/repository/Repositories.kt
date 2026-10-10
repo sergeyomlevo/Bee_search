@@ -77,10 +77,18 @@ interface PhysicalObjectRepository {
         territoryId: UUID,
         hollowDateInterval: ResearchDateInterval? = null,
         logHiveDateInterval: ResearchDateInterval? = null,
+        hollowFilters: org.beesearch.app.domain.model.PhysicalObjectFilterSet = org.beesearch.app.domain.model.PhysicalObjectFilterSet(),
+        logHiveFilters: org.beesearch.app.domain.model.PhysicalObjectFilterSet = org.beesearch.app.domain.model.PhysicalObjectFilterSet(),
     ): TerritoryPhysicalObjects
     suspend fun updateHollow(id: UUID, properties: HollowProperties, name: String? = null): Hollow
     suspend fun updateLogHive(id: UUID, properties: LogHiveProperties, name: String? = null): LogHive
     suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double)
+
+    /** Direct object media is an object modification, independent of future Inspection media. */
+    suspend fun addObjectMedia(id: UUID, media: List<org.beesearch.app.domain.model.PhysicalObjectMedia>)
+
+    /** Returns the removed app-owned path for file cleanup after the transaction commits. */
+    suspend fun removeObjectMedia(id: UUID, mediaId: UUID): String?
 
     /**
      * Removes one unused Hollow from the database.
@@ -149,6 +157,7 @@ interface ObservationRepository : ObservationPointPreparationCreator, Observatio
         territoryId: UUID,
         observationYear: Int? = null,
         dateInterval: ResearchDateInterval? = null,
+        countFilters: org.beesearch.app.domain.model.ObservationPointFilterSet = org.beesearch.app.domain.model.ObservationPointFilterSet(),
     ): Flow<List<ObservationPointSummary>>
     suspend fun getObservationPointDetail(pointId: UUID): ObservationPointDetail?
     fun observeActivePoint(): Flow<ObservationPoint?>

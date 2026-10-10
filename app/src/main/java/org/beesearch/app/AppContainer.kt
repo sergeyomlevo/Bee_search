@@ -57,6 +57,7 @@ import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.local.settings.settingsDataStore
 import org.beesearch.app.data.local.settings.installStateDataStore
 import org.beesearch.app.data.local.settings.DataStoreMapAreaStore
+import org.beesearch.app.data.local.settings.DataStoreMapDataDisplayStore
 import org.beesearch.app.data.local.settings.DataStoreMapPackageStore
 import org.beesearch.app.data.repository.RoomObservationRepository
 import org.beesearch.app.data.repository.RoomPhysicalObjectRepository
@@ -72,6 +73,7 @@ import org.beesearch.app.domain.repository.TerritoryRepository
 import org.beesearch.app.domain.usecase.CreateObservationPoint
 import org.beesearch.app.domain.weather.WeatherBackfillRunner
 import org.beesearch.app.ui.map.MapAreaStore
+import org.beesearch.app.ui.map.MapDataDisplayStore
 import java.time.Clock
 
 class BeeSearchApplication : Application() {
@@ -182,6 +184,15 @@ internal class AppContainer(private val context: Context) {
         filesDir = context.filesDir,
         dataStore = context.settingsDataStore,
     )
+
+    /**
+     * «Данные на карте» state of each Territory: type visibility and per-type periods.
+     *
+     * It is presentation state, so it lives in the existing settings DataStore next to the other
+     * device-local entries and never in the research database.
+     */
+    val mapDataDisplayStore: MapDataDisplayStore =
+        DataStoreMapDataDisplayStore(context.settingsDataStore)
     val territoryRepository: TerritoryRepository = RoomTerritoryRepository(
         database = database,
         territoryDao = database.territoryDao(),

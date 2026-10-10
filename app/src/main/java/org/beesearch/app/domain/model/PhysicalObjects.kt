@@ -104,6 +104,8 @@ data class Hollow(
     val media: List<PhysicalObjectMedia> = emptyList(),
     val name: String? = null,
     val fixationDate: LocalDate? = null,
+    val fixationAt: Instant? = null,
+    val updatedAt: Instant? = null,
 ) {
     val designation: String get() = PhysicalObjectType.HOLLOW.designation(sequenceNumber)
 }
@@ -120,6 +122,8 @@ data class LogHive(
     val media: List<PhysicalObjectMedia> = emptyList(),
     val name: String? = null,
     val fixationDate: LocalDate? = null,
+    val fixationAt: Instant? = null,
+    val updatedAt: Instant? = null,
 ) {
     val designation: String get() = PhysicalObjectType.LOG_HIVE.designation(sequenceNumber)
 }
@@ -134,6 +138,8 @@ data class Apiary(
     val name: String?,
     val creatorObserverId: UUID? = null,
     val fixationDate: LocalDate? = null,
+    val fixationAt: Instant? = null,
+    val updatedAt: Instant? = null,
 ) {
     val designation: String get() = PhysicalObjectType.APIARY.designation(sequenceNumber)
 }

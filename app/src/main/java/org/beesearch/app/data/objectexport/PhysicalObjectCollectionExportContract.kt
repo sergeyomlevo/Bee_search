@@ -7,7 +7,8 @@ import org.beesearch.app.domain.model.PhysicalObjectType
 /** Portable package of one concrete Physical Object type in one Territory. */
 internal object PhysicalObjectCollectionExportContract {
     const val PROFILE = "PHYSICAL_OBJECT_COLLECTION"
-    const val FORMAT_VERSION = 2
+    const val FORMAT_VERSION = 3
+    const val TEMPORAL_FORMAT_VERSION = 2
     const val LEGACY_FORMAT_VERSION = 1
     const val MANIFEST_ENTRY = "manifest.json"
     const val TERRITORY_ENTRY = "territory.json"

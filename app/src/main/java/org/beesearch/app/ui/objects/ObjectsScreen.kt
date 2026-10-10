@@ -53,7 +53,7 @@ internal fun ObjectsScreen(
             HorizontalDivider()
             ListItem(
                 headlineContent = { Text("Точки наблюдения") },
-                supportingContent = { Text("Карта, таблица и история наблюдений") },
+                supportingContent = { Text("Таблица и история наблюдений") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = onOpenObservationPoints)

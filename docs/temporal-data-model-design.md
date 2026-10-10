@@ -1020,6 +1020,11 @@ I6  UI integration: период в «Данные на карте» + ввод 
 I7  Device verification: Samsung, офлайн, смена пояса, границы месяца/года ← последний
 ```
 
+Owner clarification · 2026-10-10: ввод и исправление даты `ObservationPoint` в I6 **не входят** —
+дата точки по-прежнему задаётся автоматически при создании и не редактируется через UI
+(`docs/product-requirements.md` §17.1). Реализованный I6 — это период на тип в «Данные на карте» и
+общая карта исследовательских объектов; correction API из I1 остаётся без user-facing caller.
+
 Owner execution clarification · 2026-10-08: I1 остаётся самостоятельным increment; correction API
 реализуется и тестируется без user-facing caller. Normal creation не принимает explicit date.
 **I3 Backup/Snapshot carriage + I4 Export carriage MUST complete before I6 или любым другим
@@ -1056,3 +1061,28 @@ strategy, snapshot status model, выбор используемого timestamp
 `RoomPhysicalObjectRepository.kt`, `PhysicalObjectExportCodec.kt`,
 `PhysicalObjectCollectionExportCodec.kt`, `ObservationPointExportCodec.kt`, `BackupCore.kt`,
 `PhysicalObjectExportFileName.kt`, `OpenMeteoWeatherProvider.kt`.
+
+
+## 25. OWNER correction: physical-object fixation moment
+
+Accepted D103 (2026-10-10), current I6 amendment. This section supersedes statements above that physical objects have no own modification timestamp or that fixation is only a calendar date; prior I2 migration's unknown-legacy rule remains intact.
+
+Exact fields and lifecycle are normative in [data model: temporal object facts](data-model.md#временные-факты-объекта) and [D103](decisions.md#d103--physical-object-fixation-moment-and-modification-boundary). Fixation has an immutable exact instant plus a separately captured research calendar date. Period queries continue to use fixation_date only. Technical timestamps remain distinct. Inspection is separate and never modifies its parent merely by changing child data/media.
+
+Read-only audit: identity previously contained createdAt Instant and fixationDate LocalDate? only; Hollow/LogHive subtype rows had no timestamps. PhysicalObjectCards displayed `Создано` from createdAt using dd.MM.yyyy HH:mm in the display system zone. No true immutable fixation timestamp or object updated_at existed. New identity creation used one clock.instant() and its local calendar projection; characteristic/coordinate edits had no modification timestamp. Media could be supplied at creation and removed with full-object deletion; standalone association methods now update object updated_at atomically. Inspection does not exist in the current Room/domain capability.
+
+Creation history (1596f5c and later) captures created_at at form save. There is no manual date/time override in NewHollow/NewLogHive or creation UI. Restore/archive preserve source createdAt instead of replacing it with restore time; physical-object exports have readers but no persistence importer. This is only partial software-workflow evidence: it does not prove actual discovery occurred at save time, does not preserve historical capture zone, and gives no per-record origin classification. General legacy created_at→fixation equivalence is UNPROVEN. No backfill is executed.
+
+Read-only Samsung evidence for the disputed records before Room 14:
+- Hollow 10 UUID 14bf5e39-d3ca-4245-a1cb-8287174c3490: created_at 1791446361564 (08.10.2026 10:59:21.564 Europe/Moscow); fixation_date NULL.
+- LogHive 1 UUID d170bb70-8e91-4b2a-85b9-dd6803c8f948: created_at 1790850344115 (01.10.2026 13:25:44.115 Europe/Moscow); fixation_date NULL.
+These displayed `Создано` values are technical provenance, not proven fixation. Migration leaves fixation_at/fixation_date/updated_at NULL and UI reports unknown fixation. Owner records are not edited to manufacture evidence.
+
+Room 14 / migration 13→14 adds nullable fixation_at and updated_at INTEGER with no data promotion. Required wire versions: Complete Backup V8, Snapshot V3, single physical-object Export V3 and collection Export V3; prior readers preserve unknown values, legacy writers fail instead of silently dropping new fields.
+
+Fixation instant UI uses the existing dd.MM.yyyy HH:mm display-zone format. This local presentation does not rewrite the captured calendar date or affect filtering. A date-only legacy record explicitly reports unknown time; LocalDate is never converted into a fabricated Instant.
+
+Possible future legacy correction: owner confirms an individual object's actual fixation instant and original calendar date/zone, then a separately approved, audited correction persists them. No correction UI or bulk migration is implemented here. A one-time created_at promotion would require a provable subset, source provenance and an approved historical calendar-zone policy; none is currently established for all legacy rows.
+
+
+D103 implementation research used the installed Room 2.8.4 manual migration/testing APIs and standard SQLite nullable ADD COLUMN behavior; no dependency was added. Primary references: [Room release/API context](https://developer.android.com/jetpack/androidx/releases/room#2.8.4), [Room migrations](https://developer.android.com/training/data-storage/room/migrating-db-versions), [SQLite ALTER TABLE](https://sqlite.org/lang_altertable.html). Legacy policy remains a project/OWNER decision, not an inference from those APIs.

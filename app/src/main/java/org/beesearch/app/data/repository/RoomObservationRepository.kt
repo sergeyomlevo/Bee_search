@@ -96,13 +96,12 @@ internal class RoomObservationRepository(
         territoryId: UUID,
         observationYear: Int?,
         dateInterval: org.beesearch.app.domain.model.ResearchDateInterval?,
-    ): Flow<List<ObservationPointSummary>> = (if (dateInterval == null) {
-        pointDao.observeSummaries(territoryId, observationYear)
-    } else {
-        pointDao.observeSummariesInDateInterval(
-            territoryId, observationYear, dateInterval.fromDate, dateInterval.toDate,
-        )
-    })
+        countFilters: org.beesearch.app.domain.model.ObservationPointFilterSet,
+    ): Flow<List<ObservationPointSummary>> = pointDao.observeFilteredSummaries(
+        territoryId, observationYear, (countFilters.dateInterval ?: dateInterval)?.fromDate, (countFilters.dateInterval ?: dateInterval)?.toDate,
+        countFilters.beeCount.min, countFilters.beeCount.max,
+        countFilters.flightCycleCount.min, countFilters.flightCycleCount.max,
+    )
         .map { rows ->
             rows.map { row ->
                 ObservationPointSummary(
@@ -120,6 +119,7 @@ internal class RoomObservationRepository(
                     completedAt = row.completedAt,
                     beeCount = row.beeCount,
                     completedFlightCycleCount = row.completedFlightCycleCount,
+                    totalFlightCycleCount = row.totalFlightCycleCount,
                 )
             }
         }

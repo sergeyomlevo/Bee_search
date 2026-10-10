@@ -1860,6 +1860,8 @@ latitude         Double    фактические координаты объе�
 longitude        Double    фактические координаты объекта
 created_at       Instant
 fixation_date    LocalDate nullable, SQLite TEXT ISO YYYY-MM-DD; unknown = NULL
+fixation_at      Instant nullable, SQLite INTEGER epoch ms; unknown = NULL
+updated_at       Instant nullable, SQLite INTEGER epoch ms; legacy unknown = NULL
 creator_observer_id UUID nullable for historical foundation rows, FK → observers.id (RESTRICT)
 ```
 
@@ -1912,18 +1914,19 @@ SHA-256 и `created_at`. FK — `RESTRICT`. Медиа создания не с�
 
 ## Временные факты объекта
 
-`created_at` — техническая метка identity-записи: когда строка появилась в базе Bee Search.
-Subtype-строки Дупла, Колоды и Пасеки собственных временных меток не имеют, поэтому время изменения
-характеристик или названия сейчас не сохраняется.
+D103 / Room v14: общая identity-таблица хранит `created_at Instant`, `updated_at Instant?`, `fixation_at Instant?` (SQLite INTEGER epoch ms) и `fixation_date LocalDate?` (SQLite TEXT ISO YYYY-MM-DD).
 
-Исследовательская дата объекта — **дата фиксации**: когда исследователь зафиксировал объект в рамках
-исследования. Она независима от `created_at` и используется обычным фильтром карты по периоду
-(D094). I2 / Room v13 хранит её в общей identity-таблице как `fixation_date TEXT NULL`,
-Kotlin `LocalDate?`, ISO YYYY-MM-DD, без DEFAULT/index и без timezone после сохранения.
-Новые Hollow/LogHive получают локальную календарную дату из того же единственного Instant,
-который сохраняется как createdAt; нумерация от даты не зависит. Все legacy Hollow/LogHive/Apiary
-после migration 12→13 имеют NULL без backfill. Технический createApiary также оставляет NULL.
-Subtype dates, date editor и explicit date creation override не добавлены.
+`fixation_at` — неизменяемый реальный момент фиксации; `fixation_date` — календарная дата, захваченная вместе с ним в локальной зоне фиксации. Дата не пересчитывается при смене зоны. Фильтры I5/I6 используют только fixation_date, включительно; bounded intervals исключают NULL, all-time сохраняет NULL.
+
+При обычном создании Hollow/LogHive один captured Instant T с миллисекундной точностью атомарно задаёт fixation_at = created_at = updated_at = T и fixation_date = localDate(T, captured creation zone). Это совпадение значений не объединяет семантику. Apiary capability не добавлена: технический createApiary оставляет fixation_at/fixation_date NULL.
+
+Изменение собственных характеристик, имени/заметок, координат или direct object media обновляет только updated_at. No-op, чтение, map selection, фильтрация, export и backup ничего не меняют. Direct media association mutation — repository transaction; удалённый путь передаётся вызывающему слою для cleanup после commit. UI редактирования media не добавлен.
+
+Осмотр — отдельная сущность (D088/D103): создание/редактирование Осмотра и его media не меняет parent Hollow/LogHive и его timestamps. Inspection capability пока отсутствует.
+
+Migration 13→14 добавляет два nullable INTEGER без DEFAULT/backfill. Legacy fixation_at/updated_at неизвестны (NULL), существующие fixation_date и created_at сохраняются. Created_at не становится fixation fallback. Новое подтверждение исторической фиксации требует отдельного OWNER решения; date editor / ручная коррекция в этом шаге не реализованы.
+
+Complete Backup V8, Snapshot V3 и физические single/collection Export V3 явно переносят fixationAt/updatedAt. Старые readers materialize новые поля NULL; старые writers запрещают потерю непредставимых полей. ObservationPoint Export V2 не меняется.
 
 В текущей schema отсутствуют:
 - дата или год основания пасеки — характеристика реального объекта, отдельная от даты фиксации;

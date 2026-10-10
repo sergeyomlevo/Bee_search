@@ -81,6 +81,8 @@ class PhysicalObjectCollectionExportSourceTest {
         assertEquals(listOf(logHive.id), logHives.objects.map { it.id })
         assertTrue(hollows.objects.all { it.fixationDate == NOW.atZone(ZoneOffset.UTC).toLocalDate() })
         assertTrue(logHives.objects.all { it.fixationDate == NOW.atZone(ZoneOffset.UTC).toLocalDate() })
+        assertTrue(hollows.objects.all { it.fixationAt == NOW && it.updatedAt == NOW })
+        assertTrue(logHives.objects.all { it.fixationAt == NOW && it.updatedAt == NOW })
         assertTrue(logHives.objects.none { it.id == a1.id || it.id == a2.id })
         assertEquals(setOf(OBSERVER_A, OBSERVER_B), hollows.objects.mapNotNull { it.creatorObserverId }.toSet())
 

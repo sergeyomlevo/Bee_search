@@ -65,7 +65,7 @@ class PhysicalObjectCardsTest {
 
         composeRule.onNodeWithTag("physical-object-detail-media-hero").assertIsDisplayed()
         composeRule.onNodeWithTag("physical-object-detail-media-${media[1].id}").assertIsDisplayed()
-        composeRule.onNodeWithText("Направление летка").assertIsDisplayed()
+        composeRule.onNodeWithText("Направление летка:").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("127° · ЮВ").assertIsDisplayed()
         composeRule.onAllNodesWithText("Азимут").assertCountEquals(0)
         composeRule.onNodeWithTag("physical-object-coordinates").performScrollTo().assertIsDisplayed()
@@ -76,6 +76,45 @@ class PhysicalObjectCardsTest {
             assertTrue(showOnMap)
             assertTrue(editCoordinates)
         }
+    }
+
+    @Test
+    fun savedObjectShowsFixationMomentInsteadOfTechnicalCreationTime() {
+        val fixationAt = Instant.parse("2026-08-05T08:34:56Z")
+        val expected = fixationAt.atZone(java.time.ZoneId.systemDefault())
+            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+        composeRule.setContent { Bee_searchTheme {
+            HollowCard(
+                value = hollow(4).copy(
+                    createdAt = Instant.parse("2026-10-10T08:00:00Z"),
+                    fixationDate = java.time.LocalDate.of(2026, 8, 5),
+                    fixationAt = fixationAt,
+                ),
+                territoryLabel = "T",
+                creatorLabel = "O",
+            )
+        } }
+
+        composeRule.onNodeWithText("Зафиксировано:").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(expected).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Создано", substring = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun savedObjectStatesUnknownFixationPrecisionWithoutCreatedAtFallback() {
+        composeRule.setContent { Bee_searchTheme {
+            HollowCard(
+                value = hollow(4).copy(
+                    createdAt = Instant.parse("2026-10-10T08:00:00Z"),
+                    fixationDate = java.time.LocalDate.of(2026, 8, 5),
+                    fixationAt = null,
+                ),
+                territoryLabel = "T",
+                creatorLabel = "O",
+            )
+        } }
+        composeRule.onNodeWithText("05.08.2026, время фиксации неизвестно").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("10.10.2026", substring = true).assertCountEquals(0)
     }
 
     @Test
@@ -261,7 +300,7 @@ class PhysicalObjectCardsTest {
             )
         } }
 
-        composeRule.onNodeWithText("Направление летка").assertIsDisplayed()
+        composeRule.onNodeWithText("Направление летка:").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("90° · В").assertIsDisplayed()
         composeRule.onAllNodesWithText("Азимут").assertCountEquals(0)
     }

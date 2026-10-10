@@ -5,7 +5,6 @@ import java.util.UUID
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.ObservationPointSummary
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PointsPresentationTest {
@@ -21,33 +20,24 @@ class PointsPresentationTest {
             allPoints = listOf(newest, old),
             selectedTerritoryId = devTerritory,
             requestedYearFilter = null,
-            viewMode = PointsViewMode.MAP,
-            selectedPointId = null,
         )
         val oldYear = buildPointsUiState(
             allPoints = listOf(newest, old),
             selectedTerritoryId = devTerritory,
             requestedYearFilter = PointsYearFilter.Year(2025),
-            viewMode = PointsViewMode.TABLE,
-            selectedPointId = old.id,
         )
 
         assertEquals(listOf(2026, 2025), initial.availableYears)
         assertEquals(PointsYearFilter.Year(2026), initial.yearFilter)
         assertEquals(listOf(newest.id), initial.points.map { it.id })
         assertEquals(listOf(old.id), oldYear.points.map { it.id })
-        assertEquals(old.id, oldYear.selectedPoint?.id)
     }
 
     @Test
-    fun allYearsAndViewSwitchKeepExactlyTheSamePointIds() {
+    fun allYearsKeepExactlyTheSamePointIds() {
         val points = listOf(summary(2026, 3), summary(2025, 2), summary(2024, 1))
-        val map = buildPointsUiState(points, devTerritory, PointsYearFilter.All, PointsViewMode.MAP, null)
-        val table = buildPointsUiState(points, devTerritory, PointsYearFilter.All, PointsViewMode.TABLE, null)
-
-        assertEquals(points.map { it.id }, map.points.map { it.id })
-        assertEquals(map.points.map { it.id }, table.points.map { it.id })
-        assertNull(table.selectedPoint)
+        val state = buildPointsUiState(points, devTerritory, PointsYearFilter.All, null)
+        assertEquals(points.map { it.id }, state.points.map { it.id })
     }
 
     /**
@@ -62,8 +52,6 @@ class PointsPresentationTest {
             allPoints = listOf(viewed),
             selectedTerritoryId = otherTerritory,
             requestedYearFilter = null,
-            viewMode = PointsViewMode.MAP,
-            selectedPointId = null,
         )
 
         assertEquals(otherTerritory, state.selectedTerritoryId)
@@ -83,8 +71,6 @@ class PointsPresentationTest {
             allPoints = listOf(summary(2026, 1), summary(2025, 2), otherYear),
             selectedTerritoryId = devTerritory,
             requestedYearFilter = PointsYearFilter.Year(2025),
-            viewMode = PointsViewMode.TABLE,
-            selectedPointId = null,
         )
 
         assertEquals(listOf(2025), state.points.map { it.observationYear })
@@ -97,8 +83,6 @@ class PointsPresentationTest {
             allPoints = listOf(summary(2024, 1), summary(2023, 2)),
             selectedTerritoryId = devTerritory,
             requestedYearFilter = PointsYearFilter.Year(2026),
-            viewMode = PointsViewMode.MAP,
-            selectedPointId = null,
         )
 
         assertEquals(PointsYearFilter.Year(2024), state.yearFilter)
@@ -111,14 +95,11 @@ class PointsPresentationTest {
             allPoints = emptyList(),
             selectedTerritoryId = devTerritory,
             requestedYearFilter = PointsYearFilter.Year(2026),
-            viewMode = PointsViewMode.MAP,
-            selectedPointId = UUID.randomUUID(),
         )
 
         assertEquals(emptyList<UUID>(), state.points.map { it.id })
         assertEquals(emptyList<Int>(), state.availableYears)
         assertEquals(PointsYearFilter.All, state.yearFilter)
-        assertNull(state.selectedPoint)
     }
 
     @Test
@@ -155,6 +136,6 @@ class PointsPresentationTest {
         createdAt = Instant.parse("$year-01-01T00:00:00Z"),
         completedAt = Instant.parse("$year-01-01T01:00:00Z"),
         beeCount = 1,
-        completedFlightCycleCount = 1,
+        completedFlightCycleCount = 1, totalFlightCycleCount = 1,
     )
 }

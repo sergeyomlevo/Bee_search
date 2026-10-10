@@ -41,6 +41,7 @@ internal data class ObservationPointSummaryRow(
     @ColumnInfo(name = "completed_at") val completedAt: Instant?,
     @ColumnInfo(name = "bee_count") val beeCount: Int,
     @ColumnInfo(name = "completed_flight_cycle_count") val completedFlightCycleCount: Int,
+    @ColumnInfo(name = "total_flight_cycle_count") val totalFlightCycleCount: Int,
 )
 
 @Dao
@@ -120,6 +121,9 @@ internal interface PhysicalObjectDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertMedia(values: List<PhysicalObjectMediaEntity>)
 
+    @Query("DELETE FROM physical_object_media WHERE id = :mediaId AND physical_object_id = :objectId")
+    suspend fun deleteObjectMedia(objectId: UUID, mediaId: UUID): Int
+
     @Query("SELECT * FROM physical_objects WHERE id = :id")
     suspend fun getById(id: UUID): PhysicalObjectEntity?
 
@@ -135,6 +139,25 @@ internal interface PhysicalObjectDao {
         objectType: PhysicalObjectType,
         fromDate: LocalDate,
         toDate: LocalDate,
+    ): List<PhysicalObjectEntity>
+
+    @Query("""
+        SELECT p.* FROM physical_objects p
+        LEFT JOIN hollows h ON h.physical_object_id = p.id
+        LEFT JOIN log_hives l ON l.physical_object_id = p.id
+        WHERE p.territory_id = :territoryId AND p.object_type = :objectType
+          AND (:fromDate IS NULL OR p.fixation_date >= :fromDate)
+          AND (:toDate IS NULL OR p.fixation_date <= :toDate)
+          AND (:minHeight IS NULL OR CASE WHEN p.object_type = 'HOLLOW' THEN h.entrance_height_cm ELSE l.entrance_height_cm END >= :minHeight)
+          AND (:maxHeight IS NULL OR CASE WHEN p.object_type = 'HOLLOW' THEN h.entrance_height_cm ELSE l.entrance_height_cm END <= :maxHeight)
+          AND (:minDiameter IS NULL OR CASE WHEN p.object_type = 'HOLLOW' THEN h.outer_diameter_cm ELSE l.outer_diameter_cm END >= :minDiameter)
+          AND (:maxDiameter IS NULL OR CASE WHEN p.object_type = 'HOLLOW' THEN h.outer_diameter_cm ELSE l.outer_diameter_cm END <= :maxDiameter)
+        ORDER BY p.sequence_number, p.id
+    """)
+    suspend fun getFilteredForTerritoryByType(
+        territoryId: UUID, objectType: PhysicalObjectType,
+        fromDate: LocalDate?, toDate: LocalDate?,
+        minHeight: Double?, maxHeight: Double?, minDiameter: Double?, maxDiameter: Double?,
     ): List<PhysicalObjectEntity>
 
     @Query("SELECT * FROM apiaries WHERE physical_object_id = :id")
@@ -166,6 +189,9 @@ internal interface PhysicalObjectDao {
 
     @Query("UPDATE physical_objects SET latitude = :latitude, longitude = :longitude WHERE id = :id AND object_type IN ('HOLLOW', 'LOG_HIVE')")
     suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double): Int
+
+    @Query("UPDATE physical_objects SET updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateModificationTime(id: UUID, updatedAt: Instant): Int
 
     @Query("SELECT * FROM apiaries WHERE physical_object_id IN (:ids) ORDER BY physical_object_id")
     suspend fun getApiaries(ids: Collection<UUID>): List<ApiaryEntity>
@@ -319,44 +345,39 @@ internal interface ObservationPointDao {
                p.bee_presence_result, p.latitude, p.longitude, p.gps_accuracy_m,
                p.created_at, p.completed_at,
                COUNT(DISTINCT b.id) AS bee_count,
-               COUNT(CASE WHEN c.return_time IS NOT NULL THEN 1 END) AS completed_flight_cycle_count
+               COUNT(CASE WHEN c.return_time IS NOT NULL THEN 1 END) AS completed_flight_cycle_count,
+               COUNT(c.id) AS total_flight_cycle_count
         FROM observation_points AS p
         LEFT JOIN bees AS b ON b.observation_point_id = p.id
         LEFT JOIN flight_cycles AS c ON c.bee_id = b.id
         WHERE p.territory_id = :territoryId
           AND (:observationYear IS NULL OR p.observation_year = :observationYear)
+          AND (:fromDate IS NULL OR p.observation_date >= :fromDate)
+          AND (:toDate IS NULL OR p.observation_date <= :toDate)
         GROUP BY p.id
+        HAVING (:minBees IS NULL OR COUNT(DISTINCT b.id) >= :minBees)
+           AND (:maxBees IS NULL OR COUNT(DISTINCT b.id) <= :maxBees)
+           AND (:minCycles IS NULL OR COUNT(c.id) >= :minCycles)
+           AND (:maxCycles IS NULL OR COUNT(c.id) <= :maxCycles)
         ORDER BY p.created_at DESC, p.id
         """,
     )
-    fun observeSummaries(
+    fun observeFilteredSummaries(
         territoryId: UUID,
         observationYear: Int?,
+        fromDate: LocalDate?,
+        toDate: LocalDate?,
+        minBees: Int?, maxBees: Int?,
+        minCycles: Int?, maxCycles: Int?,
     ): Flow<List<ObservationPointSummaryRow>>
 
-    @Query(
-        """
-        SELECT p.observation_date, p.id, p.territory_id, p.observation_year, p.point_number, p.code,
-               p.bee_presence_result, p.latitude, p.longitude, p.gps_accuracy_m,
-               p.created_at, p.completed_at,
-               COUNT(DISTINCT b.id) AS bee_count,
-               COUNT(CASE WHEN c.return_time IS NOT NULL THEN 1 END) AS completed_flight_cycle_count
-        FROM observation_points AS p
-        LEFT JOIN bees AS b ON b.observation_point_id = p.id
-        LEFT JOIN flight_cycles AS c ON c.bee_id = b.id
-        WHERE p.territory_id = :territoryId
-          AND (:observationYear IS NULL OR p.observation_year = :observationYear)
-          AND p.observation_date >= :fromDate AND p.observation_date <= :toDate
-        GROUP BY p.id
-        ORDER BY p.created_at DESC, p.id
-        """,
-    )
+    fun observeSummaries(territoryId: UUID, observationYear: Int?): Flow<List<ObservationPointSummaryRow>> =
+        observeFilteredSummaries(territoryId, observationYear, null, null, null, null, null, null)
+
     fun observeSummariesInDateInterval(
-        territoryId: UUID,
-        observationYear: Int?,
-        fromDate: LocalDate,
-        toDate: LocalDate,
-    ): Flow<List<ObservationPointSummaryRow>>
+        territoryId: UUID, observationYear: Int?, fromDate: LocalDate, toDate: LocalDate,
+    ): Flow<List<ObservationPointSummaryRow>> =
+        observeFilteredSummaries(territoryId, observationYear, fromDate, toDate, null, null, null, null)
 
     @Query("SELECT COUNT(*) FROM observation_points WHERE completed_at IS NULL")
     suspend fun countActive(): Int

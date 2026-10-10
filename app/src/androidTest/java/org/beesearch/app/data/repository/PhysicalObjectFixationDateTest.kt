@@ -44,12 +44,16 @@ class PhysicalObjectFixationDateTest {
         assertEquals(1, clock.calls)
         assertEquals(firstId, hollow.id)
         assertEquals(clock.value, hollow.createdAt)
+        assertEquals(clock.value, hollow.fixationAt)
+        assertEquals(clock.value, hollow.updatedAt)
         assertEquals(LocalDate.of(2027, 1, 1), hollow.fixationDate)
         val logId = UUID.randomUUID()
         val log = repo.createLogHive(newLogHive(logId))
         assertEquals(2, clock.calls)
         assertEquals(logId, log.id)
         assertEquals(clock.value, log.createdAt)
+        assertEquals(clock.value, log.fixationAt)
+        assertEquals(clock.value, log.updatedAt)
         assertEquals(hollow.fixationDate, log.fixationDate)
         assertEquals(1, hollow.sequenceNumber)
         assertEquals(1, log.sequenceNumber)
@@ -92,7 +96,7 @@ class PhysicalObjectFixationDateTest {
         // Persist actual nullable entities, rather than relying on a decoder fallback.
         for (id in listOf(hollow.id, log.id, apiary.id)) {
             val entity = db.physicalObjectDao().getById(id)!!
-            db.openHelper.writableDatabase.execSQL("UPDATE physical_objects SET fixation_date = NULL WHERE id = ?", arrayOf(entity.id.toString()))
+            db.openHelper.writableDatabase.execSQL("UPDATE physical_objects SET fixation_date = NULL, fixation_at = NULL WHERE id = ?", arrayOf(entity.id.toString()))
         }
         assertNull(repo.getHollow(hollow.id)!!.fixationDate)
         assertNull(repo.getLogHive(log.id)!!.fixationDate)
@@ -101,6 +105,60 @@ class PhysicalObjectFixationDateTest {
         assertNull(all.hollows.single().fixationDate)
         assertNull(all.logHives.single().fixationDate)
         assertNull(all.apiaries.single().fixationDate)
+    }
+
+
+    @Test fun ownEditsPreserveFixationAndNoOpsDoNotTouchClock() = runBlocking {
+        val hollow = repo.createHollow(newHollow(UUID.randomUUID()))
+        val log = repo.createLogHive(newLogHive(UUID.randomUUID()))
+        clock.value = Instant.parse("2028-01-02T12:00:00Z")
+        val changedH = repo.updateHollow(hollow.id, hollow.properties!!.copy(notes = "edited"), "H")
+        val changedL = repo.updateLogHive(log.id, log.properties!!.copy(notes = "edited"), "L")
+        assertEquals(hollow.copy(properties = changedH.properties, name = "H", updatedAt = clock.value), changedH)
+        assertEquals(log.copy(properties = changedL.properties, name = "L", updatedAt = clock.value), changedL)
+        val calls = clock.calls
+        repo.updateHollow(changedH.id, changedH.properties!!, changedH.name)
+        repo.updateLogHive(changedL.id, changedL.properties!!, changedL.name)
+        repo.updateCoordinates(hollow.id, hollow.latitude, hollow.longitude)
+        repo.getHollow(hollow.id)
+        repo.getLogHive(log.id)
+        // Filtering uses the original captured date, never the much later updated_at.
+        val found = repo.listForTerritory(territory,
+            ResearchDateInterval(LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 1)),
+            ResearchDateInterval(LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 1)))
+        assertEquals(hollow.id, found.hollows.single().id)
+        assertEquals(log.id, found.logHives.single().id)
+        assertEquals(calls, clock.calls)
+        clock.value = clock.value.plusSeconds(60)
+        repo.updateCoordinates(hollow.id, 57.0, 43.0)
+        assertEquals(changedH.copy(latitude = 57.0, longitude = 43.0, updatedAt = clock.value), repo.getHollow(hollow.id))
+        clock.value = clock.value.plusSeconds(60)
+        repo.updateCoordinates(log.id, 57.0, 43.0)
+        assertEquals(changedL.copy(latitude = 57.0, longitude = 43.0, updatedAt = clock.value), repo.getLogHive(log.id))
+    }
+
+    @Test fun directMediaChangesOnlyModificationTimeAndFailedMutationRollsBack() = runBlocking {
+        for (type in listOf(PhysicalObjectType.HOLLOW, PhysicalObjectType.LOG_HIVE)) {
+            val id = UUID.randomUUID()
+            if (type == PhysicalObjectType.HOLLOW) repo.createHollow(newHollow(id)) else repo.createLogHive(newLogHive(id))
+            val initial = db.physicalObjectDao().getById(id)!!
+            clock.value = clock.value.plusSeconds(60)
+            val media = PhysicalObjectMedia(UUID.randomUUID(), id, PhysicalObjectMediaType.IMAGE,
+                "physical-objects/$id/image.jpg", "image.jpg", "image/jpeg", 1L, "a".repeat(64), clock.value)
+            repo.addObjectMedia(id, listOf(media))
+            assertEquals(initial.copy(updatedAt = clock.value), db.physicalObjectDao().getById(id))
+            val afterAdd = db.physicalObjectDao().getById(id)!!
+            try { repo.addObjectMedia(id, listOf(media)); fail("duplicate media must fail") } catch (_: android.database.sqlite.SQLiteConstraintException) { }
+            assertEquals(afterAdd, db.physicalObjectDao().getById(id))
+            val calls = clock.calls
+            repo.addObjectMedia(id, emptyList())
+            assertNull(repo.removeObjectMedia(id, UUID.randomUUID()))
+            assertEquals(calls, clock.calls)
+            clock.value = clock.value.plusSeconds(60)
+            assertEquals(media.relativePath, repo.removeObjectMedia(id, media.id))
+            assertEquals(initial.copy(updatedAt = clock.value), db.physicalObjectDao().getById(id))
+            assertTrue(db.physicalObjectDao().getMedia(id).isEmpty())
+        }
     }
 
     private fun repository(zone: ZoneId) = RoomPhysicalObjectRepository(db, db.physicalObjectDao(), db.physicalObjectSequenceDao(),

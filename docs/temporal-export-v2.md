@@ -1,7 +1,7 @@
 # Temporal Export V2 — canonical research-date carriage
 
 Owner execution contract · 2026-10-08. Implements temporal I4; no Room, UI or import-to-Room change.
-Current production writers use formatVersion **2** for each independent profile below.
+ObservationPoint production writer remains formatVersion **2**; physical single/collection writers now use **3** (D103 amendment below).
 
 | Profile | V2 payload field | V1 materialization |
 |---|---|---|
@@ -43,3 +43,10 @@ Backup V7, Snapshot V2 and all three Export V2 profiles now carry canonical date
 one deployment unit. Samsung installation still requires a separate gate: Room 12→13 runtime
 migration, Android V7 restore, Snapshot V2 SAF publication/read-back, V2 export integration and
 preservation of existing DEV data/settings/maps/repository. I5–I7 are not implemented here.
+
+
+## Physical-object Export V3 — D103
+
+SINGLE_PHYSICAL_OBJECT and PHYSICAL_OBJECT_COLLECTION independently use formatVersion 3. Their strict object identity adds REQUIRED nullable `fixationAt` and `updatedAt` as integer epoch milliseconds. Existing createdAt/media Instant fields retain their prior ISO string encoding. fixationDate remains the persisted zone-free date; non-null fixationAt requires non-null fixationDate. No createdAt fallback or historical time reconstruction.
+
+V1/V2 readers remain supported and materialize the new fields NULL. Explicit V1/V2 writers reject non-null instant fields rather than lose them; V2 date-only exports remain representable. UUIDs, type/territory scope, media layout, ordering, hashes and SAF workflows are unchanged. Reverse import-to-Room is still absent.

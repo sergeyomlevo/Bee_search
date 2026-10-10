@@ -1,15 +1,18 @@
 package org.beesearch.app
 
 import android.content.Context
+import androidx.lifecycle.ViewModelStore
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.room.Room
+import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CoroutineScope
@@ -26,6 +29,7 @@ import org.beesearch.app.data.local.room.BeeEntity
 import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.room.ObservationPointEntity
 import org.beesearch.app.data.local.settings.DataStoreMapAreaStore
+import org.beesearch.app.data.local.settings.DataStoreMapDataDisplayStore
 import org.beesearch.app.data.local.settings.DataStoreMapPackageStore
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
 import org.beesearch.app.data.location.AndroidLocationProvider
@@ -48,11 +52,16 @@ import org.beesearch.app.domain.model.MarkPosition
 import org.beesearch.app.domain.model.NewHollow
 import org.beesearch.app.domain.model.NewObservationPoint
 import org.beesearch.app.domain.model.PhysicalObjectType
+import org.beesearch.app.domain.model.ResearchDateInterval
 import org.beesearch.app.domain.usecase.CreateObservationPoint
 import org.beesearch.app.domain.weather.WeatherSyncScheduler
+import org.beesearch.app.ui.map.DEFAULT_MAP_DATA_DISPLAY
 import org.beesearch.app.ui.map.MapAreaReadResult
+import org.beesearch.app.ui.map.MapDataType
 import org.beesearch.app.ui.map.MapGeoBounds
 import org.beesearch.app.ui.map.MapPackageAvailability
+import org.beesearch.app.ui.map.MapObjectMarker
+import org.beesearch.app.ui.map.MapObjectType
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -118,16 +127,22 @@ class CleanStartupIntegrationTest {
         clock = Clock.systemUTC(),
     )
     private val renderedRoutes = CopyOnWriteArrayList<AppRoute>()
+    private val viewModelStore = ViewModelStore()
+    private val viewModelJobs = mutableListOf<Job>()
 
     @After
     fun tearDown() {
+        viewModelStore.clear()
+        runBlocking { viewModelJobs.forEach { it.join() } }
         database.close()
         storeScope.cancel()
+        runBlocking { storeScope.coroutineContext[Job]?.join() }
         settingsFile.delete()
         installStateFile.delete()
     }
 
-    private fun newViewModel(): MainViewModel = MainViewModel(
+    private fun newViewModel(): MainViewModel {
+        val viewModel = MainViewModel(
         settingsRepository = settingsRepository,
         territoryRepository = territoryRepository,
         observerRepository = observerRepository,
@@ -168,7 +183,11 @@ class CleanStartupIntegrationTest {
             contentResolver = context.contentResolver,
             cacheDirectory = context.cacheDir,
         ),
-    )
+        )
+        viewModelJobs += requireNotNull(viewModel.viewModelScope.coroutineContext[Job])
+        viewModelStore.put("main-${UUID.randomUUID()}", viewModel)
+        return viewModel
+    }
 
     /**
      * Mirrors MainActivity: the running Activity records the route it rendered and reacts to the
@@ -367,6 +386,88 @@ class CleanStartupIntegrationTest {
     }
 
     @Test
+    fun mapMarkerOpensTheExistingTypedRecordWithExactIdentityAndBackReturnsToMap() = runBlocking {
+        val viewModel = newViewModel()
+        val markers = listOf(
+            MapObjectMarker(MapObjectType.OBSERVATION_POINT, UUID.randomUUID(), 56.1, 42.7, "Точка 1"),
+            MapObjectMarker(MapObjectType.HOLLOW, UUID.randomUUID(), 56.2, 42.8, "Дупло 2"),
+            MapObjectMarker(MapObjectType.LOG_HIVE, UUID.randomUUID(), 56.3, 42.9, "Колода 3"),
+        )
+
+        markers.forEach { marker ->
+            viewModel.openMapObject(marker)
+            when (marker.type) {
+                MapObjectType.OBSERVATION_POINT -> {
+                    val route = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+                        viewModel.route.first { it is AppRoute.PointDetail }
+                    } as AppRoute.PointDetail
+                    assertEquals(marker.id, route.pointId)
+                    assertEquals(PointDetailOrigin.MAP, route.origin)
+                    viewModel.closePointDetail(route)
+                }
+                MapObjectType.HOLLOW, MapObjectType.LOG_HIVE -> {
+                    val expectedType = if (marker.type == MapObjectType.HOLLOW) PhysicalObjectType.HOLLOW else PhysicalObjectType.LOG_HIVE
+                    val route = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+                        viewModel.route.first { it is AppRoute.PhysicalObjectDetail }
+                    } as AppRoute.PhysicalObjectDetail
+                    assertEquals(marker.id, route.objectId)
+                    assertEquals(expectedType, route.listType)
+                    assertTrue(route.returnToMap)
+                    viewModel.closePhysicalObjectDetail()
+                }
+            }
+            awaitRoute(viewModel, AppRoute.CurrentTerritory())
+        }
+    }
+
+    @Test
+    fun nonMapPointAndPhysicalObjectRoutesKeepTheirExistingBackTargets() = runBlocking {
+        val viewModel = newViewModel()
+        val pointId = UUID.randomUUID()
+        viewModel.openPointDetail(pointId)
+        val pointRoute = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+            viewModel.route.first { it is AppRoute.PointDetail }
+        } as AppRoute.PointDetail
+        assertEquals(PointDetailOrigin.POINTS, pointRoute.origin)
+        viewModel.closePointDetail(pointRoute)
+        awaitRoute(viewModel, AppRoute.Points)
+
+        val objectId = UUID.randomUUID()
+        viewModel.openPhysicalObjectDetail(objectId, PhysicalObjectType.HOLLOW)
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(objectId, PhysicalObjectType.HOLLOW))
+        viewModel.closePhysicalObjectDetail()
+        awaitRoute(viewModel, AppRoute.PhysicalObjectList(PhysicalObjectType.HOLLOW))
+    }
+
+    @Test
+    fun mapPhysicalCardShowOnMapAndCoordinateEditPreserveMapOrigin() = runBlocking {
+        val viewModel = newViewModel()
+        val objectId = UUID.randomUUID()
+        viewModel.openPhysicalObjectFromMap(objectId, PhysicalObjectType.HOLLOW)
+        viewModel.showPhysicalObjectOnMap(56.1, 42.7)
+        val mapRoute = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+            viewModel.route.first { it is AppRoute.CurrentTerritory }
+        } as AppRoute.CurrentTerritory
+        assertEquals(PhysicalObjectCardReturn(objectId, PhysicalObjectType.HOLLOW, true), mapRoute.returnToObject)
+        viewModel.returnFromPhysicalObjectMap()
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(objectId, PhysicalObjectType.HOLLOW, returnToMap = true))
+
+        viewModel.editPhysicalObjectCoordinates(objectId, "Дупло", 56.2, 42.8)
+        awaitRoute(viewModel, AppRoute.CurrentTerritory())
+        viewModel.cancelPhysicalObjectLocationSelection()
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(objectId, PhysicalObjectType.HOLLOW, returnToMap = true))
+
+        viewModel.editPhysicalObjectCoordinates(objectId, "Дупло", 56.2, 42.8)
+        viewModel.confirmPhysicalObjectLocation(56.3, 42.9)
+        val updated = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+            viewModel.route.first { it is AppRoute.PhysicalObjectDetail && it.coordinateUpdate != null }
+        } as AppRoute.PhysicalObjectDetail
+        assertTrue(updated.returnToMap)
+        viewModel.consumePhysicalObjectCoordinateUpdate(requireNotNull(updated.coordinateUpdate).requestId)
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(objectId, PhysicalObjectType.HOLLOW, returnToMap = true))
+    }
+
+    @Test
     fun deletingAnObjectFromItsCardReturnsToItsListAndDoesNotReuseTheNumber() = runBlocking {
         val territory = territoryRepository.createTerritory("DEL", "Территория", "Область", "Район")
         val observer = observerRepository.createObserver("DELOBS", "Иванов", "Иван", null, null)
@@ -427,12 +528,14 @@ class CleanStartupIntegrationTest {
 
         viewModel.deletePhysicalObject(hollow.id, PhysicalObjectType.HOLLOW)
 
-        withTimeout(ROUTE_TIMEOUT_MILLIS) { viewModel.feedback.first { it != null } }
-        assertEquals(
-            "Объект используется в данных наблюдений и не может быть удалён",
-            viewModel.feedback.value?.message,
-        )
-        assertEquals(AppRoute.PhysicalObjectDetail(hollow.id, PhysicalObjectType.HOLLOW), viewModel.route.value)
+        val blocked = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+            viewModel.route.first { it is AppRoute.PhysicalObjectDetail && it.deletionBlockers != null }
+        } as AppRoute.PhysicalObjectDetail
+        assertEquals(hollow.id, blocked.objectId)
+        assertEquals(PhysicalObjectType.HOLLOW, blocked.listType)
+        assertTrue(requireNotNull(blocked.deletionBlockers).references.isNotEmpty())
+        viewModel.consumePhysicalObjectDeletionBlockers(requireNotNull(blocked.deletionBlockers).requestId)
+        awaitRoute(viewModel, AppRoute.PhysicalObjectDetail(hollow.id, PhysicalObjectType.HOLLOW))
         assertNotNull(physicalObjectRepository.getHollow(hollow.id))
         assertEquals(hollow.id, physicalObjectRepository.getBeeSourceObjectId(beeId))
     }
@@ -498,6 +601,79 @@ class CleanStartupIntegrationTest {
         } finally {
             activity.cancel()
         }
+    }
+
+    /**
+     * The «Данные на карте» display state is written to the same settings file the startup route is
+     * derived from. Re-reading those facts must not flash the route through `Loading`, because a
+     * transient `Loading` replaces the visible route — and with it the map screen and the open panel.
+     *
+     * This is the exact mechanism behind the owner-reported defect "the panel closes after every
+     * change"; before the loading guard in `MainViewModel` this test fails on the `Loading` entry.
+     */
+    @Test
+    fun writingTheDisplayStateNeverFlashesTheRouteThroughLoading() = runBlocking {
+        val territory = territoryRepository.createTerritory("I6", "Территория", "Область", "Район")
+        val observer = observerRepository.createObserver("I6OBS", "Иванов", "Иван", null, null)
+        settingsRepository.setCurrentTerritoryId(territory.id)
+        settingsRepository.setCurrentObserverId(observer.id)
+        settingsRepository.setInitialSetupOfferHandled(true)
+
+        val viewModel = newViewModel()
+        val activity = mirrorActivityStartup(viewModel)
+        val setupStates = CopyOnWriteArrayList<InitialSetupState>()
+        val setupObserver = observeSetupStatesWithoutConflation(viewModel, setupStates)
+        try {
+            // The map is reached as a startup destination, which is when the route really follows
+            // this state (an explicitly browsed route pins itself and cannot show the defect).
+            assertEquals(AppRoute.CurrentTerritory(), firstUserRoute(viewModel))
+            val routesBeforeTheWrite = renderedRoutes.size
+            withTimeout(ROUTE_TIMEOUT_MILLIS) {
+                viewModel.visibleInitialSetup.first { it is InitialSetupState.Ready }
+            }
+            val statesBeforeTheWrite = setupStates.size
+
+            // The write every panel change performs: a visibility switch, a period or a reset.
+            DataStoreMapDataDisplayStore(dataStore).save(
+                territory.id,
+                DEFAULT_MAP_DATA_DISPLAY.withPeriod(
+                    MapDataType.HOLLOW,
+                    ResearchDateInterval(LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 31)),
+                ),
+            )
+            delay(SETTLE_MILLIS)
+
+            val afterTheWrite = setupStates.drop(statesBeforeTheWrite)
+            assertTrue(
+                "a display-state write must not resolve the same generation from Loading again, saw " +
+                    afterTheWrite.map { it::class.simpleName },
+                afterTheWrite.none { it is InitialSetupState.Loading },
+            )
+            val duringTheWrite = renderedRoutes.drop(routesBeforeTheWrite)
+            assertTrue(
+                "a display-state write must not flash the route through Loading, saw $duringTheWrite",
+                duringTheWrite.none { it == AppRoute.Loading },
+            )
+            assertEquals(AppRoute.CurrentTerritory(), viewModel.route.value)
+        } finally {
+            setupObserver.cancel()
+            activity.cancel()
+        }
+    }
+
+    /**
+     * Observes the resolved setup state without the conflation a queued collector would apply.
+     *
+     * The state a settings write produces is `Loading` followed by `Ready` within the same main-thread
+     * turn when the reads are cheap, so a collector that resumes through the main queue can miss the
+     * `Loading` entirely — and with it the very defect this gate exists for. `Dispatchers.Unconfined`
+     * resumes on the emitting thread, which observes every assigned value.
+     */
+    private fun CoroutineScope.observeSetupStatesWithoutConflation(
+        viewModel: MainViewModel,
+        sink: MutableList<InitialSetupState>,
+    ): Job = launch(Dispatchers.Unconfined) {
+        viewModel.visibleInitialSetup.collect { sink += it }
     }
 
     private companion object {

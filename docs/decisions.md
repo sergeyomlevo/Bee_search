@@ -1812,6 +1812,12 @@ Summary вычисляет число Bee и завершённых FlightCycle 
 показывает ObservationPoint, Observer, Bee и упорядоченные FlightCycle без
 редактирования или аналитических выводов.
 
+**Owner correction 2026-10-10 (I6).** После интеграции исследовательских markers в основную
+карту отдельный map mode Points Browser удалён. Прежнее решение о двух surfaces выше
+заменено: Points = таблица/records с прежним year filter; основная карта = operational + unified
+research-data display с per-type FilterSet. Row/detail и разрешённое последующими decisions
+редактирование сохраняются. Production D102 infrastructure не удаляется.
+
 Points Browser не вводит persisted read model, новую domain entity или Room
 migration. Online/offline basemap, PMTiles lifecycle, GPS, создание наблюдения,
 backup и analysis остаются без изменений.
@@ -3618,3 +3624,46 @@ markers могут визуально перекрываться и их touch t
 Принятие не реализует registry, generation guard, ID namespace, Layers/Filters, temporal model или
 marker assets. Следующий отдельный production stage — temporal data model по уже утверждённому
 `temporal-data-model-design.md`; в этом docs-only slice implementation не начинается.
+
+
+# D103 — Physical-object fixation moment and modification boundary
+
+**Status: ACCEPTED** (OWNER, 2026-10-10). Extends D088/D094 within TEMPORAL I6.
+
+Hollow/LogHive fixation is an immutable real-world date + time, represented by nullable `fixation_at` (Instant, epoch milliseconds). `fixation_date` remains the independent captured zone-free calendar date used by inclusive DAY/MONTH/YEAR filters. No historical time may be reconstructed from a LocalDate.
+
+`created_at` means technical row creation. `updated_at` means the last modification of the object's own record (properties, name/notes, coordinates, direct media association). New objects initialize both technical timestamps and fixation instant from one captured millisecond-precision clock instant; fixation date is captured in the creation zone. Actual edits update only `updated_at`; no-op edits and reads do not.
+
+Inspection is a separate entity: creating/editing it or its media never changes parent fixation or parent updated_at. Its capability is not implemented by this decision. Direct object media is an object modification.
+
+Room 14 migration 13→14 adds nullable fixation_at/updated_at without backfill. Existing fixation_date remains untouched. Unknown legacy fixation and modification timestamps remain NULL. `created_at` is never a runtime fallback for fixation; any evidence-backed one-time legacy promotion requires separate OWNER approval, including historical calendar-zone convention.
+
+Complete Backup V8, Snapshot V3 and both physical-object export profiles V3 preserve both new fields. Prior formats remain readable with new fields NULL; legacy writers reject fields they cannot represent. ObservationPoint temporal semantics and export profile are unchanged.
+
+User-facing record and map preview show `Зафиксировано` from the actual fixation instant, or an honest unknown state; technical timestamps are not disguised as fixation. A date-only record preserves its known calendar date while explicitly reporting unknown fixation time.
+
+Implementation and audit details: [temporal design §25](temporal-data-model-design.md#25-owner-correction-physical-object-fixation-moment). Backlog pointer: [I017](ideas.md#i017--physical-object-fixation-moment-and-modification-boundary).
+
+# D104 — Main map bottom toolbar
+
+**Status: ACCEPTED** (OWNER, 2026-10-10). Refines the D077 navigation shell and I6 map-data entry presentation.
+
+The accepted prototype is `C:\App\Bee_search_ui_input\Макет панели инструментов карты MapLibre.png`.
+Use Compose/vector graphics, not the PNG in the APK. Preserve the existing 56 dp toolbar height.
+Four equal-width zones, left to right: **Analysis, Visualization, Objects, Settings**. No visible labels;
+large light pictograms fill the available height with small safe margins. Vocabulary: three ascending
+bars, symmetric open eye, four squares 2×2, broad-toothed gear with central hole. Dark neutral gray
+background, three muted inset dividers, consistent pressed feedback and warm-brown rounded open-state highlight.
+
+Analysis is a reserved disabled action until a real capability exists; no fake destination or active state.
+Visualization opens the existing «Данные на карте» panel on the unified map, with all I6 session,
+visibility, FilterSet and Back/Done semantics preserved. Objects and Settings keep their existing actions.
+Their screens replace the map, so no persistent active flag is introduced for them. Map-data highlight
+follows actual panelOpen, separately from the retained filter-restriction indicator.
+
+Each full zone is the touch target, with localized accessible name, button role and state/availability
+semantics. No map-source, creation, marker, camera, temporal or domain architecture changes belong here.
+Exact UI contract: [map display §2](ui/unified-territory-map-display-spec.md#2-точка-входа-на-карте).
+OWNER color refinement: the existing 9 dp circular active/restriction indicator is light lime-green
+`#B7E27A`, replacing theme-primary brown without any geometry, position or other toolbar change.
+Backlog pointer: [I004](ideas.md#i004--main-field-ui-simplification).

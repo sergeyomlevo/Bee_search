@@ -10,14 +10,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Button
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -25,6 +23,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -35,10 +35,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import org.beesearch.app.MapMeasurement
 import org.beesearch.app.ObservationPointCreationDraft
 import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.model.Territory
+import org.beesearch.app.domain.repository.ObservationRepository
+import org.beesearch.app.domain.repository.PhysicalObjectRepository
 import java.util.UUID
 import org.beesearch.app.formatMapMeasurement
 import org.beesearch.app.MapCenterRequest
@@ -57,6 +61,10 @@ internal fun CurrentTerritoryScreen(
     onCreateObservationPoint: () -> Unit,
     onCreateHollow: () -> Unit,
     onCreateLogHive: () -> Unit,
+    observationRepository: ObservationRepository,
+    physicalObjectRepository: PhysicalObjectRepository,
+    mapDataDisplayStore: MapDataDisplayStore,
+    onOpenMapObject: (MapObjectMarker) -> Unit = {},
     physicalObjectLocationLabel: String? = null,
     mapCenterRequest: MapCenterRequest? = null,
     onMapCenterRequestHandled: (UUID) -> Unit = {},
@@ -83,9 +91,32 @@ internal fun CurrentTerritoryScreen(
     if (onReturnToObjectCard != null) {
         BackHandler(onBack = onReturnToObjectCard)
     }
+    val mapDataViewModel: MapDataViewModel = viewModel(
+        factory = MapDataViewModel.factory(
+            observationRepository = observationRepository,
+            physicalObjectRepository = physicalObjectRepository,
+            store = mapDataDisplayStore,
+        ),
+    )
+    val mapDataState by mapDataViewModel.uiState.collectAsStateWithLifecycle()
+
+    // Display state belongs to one Territory, so the map always shows the state of the one it draws.
+    LaunchedEffect(territory?.id) { mapDataViewModel.setTerritory(territory?.id) }
+    // Objects of the Territory can be created or deleted off-screen; this screen leaves the
+    // composition for those routes, so entering it again re-reads the records.
+    LaunchedEffect(Unit) { mapDataViewModel.refresh() }
+    // Opening the panel is also a fresh look at the same records, and it is the moment a user checks
+    // whether a newly created object is on the map.
+    LaunchedEffect(mapDataState.panelOpen) {
+        if (mapDataState.panelOpen) mapDataViewModel.refresh()
+    }
+
     MapFirstScaffold(
         onOpenObjects = onOpenObjects,
         onOpenSettings = onOpenSettings,
+        onOpenMapData = mapDataViewModel::openPanel,
+        mapDataOpen = mapDataState.panelOpen,
+        mapDataRestricted = mapDataState.display.hasActiveRestriction,
     ) { mapModifier ->
         Box(modifier = mapModifier) {
             BeeMap(
@@ -107,6 +138,26 @@ internal fun CurrentTerritoryScreen(
                     areaEditorRequest = areaEditorRequest,
                     onAreaEditorRequestHandled = onAreaEditorRequestHandled,
                     onCoverageSessionEnded = onCoverageEditFinished,
+                    researchObjectMarkers = mapDataState.markers,
+                    selectedResearchObjectId = mapDataState.selectedObjectId,
+                    onSelectResearchObject = { marker -> mapDataViewModel.toggleSelection(marker.id) },
+                    initialCamera = mapDataViewModel.cameraFor(territory?.id),
+                    onCameraChanged = { camera ->
+                        territory?.id?.let { mapDataViewModel.saveCamera(it, camera) }
+                    },
+                    selectedResearchObjectPreview = {
+                        if (!mapDataState.panelOpen) {
+                            mapDataState.selectedMarker?.let { marker ->
+                                MapSelectedObjectCard(
+                                    marker = marker,
+                                    onOpen = onOpenMapObject,
+                                    onClose = mapDataViewModel::closePreview,
+                                    modifier = Modifier.align(Alignment.BottomCenter)
+                                        .padding(start = 16.dp, end = 16.dp, bottom = 144.dp).zIndex(3f),
+                                )
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxSize().testTag(MAIN_MAP_VIEWPORT_TAG),
                 )
             if (observationPointDraft != null) {
@@ -116,6 +167,9 @@ internal fun CurrentTerritoryScreen(
                     onCreateHollow = onCreateHollow,
                     onCreateLogHive = onCreateLogHive,
                 )
+            }
+            if (mapDataState.panelOpen) {
+                MapDataSurface(state = mapDataState, viewModel = mapDataViewModel)
             }
             if (territory == null) {
                 Surface(
@@ -137,117 +191,62 @@ internal fun CurrentTerritoryScreen(
     }
 }
 
+/**
+ * The «Данные на карте» panel bound to the session owner.
+ *
+ * The wiring lives here, next to the screen that renders it, so a test can drive the same wiring the
+ * field screen uses instead of re-implementing it: only the panel's actions and the ViewModel's session
+ * state decide what stays open.
+ */
+@Composable
+internal fun MapDataSurface(
+    state: MapDataUiState,
+    viewModel: MapDataViewModel,
+    modifier: Modifier = Modifier,
+) {
+    MapDataPanel(
+        state = state,
+        onVisibilityChange = viewModel::setVisible,
+        onPeriodChange = viewModel::setPeriod,
+        onFiltersChange = viewModel::setFilters,
+        onResetPeriod = viewModel::resetPeriod,
+        onResetFilters = viewModel::resetFilters,
+        onOpenType = viewModel::openTypeFilters,
+        onCloseType = viewModel::closeTypeFilters,
+        onDismiss = viewModel::closePanel,
+        modifier = modifier,
+    )
+}
+
 internal const val MAIN_MAP_VIEWPORT_TAG = "main-map-viewport"
-internal const val MAIN_BOTTOM_PANEL_TAG = "main-bottom-panel"
 internal const val RECENTER_MAP_DESCRIPTION = "Вернуться к текущему местоположению"
 internal const val CREATE_RECORD_DESCRIPTION = "Создать запись здесь"
-internal const val OBJECTS_DESCRIPTION = "Объекты"
-internal const val SETTINGS_DESCRIPTION = "Настройки"
 
 @Composable
 internal fun MapFirstScaffold(
     onOpenObjects: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenMapData: () -> Unit = {},
+    mapDataOpen: Boolean = false,
+    mapDataRestricted: Boolean = false,
     content: @Composable BoxScope.(Modifier) -> Unit,
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            MapBottomPanel(onOpenObjects = onOpenObjects, onOpenSettings = onOpenSettings)
+            MapBottomPanel(
+                onOpenObjects = onOpenObjects,
+                onOpenMapData = onOpenMapData,
+                onOpenSettings = onOpenSettings,
+                mapDataOpen = mapDataOpen,
+                mapDataRestricted = mapDataRestricted,
+            )
         },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
             content(Modifier.fillMaxSize().padding(padding))
         }
-    }
-}
-
-@Composable
-internal fun MapBottomPanel(
-    onOpenObjects: () -> Unit,
-    onOpenSettings: () -> Unit,
-) {
-    Surface(tonalElevation = 3.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .padding(horizontal = 8.dp)
-                .testTag(MAIN_BOTTOM_PANEL_TAG),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                onClick = onOpenObjects,
-                modifier = Modifier
-                    .size(48.dp)
-                    .semantics { contentDescription = OBJECTS_DESCRIPTION }
-                    .testTag("open-objects"),
-            ) {
-                ObjectsGlyph(Modifier.size(28.dp))
-            }
-            IconButton(
-                onClick = onOpenSettings,
-                modifier = Modifier
-                    .size(48.dp)
-                    .semantics { contentDescription = SETTINGS_DESCRIPTION },
-            ) {
-                SettingsGlyph(Modifier.size(30.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun ObjectsGlyph(modifier: Modifier = Modifier) {
-    val color = LocalContentColor.current
-    Canvas(modifier) {
-        val cell = size.minDimension * 0.28f
-        val gap = size.minDimension * 0.12f
-        val total = cell * 2f + gap
-        val startX = (size.width - total) / 2f
-        val startY = (size.height - total) / 2f
-        repeat(2) { row ->
-            repeat(2) { column ->
-                drawRect(
-                    color = color,
-                    topLeft = Offset(startX + column * (cell + gap), startY + row * (cell + gap)),
-                    size = androidx.compose.ui.geometry.Size(cell, cell),
-                    style = Stroke(width = 2.dp.toPx()),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingsGlyph(modifier: Modifier = Modifier) {
-    val color = LocalContentColor.current
-    Canvas(modifier) {
-        val center = Offset(size.width / 2f, size.height / 2f)
-        val innerRadius = size.minDimension * 0.23f
-        val spokeStartRadius = innerRadius
-        val spokeEndRadius = size.minDimension * 0.46f
-        drawCircle(
-            color = color,
-            radius = innerRadius,
-            center = center,
-            style = Stroke(width = 2.2.dp.toPx()),
-        )
-        repeat(8) { index ->
-            val angle = Math.PI * index / 4.0
-            val start = Offset(
-                x = center.x + (kotlin.math.cos(angle) * spokeStartRadius).toFloat(),
-                y = center.y + (kotlin.math.sin(angle) * spokeStartRadius).toFloat(),
-            )
-            val end = Offset(
-                x = center.x + (kotlin.math.cos(angle) * spokeEndRadius).toFloat(),
-                y = center.y + (kotlin.math.sin(angle) * spokeEndRadius).toFloat(),
-            )
-            drawLine(color = color, start = start, end = end, strokeWidth = 2.8.dp.toPx())
-        }
-        drawCircle(color = color, radius = 1.8.dp.toPx(), center = center)
     }
 }
 

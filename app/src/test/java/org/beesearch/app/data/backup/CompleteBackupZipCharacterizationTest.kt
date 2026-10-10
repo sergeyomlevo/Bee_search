@@ -25,8 +25,8 @@ import java.util.zip.CRC32
 class CompleteBackupZipCharacterizationTest {
     @get:Rule val temporary = TemporaryFolder()
 
-    @Test fun parsesMinimalValidV1ThroughV6Archives() {
-        (1..6).forEach { format -> parseArchive(validArchive(format)) }
+    @Test fun parsesMinimalValidV1ThroughV8Archives() {
+        (1..8).forEach { format -> parseArchive(validArchive(format)) }
     }
 
     @Test fun parsesNonEmptyV6AndReorderedEntries() {
@@ -95,7 +95,7 @@ class CompleteBackupZipCharacterizationTest {
     @Test fun parseRejectsVersionSchemaProfileAndCollectionDescriptors() {
         val base = validEntries(1)
         fun fail(manifest: String, type: Class<out Throwable>, message: String) = assertParseFailure(base + (MANIFEST to manifest.toByteArray()), type, message)
-        fail(manifest(8, CONTRACTS[1]!!.toList(), base), UnsupportedBackupFormat::class.java, "unsupported backup format")
+        fail(manifest(9, CONTRACTS[1]!!.toList(), base), UnsupportedBackupFormat::class.java, "unsupported backup format")
         fail(manifest(1, CONTRACTS[1]!!.toList(), base).replace("\"archiveSchemaVersion\":1", "\"archiveSchemaVersion\":2"), UnsupportedArchiveSchema::class.java, "unsupported archive schema")
         fail(manifest(1, CONTRACTS[1]!!.toList(), base).replace("COMPLETE_BACKUP", "WRONG"), UnsupportedBackupFormat::class.java, "unsupported profile")
         val unknown = manifest(1, CONTRACTS[1]!!.toList(), base).replace(
@@ -174,7 +174,7 @@ class CompleteBackupZipCharacterizationTest {
 
     private fun validArchive(format: Int): File = temporary.newFile("v$format.zip").also { it.writeBytes(zipEntries(validEntries(format).toList())) }
     private fun validEntries(format: Int): Map<String, ByteArray> {
-        val contract = CONTRACTS[if (format == 6) 5 else format]!!
+        val contract = CONTRACTS[if (format == 6 || format >= 7) 5 else format]!!
         val values = contract.associate { (name, path) ->
             path to (if (name == "portable-settings") "{\"currentTerritoryId\":null,\"currentObserverId\":null}\n" else "").toByteArray()
         }

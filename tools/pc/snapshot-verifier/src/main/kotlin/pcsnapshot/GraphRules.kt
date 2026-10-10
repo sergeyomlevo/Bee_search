@@ -27,6 +27,7 @@ internal object GraphRules {
         rows("physical-objects").forEach {
             fk(it,"territoryId",territories,"physical-objects"); fk(it,"creatorObserverId",observers,"physical-objects")
             require(l(it,"sequenceNumber") >= 1,"physical-objects","sequenceNumber"); coordinates(it,"physical-objects")
+            if (it.has("fixationAt")) require(it.get("fixationAt").isJsonNull || !it.get("fixationDate").isJsonNull,"physical-objects","fixationAt requires fixationDate")
         }
         val subtypes = listOf("apiaries" to "APIARY", "hollows" to "HOLLOW", "log-hives" to "LOG_HIVE")
         val owners = mutableMapOf<String, Int>()

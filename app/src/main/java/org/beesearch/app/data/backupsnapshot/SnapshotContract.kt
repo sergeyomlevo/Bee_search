@@ -28,8 +28,8 @@ internal data class SnapshotLimits(
 
 internal object SnapshotContract {
     const val FORMAT = "beesearch-snapshot"
-    const val VERSION = 2
-    val supportedVersions = setOf(1, 2)
+    const val VERSION = 3
+    val supportedVersions = setOf(1, 2, 3)
     val paths = listOf(
         "manifest.json", "data/territories.jsonl", "data/observers.jsonl",
         "data/physical-objects.jsonl", "data/apiaries.jsonl", "data/hollows.jsonl",

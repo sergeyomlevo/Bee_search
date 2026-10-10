@@ -20,8 +20,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 import kotlin.math.roundToInt
-import org.beesearch.app.domain.model.BeePresenceResult
+import org.beesearch.app.domain.model.Hollow
+import org.beesearch.app.domain.model.LogHive
 import org.beesearch.app.domain.model.ObservationPointSummary
+import org.beesearch.app.ui.physicalobjects.physicalObjectFixationText
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
@@ -29,11 +31,10 @@ import org.maplibre.android.maps.MapView
 /**
  * Saved-object map presentation.
  *
- * The browser map draws a list of [MapObjectMarker]. ObservationPoint is the only object kind with a
- * production map surface today, so [MapObjectType] has exactly one entry: adding Hollow, LogHive,
- * Apiary or Trap means adding an enum entry, a mapper and nothing else — the overlay, the map wiring
- * and the marker rendering already work on the marker list. Hollow and LogHive still have no map
- * screen, and Trap/Apiary have no product capability, so they stay reserved D102 vocabulary.
+ * One marker list is drawn by every research map surface. [MapObjectType] holds exactly the kinds
+ * with a user-reachable lifecycle and a real map surface: ObservationPoint, Hollow and LogHive.
+ * Trap has no domain type and Apiary has no user lifecycle, so both stay reserved D102 vocabulary
+ * and are deliberately absent here — the panel that filters types must not promise them either.
  *
  * Presentation only: not a domain entity, never persisted, no Room representation. Appearance comes
  * from the approved [ResearchMarkerType] catalogue, so shape, colour and size are never duplicated
@@ -41,11 +42,22 @@ import org.maplibre.android.maps.MapView
  */
 internal enum class MapObjectType {
     OBSERVATION_POINT,
+    HOLLOW,
+    LOG_HIVE,
 }
 
 /** The approved D102 presentation of this object kind: single source of shape, colour and size. */
 internal fun MapObjectType.researchMarkerType(): ResearchMarkerType = when (this) {
     MapObjectType.OBSERVATION_POINT -> ResearchMarkerType.OBSERVATION_POINT
+    MapObjectType.HOLLOW -> ResearchMarkerType.HOLLOW
+    MapObjectType.LOG_HIVE -> ResearchMarkerType.LOG_HIVE
+}
+
+/** The display type this object kind belongs to; the panel and the marker list share one vocabulary. */
+internal fun MapDataType.objectType(): MapObjectType = when (this) {
+    MapDataType.OBSERVATION_POINT -> MapObjectType.OBSERVATION_POINT
+    MapDataType.HOLLOW -> MapObjectType.HOLLOW
+    MapDataType.LOG_HIVE -> MapObjectType.LOG_HIVE
 }
 
 internal data class MapObjectMarker(
@@ -64,14 +76,67 @@ internal fun observationPointMarkers(points: List<ObservationPointSummary>): Lis
             id = point.id,
             latitude = point.latitude,
             longitude = point.longitude,
-            label = "Точка ${point.pointNumber}, ${presenceLabel(point.beePresenceResult)}",
+            label = if (point.beeCount == 0) "Точка ${point.pointNumber}, пчёлы не найдены" else
+                "Точка ${point.pointNumber}, ${russianQuantity(point.beeCount, "пчела", "пчелы", "пчёл")}, " +
+                    russianQuantity(point.totalFlightCycleCount, "цикл", "цикла", "циклов"),
         )
     }
 
-private fun presenceLabel(result: BeePresenceResult?): String = when (result) {
-    BeePresenceResult.BEES_FOUND -> "пчёлы найдены"
-    BeePresenceResult.NO_BEES_FOUND -> "пчёлы отсутствуют"
-    null -> "результат не зафиксирован"
+/** Russian quantity forms, shared by both real point aggregates in the marker/preview label. */
+internal fun russianQuantity(count: Int, one: String, few: String, many: String): String {
+    val word = when {
+        count % 100 in 11..14 -> many
+        count % 10 == 1 -> one
+        count % 10 in 2..4 -> few
+        else -> many
+    }
+    return "$count $word"
+}
+
+internal fun hollowMarkers(hollows: List<Hollow>): List<MapObjectMarker> = hollows.map { hollow ->
+    MapObjectMarker(
+        type = MapObjectType.HOLLOW,
+        id = hollow.id,
+        latitude = hollow.latitude,
+        longitude = hollow.longitude,
+        label = physicalObjectLabel(
+            designation = hollow.designation,
+            name = hollow.name,
+            fixationAt = hollow.fixationAt,
+            fixationDate = hollow.fixationDate,
+        ),
+    )
+}
+
+internal fun logHiveMarkers(logHives: List<LogHive>): List<MapObjectMarker> = logHives.map { logHive ->
+    MapObjectMarker(
+        type = MapObjectType.LOG_HIVE,
+        id = logHive.id,
+        latitude = logHive.latitude,
+        longitude = logHive.longitude,
+        label = physicalObjectLabel(
+            designation = logHive.designation,
+            name = logHive.name,
+            fixationAt = logHive.fixationAt,
+            fixationDate = logHive.fixationDate,
+        ),
+    )
+}
+
+/**
+ * Accessibility label of a physical research object.
+ *
+ * A missing fixation moment preserves any known calendar date and never falls back to `created_at`,
+ * which is a technical timestamp and not a research moment.
+ */
+private fun physicalObjectLabel(
+    designation: String,
+    name: String?,
+    fixationAt: java.time.Instant?,
+    fixationDate: java.time.LocalDate?,
+): String {
+    val headline = if (name == null) designation else "$designation, $name"
+    return "$headline, ${physicalObjectFixationText(fixationAt, fixationDate)}"
 }
 
 @Composable
@@ -154,4 +219,6 @@ internal fun SavedObjectMarker(
 /** Stable test tag per object kind; new kinds add their own prefix here. */
 internal fun markerTestTag(marker: MapObjectMarker): String = when (marker.type) {
     MapObjectType.OBSERVATION_POINT -> "point-marker-${marker.id}"
+    MapObjectType.HOLLOW -> "hollow-marker-${marker.id}"
+    MapObjectType.LOG_HIVE -> "log-hive-marker-${marker.id}"
 }

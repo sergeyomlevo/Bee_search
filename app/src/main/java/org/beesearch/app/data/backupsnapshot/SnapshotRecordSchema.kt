@@ -97,9 +97,10 @@ internal object SnapshotRecordSchema {
     fun validateRows(path: String, rows: List<JsonObject>, version: Int = 1) {
         if (version !in SnapshotContract.supportedVersions) invalid("VERSION")
         val legacy = schemas[path] ?: invalid("UNKNOWN_RECORD_PATH")
-        val expected = if (version == 2) when (path) {
+        val expected = if (version >= 2) when (path) {
             "data/observation-points.jsonl" -> legacy + ("observationDate" to f(Kind.DATE))
-            "data/physical-objects.jsonl" -> legacy + ("fixationDate" to f(Kind.DATE, true))
+            "data/physical-objects.jsonl" -> legacy + ("fixationDate" to f(Kind.DATE, true)) +
+                if (version >= 3) listOf("fixationAt" to f(Kind.T, true), "updatedAt" to f(Kind.T, true)) else emptyList()
             else -> legacy
         } else legacy
         var previous: List<String>? = null

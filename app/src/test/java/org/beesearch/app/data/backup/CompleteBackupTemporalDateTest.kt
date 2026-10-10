@@ -16,9 +16,9 @@ import java.time.Instant
 import java.util.TimeZone
 import java.util.UUID
 
-/** Characterizes the V7 required canonical research-date fields at the private graph parser. */
+    /** Characterizes the V8 canonical research date and instant temporal fields at the private graph parser. */
 class CompleteBackupTemporalDateTest {
-    @Test fun actualV7WriterBlobsRoundTripThroughParser() {
+    @Test fun actualV8WriterBlobsRoundTripThroughParser() {
         val oldZone = TimeZone.getDefault()
         TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Kiritimati"))
         try {
@@ -33,7 +33,8 @@ class CompleteBackupTemporalDateTest {
             territories = listOf(TerritoryEntity(t, "T", "Territory", "R", "D", created, created)),
             observers = listOf(ObserverEntity(o, "O", "Last", "First", null, null, created, created)),
             physicalObjects = listOf(
-                PhysicalObjectEntity(h, t, PhysicalObjectType.HOLLOW, 1, 56.0, 42.0, created, o, java.time.LocalDate.of(2026, 8, 21)),
+                PhysicalObjectEntity(h, t, PhysicalObjectType.HOLLOW, 1, 56.0, 42.0, created, o, java.time.LocalDate.of(2026, 8, 21),
+                    fixationAt = Instant.parse("2026-08-21T08:00:00Z"), updatedAt = Instant.parse("2026-08-22T08:00:00Z")),
                 PhysicalObjectEntity(l, t, PhysicalObjectType.LOG_HIVE, 1, 56.0, 42.0, created, o, java.time.LocalDate.of(2026, 8, 22)),
                 PhysicalObjectEntity(a, t, PhysicalObjectType.APIARY, 1, 56.0, 42.0, created, o, null),
             ),
@@ -47,9 +48,9 @@ class CompleteBackupTemporalDateTest {
         val settings = PortableSettingsSnapshot(null, null, emptyMap())
         val writer = declaredMethod("blobsV7", Graph::class.java, PortableSettingsSnapshot::class.java, Class.forName("org.beesearch.app.data.media.ObservationAttachmentFileStore"), Class.forName("org.beesearch.app.data.media.PhysicalObjectMediaFileStore"), Int::class.javaPrimitiveType!!)
         @Suppress("UNCHECKED_CAST")
-        val blobs = writer.invoke(null, graph, settings, null, null, 7) as List<Any>
+        val blobs = writer.invoke(null, graph, settings, null, null, 8) as List<Any>
         val manifestMethod = declaredMethod("manifest", UUID::class.java, Instant::class.java, String::class.java, List::class.java, Int::class.javaPrimitiveType!!)
-        val manifest = manifestMethod.invoke(null, UUID.randomUUID(), created, "test", blobs, 7) as ByteArray
+        val manifest = manifestMethod.invoke(null, UUID.randomUUID(), created, "test", blobs, 8) as ByteArray
         val entries = linkedMapOf<String, ArchivePayload>(MANIFEST to ArchivePayload.metadata(manifest))
         blobs.forEach { blob ->
             val type = blob.javaClass
@@ -60,15 +61,25 @@ class CompleteBackupTemporalDateTest {
         val parsedGraph = parsed.javaClass.getDeclaredMethod("getGraph").also { it.isAccessible = true }.invoke(parsed) as Graph
         assertEquals(java.time.LocalDate.of(2026, 8, 25), parsedGraph.points.single().observationDate)
         assertEquals(java.time.LocalDate.of(2026, 8, 21), parsedGraph.physicalObjects.single { it.id == h }.fixationDate)
+        assertEquals(Instant.parse("2026-08-21T08:00:00Z"), parsedGraph.physicalObjects.single { it.id == h }.fixationAt)
+        assertEquals(Instant.parse("2026-08-22T08:00:00Z"), parsedGraph.physicalObjects.single { it.id == h }.updatedAt)
         assertEquals(java.time.LocalDate.of(2026, 8, 22), parsedGraph.physicalObjects.single { it.id == l }.fixationDate)
         assertEquals(null, parsedGraph.physicalObjects.single { it.id == a }.fixationDate)
-        assertEquals("13", String(manifest).substringAfter("\"roomSchemaVersion\":").substringBefore(','))
+        assertEquals("14", String(manifest).substringAfter("\"roomSchemaVersion\":").substringBefore(','))
         val pointPayload = entries.getValue("research/observation-points.json").readMetadata(1024).toString(Charsets.UTF_8)
         val physicalPayload = entries.getValue("research/physical-objects.json").readMetadata(1024).toString(Charsets.UTF_8)
         assertTrue(pointPayload.contains("\"observationDate\":\"2026-08-25\""))
         assertTrue(physicalPayload.contains("\"fixationDate\":\"2026-08-21\""))
+        assertTrue(physicalPayload.contains("\"fixationAt\":1787299200000"))
+        assertTrue(physicalPayload.contains("\"updatedAt\":1787385600000"))
         assertTrue(physicalPayload.contains("\"fixationDate\":\"2026-08-22\""))
         assertTrue(physicalPayload.contains("\"fixationDate\":null"))
+        val v7Graph = graph.copy(physicalObjects = graph.physicalObjects.map {
+            it.copy(fixationAt = null, updatedAt = null)
+        })
+        @Suppress("UNCHECKED_CAST")
+        val v7Blobs = writer.invoke(null, v7Graph, settings, null, null, 7) as List<Any>
+        assertTrue(v7Blobs.isNotEmpty())
         } finally {
             TimeZone.setDefault(oldZone)
         }

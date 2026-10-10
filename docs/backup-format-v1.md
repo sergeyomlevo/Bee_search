@@ -112,3 +112,10 @@ legacy representability guards.
 
 No Export wire evolution is included. I2 + I3 + I4 remain one deployment unit;
 I4 carriage and pending isolated Room/device verification block Samsung install.
+
+
+## Complete Backup V8 — physical-object temporal moments (D103)
+
+Current writer: backupFormatVersion/archiveSchemaVersion 8, roomSchemaVersion 14. Physical-object records retain V7 fixationDate and add REQUIRED nullable `fixationAt` / `updatedAt`, integer epoch milliseconds. Non-null fixationAt requires a known fixationDate. Restore explicitly preserves all fields without deriving dates/instants from createdAt or restore time.
+
+Readers retain V1–V7: new fields materialize NULL. V6 retains its original canonical-date representability guards; V7 can still represent canonical dates. Both legacy writers reject non-null new instant fields. Inventory, settings, media, UUIDs, restore transaction and validation remain unchanged; malformed new keys fail before mutation.

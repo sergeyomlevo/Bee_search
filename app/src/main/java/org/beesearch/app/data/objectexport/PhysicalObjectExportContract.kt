@@ -29,7 +29,8 @@ import org.beesearch.app.domain.model.PhysicalObjectType
  */
 internal object PhysicalObjectExportContract {
     const val PROFILE = "SINGLE_PHYSICAL_OBJECT"
-    const val FORMAT_VERSION = 2
+    const val FORMAT_VERSION = 3
+    const val TEMPORAL_FORMAT_VERSION = 2
     const val LEGACY_FORMAT_VERSION = 1
     const val MANIFEST_ENTRY = "manifest.json"
     const val OBJECT_ENTRY = "object.json"
@@ -102,6 +103,9 @@ internal data class PhysicalObjectExportGraph(
     val observer: ObserverExportSnapshot?,
     /** I2 canonical date; V1 payloads deliberately cannot carry non-null values. */
     val fixationDate: LocalDate? = null,
+    /** I3 temporal provenance; V1/V2 payloads deliberately cannot carry non-null values. */
+    val fixationAt: Instant? = null,
+    val updatedAt: Instant? = null,
 )
 
 internal data class DecodedPhysicalObjectExport(

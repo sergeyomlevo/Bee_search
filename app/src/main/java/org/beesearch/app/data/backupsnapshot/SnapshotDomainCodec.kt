@@ -15,6 +15,7 @@ import kotlinx.serialization.json.JsonNull
 import org.beesearch.app.data.backup.validateGraph
 import org.beesearch.app.data.backup.validateLegacyObservationDates
 import org.beesearch.app.data.backup.validateLegacyPhysicalObjectDates
+import org.beesearch.app.data.backup.validateLegacyPhysicalObjectInstants
 import org.beesearch.app.domain.backup.BackupDomainInvariantViolation
 import org.beesearch.app.data.backup.snapshotGraphFromRows
 import java.io.BufferedInputStream
@@ -57,6 +58,9 @@ internal object SnapshotDomainCodec {
             if (version == 1) {
                 validateLegacyObservationDates(graph)
                 validateLegacyPhysicalObjectDates(graph)
+                validateLegacyPhysicalObjectInstants(graph)
+            } else if (version == 2) {
+                validateLegacyPhysicalObjectInstants(graph)
             }
         }
         catch (e: BackupDomainInvariantViolation) { logical(e.message ?: "legacy date not representable", e) }

@@ -1,5 +1,343 @@
 # Bee Search handoff
 
+## Current I6 — D104 main-map toolbar owner prototype (2026-10-10)
+
+Current dirty I6 retained; HEAD 20a7c55835f2d129908da899f743e9583414f42a. NO git add/commit/push;
+I7 not started; protected verifier TOML untouched. D103 Room 14 and all preceding map/filter/marker
+corrections remain intact. OWNER now identifies Hollow 10 / LogHive 1 as test records: leave them
+unchanged; their historical fixation provenance is not a toolbar blocker or evidence for mass backfill.
+
+Toolbar is one cohesive MapBottomToolbar.kt component: unchanged 56 dp, four equal icon-only zones
+Analysis (disabled reserved), Visualization (existing Map Data panel), Objects, Settings. Background
+#555555, active #966B4F tied to panelOpen, three inset dividers; icons visual height 44–46 dp.
+#B7E27A is the OWNER-refined small circular active/restriction dot color; its geometry is unchanged.
+MainMapScreen only integrates real panelOpen/callbacks. I004 bounded subitem is done, D104 accepted, map-display spec,
+product requirements and workflows aligned. No new route, raster icon, dependency or temporal changes.
+
+Latest quality after lime color refinement: build/toolbar-lime-quality.log PASS all required
+JVM/build/compile/lint tasks; JVM 887/887, focused JVM 39/39, lint 0 errors / 28 warnings / 6 hints.
+Samsung toolbar suite rerun 7/7 (build/toolbar-lime-samsung-tests.log), actual main-map toolbar
+168 px, quarters 270 px at fontScale 1.7.
+Visualization/Objects/Settings smoke succeeded; settings PB before/after identical. Device evidence:
+build/toolbar-evidence/main-map-lime.png, panel.png, settings-real.png, toolbar-active.png.
+Final emulator toolbar/map/session regression: 32/32 PASS (build/toolbar-android-final2.log).
+The two legacy entry/indicator tests also PASS (build/toolbar-android-legacy-final.log): emulator total
+34/34 across the two runs. A parallel-user Samsung legacy attempt reported no Compose hierarchy and
+is not accepted as evidence; the independent Samsung toolbar suite remains 7/7 PASS. Independent
+post-documentation review is the final acceptance gate; use the final report for its verdict.
+Comparison: build/toolbar-evidence/prototype-comparison.html.
+Decomposition performed: toolbar, vectors and tokens extracted into cohesive MapBottomToolbar.kt;
+MainMapScreen retains the map scaffold and operational controls (418 lines).
+OWNER final visual acceptance is required before any commit. Older sections below are historical.
+
+
+## Current I6 — D103 physical temporal owner correction (2026-10-10)
+
+Base HEAD 20a7c55835f2d129908da899f743e9583414f42a; current dirty I6 preserved. NO git add/commit/push; I7 not started; protected verifier TOML unchanged.
+
+D103 accepted and routed via ideas I017. Authoritative semantics: temporal-data-model-design §25 / data-model physical temporal facts. Room14 migration13→14 adds nullable fixation_at and updated_at without legacy promotion. New Hollow/LogHive capture one millisecond Instant for fixationAt/createdAt/updatedAt plus captured fixationDate. Own actual edits/direct media association update only updatedAt; no-op/read/query operations leave timestamps unchanged. Inspection capability absent, separate parent/child boundary documented. Fixation UI shared by map preview/full card; known timestamp, date-only unknown-time, or honest unknown. No createdAt fallback.
+
+Durable transfer: Complete Backup8, Snapshot3, physical single/collection Export3; prior readers retain NULL new fields; legacy writers reject silent loss. ObservationPoint Export2 unchanged. PC Snapshot verifier accepts1/2/3. Preserve all previous I6 counts, unified map, records/navigation/camera context, FilterSet and whole-editor Done composition.
+
+Samsung installed DEV SHA781CC81D77CC47FF04697586CDF27E522990B9394B664B63881F5F7229320AA8, update2026-10-10 10:25:05; fontScale1.7. Narrow readonly audit: Hollow10 and LogHive1 fixation_date/fixation_at/updated_at NULL, old created_at preserved. Both full cards show honest unknown; LogHive marker preview → correct record → Back checked. Owner filters/visibility restored byte-identically. No owner records created/edited. Evidence build/i6-physical-evidence. Unknown legacy is intentional pending separate owner provenance/migration decision.
+
+Current verification: JVM887/887, PC101/101; Android data33/33 + cards17/17 = 50/50; narrow Samsung readonly audit1/1. Final independent review of this current diff is the final owner-report gate; evidence is in build/i6-physical-android-* and the final response. All required builds/variant compiles/lint pass (0errors28warnings6hints), diffcheck passes. Emulator system crash was retried separately; do not use aborted runs as passes.
+
+Next: await OWNER Samsung visual acceptance; no blind legacy backfill. Previous sections below are historical.
+
+## I6 owner visual corrections #2 (2026-10-10)
+
+Architecture owner-functionally accepted; retained. Preview now uses real Bee/ALL cycle query
+aggregates with Russian forms/zero-bee wording. Every type editor has one separate whole-editor
+footer Done, local reset only in sections; Samsungfont1.7/IME checked.
+STOP on physical canonical-date data correction: H10UUID14bf5e39-d3ca-4245-a1cb-8287174c3490 and
+L1UUIDd170bb70-8e91-4b2a-85b9-dd6803c8f948 have fixation_dateNULL; full records show created_at
+08.10.2026 10:59 / 01.10.2026 13:25. No fallback/backfill/schema/migration change. Owner must decide
+legitimate date provenance/legacy policy before this item can be fixed. Report/evidence:
+docs/temporal-i6-owner-visual-corrections-2.md, build/i6-visual2-evidence.
+FocusedJVM17/full878/Android85 pass; additional narrow on-device readonlyaudit1pass.
+Final build/lint log build/i6-visual2-quality-final.log; final independent review follows current
+changes, use final response for B/H/M. Current owner settings restored exactly (OPbees4–5,
+Hollowheight4–6cm, bothvisibleSepOct; Lhiddenunbounded), not previous turn defaults.
+NOadd/commit/push/I7; protectedTOMLuntouched. Next: final review, owner UI verification and
+separate physical legacy-date decision. Prior sections below are historical continuation evidence.
+
+
+## I6 owner corrections + marker records — final owner visual gate (2026-10-10)
+
+Continued dirty tree at 20a7c55835f2d129908da899f743e9583414f42a. No add/commit/push.
+Resolved-setup generation guard and ViewModel panel session preserved. Main map is unified;
+Points table/records only; temporary D102 preview removed, production32dp/pictograms/halo retained.
+Typed FilterSets: OP Bee-record/all FlightCycle-record counts; H/L existing entrance height and
+outer diameter. Room13/schema unchanged; optional SQL bounds retain I5/NULL dates; codec2 reads1.
+All three marker types now open compact preview → existing full record by real UUID. Record origin
+returns to main map; per-Territory camera target/zoom/bearing/tilt, selection and filters survive
+ordinary record navigation. No process-death guarantee claimed. Historical selection-only notes
+below are superseded by this owner extension.
+
+Focused JVM109/full JVM877 pass, current Android83/83, focused marker-record Android22/22.
+All requested build/compile/lint gates pass: build/i6-marker-record-quality-final.log.
+Lint0errors/28warnings/6hints. Fresh final complete-diff independent review follows these final
+changes; final response records its result. Report: docs/temporal-i6-owner-corrections-report.md.
+
+Samsung DEV safe install-r APK SHA98F34958FDFF1B733CB23B072236FEE6E1FAC1003B95C4DDD2A05F85699AC4FC,
+update2026-10-10 08:54:26, fontScale1.7. One panel/multiple live changes, May→July, numeric filters,
+real marker filtering and selected halos checked. Actual Point16/Hollow13/LogHive1 → existing record
+→ Back to selected preview checked. Point/LogHive marker screen bounds matched, zoom15 retained.
+Original display restored: OP visible Sep–Oct2026/no counts; H/L hidden/unbounded; final PB snapshot.
+No owner DB fixtures/deletion/clear/uninstall. Protected verifier TOML untouched, intentionally dirty,
+SHA7388F2F233AB86694C69F15CB0BF8076C39A65932D2248D44046CFE2E46A1F31.
+Next: final independent review, then owner final Samsung UI verification; STOP before commit/push/I7.
+
+## I6 interaction defect fixed — the panel no longer closes on every change (2026-10-10)
+
+Owner-reported defect: in «Данные на карте» every action — a visibility switch, a calendar tap, a
+reset — closed the panel and returned the user to the map, so enabling three types took three
+openings of the panel. Fixed in the same uncommitted I6 working tree; NO commit, NO push.
+
+### Root cause (measured, not guessed)
+
+Temporary diagnostics on the Samsung device produced this exact sequence on one switch tap:
+
+```text
+00:24:12.973  recompose open=true            <- the switch was tapped, display state updated
+00:24:13.001  activity route=Loading         <- the route flipped to Loading for ~60 ms
+00:24:13.058  PANEL_STATE_CREATED            <- the whole map screen (and the panel) was recreated
+00:24:13.060  activity route=CurrentTerritory
+00:24:13.061  recompose open=false           <- the panel is gone; the user is back on the map
+```
+
+The panel was never asked to dismiss (`ON_DISMISS_REQUESTED` never fired, and no scrim, Back, swipe or
+drag was involved). The chain is:
+
+1. `MainViewModel.initialSetup` (`MainViewModel.kt:410`) is
+   `combine(setupFacts, setupRefresh).flatMapLatest { flow { emit(InitialSetupState.Loading(...)); … emit(Ready(...)) } }`,
+   and `setupFacts` includes `settingsRepository.settings`.
+2. Every change in «Данные на карте» writes the display state to that same settings DataStore.
+3. `settings` re-emits → `flatMapLatest` restarts the inner flow → it **emits `Loading` first** →
+   `startupDestination` → `route = AppRoute.Loading`.
+4. `MainActivity` renders routes with a plain `when (route)`, so the transient `Loading` branch
+   disposed `CurrentTerritoryScreen` together with the panel's `rememberSaveable` open flag.
+5. ~60 ms later `Ready` returned the map, and the panel was closed because its state had been lost.
+
+So the defect was a **state-ownership/lifecycle** bug of exactly the class AGENTS.md §14 warns about
+(a durable UI session living in a subtree that can be recreated), triggered by an app-wide
+`Loading` flash that any settings write could cause — not a bottom-sheet problem.
+
+### Fixes
+
+- `MainViewModel.initialSetup`: a re-read of an **already resolved generation** no longer emits
+  `Loading` (`resolvedSetupGeneration`), so a settings write cannot flash the route through `Loading`
+  and tear the visible screen down. A new generation still starts from `Loading`, so startup
+  behaviour is unchanged.
+- The panel session moved out of the composition into `MapDataViewModel`: `panelOpen` and `openedType`
+  are part of `MapDataUiState`, with `openPanel` / `closePanel` / `openTypeFilters` / `closeTypeFilters`.
+  The sheet is now stateless with respect to its own navigation, so nothing that merely recomposes the
+  map surface can close an open panel or lose the filter screen the user is working in.
+- `MapDataFiltersScreen`: «Готово» now finishes **that type** and returns to the type list
+  (`onDone = onBack`); only the main panel's `Готово`, `✕`, a system Back from the type list, a swipe
+  down or a tap on the scrim close the sheet.
+- `MainMapScreen`: the open flag is no longer `rememberSaveable`; the panel is rendered from
+  `uiState.panelOpen` and driven by the ViewModel callbacks.
+
+### Behaviour after the fix (owner scenario, reproduced literally on the device)
+
+One opening of «Данные на карте» was enough for: three visibility switches (panel stayed open after
+each), the type filter screen, several calendar actions (МАР → СЕН gave the range «мар–сен 2026» with
+the boundaries and in-range months drawn as approved), `Готово` in the editor (returned to the type
+list, **not** to the map), a second type configured in the same session (Дупла = 2026, with the
+approved hint «Один год даёт период с 01.01 по 31.12 этого года.»), and finally `Готово` on the main
+panel, which closed the sheet and returned to the map. The list then showed three independent states
+(`мар–сен 2026` · `2026` · `Всё время`), which survived a force-stop and relaunch, and
+`Сбросить фильтры` cleared the periods without changing visibility and left no stored entry.
+
+### Regression tests (all pass)
+
+Instrumented `MapDataPanelTest` (31 tests) now drives the **real** `ModalBottomSheet` and pins the
+owner's sections A–J: visibility toggles of all three types keep the panel open (and never act as a tap
+on the parent row); precision and year/month/day selection keep the editor open; both range boundaries
+keep the editor open; the in-section reset keeps the editor open; the editor's `Готово` and system Back
+return to the list while the panel stays open; Back and `Готово` on the main panel close it; toggling
+visibility never resets a period; and a full multi-type session in one opening ends with three
+independent states.
+
+Because the panel-level tests cannot reproduce a route-level failure, two further gates cover the
+reported mechanism itself:
+
+- `CleanStartupIntegrationTest.writingTheDisplayStateNeverFlashesTheRouteThroughLoading` reaches the map
+  as a startup destination, performs the exact write a panel change performs, and asserts that the
+  resolved setup state never returns to `Loading` and the route never becomes `Loading`. Its collector
+  uses `Dispatchers.Unconfined`, because with cheap reads the `Loading`→`Ready` pair happens inside one
+  main-thread turn and a queued collector would conflate it away. Verified both ways: with the fix it
+  passes, and with the guard temporarily disabled it fails with `saw [Loading, Ready]`.
+- `InitialSetupLoadingRuleTest` pins the rule itself (first load and a new generation show `Loading`;
+  re-reading an already resolved generation does not).
+
+`MapDataViewModelSessionTest` (6 instrumented tests) pins the session owner: the panel starts closed and
+opens at the list, visibility/period/reset changes keep it open and keep the current type screen, the
+type screen's Back/`Готово` return to the list, only an explicit close ends the session, reopening never
+resumes the previous type screen, the three types stay independent, and losing the Territory clears the
+session and the displayed state. That last test found and fixed a real gap: `setTerritory(null)` used to
+leave the panel open over a map with no research data, and now closes it.
+
+### Decomposition (AGENTS.md §14)
+
+`Decomposition reviewed; kept cohesive because:`
+
+- `MainMapScreen.kt` (538 lines) grew only additively: the panel, the type screen and the calendars live
+  in `MapDataPanel.kt` and `MapPeriodEditor.kt`, the marker assembly in `MapResearchObjects.kt`, and the
+  DEBUG specimens in the source-set files `app/src/{debug,beta,release}/java/org/beesearch/app/ui/map/MarkerVisualPreview.kt`
+  (only referenced from `BeeMap.kt`), so what remains is one responsibility — the map screen, its
+  scaffold, bottom panel and chrome glyphs.
+- `MapPeriodEditor.kt` (582 lines, new) stays one file because it is a single screen-level editor: the
+  level composables, the year/month/day grids, the shared cell and its copy constants all change together
+  for one reason (the approved period model) and none of them is used anywhere else; splitting the grid
+  geometry out would create a second file with one consumer, and the file contains no persistence, I/O,
+  domain logic or second workflow.
+- `BeeMap.kt` (1169 lines, +30 additive) is unchanged in structure: the new code is two parameters and
+  one guarded overlay branch beside the existing overlay; extracting the pre-existing screen out of that
+  file is an unrelated refactor and was not performed.
+- `MainViewModel.kt` (1564 lines) changed by one guarded emission plus one pure rule; the rest of the
+  file is pre-existing and untouched, and splitting it is not part of this task.
+- The new presentation files stay near the 300-line review trigger: `MapDataDisplay.kt` 299,
+  `MapDataViewModel.kt` 297, `MapDataPanel.kt` 396 (one surface: sheet + list + type screen + rows).
+
+### Evidence
+
+- `app/build/reports/i6-owner-gate/` — screenshots and UI dumps of the scenario
+  (`50-scenario-open` … `74-default-clean`), plus `datastore-before-scenario.bin`, a byte copy of the
+  display state the owner had before this gate.
+- Samsung SM-S938B / RFCY90MBYVZ, in-place `install -r` only: the installed `base.apk`
+  `d2b12c02f0df835b14601a9637adc9a00155a426e6ac3156d0e655a71218288e` equals the built APK,
+  `firstInstallTime 2026-09-16 08:13:50` unchanged, and the DB and DataStore hashes were identical
+  before/after every install. The device is left in the **default** display state (all types visible, no
+  periods, no stored entry, DataStore back to its baseline hash) and on the map with all real markers.
+- Gates after the last source change: full JVM `873 tests / 107 suites / 0 failures / 0 errors /
+  0 skipped`; instrumented I6 set **45/45** (`MapDataPanelTest` 31, `MapDataViewModelSessionTest` 6,
+  `DataStoreMapDataDisplayStoreTest` 5, `MapResearchObjectsQueryTest` 2, and
+  `CleanStartupIntegrationTest#writingTheDisplayStateNeverFlashesTheRouteThroughLoading`);
+  `assembleDebug`, `assembleDebugAndroidTest`, `compileDebugAndroidTestKotlin`, `compileBetaKotlin`,
+  `compileReleaseKotlin`, `lintDebug` (0 errors, 24 warnings, 3 hints) and `git diff --check` all PASS.
+- The new startup gate was verified in both directions: it passes with the guard and fails without it
+  (`saw [Loading, Ready]`), and it had to observe through `Dispatchers.Unconfined` because a queued
+  collector conflates the `Loading`→`Ready` pair away.
+- Related startup/territory screens re-checked on the device after the route fix:
+  `InitialSetupScreenTest` + `TerritoryManagementScreenImeTest` 6/6 PASS.
+- The Android emulator (`emulator-5554`) died during one batch run (`Can't find service: package`) and
+  was restarted headless; results above are from the restarted, healthy instance.
+
+## Current continuation — Temporal I6: unified data map / «Данные на карте» (2026-10-09)
+
+Baseline HEAD/main/origin/main: `20a7c55835f2d129908da899f743e9583414f42a` (D102 committed/pushed).
+Work is uncommitted in the working tree: NO commit, NO push, index empty. I6 (unified visualization +
+«Данные на карте» + independent per-type date periods) is IMPLEMENTED and VERIFIED, and it AWAITS
+OWNER SAMSUNG UI VERIFICATION. Temporal I7 and the deployment/owner-device migration gate for the
+temporal I2–I5 deployment unit are NOT started/closed by this work.
+
+### Authoritative contract used (recovered, not invented)
+
+- `docs/ui/mockups/unified-territory-layers-v2-1.md` — APPROVED UI DIRECTION (2026-10-02), frames A–D.
+- `docs/ui/mockups/unified-territory-layers-v2-1-calendar.png` — APPROVED frames E–H (calendar levels);
+  the exact copy of the frames was read from the artifact at full resolution and used verbatim.
+- `docs/ui/unified-territory-map-display-spec.md` — APPROVED behavioural specification: §8 summary,
+  §9–§13 calendar, §15 reset, §17 map result, §18 indicator, §20 per-Territory persistence, §21
+  accessibility, §26 deliberately unspecified.
+- There is NO separate «Визуализация» screen in any approved artifact: the approved surface is a third
+  action in the existing bottom map panel (`Объекты · Данные на карте · Настройки`) whose panel and
+  type screen live inside the existing map screen. No map mode, screen or control was added, and no
+  second unified-map concept was created.
+
+### Implemented (narrow, in the approved boundary)
+
+- Marker vocabulary reused from D102: `MapObjectType`/`MapDataType` now hold exactly ObservationPoint,
+  Hollow and LogHive; each resolves its own `ResearchMarkerType` (yellow wingless bee / green tree /
+  brown trunk) through the single existing catalogue. 32 dp visual size, 48 dp targets, no clustering.
+- Unified presentation/semantics: `MapDataDisplay.kt` (per-type visibility + own period, summary
+  formatting, precision projection, tap rules), `MapDataDisplayCodec.kt` (versioned per-Territory
+  value), `MapDataDisplayStore.kt` + `DataStoreMapDataDisplayStore.kt` (existing settings DataStore,
+  key `map_data_display_<territoryId>`, default state never written), `MapDataViewModel.kt`,
+  `MapResearchObjects.kt` (each type's interval goes only to its own I5 query),
+  `MapDataPanel.kt` (sheet + type screen + accordion), `MapPeriodEditor.kt` (Год/Месяц/День).
+- Map: the field map draws research markers of visible types, each type filtered by its own period in
+  SQL through the I5 query layer. The overlay stays out of the участки/placement modes and AREA_VIEW.
+- Room stays **v13**: no schema, migration, index or canonical-date-column change. Periods are
+  presentation/query state and never write a research date. No ObservationPoint date-edit UI exists.
+- Trap and Apiary remain reserved D102 vocabulary: not in the panel, not in the marker path, not in
+  the codec; `Apiary` rows returned by the repository are dropped before any marker or label.
+
+### Automated gates (all after the last source edit)
+
+- Focused JVM: `org.beesearch.app.ui.map.*` including the new `MapDataDisplayTest` (8),
+  `MapPeriodSelectionTest` (12), `MapDataDisplayCodecTest` (4), `MapResearchObjectsTest` (5),
+  `MapPeriodGridTest` (4) and the extended `SavedObjectMarkerPresentationTest` (3) — PASS.
+- Full JVM `:app:testDebugUnitTest`: **870 tests / 106 suites / 0 failures / 0 errors / 0 skipped**.
+- `:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:compileDebugAndroidTestKotlin`,
+  `:app:compileBetaKotlin`, `:app:compileReleaseKotlin`, `:app:lintDebug` — PASS;
+  lint **0 errors, 24 warnings, 3 hints** (unchanged from baseline).
+- Instrumented, API29 emulator-5554, focused I6 classes (`MapDataPanelTest`,
+  `MapResearchObjectsQueryTest`, `DataStoreMapDataDisplayStoreTest`): **30/30 PASS**, including the
+  per-type independence, visibility independence, 48 dp targets, reflow, system-back priority,
+  undated-record wording, panel reopen and restart-persistence cases.
+- The **full** connected suite on this emulator aborts (app process crash on a closed in-memory
+  SQLite database). Reproduced identically on an untouched HEAD baseline worktree, so it is a
+  pre-existing environment/infrastructure fragility, not an I6 regression. Filtered runs are used.
+- Two `CleanStartupIntegrationTest` failures (`deletingAnObjectUsedByObservationDataIsRefused…`
+  timeout and `backupAccessScreenOpensFromSettingsAndReturnsToSettings` closed connection pool) were
+  reproduced on the untouched HEAD baseline worktree: pre-existing, and the first is the same known
+  failure already recorded in this file for baseline `fd0e380`.
+
+### Samsung owner gate (SM-S938B / RFCY90MBYVZ, in-place `install -r`, no uninstall/clear)
+
+- Installed APK SHA-256 `062958f350154c3db5348930df3db085d62ee5926f29134edaa6c17677e70250` equals the
+  built `app-debug.apk`; `lastUpdateTime` advanced, `firstInstallTime 2026-09-16 08:13:50` unchanged,
+  and DB/WAL/DataStore hashes were identical before/after every install. Rooted in real records only:
+  no fake record was created and none was deleted.
+- Real data on the production map: ObservationPoint markers (Точка 16–22), Hollow markers
+  (Дупло 12–14, «дата фиксации 09.10.2026») and the LogHive marker (Колода 1, «дата фиксации не
+  зафиксирована»). The undated LogHive is exactly the legacy NULL-date case.
+- Verified on the device: entry action + state indicator (words in the description, dot as a second
+  channel); panel rows with independent summaries; hiding a type removes only its markers and keeps
+  its period; setting Дупла = 2026 changed only that type (Точки and Колоды stayed «Всё время»); the
+  state survived force-stop/relaunch and is persisted per Territory (DataStore value
+  `v1|{…"HOLLOW":{"visible":true,"from":"2026-01-01","to":"2026-12-31"}…}` under
+  `map_data_display_48ef6a6c-…`); «Колоды» with only undated records shows «Нет записей этого типа с
+  известной датой фиксации.» while its marker stays visible; the day level renders the approved
+  seven-column weekday calendar with 48 dp cells at the phone's 360 dp width; the panel at the
+  owner's system font scale (1.7) shows every row and both actions; «Сбросить фильтры» cleared the
+  periods, kept visibility, and returned the store to the default state (entry removed, DataStore
+  hash back to the pre-gate value). The phone is left on the default display state.
+- Evidence: `app/build/reports/i6-owner-gate/` (ignored, not committed).
+
+### Open items / limitations (for the owner)
+
+1. **Marker tap on the unified map.** Neither V2.1 nor the approved specification defines what
+   tapping a research marker on the map does, and V2.1 forbids additional controls over the map, so
+   no card, screen or navigation was invented: a tap selects the object (approved D102 selected
+   treatment) and a second tap clears it. Opening the object from this map is a separate product
+   decision.
+2. **No real device record can demonstrate an excluding period.** Every dated record on the phone is
+   in 2026 and the only LogHive has no date, so a bounded period that excludes a real record cannot
+   be shown without creating data. Exclusion and NULL-exclusion are covered by the in-memory Room
+   test `MapResearchObjectsQueryTest` (bounded excludes out-of-range and NULL; unbounded keeps NULL).
+3. **Compose marker scale/performance benchmark (200–1000 markers)** from `docs/architecture.md`
+   §73.3 remains open; it is a pre-rollout measurement, not an I6 implementation defect.
+4. Known device observations already accepted in D102 stay unchanged: nearby markers overlap at low
+   zoom, and a point card can occlude the selected marker's halo in the «Точки» browser.
+5. `PhysicalObjectCardsTest` reports 2 failures on this emulator (`«Направление летка» is not
+   displayed`). The class exercises only unchanged code (`PhysicalObjectCards`/`LogHiveCard` + theme)
+   and touches no I6 file; the failure was not reproduced against the baseline worktree, so it is
+   reported as an unverified environment/order-dependent failure rather than an I6 regression.
+6. Documentation follow-up still owed after the owner gate: Help content, I016 status reconciliation
+   in `docs/ideas.md`, and the checklist's documentation-follow-up section.
+7. Three independent read-only reviews were run on this diff (final verdicts: BLOCKER 0 / HIGH 0 /
+   MEDIUM 0 after each round's fixes). The code left in the tree is the reviewed revision; the
+   device screenshots in `app/build/reports/i6-owner-gate/` are the visual evidence for frame
+   fidelity at the real font scale.
+
+Protected unrelated file `.codex/agents/luna-verifier.toml` is untouched and excluded from any I6
+commit; SHA-256 `7388F2F233AB86694C69F15CB0BF8076C39A65932D2248D44046CFE2E46A1F31`.
+STOP before commit and push: the next step is owner Samsung UI verification of the new surface.
+
 ## Current continuation — D102 approved marker visual gate (2026-10-09)
 
 Baseline HEAD/main/origin/main: 3c2c4c349b78accaf0d0d1b8c9a21d3efbec1df5.

@@ -13,6 +13,8 @@ When an idea becomes timely, it may be discussed and promoted. Promotion to
 authoritative requirements or decisions. Keep entries concise and link to
 authoritative documentation instead of copying it here.
 
+Owner process rule (2026-10-10): substantive product, data or architecture decisions accepted in discussion must enter this backlog as a concise pointer, or enter the current task and authoritative documentation immediately. They must not remain only in chat.
+
 ## Statuses
 
 - `idea` — captured thought that has not yet been evaluated.
@@ -206,6 +208,13 @@ revisable UI detail rather than a domain rule.
 - remove the large `Управление территориями` action from the main map screen;
 - further refine the accepted bottom actions `Объекты | Настройки` without mixing creation and browsing.
 
+**Accepted implementation within I004 (OWNER, 2026-10-10):** main-map bottom toolbar prototype:
+four equal icon-only zones, Analysis / Visualization / Objects / Settings, unchanged compact height.
+Analysis remains reserved; Visualization opens the existing «Данные на карте» surface. This bounded
+item is **done** in the current uncommitted I6 under [D104](decisions.md#d104--main-map-bottom-toolbar)
+(OWNER final visual acceptance pending);
+the remaining broader simplification ideas below are not promoted by this acceptance.
+
 **Motivation / expected value:** Give the map more space and reduce visual noise
 during frequent field work.
 
@@ -214,7 +223,8 @@ device testing; a replacement way to keep the current Territory unambiguous and
 Territory management safely reachable.
 
 **Notes:** D077 accepts only the general create chooser and the
-`Объекты | Настройки` navigation shell. The broader visual simplification in
+`Объекты | Настройки` navigation shell; D104 supersedes its toolbar presentation with four actions.
+The broader visual simplification in
 this idea remains unaccepted. Removing Territory information without an adequate
 replacement would conflict with the current workflow requirement that the active
 Territory be clear on the working screen.
@@ -820,3 +830,12 @@ I011, метод анализа вероятного гнезда — темой
 режимов, не определяет Room schema и не отменяет существующие источники карты. Независимое
 включение тематических слоёв — принцип: рост числа слоёв не должен превращаться в рост числа
 верхнеуровневых экранов.
+
+
+## I017 — Physical-object fixation moment and modification boundary
+
+**Status:** `accepted` — OWNER, 2026-10-10; implemented within current TEMPORAL I6.
+
+Distinguish immutable research fixation moment and captured calendar date from technical row creation/modification. Inspection is separate from its parent object. Legacy timestamps require evidence and separate approval before promotion to fixation.
+
+**Authoritative decision:** [D103](decisions.md#d103--physical-object-fixation-moment-and-modification-boundary); precise model and compatibility: [temporal design §25](temporal-data-model-design.md#25-owner-correction-physical-object-fixation-moment) and [data model](data-model.md#временные-факты-объекта).

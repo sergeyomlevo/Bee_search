@@ -113,7 +113,7 @@ class IsolatedTemporalExportSafTest {
                 fun json(value: ByteArray) = Json.parseToJsonElement(value.decodeToString()).jsonObject
                 fun verifyManifest(value: ByteArray,profile: String): Map<String,ByteArray> = entries(value).also {
                     val manifest = json(it.getValue("manifest.json"))
-                    assertEquals(2,manifest.getValue("formatVersion").jsonPrimitive.int)
+                    assertEquals(if (profile == "SINGLE_OBSERVATION_POINT") 2 else 3,manifest.getValue("formatVersion").jsonPrimitive.int)
                     assertEquals(profile,manifest.getValue("profile").jsonPrimitive.content)
                 }
                 val pointUri = destination("point-v2.zip")
@@ -143,7 +143,7 @@ class IsolatedTemporalExportSafTest {
                         objectJson.getValue("fixationDate"))
                     PhysicalObjectExportCodec.decode(value.inputStream()).use { decoded ->
                         assertEquals(original,decoded.graph)
-                        println("RT4 SINGLE id=$id type=${decoded.graph.type} uri=$uri bytes=${value.size} version=2 before=${original.fixationDate} after=${decoded.graph.fixationDate}")
+                        println("RT4 SINGLE id=$id type=${decoded.graph.type} uri=$uri bytes=${value.size} version=3 before=${original.fixationDate} after=${decoded.graph.fixationDate}")
                     }
                 }
                 val collectionExporter = SafPhysicalObjectCollectionDocumentExporter(

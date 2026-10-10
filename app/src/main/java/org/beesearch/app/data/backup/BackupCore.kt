@@ -107,13 +107,16 @@ internal class BackupService(
         objectMediaStore: PhysicalObjectMediaFileStore? = null,
     ) : this(database, DataStorePortableSettingsStore(settings), clock, sourceAppVersion, checkpoint, attachmentStore, objectMediaStore)
 
-    suspend fun export(output: File, format: Int = BackupContractV7.FORMAT): UUID {
-        if (format !in 6..7) throw UnsupportedBackupFormat("unsupported writer format")
+    suspend fun export(output: File, format: Int = BackupContractV8.FORMAT): UUID {
+        if (format !in 6..8) throw UnsupportedBackupFormat("unsupported writer format")
         val graph = database.withTransaction { database.backupDao().snapshot() }
         validateGraph(graph)
         if (format == 6) {
             validateLegacyObservationDates(graph)
             validateLegacyPhysicalObjectDates(graph)
+            validateLegacyPhysicalObjectInstants(graph)
+        } else if (format == 7) {
+            validateLegacyPhysicalObjectInstants(graph)
         }
         val portable = settings.snapshot()
         validateSettings(portable, graph)
@@ -376,7 +379,7 @@ private fun blobsV7(
     settings: PortableSettingsSnapshot,
     attachmentStore: ObservationAttachmentFileStore?,
     objectMediaStore: PhysicalObjectMediaFileStore?,
-    format: Int = BackupContractV7.FORMAT,
+    format: Int = BackupContractV8.FORMAT,
 ): List<Blob> {
     fun rows(name: String, values: List<String>): Blob {
         val text = values.joinToString("\n", postfix = if (values.isEmpty()) "" else "\n")
@@ -387,13 +390,13 @@ private fun blobsV7(
     val result = mutableListOf(
         rows("territories", graph.territories.sortedBy { it.id.toString() }.map { it.json() }),
         rows("observers", graph.observers.sortedBy { it.id.toString() }.map { it.json() }),
-        rows("physical-objects", graph.physicalObjects.sortedBy { it.id.toString() }.map { if (format == 7) it.jsonV7() else it.jsonV4() }),
+        rows("physical-objects", graph.physicalObjects.sortedBy { it.id.toString() }.map { when (format) { 8 -> it.jsonV8(); 7 -> it.jsonV7(); else -> it.jsonV4() } }),
         rows("hollows", graph.hollows.sortedBy { it.physicalObjectId.toString() }.map { it.jsonV6() }),
         rows("log-hives", graph.logHives.sortedBy { it.physicalObjectId.toString() }.map { it.jsonV6() }),
         rows("physical-object-media", graph.objectMedia.sortedBy { it.id.toString() }.map { it.json() }),
         rows("apiaries", graph.apiaries.sortedBy { it.physicalObjectId.toString() }.map { it.json() }),
         rows("physical-object-sequences", graph.sequences.sortedBy { it.territoryId.toString() + it.objectType.name }.map { it.json() }),
-        rows("observation-points", graph.points.sortedBy { it.id.toString() }.map { if (format == 7) it.jsonV7() else it.jsonV2() }),
+        rows("observation-points", graph.points.sortedBy { it.id.toString() }.map { if (format >= 7) it.jsonV7() else it.jsonV2() }),
         rows("bees", graph.bees.sortedBy { it.id.toString() }.map { it.jsonV3() }),
         rows("flight-cycles", graph.cycles.sortedBy { it.id.toString() }.map { it.json() }),
         rows("observation-point-weather", weatherRows.sortedBy { it.observationPointId.toString() }.map { it.json() }),
@@ -424,10 +427,10 @@ private fun mediaPayload(file: File, size: Long, hash: String): ArchivePayload =
     if (it.size != size || it.sha256 != hash) throw BackupIntegrityMismatch("media source changed")
 }
 
-private fun manifest(id: UUID, created: Instant, appVersion: String, blobs: List<Blob>, format: Int = BackupContractV7.FORMAT) = obj(
+private fun manifest(id: UUID, created: Instant, appVersion: String, blobs: List<Blob>, format: Int = BackupContractV8.FORMAT) = obj(
     "backupFormatVersion" to format.toString(), "archiveSchemaVersion" to format.toString(), "archiveId" to j(id),
     "createdAt" to created.toEpochMilli().toString(), "sourceAppVersion" to j(appVersion),
-    "roomSchemaVersion" to (if (format == 7) "13" else "11"), "profile" to j(BackupContractV6.PROFILE),
+    "roomSchemaVersion" to (when (format) { 8 -> "14"; 7 -> "13"; else -> "11" }), "profile" to j(BackupContractV6.PROFILE),
     "collections" to blobs.joinToString(",", "[", "]") { obj(
         "name" to j(it.name), "path" to j(it.path), "collectionSchemaVersion" to "1", "required" to "true",
         "recordCount" to it.count.toString(), "byteLength" to it.payload.size.toString(), "sha256" to j(it.payload.sha256),
@@ -438,7 +441,7 @@ private fun parse(entries: Map<String, ArchivePayload>): Parsed {
     val manifest = objectFrom((entries[MANIFEST] ?: throw MissingBackupCollection(MANIFEST)).readMetadata(MAX_METADATA_ENTRY_BYTES), "manifest")
     val format = manifest.int("backupFormatVersion")
     val schema = manifest.int("archiveSchemaVersion")
-    if (format !in 1..7) throw UnsupportedBackupFormat("unsupported backup format")
+    if (format !in 1..8) throw UnsupportedBackupFormat("unsupported backup format")
     if (schema != format) throw UnsupportedArchiveSchema("unsupported archive schema")
     val contract = when (format) {
         1 -> BackupContractV1.collections
@@ -447,7 +450,8 @@ private fun parse(entries: Map<String, ArchivePayload>): Parsed {
         4 -> BackupContractV4.collections
         5 -> BackupContractV5.collections
         6 -> BackupContractV6.collections
-        else -> BackupContractV7.collections
+        7 -> BackupContractV7.collections
+        else -> BackupContractV8.collections
     }
     val archiveId = manifest.uuid("archiveId"); manifest.long("createdAt")
     if (manifest.string("sourceAppVersion").isBlank()) throw MalformedBackup("blank sourceAppVersion")
@@ -508,13 +512,13 @@ private fun parse(entries: Map<String, ArchivePayload>): Parsed {
     val graph = Graph(
         territories = objects("territories").map(::territory),
         observers = objects("observers").map(::observer),
-        physicalObjects = if (format >= 3) objects("physical-objects").map { if (format >= 4) physicalObjectV4(it, canonicalDate = format == 7) else physicalObject(it) } else emptyList(),
+        physicalObjects = if (format >= 3) objects("physical-objects").map { if (format >= 4) physicalObjectV4(it, canonicalDate = format >= 7, extendedTemporal = format >= 8) else physicalObject(it) } else emptyList(),
         hollows = if (format >= 4) objects("hollows").map { hollow(it, format >= 6) } else emptyList(),
         logHives = if (format >= 4) objects("log-hives").map { logHive(it, format >= 6) } else emptyList(),
         objectMedia = if (format >= 4) objects("physical-object-media").map(::objectMedia) else emptyList(),
         sequences = if (format >= 5) objects("physical-object-sequences").map(::sequence) else emptyList(),
         apiaries = if (format >= 3) objects("apiaries").map(::apiary) else emptyList(),
-        points = objects("observation-points").map { if (format == 1) point(it) else pointV2(it, canonicalDate = format == 7) },
+        points = objects("observation-points").map { if (format == 1) point(it) else pointV2(it, canonicalDate = format >= 7) },
         bees = objects("bees").map { if (format >= 3) beeV3(it) else bee(it) },
         cycles = objects("flight-cycles").map(::cycle),
         weather = if (format >= 2) objects("observation-point-weather").map(::weather)
@@ -694,6 +698,12 @@ internal fun validateLegacyPhysicalObjectDates(graph: Graph) {
     }
 }
 
+internal fun validateLegacyPhysicalObjectInstants(graph: Graph) {
+    graph.physicalObjects.firstOrNull { it.fixationAt != null || it.updatedAt != null }?.let {
+        throw BackupDomainInvariantViolation("PhysicalObject ${it.id}: fixationAt/updatedAt are not representable in legacy format")
+    }
+}
+
 internal fun validateLegacyObservationDates(graph: Graph) {
     val zone = ZoneId.systemDefault()
     graph.points.forEach { point ->
@@ -720,6 +730,7 @@ internal fun validateGraph(g: Graph, globalIdentityUniqueness: Boolean = true) {
         if (value.territoryId !in territories) throw BrokenBackupForeignKey("physical object ${value.id} territory missing")
         if (value.creatorObserverId != null && value.creatorObserverId !in observers) throw BrokenBackupForeignKey("physical object ${value.id} creator missing")
         domain(value.sequenceNumber > 0, "invalid physical object sequence")
+        domain(value.fixationAt == null || value.fixationDate != null, "physical object fixationAt requires fixationDate")
         coordinate(value.latitude, -90.0, 90.0); coordinate(value.longitude, -180.0, 180.0)
     }
     unique(g.sequences, "physical object sequence scope") { it.territoryId to it.objectType }
@@ -819,7 +830,12 @@ internal fun validateGraph(g: Graph, globalIdentityUniqueness: Boolean = true) {
 private fun territory(o: JsonObject) = TerritoryEntity(o.uuid("id"), o.string("code"), o.string("name"), o.string("region"), o.string("district"), o.instant("createdAt"), o.instant("updatedAt"))
 private fun observer(o: JsonObject) = ObserverEntity(o.uuid("id"), o.string("code"), o.string("lastName"), o.string("firstName"), o.optionalString("middleName"), o.optionalString("contact"), o.instant("createdAt"), o.instant("updatedAt"))
 private fun physicalObject(o: JsonObject) = PhysicalObjectEntity(o.uuid("id"), o.uuid("territoryId"), o.enum("objectType"), o.int("sequenceNumber"), o.double("latitude"), o.double("longitude"), o.instant("createdAt"), fixationDate = null)
-private fun physicalObjectV4(o: JsonObject, canonicalDate: Boolean = false) = PhysicalObjectEntity(o.uuid("id"), o.uuid("territoryId"), o.enum("objectType"), o.int("sequenceNumber"), o.double("latitude"), o.double("longitude"), o.instant("createdAt"), o.optionalUuid("creatorObserverId"), fixationDate = if (canonicalDate) o.researchDate("fixationDate", nullable = true) else null)
+private fun physicalObjectV4(o: JsonObject, canonicalDate: Boolean = false, extendedTemporal: Boolean = false) = PhysicalObjectEntity(
+    o.uuid("id"), o.uuid("territoryId"), o.enum("objectType"), o.int("sequenceNumber"), o.double("latitude"), o.double("longitude"),
+    o.instant("createdAt"), o.optionalUuid("creatorObserverId"), fixationDate = if (canonicalDate) o.researchDate("fixationDate", nullable = true) else null,
+    fixationAt = if (extendedTemporal) o.optionalInstant("fixationAt") else null,
+    updatedAt = if (extendedTemporal) o.optionalInstant("updatedAt") else null,
+)
 private fun nullablePositive(o: JsonObject, name: String): Double? = o.optionalDouble(name)
 private fun hollow(o: JsonObject, hasName: Boolean) = HollowEntity(o.uuid("physicalObjectId"), o.optionalString("tree"), nullablePositive(o, "entranceHeightCm"), o.field("entranceAzimuthDeg").let { if (it is JsonNull) null else o.int("entranceAzimuthDeg") }, nullablePositive(o, "outerDiameterCm"), nullablePositive(o, "internalDiameterCm"), o.optionalString("notes"), if (hasName) o.optionalString("name") else null)
 private fun logHive(o: JsonObject, hasName: Boolean) = LogHiveEntity(o.uuid("physicalObjectId"), o.optionalString("tree"), nullablePositive(o, "entranceHeightCm"), o.field("entranceAzimuthDeg").let { if (it is JsonNull) null else o.int("entranceAzimuthDeg") }, nullablePositive(o, "outerDiameterCm"), o.optionalString("material"), nullablePositive(o, "internalDiameterCm"), nullablePositive(o, "internalHeightCm"), o.optionalString("notes"), if (hasName) o.optionalString("name") else null)
@@ -851,6 +867,9 @@ private fun JsonObject.researchDate(name: String, nullable: Boolean): LocalDate?
 
 private fun PhysicalObjectEntity.jsonV7(): String = jsonV4().dropLast(1) +
     ",\"fixationDate\":" + j(fixationDate?.let { parseCanonicalResearchDate(it.toString()).toString() }) + "}"
+
+private fun PhysicalObjectEntity.jsonV8(): String = jsonV7().dropLast(1) +
+    ",\"fixationAt\":" + j(fixationAt) + ",\"updatedAt\":" + j(updatedAt) + "}"
 
 private fun ObservationPointEntity.jsonV7(): String = jsonV2().dropLast(1) +
     ",\"observationDate\":" + j(parseCanonicalResearchDate(observationDate.toString()).toString()) + "}"
@@ -920,13 +939,13 @@ private fun sha256(file: File): String = file.inputStream().buffered().use { inp
 internal fun snapshotRows(graph: Graph, version: Int = 1): Map<String, List<String>> = linkedMapOf(
     "data/territories.jsonl" to graph.territories.sortedBy { it.id.toString() }.map { it.json() },
     "data/observers.jsonl" to graph.observers.sortedBy { it.id.toString() }.map { it.json() },
-    "data/physical-objects.jsonl" to graph.physicalObjects.sortedBy { it.id.toString() }.map { if (version == 2) it.jsonV7() else it.jsonV4() },
+    "data/physical-objects.jsonl" to graph.physicalObjects.sortedBy { it.id.toString() }.map { when (version) { 3 -> it.jsonV8(); 2 -> it.jsonV7(); else -> it.jsonV4() } },
     "data/apiaries.jsonl" to graph.apiaries.sortedBy { it.physicalObjectId.toString() }.map { it.json() },
     "data/hollows.jsonl" to graph.hollows.sortedBy { it.physicalObjectId.toString() }.map { it.jsonV6() },
     "data/log-hives.jsonl" to graph.logHives.sortedBy { it.physicalObjectId.toString() }.map { it.jsonV6() },
     "data/physical-object-sequences.jsonl" to graph.sequences.sortedWith(compareBy({ it.territoryId.toString() }, { it.objectType.name })).map { it.json() },
     "data/physical-object-media.jsonl" to graph.objectMedia.sortedBy { it.id.toString() }.map { it.json() },
-    "data/observation-points.jsonl" to graph.points.sortedBy { it.id.toString() }.map { if (version == 2) it.jsonV7() else it.jsonV2() },
+    "data/observation-points.jsonl" to graph.points.sortedBy { it.id.toString() }.map { if (version >= 2) it.jsonV7() else it.jsonV2() },
     "data/bees.jsonl" to graph.bees.sortedBy { it.id.toString() }.map { it.jsonV3() },
     "data/flight-cycles.jsonl" to graph.cycles.sortedBy { it.id.toString() }.map { it.json() },
     "data/observation-point-weather.jsonl" to graph.weather.sortedBy { it.observationPointId.toString() }.map { it.json() },
@@ -942,13 +961,13 @@ internal fun snapshotGraphFromRows(rows: Map<String, List<JsonObject>>, version:
     val graph = Graph(
         territories = values("data/territories.jsonl").map(::territory),
         observers = values("data/observers.jsonl").map(::observer),
-        physicalObjects = values("data/physical-objects.jsonl").map { physicalObjectV4(it, canonicalDate = version == 2) },
+        physicalObjects = values("data/physical-objects.jsonl").map { physicalObjectV4(it, canonicalDate = version >= 2, extendedTemporal = version >= 3) },
         apiaries = values("data/apiaries.jsonl").map { apiary(it) },
         hollows = values("data/hollows.jsonl").map { hollow(it, true) },
         logHives = values("data/log-hives.jsonl").map { logHive(it, true) },
         sequences = values("data/physical-object-sequences.jsonl").map(::sequence),
         objectMedia = values("data/physical-object-media.jsonl").map(::objectMedia),
-        points = values("data/observation-points.jsonl").map { pointV2(it, canonicalDate = version == 2) },
+        points = values("data/observation-points.jsonl").map { pointV2(it, canonicalDate = version >= 2) },
         bees = values("data/bees.jsonl").map(::beeV3),
         cycles = values("data/flight-cycles.jsonl").map(::cycle),
         weather = values("data/observation-point-weather.jsonl").map(::weather),

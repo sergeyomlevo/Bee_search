@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -75,7 +76,6 @@ import org.maplibre.android.maps.Style
 
 internal enum class BeeMapMode {
     FIELD,
-    POINT_BROWSER,
 
     /**
      * Read-only Ареал review: the saved участки on a clean map.
@@ -117,11 +117,19 @@ internal fun BeeMap(
     /** Reports that the pending request was handled, so it cannot be replayed. */
     onAreaEditorRequestHandled: () -> Unit = {},
     mode: BeeMapMode = BeeMapMode.FIELD,
-    /** Saved objects drawn in the browser mode. ObservationPoint is the only kind today. */
-    savedObjectMarkers: List<MapObjectMarker> = emptyList(),
-    /** The saved object the host currently has selected; only it gets the selected treatment. */
-    selectedSavedObjectId: UUID? = null,
-    onSelectSavedObject: (MapObjectMarker) -> Unit = {},
+    /**
+     * Research objects of the unified data map.
+     *
+     * The host passes objects that already satisfy the display state — visible types with each
+     * type's own period applied by the temporal query layer — so the map never filters research
+     * dates itself and never mutates a stored date.
+     */
+    researchObjectMarkers: List<MapObjectMarker> = emptyList(),
+    selectedResearchObjectId: UUID? = null,
+    onSelectResearchObject: (MapObjectMarker) -> Unit = {},
+    initialCamera: MapCameraContext? = null,
+    onCameraChanged: (MapCameraContext) -> Unit = {},
+    selectedResearchObjectPreview: (@Composable BoxScope.() -> Unit)? = null,
     /** Leaves the Ареал view mode; the host decides which screen that means. */
     onExitAreaView: () -> Unit = {},
     /** Opens the участки editor from the Ареал view mode. */
@@ -136,8 +144,8 @@ internal fun BeeMap(
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var gpsScreenPosition by remember { mutableStateOf<Offset?>(null) }
     var gpsProjectedPosition by remember { mutableStateOf<Offset?>(null) }
-    var firstFixCentered by remember { mutableStateOf(false) }
-    var initialGpsCenterEstablished by remember { mutableStateOf(false) }
+    var firstFixCentered by remember { mutableStateOf(initialCamera != null) }
+    var initialGpsCenterEstablished by remember { mutableStateOf(initialCamera != null) }
     var mapCenter by remember { mutableStateOf<MapTarget?>(null) }
     var mapZoom by remember { mutableStateOf<Double?>(null) }
     var recenteredUntilNextGesture by remember { mutableStateOf(false) }
@@ -186,6 +194,7 @@ internal fun BeeMap(
         sentinelArchive?.let(::beeSearchDevSentinelMapProfile)
     }
     val latestTerritoryId by rememberUpdatedState(territoryId)
+    val latestCameraChanged by rememberUpdatedState(onCameraChanged)
     val onlineMapProfile = remember { beeSearchFieldMapProfile() }
     val coroutineScope = rememberCoroutineScope()
     LaunchedEffect(territoryId, areaStore, territoryName) {
@@ -431,6 +440,12 @@ internal fun BeeMap(
                     view.getMapAsync { mapInstance ->
                         map = mapInstance
                         mapInstance.setMaxZoomPreference(onlineMapProfile.uiMaxZoom)
+                        initialCamera?.let { saved ->
+                            mapInstance.cameraPosition = CameraPosition.Builder()
+                                .target(LatLng(saved.latitude, saved.longitude)).zoom(saved.zoom)
+                                .bearing(saved.bearing).tilt(saved.tilt).build()
+                            mapCenter = MapTarget(saved.latitude, saved.longitude)
+                        }
                         mapInstance.setStyle(Style.Builder().fromJson(onlineMapProfile.styleJson))
                         mapZoom = mapInstance.cameraPosition.zoom
                     }
@@ -484,30 +499,6 @@ internal fun BeeMap(
             gpsScreenPosition = gpsProjectedPosition?.takeIf { isMapPositionVisible(it, mapView) }
         }
 
-        LaunchedEffect(map, mode, savedObjectMarkers.map(MapObjectMarker::id)) {
-            if (mode != BeeMapMode.POINT_BROWSER || savedObjectMarkers.isEmpty()) {
-                return@LaunchedEffect
-            }
-            val mapInstance = map ?: return@LaunchedEffect
-            val north = savedObjectMarkers.maxOf(MapObjectMarker::latitude)
-            val east = savedObjectMarkers.maxOf(MapObjectMarker::longitude)
-            val south = savedObjectMarkers.minOf(MapObjectMarker::latitude)
-            val west = savedObjectMarkers.minOf(MapObjectMarker::longitude)
-            if (north == south && east == west) {
-                mapInstance.moveCamera(
-                    CameraUpdateFactory.newLatLngZoom(LatLng(north, east), 15.0),
-                )
-            } else {
-                mapInstance.moveCamera(
-                    CameraUpdateFactory.newLatLngBounds(
-                        MapGeoBounds(north = north, east = east, south = south, west = west)
-                            .toLatLngBounds(),
-                        80,
-                    ),
-                )
-            }
-        }
-
         LaunchedEffect(map, mapCenterRequest?.requestId) {
             val request = mapCenterRequest ?: return@LaunchedEffect
             val mapInstance = map ?: return@LaunchedEffect
@@ -551,6 +542,9 @@ internal fun BeeMap(
                 onDispose { }
             } else {
                 val updateMapOverlays = {
+                    if (mode == BeeMapMode.FIELD) {
+                        mapInstance.cameraPosition.toMapCameraContext()?.let(latestCameraChanged)
+                    }
                     gpsProjectedPosition = projectedMapPosition(mapInstance, currentMapView, gpsPosition)
                     gpsScreenPosition = gpsProjectedPosition?.takeIf {
                         isMapPositionVisible(it, currentMapView)
@@ -669,7 +663,7 @@ internal fun BeeMap(
             MapCenterTarget(Modifier.align(Alignment.Center).zIndex(2f))
         }
 
-        if (mode == BeeMapMode.POINT_BROWSER || mode == BeeMapMode.AREA_VIEW) {
+        if (mode == BeeMapMode.AREA_VIEW) {
             mapZoom?.let { zoom ->
                 MapZoomIndicator(
                     zoom = zoom,
@@ -861,22 +855,24 @@ internal fun BeeMap(
                 },
             )
         }
-
-
-        if (mode == BeeMapMode.POINT_BROWSER) {
+        // Unified data map: research objects of the current Territory, already filtered by the
+        // display state (visible types and each type's own period). The overlay stays out of the way
+        // of the dedicated placement and участки editing modes, which own the map gestures.
+        if (mode == BeeMapMode.FIELD &&
+            !coverageSelectionActive &&
+            locationSelectionLabel == null &&
+            researchObjectMarkers.isNotEmpty()
+        ) {
             SavedObjectMarkersOverlay(
-                markers = savedObjectMarkers,
+                markers = researchObjectMarkers,
                 map = map,
                 mapView = mapView,
                 cameraRevision = mapCameraRevision,
-                onSelectMarker = onSelectSavedObject,
+                onSelectMarker = onSelectResearchObject,
                 modifier = Modifier.fillMaxSize().zIndex(2f),
-                selectedObjectId = selectedSavedObjectId,
+                selectedObjectId = selectedResearchObjectId,
             )
-        }
-        // Source-set boundary: DEBUG specimens only, never research records or release navigation.
-        if (mode == BeeMapMode.FIELD && !coverageSelectionActive && locationSelectionLabel == null) {
-            MarkerVisualPreview(Modifier.fillMaxSize().zIndex(3f))
+            selectedResearchObjectPreview?.invoke(this)
         }
     }
 

@@ -124,6 +124,8 @@ sealed interface AppRoute {
          * replay a message the user already handled.
          */
         val deletionBlockers: PhysicalObjectDeletionBlockers? = null,
+        /** The same full card can also be entered from the unified map. */
+        val returnToMap: Boolean = false,
     ) : AppRoute
     data object PrepareObservationPoint : AppRoute
     data class ResumeObservation(val point: ObservationPoint) : AppRoute
@@ -148,6 +150,7 @@ internal sealed interface PhysicalObjectLocationSelection {
         val objectId: UUID,
         val listType: PhysicalObjectType,
         override val label: String,
+        val returnToMap: Boolean = false,
     ) : PhysicalObjectLocationSelection
 }
 
@@ -155,6 +158,7 @@ internal sealed interface PhysicalObjectLocationSelection {
 data class PhysicalObjectCardReturn(
     val objectId: UUID,
     val listType: PhysicalObjectType,
+    val returnToMap: Boolean = false,
 )
 
 data class PhysicalObjectCoordinateUpdate(
@@ -190,7 +194,7 @@ data class PhysicalObjectCreationTarget(
 )
 
 /** Origin of the single ObservationPoint screen. */
-enum class PointDetailOrigin { POINTS, OBSERVATION }
+enum class PointDetailOrigin { POINTS, OBSERVATION, MAP }
 
 data class BeePreparationUiState(
     val pointId: UUID? = null,
@@ -270,6 +274,17 @@ internal fun setupStepReturnRoute(setupStepPending: Boolean): AppRoute? =
 internal fun setupDestinationReturnRoute(setupStepPending: Boolean): AppRoute =
     if (setupStepPending) AppRoute.InitialSetup else AppRoute.Objects
 
+/**
+ * Whether resolving setup facts must start from the visible `Loading` state.
+ *
+ * The route is derived from that state, so `Loading` is only correct when nothing is resolved yet or
+ * the setup generation genuinely changed. Re-reading facts of an already resolved generation — which
+ * happens after any settings write — must keep the current route, otherwise the visible screen is
+ * torn down for the duration of the reads and an open overlay disappears with it.
+ */
+internal fun shouldShowInitialSetupLoading(resolvedGeneration: Int?, generation: Int): Boolean =
+    resolvedGeneration != generation
+
 internal class MainViewModel(
     private val settingsRepository: SettingsRepository,
     private val territoryRepository: TerritoryRepository,
@@ -292,6 +307,16 @@ internal class MainViewModel(
     private val _setupSettingsSection = MutableStateFlow<SetupSettingsSection?>(null)
     val setupSettingsSection: StateFlow<SetupSettingsSection?> = _setupSettingsSection.asStateFlow()
     private var setupReturnPending = false
+
+    /**
+     * The generation whose facts are already resolved in [initialSetup].
+     *
+     * Re-reading those facts — which happens after any settings write, including the display state
+     * of «Данные на карте» — must not flash [InitialSetupState.Loading] again: the route is derived
+     * from this state, and a transient `Loading` route tears the visible screen down, which would
+     * close an open overlay and lose its session state. Only a new generation starts from `Loading`.
+     */
+    private var resolvedSetupGeneration: Int? = null
 
     /**
      * The pending request to open the участки editor.
@@ -390,7 +415,11 @@ internal class MainViewModel(
         facts to generation
     }.flatMapLatest { (facts, generation) ->
             flow {
-                emit(InitialSetupState.Loading(facts.activePoint, generation))
+                // A re-read of facts that are already resolved keeps the current route: emitting
+                // `Loading` here would dispose the visible screen for the duration of the reads.
+                if (shouldShowInitialSetupLoading(resolvedSetupGeneration, generation)) {
+                    emit(InitialSetupState.Loading(facts.activePoint, generation))
+                }
                 val territory = facts.settings.currentTerritoryId?.let { id ->
                     facts.territories.firstOrNull { it.id == id }
                 }
@@ -411,6 +440,7 @@ internal class MainViewModel(
                 } else null
                 emit(InitialSetupState.Ready(facts.activePoint, observer, territory, area, map,
                     facts.settings.initialSetupOfferHandled, generation))
+                resolvedSetupGeneration = generation
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InitialSetupState.Loading())
     val visibleInitialSetup: StateFlow<InitialSetupState> = combine(initialSetup, setupRefresh) { state, generation ->
@@ -523,9 +553,24 @@ internal class MainViewModel(
         clearFeedback()
     }
 
+    /** Opens the existing record UI with explicit map origin; no map-only data copy. */
+    fun openPointFromMap(pointId: UUID) {
+        manualRoute.value = AppRoute.PointDetail(pointId, PointDetailOrigin.MAP)
+        clearFeedback()
+    }
+
+    internal fun openMapObject(marker: org.beesearch.app.ui.map.MapObjectMarker) {
+        when (marker.type) {
+            org.beesearch.app.ui.map.MapObjectType.OBSERVATION_POINT -> openPointFromMap(marker.id)
+            org.beesearch.app.ui.map.MapObjectType.HOLLOW -> openPhysicalObjectFromMap(marker.id, PhysicalObjectType.HOLLOW)
+            org.beesearch.app.ui.map.MapObjectType.LOG_HIVE -> openPhysicalObjectFromMap(marker.id, PhysicalObjectType.LOG_HIVE)
+        }
+    }
+
     fun closePointDetail(route: AppRoute.PointDetail) {
         manualRoute.value = when (route.origin) {
             PointDetailOrigin.POINTS -> AppRoute.Points
+            PointDetailOrigin.MAP -> AppRoute.CurrentTerritory()
             PointDetailOrigin.OBSERVATION -> activePoint.value?.let(AppRoute::ResumeObservation)
                 ?: AppRoute.CurrentTerritory()
         }
@@ -792,6 +837,7 @@ internal class MainViewModel(
             is PhysicalObjectLocationSelection.Edit -> AppRoute.PhysicalObjectDetail(
                 objectId = selection.objectId,
                 listType = selection.listType,
+                returnToMap = selection.returnToMap,
                 coordinateUpdate = PhysicalObjectCoordinateUpdate(
                     requestId = UUID.randomUUID(),
                     latitude = latitude,
@@ -807,7 +853,8 @@ internal class MainViewModel(
         _physicalObjectLocationSelection.value = null
         _mapCenterRequest.value = null
         if (selection is PhysicalObjectLocationSelection.Edit) {
-            manualRoute.value = AppRoute.PhysicalObjectDetail(selection.objectId, selection.listType)
+            manualRoute.value = AppRoute.PhysicalObjectDetail(selection.objectId, selection.listType,
+                returnToMap = selection.returnToMap)
         }
         clearFeedback()
     }
@@ -819,6 +866,7 @@ internal class MainViewModel(
             objectId = objectId,
             listType = physicalObjectCardOnScreen()?.listType ?: PhysicalObjectType.HOLLOW,
             label = designation,
+            returnToMap = physicalObjectCardOnScreen()?.returnToMap ?: false,
         )
         _mapCenterRequest.value = MapCenterRequest(UUID.randomUUID(), MapTarget(latitude, longitude))
         manualRoute.value = AppRoute.CurrentTerritory()
@@ -832,7 +880,7 @@ internal class MainViewModel(
     fun showPhysicalObjectOnMap(latitude: Double, longitude: Double) {
         if (!latitude.isFinite() || latitude !in -90.0..90.0) return
         if (!longitude.isFinite() || longitude !in -180.0..180.0) return
-        val card = physicalObjectCardOnScreen()?.let { PhysicalObjectCardReturn(it.objectId, it.listType) }
+        val card = physicalObjectCardOnScreen()?.let { PhysicalObjectCardReturn(it.objectId, it.listType, it.returnToMap) }
         _physicalObjectLocationSelection.value = null
         _mapCenterRequest.value = MapCenterRequest(UUID.randomUUID(), MapTarget(latitude, longitude))
         manualRoute.value = AppRoute.CurrentTerritory(returnToObject = card)
@@ -842,7 +890,7 @@ internal class MainViewModel(
     /** Back on a map opened from a Physical Object card returns to that card. */
     fun returnFromPhysicalObjectMap() {
         val card = (manualRoute.value as? AppRoute.CurrentTerritory)?.returnToObject ?: return
-        manualRoute.value = AppRoute.PhysicalObjectDetail(card.objectId, card.listType)
+        manualRoute.value = AppRoute.PhysicalObjectDetail(card.objectId, card.listType, returnToMap = card.returnToMap)
         clearFeedback()
     }
 
@@ -853,7 +901,7 @@ internal class MainViewModel(
     fun consumePhysicalObjectCoordinateUpdate(requestId: UUID) {
         val route = manualRoute.value as? AppRoute.PhysicalObjectDetail ?: return
         if (route.coordinateUpdate?.requestId == requestId) {
-            manualRoute.value = AppRoute.PhysicalObjectDetail(route.objectId, route.listType)
+            manualRoute.value = route.copy(coordinateUpdate = null)
         }
     }
 
@@ -878,10 +926,16 @@ internal class MainViewModel(
         clearFeedback()
     }
 
+    fun openPhysicalObjectFromMap(objectId: UUID, type: PhysicalObjectType) {
+        if (type == PhysicalObjectType.APIARY) return
+        manualRoute.value = AppRoute.PhysicalObjectDetail(objectId, type, returnToMap = true)
+        clearFeedback()
+    }
+
     /** Back from a card returns to the typed list it was opened from, not straight to `Объекты`. */
     fun closePhysicalObjectDetail() {
         manualRoute.value = physicalObjectCardOnScreen()
-            ?.let { AppRoute.PhysicalObjectList(it.listType) }
+            ?.let { if (it.returnToMap) AppRoute.CurrentTerritory() else AppRoute.PhysicalObjectList(it.listType) }
             ?: AppRoute.Objects
         clearFeedback()
     }
@@ -906,6 +960,7 @@ internal class MainViewModel(
      */
     fun deletePhysicalObject(objectId: UUID, listType: PhysicalObjectType) {
         if (listType == PhysicalObjectType.APIARY) return
+        val returnToMap = physicalObjectCardOnScreen()?.returnToMap == true
         viewModelScope.launch {
             try {
                 val outcome = when (listType) {
@@ -914,7 +969,7 @@ internal class MainViewModel(
                     PhysicalObjectType.APIARY -> return@launch
                 }
                 _physicalObjectLocationSelection.value = null
-                manualRoute.value = AppRoute.PhysicalObjectList(listType)
+                manualRoute.value = if (returnToMap) AppRoute.CurrentTerritory() else AppRoute.PhysicalObjectList(listType)
                 if (outcome.fileCleanupComplete) {
                     showSuccessFeedback("Объект удалён")
                 } else {

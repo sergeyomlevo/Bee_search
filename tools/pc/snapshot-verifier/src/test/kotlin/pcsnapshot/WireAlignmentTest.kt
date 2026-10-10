@@ -87,6 +87,44 @@ class WireAlignmentTest {
         assertEquals("PASS", verifyV2().verdict)
     }
 
+    @Test fun nonEmptyV3ArchiveRoundTripsNullableInstantsAndRetainsDates() {
+        val files = NonEmptyFixture.entries()
+        edit(files, "data/observation-points.jsonl") { it.addProperty("observationDate", "2024-02-29") }
+        edit(files, "data/physical-objects.jsonl") { row ->
+            row.addProperty("fixationDate", "2020-01-31")
+            row.addProperty("fixationAt", 1700000000123L)
+            row.addProperty("updatedAt", 1700000000456L)
+        }
+        files["manifest.json"] = Fixture.manifest(files).toString(Charsets.UTF_8)
+            .replace("\"snapshotFormatVersion\":1", "\"snapshotFormatVersion\":3").toByteArray()
+        val report = Verifier().verify(Fixture.canonicalCopy(temp.root.toPath(), Fixture.zip(files)))
+        assertEquals("PASS", report.verdict)
+        assertEquals(3L, report.snapshotFormatVersion)
+    }
+
+    @Test fun v3RequiresInstantKeysAndFixationDateForNonnullFixationAt() {
+        val physical = JsonParser.parseString(NonEmptyFixture.entries()["data/physical-objects.jsonl"]!!
+            .toString(Charsets.UTF_8).lineSequence().first()).asJsonObject
+        physical.addProperty("fixationDate", "2020-01-31")
+        physical.addProperty("fixationAt", 1700000000123L)
+        physical.addProperty("updatedAt", 1700000000456L)
+        assertEquals("WIRE_SCHEMA_INVALID", assertThrows(CheckFailure::class.java) {
+            RecordSchema.validate(physical.deepCopy().also { it.remove("updatedAt") }, "data/physical-objects.jsonl", 3L)
+        }.issue.code)
+
+        val files = NonEmptyFixture.entries()
+        edit(files, "data/observation-points.jsonl") { it.addProperty("observationDate", "2024-02-29") }
+        edit(files, "data/physical-objects.jsonl") { row ->
+            row.add("fixationDate", JsonNull.INSTANCE)
+            row.addProperty("fixationAt", 1700000000123L)
+            row.addProperty("updatedAt", 1700000000456L)
+        }
+        files["manifest.json"] = Fixture.manifest(files).toString(Charsets.UTF_8)
+            .replace("\"snapshotFormatVersion\":1", "\"snapshotFormatVersion\":3").toByteArray()
+        val report = Verifier().verify(Fixture.canonicalCopy(temp.root.toPath(), Fixture.zip(files)))
+        code(report, "LOGICAL_STATE_INCONSISTENT")
+    }
+
     @Test fun malformedV2DatesFailWholePipelineWithUpdatedIntegrityDescriptors() {
         for ((path, key) in listOf("data/observation-points.jsonl" to "observationDate",
             "data/physical-objects.jsonl" to "fixationDate")) {

@@ -21,11 +21,6 @@ import org.beesearch.app.domain.repository.ObservationDataMaintenance
 import org.beesearch.app.domain.repository.ObservationRepository
 import java.util.UUID
 
-internal enum class PointsViewMode {
-    MAP,
-    TABLE,
-}
-
 internal sealed interface PointsYearFilter {
     data object All : PointsYearFilter
     data class Year(val value: Int) : PointsYearFilter
@@ -43,8 +38,6 @@ internal data class PointsUiState(
     val selectedTerritoryId: UUID? = null,
     val availableYears: List<Int> = emptyList(),
     val yearFilter: PointsYearFilter = PointsYearFilter.All,
-    val viewMode: PointsViewMode = PointsViewMode.MAP,
-    val selectedPoint: ObservationPointSummary? = null,
     val isLoading: Boolean = true,
     val counts: ObservationDataCounts? = null,
     val isExporting: Boolean = false,
@@ -67,8 +60,6 @@ internal class PointsViewModel(
     private data class ViewInputs(
         val territoryId: UUID? = null,
         val yearFilter: PointsYearFilter? = null,
-        val viewMode: PointsViewMode = PointsViewMode.MAP,
-        val selectedPointId: UUID? = null,
     )
 
     private data class OperationState(
@@ -96,8 +87,6 @@ internal class PointsViewModel(
             allPoints = allPoints,
             selectedTerritoryId = current.territoryId,
             requestedYearFilter = current.yearFilter,
-            viewMode = current.viewMode,
-            selectedPointId = current.selectedPointId,
             counts = current_operation.counts,
             isExporting = current_operation.isExporting,
             isDeletingAll = current_operation.isDeletingAll,
@@ -123,7 +112,7 @@ internal class PointsViewModel(
             else -> availableTerritoryIds.firstOrNull()
         }
         if (next != current) {
-            inputs.value = inputs.value.copy(territoryId = next, yearFilter = null, selectedPointId = null)
+            inputs.value = inputs.value.copy(territoryId = next, yearFilter = null)
         }
     }
 
@@ -133,24 +122,11 @@ internal class PointsViewModel(
         inputs.value = inputs.value.copy(
             territoryId = territoryId,
             yearFilter = null,
-            selectedPointId = null,
         )
     }
 
     fun selectYear(filter: PointsYearFilter) {
-        inputs.value = inputs.value.copy(yearFilter = filter, selectedPointId = null)
-    }
-
-    fun selectViewMode(mode: PointsViewMode) {
-        inputs.value = inputs.value.copy(viewMode = mode)
-    }
-
-    fun selectPoint(pointId: UUID) {
-        inputs.value = inputs.value.copy(selectedPointId = pointId)
-    }
-
-    fun clearPointSelection() {
-        inputs.value = inputs.value.copy(selectedPointId = null)
+        inputs.value = inputs.value.copy(yearFilter = filter)
     }
 
     fun refreshCounts() {
@@ -197,7 +173,6 @@ internal class PointsViewModel(
         viewModelScope.launch {
             try {
                 val remaining = maintenance.clearObservationData()
-                inputs.value = inputs.value.copy(selectedPointId = null)
                 operation.value = operation.value.copy(
                     isDeletingAll = false,
                     counts = remaining,
@@ -242,8 +217,6 @@ internal fun buildPointsUiState(
     allPoints: List<ObservationPointSummary>,
     selectedTerritoryId: UUID?,
     requestedYearFilter: PointsYearFilter?,
-    viewMode: PointsViewMode,
-    selectedPointId: UUID?,
     counts: ObservationDataCounts? = null,
     isExporting: Boolean = false,
     isDeletingAll: Boolean = false,
@@ -266,8 +239,6 @@ internal fun buildPointsUiState(
         selectedTerritoryId = selectedTerritoryId,
         availableYears = years,
         yearFilter = effectiveFilter,
-        viewMode = viewMode,
-        selectedPoint = filteredPoints.firstOrNull { it.id == selectedPointId },
         isLoading = false,
         counts = counts,
         isExporting = isExporting,

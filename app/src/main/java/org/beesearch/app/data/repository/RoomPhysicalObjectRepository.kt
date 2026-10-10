@@ -110,14 +110,12 @@ internal class RoomPhysicalObjectRepository(
         territoryId: UUID,
         hollowDateInterval: ResearchDateInterval?,
         logHiveDateInterval: ResearchDateInterval?,
+        hollowFilters: org.beesearch.app.domain.model.PhysicalObjectFilterSet,
+        logHiveFilters: org.beesearch.app.domain.model.PhysicalObjectFilterSet,
     ): TerritoryPhysicalObjects = database.withTransaction {
-        val identities = if (hollowDateInterval == null && logHiveDateInterval == null) {
-            objectDao.getForTerritory(territoryId)
-        } else {
-            objectDao.getForTerritoryByType(territoryId, PhysicalObjectType.APIARY) +
-                identitiesForPeriod(territoryId, PhysicalObjectType.HOLLOW, hollowDateInterval) +
-                identitiesForPeriod(territoryId, PhysicalObjectType.LOG_HIVE, logHiveDateInterval)
-        }
+        val identities = objectDao.getForTerritoryByType(territoryId, PhysicalObjectType.APIARY) +
+            identitiesForFilters(territoryId, PhysicalObjectType.HOLLOW, hollowDateInterval, hollowFilters) +
+            identitiesForFilters(territoryId, PhysicalObjectType.LOG_HIVE, logHiveDateInterval, logHiveFilters)
         val hollowIds = identities.filter { it.objectType == PhysicalObjectType.HOLLOW }.map { it.id }
         val logHiveIds = identities.filter { it.objectType == PhysicalObjectType.LOG_HIVE }.map { it.id }
         val apiaryIds = identities.filter { it.objectType == PhysicalObjectType.APIARY }.map { it.id }
@@ -146,20 +144,23 @@ internal class RoomPhysicalObjectRepository(
         )
     }
 
-    private suspend fun identitiesForPeriod(
-        territoryId: UUID,
-        type: PhysicalObjectType,
-        interval: ResearchDateInterval?,
-    ): List<PhysicalObjectEntity> = if (interval == null) {
-        objectDao.getForTerritoryByType(territoryId, type)
-    } else {
-        objectDao.getForTerritoryByTypeInDateInterval(territoryId, type, interval.fromDate, interval.toDate)
-    }
+    private suspend fun identitiesForFilters(
+        territoryId: UUID, type: PhysicalObjectType, interval: ResearchDateInterval?,
+        filters: org.beesearch.app.domain.model.PhysicalObjectFilterSet,
+    ): List<PhysicalObjectEntity> = objectDao.getFilteredForTerritoryByType(
+        territoryId, type, (filters.dateInterval ?: interval)?.fromDate, (filters.dateInterval ?: interval)?.toDate,
+        filters.entranceHeightCm.min, filters.entranceHeightCm.max,
+        filters.outerDiameterCm.min, filters.outerDiameterCm.max,
+    )
 
     override suspend fun updateHollow(id: UUID, properties: HollowProperties, name: String?): Hollow = database.withTransaction {
         val identity = objectDao.getById(id)?.takeIf { it.objectType == PhysicalObjectType.HOLLOW }
             ?: throw EntityNotFoundException("Hollow")
         val normalizedName = normalizeName(name)
+        val subtype = properties.toEntity(id, normalizedName)
+        if (objectDao.getHollow(id) == subtype) {
+            return@withTransaction identity.toHollow(subtype, objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
+        }
         val changed = objectDao.updateHollow(
             id = id,
             tree = properties.tree,
@@ -171,13 +172,18 @@ internal class RoomPhysicalObjectRepository(
             name = normalizedName,
         )
         if (changed != 1) throw EntityNotFoundException("Hollow")
-        identity.toHollow(properties.toEntity(id, normalizedName), objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
+        val updated = markModified(identity)
+        updated.toHollow(subtype, objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
     }
 
     override suspend fun updateLogHive(id: UUID, properties: LogHiveProperties, name: String?): LogHive = database.withTransaction {
         val identity = objectDao.getById(id)?.takeIf { it.objectType == PhysicalObjectType.LOG_HIVE }
             ?: throw EntityNotFoundException("LogHive")
         val normalizedName = normalizeName(name)
+        val subtype = properties.toEntity(id, normalizedName)
+        if (objectDao.getLogHive(id) == subtype) {
+            return@withTransaction identity.toLogHive(subtype, objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
+        }
         val changed = objectDao.updateLogHive(
             id = id,
             tree = properties.tree,
@@ -191,7 +197,8 @@ internal class RoomPhysicalObjectRepository(
             name = normalizedName,
         )
         if (changed != 1) throw EntityNotFoundException("LogHive")
-        identity.toLogHive(properties.toEntity(id, normalizedName), objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
+        val updated = markModified(identity)
+        updated.toLogHive(subtype, objectDao.getMedia(id).map(PhysicalObjectMediaEntity::toDomain))
     }
 
     override suspend fun updateCoordinates(id: UUID, latitude: Double, longitude: Double) =
@@ -202,10 +209,42 @@ internal class RoomPhysicalObjectRepository(
             require(identity.objectType == PhysicalObjectType.HOLLOW || identity.objectType == PhysicalObjectType.LOG_HIVE) {
                 "Coordinates can only be edited for Hollow or LogHive"
             }
+            if (identity.latitude == latitude && identity.longitude == longitude) return@withTransaction
             if (objectDao.updateCoordinates(id, latitude, longitude) != 1) {
                 throw EntityNotFoundException("PhysicalObject")
             }
+            markModified(identity)
         }
+
+    override suspend fun addObjectMedia(id: UUID, media: List<PhysicalObjectMedia>) = database.withTransaction {
+        val identity = editableIdentity(id)
+        validateMedia(id, media)
+        if (media.isNotEmpty()) {
+            objectDao.insertMedia(media.map(PhysicalObjectMedia::toEntity))
+            markModified(identity)
+        }
+        Unit
+    }
+
+    override suspend fun removeObjectMedia(id: UUID, mediaId: UUID): String? = database.withTransaction {
+        val identity = editableIdentity(id)
+        val media = objectDao.getMedia(id).find { it.id == mediaId } ?: return@withTransaction null
+        check(objectDao.deleteObjectMedia(id, mediaId) == 1)
+        markModified(identity)
+        media.relativePath
+    }
+
+    private suspend fun editableIdentity(id: UUID): PhysicalObjectEntity {
+        val identity = objectDao.getById(id) ?: throw EntityNotFoundException("PhysicalObject")
+        require(identity.objectType == PhysicalObjectType.HOLLOW || identity.objectType == PhysicalObjectType.LOG_HIVE)
+        return identity
+    }
+
+    private suspend fun markModified(identity: PhysicalObjectEntity): PhysicalObjectEntity {
+        val at = java.time.Instant.ofEpochMilli(clock.instant().toEpochMilli())
+        check(objectDao.updateModificationTime(identity.id, at) == 1)
+        return identity.copy(updatedAt = at)
+    }
 
     override suspend fun setBeeSourceObject(beeId: UUID, sourceObjectId: UUID?) = database.withTransaction {
         val bee = beeDao.getById(beeId) ?: throw EntityNotFoundException("Bee")
@@ -311,7 +350,7 @@ internal class RoomPhysicalObjectRepository(
         }
         require(latitude.isFinite() && latitude in -90.0..90.0) { "Latitude is out of range" }
         require(longitude.isFinite() && longitude in -180.0..180.0) { "Longitude is out of range" }
-        val createdAt = clock.instant()
+        val createdAt = java.time.Instant.ofEpochMilli(clock.instant().toEpochMilli())
         return PhysicalObjectEntity(
             id = id,
             territoryId = territoryId,
@@ -321,6 +360,8 @@ internal class RoomPhysicalObjectRepository(
             longitude = longitude,
             createdAt = createdAt,
             fixationDate = if (type == PhysicalObjectType.APIARY) null else createdAt.atZone(fixationZoneIdProvider()).toLocalDate(),
+            fixationAt = if (type == PhysicalObjectType.APIARY) null else createdAt,
+            updatedAt = createdAt,
             creatorObserverId = creatorObserverId,
         )
     }
@@ -406,12 +447,12 @@ private fun LogHiveEntity.toProperties(): LogHiveProperties? {
 }
 
 private fun PhysicalObjectEntity.toHollow(subtype: HollowEntity, media: List<PhysicalObjectMedia>) =
-    Hollow(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media, subtype.name, fixationDate)
+    Hollow(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media, subtype.name, fixationDate, fixationAt, updatedAt)
 
 private fun PhysicalObjectEntity.toLogHive(subtype: LogHiveEntity, media: List<PhysicalObjectMedia>) =
-    LogHive(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media, subtype.name, fixationDate)
+    LogHive(id, territoryId, sequenceNumber, latitude, longitude, createdAt, creatorObserverId, subtype.toProperties(), media, subtype.name, fixationDate, fixationAt, updatedAt)
 
 private fun PhysicalObjectEntity.toApiary(subtype: ApiaryEntity) =
-    Apiary(id, territoryId, sequenceNumber, latitude, longitude, createdAt, subtype.name, creatorObserverId, fixationDate)
+    Apiary(id, territoryId, sequenceNumber, latitude, longitude, createdAt, subtype.name, creatorObserverId, fixationDate, fixationAt, updatedAt)
 
 private fun normalizeName(value: String?): String? = value?.trim()?.ifEmpty { null }

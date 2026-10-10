@@ -1690,8 +1690,8 @@ Snapshot UI/restore/FULL/offload remain unimplemented. Slice 2A adds an install-
 writes require durable expected UUID + actual header match; startup probe never auto-adopts or initializes.
 Контракт и ограничения: [Repository V1 foundation](repository-v1-foundation.md), D095/D096.
 Snapshot contract: [Repository Snapshot V1](repository-snapshot-v1.md), D097.
-Temporal I3 adds [Snapshot V2](snapshot-v2-wire-schema.md): current writer uses V2,
-readers/discovery validate V1 and V2 by manifest version. Complete Backup current writer is V7
+Temporal I3 adds [Snapshot V2](snapshot-v2-wire-schema.md); D103 advances the current writer to V3.
+Readers/discovery validate V1/V2/V3 by manifest version. Complete Backup current writer is V8
 ([format contract](backup-format-v1.md#temporal-i3--complete-backup-v7-2026-10-08)); V1–V6 readers remain.
 New formats carry explicit canonical research dates without createdAt derivation; Room stays v13.
 
@@ -2360,6 +2360,46 @@ selected halo; Hollow/LogHive ждут своего экрана карты, Tra
 Territory Data Map, независимое включение слоёв и Layers/Filters UI остаются идеей I016
 (`docs/ideas.md`).
 
+## 73.4. Реализованная общая карта данных: display state и его фильтры
+
+**Статус:** реализация утверждённой поверхности · 2026-10-09. Утверждённые основания —
+`docs/ui/mockups/unified-territory-layers-v2-1.md` (APPROVED UI DIRECTION) и
+`docs/ui/unified-territory-map-display-spec.md` (APPROVED specification). I016 в `docs/ideas.md`
+сохраняет статус `idea`; reconciliation статуса — отдельный documentation follow-up.
+
+Разделение ответственности после реализации:
+
+```text
+MapDataDisplayState (presentation, per Territory)
+    видимость и период каждого доступного типа
+        ↓
+MapObjectDateIntervals  — период типа уходит только в запрос этого типа
+        ↓
+I5 temporal query layer (Room/SQL): observation_date, fixation_date, NULL-семантика
+        ↓
+MapObjectSets → researchObjectMarkers → существующий D102 Compose marker (32 dp)
+        ↓
+SavedObjectMarkersOverlay поверх MapView в FIELD-режиме (Compose, не MapLibre layer)
+```
+
+Инварианты реализации:
+
+- состояние принадлежит конкретной Territory и хранится в существующем settings DataStore
+  (`map_data_display_<territoryId>`), а не в research database: это presentation state, а не
+  исследовательские данные; состояние по умолчанию не записывается вообще;
+- временная фильтрация выполняется исключительно в query layer (SQL) по canonical research date
+  типа; Compose не перефильтровывает загруженный набор и никогда не изменяет stored dates;
+- недоступный тип не появляется ни строкой, ни disabled-строкой, ни маркером;
+- overlay не рисуется в dedicated map modes (участки/выбор положения объекта): эти режимы владеют
+  жестами карты, и research-маркеры не должны в них вмешиваться; режим `AREA_VIEW` остаётся чистым
+  просмотром Ареала;
+- MapLibre runtime Source/Layer этим этапом не вводились: registry §73.3 остаётся нереализованным и
+  нужен только стадиям с MapLibre layers (I014/I011/I001).
+
+Открытый пункт перед rollout общей карты: Compose marker scale/performance benchmark
+(§73.3, 200–1000 маркеров). Owner определил и I6 реализовал marker tap → selected halo +
+компактный preview → существующая полная запись; Back сохраняет контекст общей карты.
+
 # 74. Критерий правильности архитектуры
 
 Архитектура считается подходящей, если она позволяет:
@@ -2374,3 +2414,29 @@ Territory Data Map, независимое включение слоёв и Laye
 8. добавлять новые функции без переделки предметной модели;
 9. позднее добавить серверную синхронизацию без превращения мобильного приложения в полностью зависимый от сервера клиент;
 10. сохранять код достаточно простым для разработки и сопровождения небольшим проектом.
+
+
+### I6 final owner integration (2026-10-10)
+
+Основная карта объединяет operational map и ObservationPoint/Hollow/LogHive display.
+Points Browser — только таблица/records; POINT_BROWSER и временный MarkerVisualPreview удалены.
+MapDataViewModel владеет panelOpen/openedType и per-Territory display; resolved initial setup generation
+не переходит Ready → Loading → Ready при unrelated settings re-emission.
+MapTypeDisplay = visible + typed ResearchObjectFilterSet. ObservationPointFilterSet содержит dateInterval,
+beeCount и flightCycleCount; PhysicalObjectFilterSet — dateInterval, entranceHeightCm и outerDiameterCm.
+MapResearchObjects передаёт фильтры в repository/Room SQL: COUNT(DISTINCT b.id) и COUNT(c.id),
+optional inclusive HAVING bounds; physical predicates используют существующие subtype measurements.
+Codec v2 совместим с v1. FilterSet не добавляет columns; D103 отдельно расширяет physical temporal model до Room v14.
+Нормативные UI/reset/range semantics: docs/ui/unified-territory-map-display-spec.md, final I6 correction.
+
+Marker-to-record owner extension: preview is a compact presentation of the current visible marker;
+its UUID/type enters existing PointDetailRoute/PhysicalObjectDetailRoute with explicit map origin.
+Back preserves that origin (also through coordinate editing and show-on-map), returning to the same
+Territory. MapDataViewModel retains selection and per-Territory MapCameraContext (target/zoom/bearing/
+tilt) independently of filters. BeeMap restores the snapshot before first GPS auto-centering and
+captures native camera movement. No second record model, domain capability, schema or navigation
+framework is introduced. Map selection/viewport are transient Activity-ViewModel state; they do not
+claim process-death recovery. FilterSet remains persisted separately.
+
+
+D103 physical temporal amendment: Room identity owns nullable fixationAt/updatedAt in addition to captured fixationDate and technical createdAt. Own property/coordinate/direct media edits stamp updatedAt in the same repository transaction; no-op/read/map/query operations do not. No Inspection capability was introduced. Current wire versions and guards: Complete Backup V8, Snapshot V3, physical single/collection Export V3 (ObservationPoint Export V2 unchanged). Legacy nullable fields are preserved without backfill. Full cards and map previews share fixation presentation and never use createdAt as fixation fallback.

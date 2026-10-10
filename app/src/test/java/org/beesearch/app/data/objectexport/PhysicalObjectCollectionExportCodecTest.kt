@@ -123,14 +123,16 @@ class PhysicalObjectCollectionExportCodecTest {
             val entries = zip(archive)
             val manifest = Json.parseToJsonElement(entries.getValue("manifest.json").decodeToString()).jsonObject
             assertEquals("\"PHYSICAL_OBJECT_COLLECTION\"", manifest.getValue("profile").toString())
-            assertEquals("2", manifest.getValue("formatVersion").toString())
+            assertEquals("3", manifest.getValue("formatVersion").toString())
             graph.objects.forEach { value ->
                 val root = Json.parseToJsonElement(entries.getValue(PhysicalObjectCollectionExportContract.objectEntry(value.id)).decodeToString()).jsonObject
                 assertEquals(setOf("object", "properties", "media"), root.keys)
                 val identity = root.getValue("object").jsonObject
-                assertEquals(setOf("id", "territoryId", "type", "sequenceNumber", "latitude", "longitude", "createdAt", "creatorObserverId", "name", "fixationDate"), identity.keys)
+                assertEquals(setOf("id", "territoryId", "type", "sequenceNumber", "latitude", "longitude", "createdAt", "creatorObserverId", "name", "fixationDate", "fixationAt", "updatedAt"), identity.keys)
                 val expectedDate = value.fixationDate?.let { "\"$it\"" } ?: "null"
                 assertEquals(expectedDate, identity.getValue("fixationDate").toString())
+                assertEquals("null", identity.getValue("fixationAt").toString())
+                assertEquals("null", identity.getValue("updatedAt").toString())
             }
         val decoded = decode(archive).graph.objects.sortedBy { it.sequenceNumber }
             assertNull(decoded[0].fixationDate)
@@ -243,10 +245,43 @@ class PhysicalObjectCollectionExportCodecTest {
         assertInvalid(mutate(good) { it[manifest] = it.getValue(manifest).decodeToString()
             .replace(PhysicalObjectCollectionExportContract.PROFILE, "WRONG").encodeToByteArray() })
         assertInvalid(mutate(good) { it[manifest] = it.getValue(manifest).decodeToString()
-            .replace("\"formatVersion\":2", "\"formatVersion\":3").encodeToByteArray() })
+            .replace("\"formatVersion\":3", "\"formatVersion\":4").encodeToByteArray() })
         assertInvalid(mutate(good) { it.remove(PhysicalObjectCollectionExportContract.objectEntry(graph.objects.single().id)) })
         assertInvalid(mutate(good) { it["extra.json"] = "{}".encodeToByteArray() })
         assertInvalid(mutate(good) { it["../unsafe"] = byteArrayOf(1) })
+    }
+
+    @Test
+    fun `v3 carries per-object nullable epoch temporal fields and old version materializes null`() {
+        val first = objectGraph(PhysicalObjectType.HOLLOW, 1).copy(
+            fixationDate = LocalDate.of(2026, 10, 2),
+            fixationAt = Instant.parse("2026-10-02T10:00:01.123Z"),
+            updatedAt = Instant.parse("2026-10-03T12:34:56.789Z"),
+        )
+        val second = objectGraph(PhysicalObjectType.HOLLOW, 2)
+        val graph = collection(PhysicalObjectType.HOLLOW, listOf(first, second))
+        val decoded = decode(encode(graph, blobs(graph))).graph.objects.sortedBy { it.sequenceNumber }
+        assertEquals(first.fixationAt, decoded[0].fixationAt)
+        assertEquals(first.updatedAt, decoded[0].updatedAt)
+        assertNull(decoded[1].fixationAt)
+        assertNull(decoded[1].updatedAt)
+
+        val old = ByteArrayOutputStream()
+        encodeV2(graph.copy(objects = graph.objects.map { it.copy(fixationAt = null, updatedAt = null) }), blobs(graph), old)
+        val oldDecoded = decode(old.toByteArray()).graph.objects
+        assertTrue(oldDecoded.all { it.fixationAt == null && it.updatedAt == null })
+        val guarded = ByteArrayOutputStream()
+        assertLegacyNotRepresentable(graph, blobs(graph), guarded)
+        assertTrue(guarded.size() == 0)
+    }
+
+    @Test
+    fun `known fixation moment without a known fixation date is rejected for one collection member`() {
+        val value = objectGraph(PhysicalObjectType.HOLLOW, 1).copy(
+            fixationAt = Instant.parse("2026-10-02T10:00:01Z"),
+            fixationDate = null,
+        )
+        assertEncodeInvalid(collection(PhysicalObjectType.HOLLOW, listOf(value)))
     }
 
     @Test
@@ -372,6 +407,9 @@ class PhysicalObjectCollectionExportCodecTest {
 
     private fun encodeV1(graph: PhysicalObjectCollectionExportGraph, blobs: Map<UUID, ByteArray>, output: ByteArrayOutputStream) =
         PhysicalObjectCollectionExportCodec.encodeV1(graph, payloads(blobs), output)
+
+    private fun encodeV2(graph: PhysicalObjectCollectionExportGraph, blobs: Map<UUID, ByteArray>, output: ByteArrayOutputStream) =
+        PhysicalObjectCollectionExportCodec.encodeV2(graph, payloads(blobs), output)
 
     private fun payloads(blobs: Map<UUID, ByteArray>) = blobs.mapValues { (_, bytes) ->
         File.createTempFile("bee-export-test-", ".media").also {

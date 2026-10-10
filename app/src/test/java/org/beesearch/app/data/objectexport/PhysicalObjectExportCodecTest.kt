@@ -161,7 +161,7 @@ class PhysicalObjectExportCodecTest {
         )
 
         assertTrue(manifest.contains("\"profile\":\"SINGLE_PHYSICAL_OBJECT\""))
-        assertTrue(manifest.contains("\"formatVersion\":2"))
+        assertTrue(manifest.contains("\"formatVersion\":3"))
         assertTrue(manifest.contains("\"physicalObjectType\":\"HOLLOW\""))
         assertTrue(manifest.contains(fixture.graph.id.toString()))
         assertTrue(manifest.contains("\"objectEntry\":\"object.json\""))
@@ -174,7 +174,11 @@ class PhysicalObjectExportCodecTest {
         val objectRoot = Json.parseToJsonElement(entries.getValue("object.json").decodeToString()).jsonObject
         assertEquals(setOf("object", "properties", "media", "territory", "observer"), objectRoot.keys)
         assertTrue(objectRoot.getValue("object").jsonObject.keys.contains("fixationDate"))
+        assertTrue(objectRoot.getValue("object").jsonObject.keys.contains("fixationAt"))
+        assertTrue(objectRoot.getValue("object").jsonObject.keys.contains("updatedAt"))
         assertEquals("null", objectRoot.getValue("object").jsonObject.getValue("fixationDate").toString())
+        assertEquals("null", objectRoot.getValue("object").jsonObject.getValue("fixationAt").toString())
+        assertEquals("null", objectRoot.getValue("object").jsonObject.getValue("updatedAt").toString())
     }
 
     @Test
@@ -212,7 +216,43 @@ class PhysicalObjectExportCodecTest {
             decode(replace(original, "manifest.json") { it.replace("SINGLE_PHYSICAL_OBJECT", "SINGLE_OBSERVATION_POINT") })
         }
         assertInvalid {
-            decode(replace(original, "manifest.json") { it.replace("\"formatVersion\":2", "\"formatVersion\":3") })
+            decode(replace(original, "manifest.json") { it.replace("\"formatVersion\":3", "\"formatVersion\":4") })
+        }
+    }
+
+    @Test
+    fun `v3 carries nullable epoch temporal fields and v2 reader materializes them as null`() {
+        val fixture = fixture(PhysicalObjectType.HOLLOW)
+        val fixationAt = Instant.parse("2026-09-20T10:00:01.123Z")
+        val updatedAt = Instant.parse("2026-09-21T12:34:56.789Z")
+        val dated = fixture.graph.copy(
+            fixationDate = LocalDate.of(2026, 9, 20),
+            fixationAt = fixationAt,
+            updatedAt = updatedAt,
+        )
+        val decoded = decode(encode(dated, fixture.blobs)).graph
+        assertEquals(fixationAt, decoded.fixationAt)
+        assertEquals(updatedAt, decoded.updatedAt)
+
+        assertLegacyNotRepresentable {
+            encodeV2(dated, fixture.blobs, ByteArrayOutputStream())
+        }
+        val v2 = encodeV2(fixture.graph, fixture.blobs)
+        assertNull(decode(v2).graph.fixationAt)
+        assertNull(decode(v2).graph.updatedAt)
+    }
+
+    @Test
+    fun `known fixation moment without a known fixation date is rejected`() {
+        val fixture = fixture(PhysicalObjectType.HOLLOW)
+        assertInvalid {
+            encode(
+                fixture.graph.copy(
+                    fixationAt = Instant.parse("2026-09-20T10:00:01Z"),
+                    fixationDate = null,
+                ),
+                fixture.blobs,
+            )
         }
     }
 
@@ -439,6 +479,12 @@ class PhysicalObjectExportCodecTest {
 
     private fun encodeV1(graph: PhysicalObjectExportGraph, blobs: Map<UUID, ByteArray>, output: ByteArrayOutputStream) =
         PhysicalObjectExportCodec.encodeV1(graph, payloads(blobs), output)
+
+    private fun encodeV2(graph: PhysicalObjectExportGraph, blobs: Map<UUID, ByteArray>): ByteArray =
+        ByteArrayOutputStream().also { PhysicalObjectExportCodec.encodeV2(graph, payloads(blobs), it) }.toByteArray()
+
+    private fun encodeV2(graph: PhysicalObjectExportGraph, blobs: Map<UUID, ByteArray>, output: ByteArrayOutputStream) =
+        PhysicalObjectExportCodec.encodeV2(graph, payloads(blobs), output)
 
     private fun payloads(blobs: Map<UUID, ByteArray>) = blobs.mapValues { (_, bytes) ->
         File.createTempFile("bee-export-test-", ".media").also {

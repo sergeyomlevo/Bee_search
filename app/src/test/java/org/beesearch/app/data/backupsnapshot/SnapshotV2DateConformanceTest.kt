@@ -55,12 +55,12 @@ class SnapshotV2DateConformanceTest {
     )
 
     private fun v2Rows(): Map<String, List<JsonObject>> = SnapshotDomainCodec.encode(
-        graph(), PortableSettingsSnapshot(null, null, emptyMap()),
+        graph(), PortableSettingsSnapshot(null, null, emptyMap()), version = 2,
     ).records.filterKeys { it != "settings/map-coverage.jsonl" }.mapValues { (_, lines) ->
         lines.map { SnapshotJson.parse(it.toByteArray(), false).jsonObject }
     }
 
-    private fun v2Entries() = SnapshotDomainCodec.encode(graph(), PortableSettingsSnapshot(null, null, emptyMap()))
+    private fun v2Entries() = SnapshotDomainCodec.encode(graph(), PortableSettingsSnapshot(null, null, emptyMap()), version = 2)
 
     private fun identity() = SnapshotIdentity(
         UUID.fromString("71000000-0000-4000-8000-000000000010"),

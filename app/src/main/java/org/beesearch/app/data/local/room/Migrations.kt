@@ -522,6 +522,17 @@ internal val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
+/** Preserve unknown legacy fixation and modification times; no created_at backfill. */
+internal val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE physical_objects ADD COLUMN fixation_at INTEGER")
+        db.execSQL("ALTER TABLE physical_objects ADD COLUMN updated_at INTEGER")
+        db.query("PRAGMA foreign_key_check").use {
+            check(!it.moveToFirst()) { "Foreign keys changed during physical object moment migration" }
+        }
+    }
+}
+
 private data class LegacyObservationPoint(
     val id: String,
     val territoryId: String,

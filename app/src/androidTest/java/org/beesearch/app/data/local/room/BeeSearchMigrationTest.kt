@@ -1213,6 +1213,34 @@ class BeeSearchMigrationTest {
         )
     }
 
+
+    @Test fun migrationThirteenToFourteenPreservesDatesAndUnknownLegacyMoments() {
+        val territory = UUID.randomUUID().toString()
+        val unknown = UUID.randomUUID().toString()
+        val dateOnly = UUID.randomUUID().toString()
+        val at = 1791446361564L
+        migrationHelper.createDatabase("physical-moment-migration-test", 13).apply {
+            execSQL("INSERT INTO territories (id,code,name,region,district,created_at,updated_at) VALUES (?,?,?,?,?,?,?)",
+                arrayOf(territory,"T","Territory","R","D",at,at))
+            execSQL("INSERT INTO physical_objects (id,territory_id,object_type,sequence_number,latitude,longitude,created_at,creator_observer_id,fixation_date) VALUES (?,?,?,?,?,?,?,?,?)",
+                arrayOf(unknown,territory,"HOLLOW",10,56.0,42.0,at,null,null))
+            execSQL("INSERT INTO physical_objects (id,territory_id,object_type,sequence_number,latitude,longitude,created_at,creator_observer_id,fixation_date) VALUES (?,?,?,?,?,?,?,?,?)",
+                arrayOf(dateOnly,territory,"LOG_HIVE",1,56.0,42.0,at,null,"2026-10-08"))
+            close()
+        }
+        migrationHelper.runMigrationsAndValidate("physical-moment-migration-test",14,true,MIGRATION_13_14).use { db ->
+            db.query("SELECT id,created_at,fixation_date,fixation_at,updated_at FROM physical_objects ORDER BY object_type").use { rows ->
+                assertTrue(rows.moveToFirst())
+                assertEquals(unknown,rows.getString(0)); assertEquals(at,rows.getLong(1))
+                assertTrue(rows.isNull(2)); assertTrue(rows.isNull(3)); assertTrue(rows.isNull(4))
+                assertTrue(rows.moveToNext())
+                assertEquals(dateOnly,rows.getString(0)); assertEquals(at,rows.getLong(1))
+                assertEquals("2026-10-08",rows.getString(2)); assertTrue(rows.isNull(3)); assertTrue(rows.isNull(4))
+                assertFalse(rows.moveToNext())
+            }
+        }
+    }
+
     private companion object {
         const val DATABASE_NAME = "bee-search-migration-test"
         const val INTERMEDIATE_V3_IDENTITY_HASH = "dfa1a6f3302e33c27f6513c2d9f702d4"

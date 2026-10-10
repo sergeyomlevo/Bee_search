@@ -1189,3 +1189,8 @@ scope; существующие блокировки удаления Territory 
 На физическом объекте не хранится изменяемое поле текущего состояния (например,
 «пчёлы есть сейчас»): актуальное состояние выводится из последнего Осмотра. Конкретная schema
 Осмотра определяется отдельной задачей.
+
+
+### Physical-object temporal boundary — D103 (OWNER 2026-10-10)
+
+Fixation of Hollow/LogHive is an immutable real-world moment (date + time), distinct from technical row creation and modification. A captured zone-free calendar date serves research period filters. Direct object properties/coordinates/name/notes/media changes modify the object's technical updated_at only. Inspection is a separate entity: creation/edit/media of an Inspection never modifies parent Hollow/LogHive timestamps. Inspection capability is not introduced here. Legacy created_at alone does not establish fixation provenance. Exact storage/lifecycle contract: [D103](decisions.md#d103--physical-object-fixation-moment-and-modification-boundary) and [data model](data-model.md#временные-факты-объекта).

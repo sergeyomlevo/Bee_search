@@ -72,17 +72,16 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 - [x] D102 marker semantic pictograms OWNER APPROVED · 2026-10-09:
       wingless existing bee / tree / cut trunk / box / reserved house.
       [Contract and owner image](ui/mockups/d102-marker-pictograms-v1.md).
-- [x] Reusable presentation components and DEBUG-only actual-map visual preview implemented.
-      Production multi-object marker promotion and temporal I6 are not part of this slice.
+- [x] Reusable presentation components promoted to the main unified map during I6.
+      Temporary DEBUG actual-map marker preview and `DEV: маркеры` were removed by owner decision.
 - [x] Samsung S25 Ultra owner approval: all five pictograms and **32 dp production normal size**.
       24 dp is readable but less convenient in the field; 20 dp is not the normal size.
 - [x] Remaining Samsung owner visual approval at 32 dp: selected state, contrast on actual
       vector / Sentinel raster / Hybrid backgrounds, nearby readability and operational-symbol
       distinction — OWNER PASS · 2026-10-09.
-- [x] Production integration of the approved marker: `SavedObjectMarkersOverlay` (просмотр «Точки»)
-      draws ObservationPoint through `ResearchObjectMarker` at 32 dp with the approved selected
-      treatment and tip anchoring; mapping lives beside the overlay.
-      Hollow/LogHive have no map screen yet, Trap/Apiary stay reserved (no capability, no UI).
+- [x] Production integration: `SavedObjectMarkersOverlay` on the existing main map draws real
+      ObservationPoint/Hollow/LogHive through `ResearchObjectMarker` at 32 dp with the approved
+      selected treatment and tip anchoring. Points is table/records only. Trap/Apiary stay reserved.
 - [x] Owner production-map verification: real saved points appear in the correct places, types and
       selected state on the production map — OWNER PASS · 2026-10-09. Nearby markers may overlap at low
       zoom (interacting touch targets); the owner accepted this, 32 dp stays unchanged and
@@ -92,15 +91,29 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 
 - [ ] Implement required Room/data-model/migration changes.
       I1 committed (f4f5105): Room v12, canonical ObservationPoint date и atomic correction без user caller.
-      I2 committed locally: Room v13 nullable fixationDate, legacy NULL, new Hollow/LogHive dates.
-      I3 committed locally: Backup V7 / Snapshot V2 explicit dates, legacy readers retained.
-      I4 implemented in worktree: три Export V2 profiles, legacy V1 readers/guards retained.
-      Owner I4 review и isolated Android/Room verification остаются pending.
-      **NOT DEPLOYABLE until device gate**; общий temporal stage не закрыт. I3 + I4 также обязательны
-      до I6 или любого user-reachable explicit/corrected research-date path.
-- [ ] Implement Layers/Filters from the approved UI spec.
+      I2 committed: Room v13 nullable fixationDate, legacy NULL, new Hollow/LogHive dates.
+      I3 committed (ac6c7d1): Backup V7 / Snapshot V2 explicit dates, legacy readers retained.
+      I4 committed (9a079d7): три Export V2 profiles, legacy V1 readers/guards retained.
+      I5 committed (3c2c4c3): `ResearchDateInterval`, ObservationPoint bounded query по `observation_date`,
+      независимые Hollow/LogHive bounded queries по `fixation_date`, bounded исключает NULL.
+      Room остаётся v13; schema, migration и canonical date columns этим stage не менялись.
+      Отдельный deployment/owner-device migration gate по-прежнему не закрыт этим пунктом.
+- [x] Implement Layers/Filters from the approved UI spec.
+      Реализовано как утверждённая поверхность: третье действие `Данные на карте` в нижней панели
+      карты, панель с независимой видимостью и периодом каждого доступного типа, экран фильтров типа
+      с accordion `Период` и уровнями год/месяц/день, per-Territory persistent состояние в
+      существующем settings DataStore. Owner Samsung UI verification — отдельный следующий шаг.
 - [ ] Implement MapLibre runtime overlay registry/restoration where required.
-- [ ] Connect Compose research markers to common layer/date filtering.
+      I6 не вводил runtime MapLibre Source/Layer: research-маркеры остаются Compose-маркерами (§73.3),
+      поэтому registry не потребовался. Пункт остаётся открытым для стадий, которым действительно
+      нужны MapLibre layers (I014 rasters, I011 geometry, I001 analytical overlays).
+- [x] Connect Compose research markers to common layer/date filtering.
+      Основная карта показывает research-объекты текущей Territory: ObservationPoint, Hollow и
+      LogHive различаются утверждёнными D102-маркерами 32 dp и фильтруются FilterSet своего типа через
+      I5 query layer (никакого post-filter в Compose). Trap/Apiary в панели и на карте не появляются.
+      Marker tap → selected halo + preview → существующая полная запись реализован для всех трёх типов.
+      Открыт обязательный перед rollout общей карты Compose marker scale/performance benchmark
+      (`docs/architecture.md` §73.3).
 
 ## Separate increments
 
@@ -113,13 +126,41 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 
 - [ ] Samsung/device verification: base-map switching, runtime overlay restoration, layer visibility,
       date ranges, marker selection, accessibility, offline operation.
+      I6 gate already performed on the owner device (SM-S938B / RFCY90MBYVZ, in-place `install -r`, no
+      uninstall/clear, DB/DataStore hashes unchanged, real records only): the panel and type screen,
+      independent per-type visibility and periods, per-Territory persistence across a restart, the
+      nullable fixation-date wording, the seven-column weekday calendar with 48 dp cells at 360 dp,
+      the panel at the owner's system font scale, «Сбросить фильтры» and the state indicator. Owner
+      visual acceptance of the surface is still open, as are base-map switching with an active filter,
+      offline operation and marker selection on this map.
+      Emulator gate: independent per-type periods, visibility, accordion, back priority, panel reopen
+      and the store are covered by focused instrumented tests on API29 — `MapDataPanelTest` 31/31,
+      `MapResearchObjectsQueryTest` 2/2, `DataStoreMapDataDisplayStoreTest` 5/5,
+      `MapDataViewModelSessionTest` 6/6, plus `CleanStartupIntegrationTest`'s display-state route gate
+      (which fails with the owner-reported defect reproduced) and the pure
+      `InitialSetupLoadingRuleTest` 3/3 in JVM.
+
+### Resolution notes recorded during I6
+
+- The approved seven-column weekday calendar and the mandatory 48 dp touch target cannot both hold at
+  the panel's 16 dp text inset on a 360 dp phone. The calendars therefore keep the approved
+  nearly-full-bleed insets (4–6 dp) and a 2 dp day gap, so the approved layout still fits at 360 dp
+  with 48 dp cells; below that width the grid reflows to fewer columns and drops the weekday header
+  rather than shrinking a target (pinned by `MapPeriodGridTest`).
+- Owner extension 2026-10-10: marker tap selects the real object (D102 selected treatment) and
+  shows a compact preview; «Открыть запись» opens its existing full record by UUID. Back restores
+  the map viewport and per-type filters; no separate map-specific domain/detail UI.
+- The panel is one settings session: a visibility switch, a period tap, a reset and a type's `Готово`
+  all keep it open, and only `Готово`/`✕`/system Back from the type list/swipe/scrim close it. This is
+  enforced by driving the real `ModalBottomSheet` in `MapDataPanelTest` (owner sections A–J), because
+  the defect that motivated them lived in the session's lifetime rather than in the panel itself.
 
 ## Documentation follow-up after implementation
 
-- [ ] update `product-requirements.md`;
-- [ ] update `user-workflows.md`;
-- [ ] update Help if user-visible behaviour changed;
-- [ ] reconcile I016 status.
+- [x] update `product-requirements.md` (§17.1 «Отображение исследовательских данных на карте»);
+- [x] update `user-workflows.md` (§48 «Данные на карте»);
+- [ ] update Help if user-visible behaviour changed (`docs/ui/help` never mentions «Данные на карте»);
+- [ ] reconcile I016 status (`docs/ideas.md` still says `idea`).
 
 ## Rules
 

@@ -19,15 +19,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,18 +54,12 @@ import org.beesearch.app.data.backup.BackupDocumentExporter
 import org.beesearch.app.data.exchange.BeeSearchExchangeStorage
 import org.beesearch.app.data.exchange.CreateExchangeDocument
 import org.beesearch.app.data.exchange.ExchangeFolder
-import org.beesearch.app.domain.location.LocationUiState
 import org.beesearch.app.domain.model.BeePresenceResult
 import org.beesearch.app.domain.model.ObservationDataCounts
 import org.beesearch.app.domain.model.ObservationPointSummary
 import org.beesearch.app.domain.model.Territory
 import org.beesearch.app.domain.repository.ObservationDataMaintenance
 import org.beesearch.app.domain.repository.ObservationRepository
-import org.beesearch.app.ui.map.BeeMap
-import org.beesearch.app.ui.map.BeeMapMode
-import org.beesearch.app.ui.map.MapAreaStore
-import org.beesearch.app.ui.map.MapPackageStore
-import org.beesearch.app.ui.map.observationPointMarkers
 
 internal const val BACKUP_DOCUMENT_NAME = "bee-search-backup.zip"
 
@@ -81,8 +71,6 @@ internal fun PointsRoute(
     observationDataMaintenance: ObservationDataMaintenance,
     backupExporter: BackupDocumentExporter,
     exchangeStorage: BeeSearchExchangeStorage,
-    mapAreaStore: MapAreaStore,
-    mapPackageStore: MapPackageStore,
     onBack: () -> Unit,
     onChooseTerritory: () -> Unit,
     onOpenPoint: (UUID) -> Unit,
@@ -115,14 +103,9 @@ internal fun PointsRoute(
     PointsScreen(
         territories = territories,
         state = state,
-        mapAreaStore = mapAreaStore,
-        mapPackageStore = mapPackageStore,
         onBack = onBack,
         onSelectTerritory = pointsViewModel::selectTerritory,
         onSelectYear = pointsViewModel::selectYear,
-        onSelectViewMode = pointsViewModel::selectViewMode,
-        onSelectPoint = pointsViewModel::selectPoint,
-        onDismissPointSelection = pointsViewModel::clearPointSelection,
         onOpenPoint = onOpenPoint,
         onExportAll = { createDocument.launch(BACKUP_DOCUMENT_NAME) },
         onDeleteAll = pointsViewModel::deleteAllPoints,
@@ -134,14 +117,9 @@ internal fun PointsRoute(
 internal fun PointsScreen(
     territories: List<Territory>,
     state: PointsUiState,
-    mapAreaStore: MapAreaStore,
-    mapPackageStore: MapPackageStore,
     onBack: () -> Unit,
     onSelectTerritory: (UUID) -> Unit,
     onSelectYear: (PointsYearFilter) -> Unit,
-    onSelectViewMode: (PointsViewMode) -> Unit,
-    onSelectPoint: (UUID) -> Unit,
-    onDismissPointSelection: () -> Unit,
     onOpenPoint: (UUID) -> Unit,
     onExportAll: () -> Unit = {},
     onDeleteAll: () -> Unit = {},
@@ -178,55 +156,12 @@ internal fun PointsScreen(
             onSelectYear = onSelectYear,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         )
-        PointsModeSwitch(
-            viewMode = state.viewMode,
-            onSelectViewMode = { mode ->
-                if (mode != state.viewMode) onDismissPointSelection()
-                onSelectViewMode(mode)
-            },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        )
         state.message?.let { message ->
             PointsMessageRow(message = message, onDismiss = onDismissMessage)
         }
         when {
             state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
-            }
-            state.viewMode == PointsViewMode.MAP -> Box(Modifier.fillMaxSize()) {
-                val selectedTerritory = territories.firstOrNull { it.id == state.selectedTerritoryId }
-                BeeMap(
-                    territoryId = state.selectedTerritoryId,
-                    territoryName = selectedTerritory?.name,
-                    areaStore = mapAreaStore,
-                    packageStore = mapPackageStore,
-                    locationState = LocationUiState.PermissionRequired,
-                    locationPermissionGranted = false,
-                    onRequestLocationPermission = {},
-                    onRequestCreateRecord = { _, _ -> },
-                    mode = BeeMapMode.POINT_BROWSER,
-                    savedObjectMarkers = observationPointMarkers(state.points),
-                    selectedSavedObjectId = state.selectedPoint?.id,
-                    onSelectSavedObject = { marker -> onSelectPoint(marker.id) },
-                    modifier = Modifier.fillMaxSize().testTag("points-map"),
-                )
-                if (state.points.isEmpty()) {
-                    EmptyPointsMessage(Modifier.align(Alignment.Center))
-                }
-                state.selectedPoint?.let { selected ->
-                    SelectedPointCard(
-                        point = selected,
-                        onOpen = {
-                            onDismissPointSelection()
-                            onOpenPoint(selected.id)
-                        },
-                        onDismiss = onDismissPointSelection,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(12.dp)
-                            .testTag("selected-point-card"),
-                    )
-                }
             }
             else -> PointsTable(
                 points = state.points,
@@ -367,25 +302,6 @@ private fun PointsFilters(
 }
 
 @Composable
-private fun PointsModeSwitch(
-    viewMode: PointsViewMode,
-    onSelectViewMode: (PointsViewMode) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SingleChoiceSegmentedButtonRow(modifier) {
-        PointsViewMode.entries.forEachIndexed { index, mode ->
-            SegmentedButton(
-                selected = viewMode == mode,
-                onClick = { onSelectViewMode(mode) },
-                shape = SegmentedButtonDefaults.itemShape(index, PointsViewMode.entries.size),
-                label = { Text(if (mode == PointsViewMode.MAP) "Карта" else "Таблица") },
-                modifier = Modifier.weight(1f).testTag("points-mode-${mode.name.lowercase()}"),
-            )
-        }
-    }
-}
-
-@Composable
 private fun PointsMessageRow(message: PointsMessage, onDismiss: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -500,31 +416,6 @@ private fun PointTableRow(
         Column(horizontalAlignment = Alignment.End) {
             Text("Пчёл: ${point.beeCount}")
             Text("Циклов: ${point.completedFlightCycleCount}", style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
-
-@Composable
-private fun SelectedPointCard(
-    point: ObservationPointSummary,
-    onOpen: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(pointDisplayName(point), style = MaterialTheme.typography.titleMedium)
-            Text(formatPointDateTime(point.createdAt))
-            Text(pointResultLabel(point.beePresenceResult))
-            Text("Пчёл: ${point.beeCount}")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onDismiss, modifier = Modifier.testTag("dismiss-selected-point")) {
-                    Text("Закрыть")
-                }
-                TextButton(onClick = onOpen, modifier = Modifier.testTag("open-selected-point")) {
-                    Text("Открыть")
-                }
-            }
         }
     }
 }

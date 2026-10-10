@@ -59,3 +59,6 @@ selected state, смена фона).
 Implementation uses Android native [variant source sets](https://developer.android.com/build/build-variants),
 [Compose drawing](https://developer.android.com/develop/ui/compose/graphics/draw/overview) and
 [semantics](https://developer.android.com/develop/ui/compose/accessibility/semantics); no new dependency.
+
+
+Owner correction 2026-10-10: temporary `DEV: маркеры` / MarkerVisualPreview removed after real D102 integration. Production catalogue, pictograms, 32 dp normal size and selected halo remain. Preview evidence above is historical.

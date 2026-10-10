@@ -163,7 +163,7 @@ class Verifier {
         requiredKeys(o, setOf("snapshotFormat", "snapshotFormatVersion", "snapshotId", "repositoryId", "variant", "createdAtEpochMs", "snapshotProfile", "creationResult", "evidencePolicy", "entries", "mediaReferences", "creationIssues"), "manifest", report)
         text(o, "snapshotFormat")?.let { if (it != "beesearch-snapshot") report.issues += Issue("MANIFEST_INVALID") } ?: run { report.issues += Issue("MANIFEST_INVALID") }
         val formatVersion = number(o, "snapshotFormatVersion")
-        if (formatVersion !in setOf(1L, 2L)) report.issues += Issue("UNSUPPORTED_FORMAT_VERSION")
+        if (formatVersion !in setOf(1L, 2L, 3L)) report.issues += Issue("UNSUPPORTED_FORMAT_VERSION")
         else report.snapshotFormatVersion = formatVersion
         val id = text(o, "snapshotId"); val repo = text(o, "repositoryId")
         if (id == null || repo == null || !validUuid(id) || !validUuid(repo)) report.issues += Issue("MANIFEST_INVALID")

@@ -47,15 +47,24 @@ internal object PhysicalObjectCollectionExportCodec {
 
     private fun acceptsVersion(version: Int): Boolean = when (version) {
         PhysicalObjectCollectionExportContract.LEGACY_FORMAT_VERSION -> false
+        PhysicalObjectCollectionExportContract.TEMPORAL_FORMAT_VERSION -> true
         PhysicalObjectCollectionExportContract.FORMAT_VERSION -> true
         else -> throw InvalidPhysicalObjectExport("unsupported formatVersion")
     }
+
+    private fun acceptsExtendedTemporal(version: Int): Boolean = version >= PhysicalObjectCollectionExportContract.FORMAT_VERSION
 
     fun encode(
         graph: PhysicalObjectCollectionExportGraph,
         mediaBytes: Map<UUID, ArchivePayload>,
         output: OutputStream,
     ) = encodeVersion(graph, mediaBytes, output, PhysicalObjectCollectionExportContract.FORMAT_VERSION)
+
+    fun encodeV2(
+        graph: PhysicalObjectCollectionExportGraph,
+        mediaBytes: Map<UUID, ArchivePayload>,
+        output: OutputStream,
+    ) = encodeVersion(graph, mediaBytes, output, PhysicalObjectCollectionExportContract.TEMPORAL_FORMAT_VERSION)
 
     fun encodeV1(
         graph: PhysicalObjectCollectionExportGraph,
@@ -72,7 +81,7 @@ internal object PhysicalObjectCollectionExportCodec {
         val canonical = graph.copy(objects = graph.objects.sortedWith(objectOrder).map { value ->
             value.copy(media = value.media.sortedWith(mediaOrder))
         })
-        validate(canonical, mediaBytes, allowFixationDate = acceptsVersion(version))
+        validate(canonical, mediaBytes, allowFixationDate = acceptsVersion(version), allowExtendedTemporal = acceptsExtendedTemporal(version))
 
         val territoryBytes = territoryJson(canonical.territory).bytes()
         val observers = canonical.objects.mapNotNull { it.observer }.distinctBy { it.id }.sortedBy { it.id.toString() }
@@ -166,6 +175,7 @@ internal object PhysicalObjectCollectionExportCodec {
         if (manifest.string("profile") != PhysicalObjectCollectionExportContract.PROFILE) invalid("unsupported profile")
         val version = manifest.int("formatVersion")
         val allowFixationDate = acceptsVersion(version)
+        val allowExtendedTemporal = acceptsExtendedTemporal(version)
         val territoryId = manifest.uuid("territoryId")
         val type = enum<PhysicalObjectType>(manifest.string("physicalObjectType"), "physicalObjectType")
         PhysicalObjectExportValidator.validateSupportedType(type)
@@ -256,7 +266,7 @@ internal object PhysicalObjectCollectionExportCodec {
             ) invalid("media descriptor mismatch")
         }
         val collection = PhysicalObjectCollectionExportGraph(territory, type, objects)
-        validate(collection, mediaBytes, allowFixationDate)
+        validate(collection, mediaBytes, allowFixationDate, allowExtendedTemporal)
         return DecodedPhysicalObjectCollectionExport(collection, mediaBytes, owner)
     }
 
@@ -264,6 +274,7 @@ internal object PhysicalObjectCollectionExportCodec {
         graph: PhysicalObjectCollectionExportGraph,
         mediaBytes: Map<UUID, ArchivePayload>,
         allowFixationDate: Boolean,
+        allowExtendedTemporal: Boolean,
     ) {
         PhysicalObjectExportValidator.validateSupportedType(graph.type)
         if (graph.objects.isEmpty()) invalid("empty collection")
@@ -285,7 +296,7 @@ internal object PhysicalObjectCollectionExportCodec {
             val ownBytes = value.media.associate { media ->
                 media.id to (mediaBytes[media.id] ?: invalid("media blob set mismatch"))
             }
-            PhysicalObjectExportValidator.validate(value, ownBytes, allowFixationDate)
+            PhysicalObjectExportValidator.validate(value, ownBytes, allowFixationDate, allowExtendedTemporal)
         }
         if (mediaBytes.keys != mediaIds) invalid("media blob set mismatch")
         val entryCount = 3 + graph.objects.size + mediaIds.size

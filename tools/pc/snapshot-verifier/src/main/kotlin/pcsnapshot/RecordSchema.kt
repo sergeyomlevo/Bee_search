@@ -26,8 +26,9 @@ internal object RecordSchema {
     fun validate(row: JsonObject, path: String, version: Long = 1L) {
         val kind = path.substringAfterLast('/').removeSuffix(".jsonl")
         val fields = schemas[kind]?.let { base ->
-            if (version == 2L && kind == "observation-points") base + "observationDate"
+            if (version >= 2L && kind == "observation-points") base + "observationDate"
             else if (version == 2L && kind == "physical-objects") base + "fixationDate"
+            else if (version >= 3L && kind == "physical-objects") base + "fixationDate" + "fixationAt" + "updatedAt"
             else base
         } ?: reject("WIRE_SCHEMA_INVALID", path)
         val optional = if (kind == "physical-object-media" || kind == "observation-point-attachments") setOf("sha256", "byteSize") else emptySet()
@@ -41,13 +42,13 @@ internal object RecordSchema {
         when (kind) {
             "territories" -> { u("id"); s("code"); s("name"); s("region"); s("district"); l("createdAt"); l("updatedAt") }
             "observers" -> { u("id"); s("code"); s("lastName"); s("firstName"); s("middleName", true); s("contact", true); l("createdAt"); l("updatedAt") }
-            "physical-objects" -> { u("id"); u("territoryId"); enum(row, "objectType", setOf("APIARY", "HOLLOW", "LOG_HIVE"), path); intField(row, "sequenceNumber", path); d("latitude"); d("longitude"); l("createdAt"); uuidNullable(row, "creatorObserverId", path); if (version == 2L) dateNullable(row, "fixationDate", path) }
+            "physical-objects" -> { u("id"); u("territoryId"); enum(row, "objectType", setOf("APIARY", "HOLLOW", "LOG_HIVE"), path); intField(row, "sequenceNumber", path); d("latitude"); d("longitude"); l("createdAt"); uuidNullable(row, "creatorObserverId", path); if (version >= 2L) dateNullable(row, "fixationDate", path); if (version >= 3L) { nullableLong(row, "fixationAt"); nullableLong(row, "updatedAt") } }
             "apiaries" -> { u("physicalObjectId"); s("name", true) }
             "hollows" -> { u("physicalObjectId"); s("tree", true); d("entranceHeightCm", true); l("entranceAzimuthDeg", true); d("outerDiameterCm", true); d("internalDiameterCm", true); s("notes", true); s("name", true) }
             "log-hives" -> { u("physicalObjectId"); s("tree", true); d("entranceHeightCm", true); l("entranceAzimuthDeg", true); d("outerDiameterCm", true); s("material", true); d("internalDiameterCm", true); d("internalHeightCm", true); s("notes", true); s("name", true) }
             "physical-object-sequences" -> { u("territoryId"); enum(row, "objectType", setOf("APIARY", "HOLLOW", "LOG_HIVE"), path); intField(row, "lastIssued", path) }
             "physical-object-media" -> media(row, path, "physicalObjectId")
-            "observation-points" -> { u("id"); u("territoryId"); u("observerId"); intField(row, "observationYear", path); intField(row, "pointNumber", path); enumNullable(row, "beePresenceResult", setOf("BEES_FOUND", "NO_BEES_FOUND"), path); s("code", true); d("latitude"); d("longitude"); d("gpsLatitude", true); d("gpsLongitude", true); d("gpsAccuracyM", true); l("createdAt"); l("initialGroupReleaseAt", true); l("completedAt", true); s("description", true); if (version == 2L) date(row, "observationDate", path) }
+            "observation-points" -> { u("id"); u("territoryId"); u("observerId"); intField(row, "observationYear", path); intField(row, "pointNumber", path); enumNullable(row, "beePresenceResult", setOf("BEES_FOUND", "NO_BEES_FOUND"), path); s("code", true); d("latitude"); d("longitude"); d("gpsLatitude", true); d("gpsLongitude", true); d("gpsAccuracyM", true); l("createdAt"); l("initialGroupReleaseAt", true); l("completedAt", true); s("description", true); if (version >= 2L) date(row, "observationDate", path) }
             "bees" -> { u("id"); u("observationPointId"); s("markColor"); enum(row, "markPosition", setOf("THORAX", "ABDOMEN", "LEFT_WING", "NONE", "RIGHT_WING"), path); l("createdAt"); uuidNullable(row, "sourceObjectId", path) }
             "flight-cycles" -> { u("id"); u("beeId"); intField(row, "sequenceNumber", path); l("departureTime"); l("returnTime", true); d("azimuthDeg", true); bool(row, "azimuthCaptureConsumed"); bool(row, "initialGroupLaunch"); bool(row, "initialGroupLaunchCorrectionEligible"); l("createdAt"); l("updatedAt") }
             "observation-point-weather" -> { u("observationPointId"); enum(row, "status", setOf("PENDING", "LOADED", "UNAVAILABLE"), path); d("temperatureC", true); d("windSpeedMps", true); d("windDirectionDeg", true); l("sampleAt", true); l("fetchedAt", true); s("source", true) }

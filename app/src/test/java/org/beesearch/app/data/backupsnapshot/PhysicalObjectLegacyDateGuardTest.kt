@@ -67,13 +67,69 @@ class PhysicalObjectLegacyDateGuardTest {
 
     @Test fun v2PreservesNonNullFixationDateThroughProductionBridge() {
         val source = graph(date)
-        val entries = SnapshotDomainCodec.encode(source, settings)
+        val entries = SnapshotDomainCodec.encode(source, settings, version = 2)
         val rows = entries.records
             .filterKeys { it != "settings/map-coverage.jsonl" }
             .mapValues { (_, lines) -> lines.map { SnapshotJson.parse(it.toByteArray(), false).jsonObject } }
         val restored = snapshotGraphFromRows(rows, version = 2)
         assertEquals(listOf(date), restored.physicalObjects.map { it.fixationDate }.distinct())
         assertEquals(source.physicalObjects.map { it.fixationDate }, restored.physicalObjects.map { it.fixationDate })
+    }
+
+    @Test fun v2RefusesNewInstantFieldsInsteadOfDroppingThem() {
+        val instant = Instant.parse("2026-08-19T12:34:56Z")
+        val source = graph(date).let { value -> value.copy(physicalObjects = value.physicalObjects.map {
+            it.copy(fixationAt = instant, updatedAt = instant)
+        }) }
+        assertThrows(SnapshotException::class.java) {
+            SnapshotDomainCodec.encode(source, settings, version = 2)
+        }
+        assertThrows(BackupDomainInvariantViolation::class.java) {
+            validateLegacyPhysicalObjectInstants(source)
+        }
+    }
+
+    @Test fun v3CarriesNullableInstantFieldsAndOldSnapshotRowsMaterializeNull() {
+        val fixationAt = Instant.parse("2026-08-19T12:34:56Z")
+        val updatedAt = Instant.parse("2026-09-01T00:00:00Z")
+        val source = graph(date).let { value -> value.copy(physicalObjects = value.physicalObjects.map {
+            it.copy(fixationAt = if (it.objectType == PhysicalObjectType.HOLLOW) fixationAt else null,
+                updatedAt = if (it.objectType == PhysicalObjectType.HOLLOW) updatedAt else null)
+        }) }
+        val entries = SnapshotDomainCodec.encode(source, settings, version = 3)
+        val rows = entries.records.filterKeys { it != "settings/map-coverage.jsonl" }
+            .mapValues { (_, lines) -> lines.map { SnapshotJson.parse(it.toByteArray(), false).jsonObject } }
+        val restored = snapshotGraphFromRows(rows, version = 3).physicalObjects.associateBy { it.id }
+        val restoredHollow = restored.getValue(source.physicalObjects.first().id)
+        assertEquals(fixationAt, restoredHollow.fixationAt)
+        assertEquals(updatedAt, restoredHollow.updatedAt)
+
+        val oldRows = SnapshotDomainCodec.encode(graph(null), settings, version = 2).records
+            .filterKeys { it != "settings/map-coverage.jsonl" }
+            .mapValues { (_, lines) -> lines.map { SnapshotJson.parse(it.toByteArray(), false).jsonObject } }
+        assertTrue(snapshotGraphFromRows(oldRows, version = 2).physicalObjects.all {
+            it.fixationAt == null && it.updatedAt == null
+        })
+    }
+
+    @Test fun fixationInstantWithoutCalendarDateIsRejected() {
+        val source = graph(null).let { value -> value.copy(physicalObjects = value.physicalObjects.map {
+            it.copy(fixationAt = Instant.parse("2026-08-19T12:34:56Z"))
+        }) }
+        assertThrows(BackupDomainInvariantViolation::class.java) { validateGraph(source) }
+    }
+
+
+    @Test fun v1AndV2RefuseUpdatedAtEvenWhenFixationIsEntirelyUnknown() {
+        val source = graph(null).let { value -> value.copy(physicalObjects = value.physicalObjects.map {
+            it.copy(updatedAt = at.plusSeconds(60))
+        }) }
+        for (version in listOf(1, 2)) {
+            val failure = assertThrows(SnapshotException::class.java) {
+                SnapshotDomainCodec.encode(source, settings, version = version)
+            }
+            assertEquals(SnapshotError.LOGICAL_STATE_INCONSISTENT, failure.error)
+        }
     }
 
     private fun identity() = SnapshotIdentity(UUID.randomUUID(), UUID.randomUUID(), "Dev", at.toEpochMilli())

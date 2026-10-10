@@ -74,7 +74,7 @@ class PreservedDatabaseMigrationRehearsalTest {
         try {
             val db = room.openHelper.writableDatabase
             assertEquals(file.absolutePath, db.path)
-            assertEquals(13, db.version)
+            assertEquals(14, db.version)
             db.query("PRAGMA integrity_check").use { assertTrue(it.moveToFirst()); assertEquals("ok", it.getString(0)) }
             db.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
             db.query("SELECT COUNT(*) FROM physical_objects WHERE fixation_date IS NOT NULL").use {

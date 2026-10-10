@@ -34,6 +34,36 @@ class PhysicalObjectLegacyBackupTest {
         } finally { source.close(); target.close(); output.delete() }
     }
 
+
+    @Test fun v8RestorePreservesPhysicalMomentsAndV7RefusesInstantLoss() = runBlocking {
+        val source = database(); val target = database()
+        val output = File(context.cacheDir, UUID.randomUUID().toString() + ".zip")
+        try {
+            seed(source)
+            val objects = source.backupDao().physicalObjects()
+            for (row in objects.filter { it.objectType != PhysicalObjectType.APIARY }) {
+                source.openHelper.writableDatabase.execSQL(
+                    "UPDATE physical_objects SET fixation_date = ?, fixation_at = ?, updated_at = ? WHERE id = ?",
+                    arrayOf("2026-08-20", at.toEpochMilli(), at.plusSeconds(60).toEpochMilli(), row.id.toString()))
+            }
+            service(source).export(output)
+            service(target).restore(output)
+            assertEquals(source.backupDao().physicalObjects(), target.backupDao().physicalObjects())
+            assertEquals(2, target.backupDao().physicalObjects().count { it.fixationAt == at })
+            val previous = output.readBytes()
+            assertThrows(BackupDomainInvariantViolation::class.java) { runBlocking { service(source).export(output, format = 7) } }
+            assertTrue(previous.contentEquals(output.readBytes()))
+            // Date-only V7 remains valid and imports new instant fields as unknown.
+            source.openHelper.writableDatabase.execSQL("UPDATE physical_objects SET fixation_at = NULL, updated_at = NULL")
+            service(source).export(output, format = 7)
+            val legacyTarget = database()
+            try {
+                service(legacyTarget).restore(output)
+                assertEquals(source.backupDao().physicalObjects(), legacyTarget.backupDao().physicalObjects())
+            } finally { legacyTarget.close() }
+        } finally { source.close(); target.close(); output.delete() }
+    }
+
     @Test fun fixationDateRejectsV6BeforeOutputCreationOrOverwrite() = runBlocking {
         val source = database()
         val output = File(context.cacheDir, UUID.randomUUID().toString() + ".zip")

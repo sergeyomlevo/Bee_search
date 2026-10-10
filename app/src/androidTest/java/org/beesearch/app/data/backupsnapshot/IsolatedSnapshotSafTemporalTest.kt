@@ -109,7 +109,7 @@ class IsolatedSnapshotSafTemporalTest {
                 }
                 val service = RepositorySnapshotService(repository, SnapshotCapture(database,settings),workspace)
                 val committed = service.create().valueOrThrow()
-                assertEquals(2, committed.snapshot.formatVersion)
+                assertEquals(3, committed.snapshot.formatVersion)
                 assertTrue(committed.snapshot.byteSize > 0)
                 val discovered = service.discover().valueOrThrow()
                 assertEquals(1, discovered.candidates.size)
@@ -122,7 +122,7 @@ class IsolatedSnapshotSafTemporalTest {
                 }
                 val validated = SnapshotArchive().validate(readBack, store.binding!!.expectedRepositoryId,
                     "Dev", committed.snapshot.identity.snapshotId, committed.snapshot.wholeSha256)
-                assertEquals(2,validated.formatVersion)
+                assertEquals(3,validated.formatVersion)
                 ZipFile(readBack).use { zip ->
                     assertEquals(SnapshotContract.paths.toSet(),zip.entries().asSequence().map { it.name }.toSet())
                     assertEquals(17,zip.size())

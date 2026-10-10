@@ -322,8 +322,6 @@ private fun BeeSearchApp(
                         observationDataMaintenance = application.container.observationDataMaintenance,
                         backupExporter = application.container.backupDocumentExporter,
                         exchangeStorage = application.container.exchangeStorage,
-                        mapAreaStore = application.container.mapAreaStore,
-                        mapPackageStore = application.container.mapPackageStore,
                         onBack = viewModel::openObjects,
                         onChooseTerritory = viewModel::openTerritoryManagement,
                         onOpenPoint = viewModel::openPointDetail,
@@ -337,7 +335,7 @@ private fun BeeSearchApp(
                         pointExporter = application.container.observationPointDocumentExporter,
                         exchangeStorage = application.container.exchangeStorage,
                         onBack = { viewModel.closePointDetail(currentRoute) },
-                        onDeleted = viewModel::openPoints,
+                        onDeleted = { viewModel.closePointDetail(currentRoute) },
                     )
                     AppRoute.TerritoryManagement -> TerritoryManagementScreen(
                         territories = territories,
@@ -368,6 +366,10 @@ private fun BeeSearchApp(
                         onCreateObservationPoint = viewModel::createObservationPointFromChooser,
                         onCreateHollow = viewModel::createHollowFromChooser,
                         onCreateLogHive = viewModel::createLogHiveFromChooser,
+                        observationRepository = application.container.observationRepository,
+                        physicalObjectRepository = application.container.physicalObjectRepository,
+                        mapDataDisplayStore = application.container.mapDataDisplayStore,
+                        onOpenMapObject = viewModel::openMapObject,
                         physicalObjectLocationLabel = physicalObjectLocationSelection?.label,
                         mapCenterRequest = mapCenterRequest,
                         onMapCenterRequestHandled = viewModel::consumeMapCenterRequest,

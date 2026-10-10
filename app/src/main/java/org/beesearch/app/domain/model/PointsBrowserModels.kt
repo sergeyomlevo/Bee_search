@@ -20,6 +20,8 @@ data class ObservationPointSummary(
     val completedAt: Instant?,
     val beeCount: Int,
     val completedFlightCycleCount: Int,
+    /** All owned FlightCycle records, including open cycles; same aggregate as map count filters. */
+    val totalFlightCycleCount: Int,
 )
 
 data class ObservationPointDetail(
