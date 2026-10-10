@@ -3667,3 +3667,27 @@ Exact UI contract: [map display §2](ui/unified-territory-map-display-spec.md#2-
 OWNER color refinement: the existing 9 dp circular active/restriction indicator is light lime-green
 `#B7E27A`, replacing theme-primary brown without any geometry, position or other toolbar change.
 Backlog pointer: [I004](ideas.md#i004--main-field-ui-simplification).
+
+# D105 — Area management in Settings and unified offline-map entry
+
+**Status: ACCEPTED** (OWNER, 2026-10-10). Refines D081 navigation without changing its persisted model.
+
+`Territory → 0..1 Area → 1..N fragments → offline-map coverage of the whole Area`.
+Area is device-local Territory/map configuration, not a research object. The existing single-value
+DataStore key per Territory and atomic refusal to create a second Area remain unchanged; no Room change.
+
+Settings opens the current Territory's Area after Territory management. Objects lists research
+capabilities only. The duplicate top-level Settings Offline Maps entry and its navigation route are
+removed. Existing Area creation, identity, geometry, sending and viewing workflows remain intact.
+Area Back returns to Settings; checklist entry keeps its checklist return target.
+
+Area uses real `MapPackageStore.loadActive(territoryId, coverage)` availability: Ready presents
+`Заменить карту`, starting the existing shared `rememberMapPackageImportSession` file-picker flow.
+Without a ready coverage-compatible map it presents `Загрузить карту`, preserving discovery and
+the same import/validation/atomic replacement path. No package format, persistence, backup/export
+format or existing installed map changes. Cancelling selection does not replace a map.
+Existing fragments are edited through `Посмотреть на карте → Изменить участки`; no duplicate editor.
+
+Current Territory is the context of the unified map and research SQL queries, not a visualization
+filter: no Territory selector in `Данные на карте`. Display/FilterSet state remains per Territory.
+Backlog pointer: [I006](ideas.md#i006--settings-information-architecture-and-autosave).

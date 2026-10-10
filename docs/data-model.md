@@ -1,5 +1,12 @@
 # Bee Search — Data Model
 
+## D105 — preserved Territory/Area cardinality
+
+`Territory → 0..1 Area → 1..N fragments → whole-Area offline-map coverage` is unchanged.
+Area is device-local map configuration, not a Room research entity. Its DataStore key is scoped by
+Territory UUID and stores one Area value; atomic create refuses an existing Area. Moving management
+to Settings and load/replace actions into Area changes no schema, Area codec or backup/export format.
+
 ## 1. Назначение документа
 
 Этот документ описывает логическую модель данных приложения **Bee Search**.

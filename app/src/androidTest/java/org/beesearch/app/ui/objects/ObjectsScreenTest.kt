@@ -18,22 +18,18 @@ class ObjectsScreenTest {
     @Test
     fun objectsCatalogOpensObservationPointsAndBackReturnsToMap() {
         var openedPoints = false
-        var openedArea = false
         var backed = false
         composeRule.setContent {
             Bee_searchTheme {
                 ObjectsScreen(
                     onBack = { backed = true },
-                    onOpenArea = { openedArea = true },
                     onOpenObservationPoints = { openedPoints = true },
                 )
             }
         }
 
         composeRule.onNodeWithText("Объекты").assertIsDisplayed()
-        composeRule.onNodeWithTag("objects-area")
-            .assertIsDisplayed()
-            .assertHasClickAction()
+        composeRule.onNodeWithTag("objects-area").assertDoesNotExist()
         composeRule.onNodeWithTag("objects-observation-points")
             .assertIsDisplayed()
             .assertHasClickAction()
@@ -42,7 +38,6 @@ class ObjectsScreenTest {
         composeRule.onNodeWithText("Назад").performClick()
         composeRule.runOnIdle {
             assertEquals(true, openedPoints)
-            assertEquals(false, openedArea)
             assertEquals(true, backed)
         }
     }
@@ -55,7 +50,6 @@ class ObjectsScreenTest {
             Bee_searchTheme {
                 ObjectsScreen(
                     onBack = {},
-                    onOpenArea = {},
                     onOpenObservationPoints = {},
                     onOpenHollows = { openedHollows = true },
                     onOpenLogHives = { openedLogHives = true },
@@ -82,20 +76,22 @@ class ObjectsScreenTest {
     }
 
     @Test
-    fun objectsCatalogOpensTheAreaScreen() {
-        var openedArea = false
+    fun objectsCatalogKeepsAllResearchObjectEntriesWithoutArea() {
         composeRule.setContent {
             Bee_searchTheme {
                 ObjectsScreen(
                     onBack = {},
-                    onOpenArea = { openedArea = true },
                     onOpenObservationPoints = {},
+                    onOpenHollows = {},
+                    onOpenLogHives = {},
                 )
             }
         }
 
-        composeRule.onNodeWithTag("objects-area").performClick()
-
-        composeRule.runOnIdle { assertEquals(true, openedArea) }
+        composeRule.onNodeWithTag("objects-area").assertDoesNotExist()
+        composeRule.onNodeWithTag("objects-observation-points").assertIsDisplayed().assertHasClickAction()
+        composeRule.onNodeWithTag("objects-hollows").assertIsDisplayed().assertHasClickAction()
+        composeRule.onNodeWithTag("objects-log-hives").assertIsDisplayed().assertHasClickAction()
     }
+
 }

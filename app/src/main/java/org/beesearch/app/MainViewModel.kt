@@ -98,7 +98,6 @@ sealed interface AppRoute {
         val origin: PointDetailOrigin = PointDetailOrigin.POINTS,
     ) : AppRoute
     data object TerritoryManagement : AppRoute
-    data object OfflineMapManagement : AppRoute
     data class CurrentTerritory(
         /**
          * The Physical Object card the map was opened from, so Back returns to that card.
@@ -500,6 +499,11 @@ internal class MainViewModel(
         clearFeedback()
     }
 
+    /** Settings owns Area management; checklist entry keeps its existing return target. */
+    fun closeArea() {
+        if (setupReturnPending) returnFromSetupDestination() else openSettings()
+    }
+
     /** The Ареал on a clean map: geometry without the editor. */
     fun openAreaView() {
         manualRoute.value = AppRoute.AreaView
@@ -511,7 +515,7 @@ internal class MainViewModel(
      *
      * The Ареал screen and the Ареал view are two different places a user can start editing from, so
      * the origin is remembered and [completeAreaSectionsEditing] returns there. Other entry points to
-     * the same editor (the map's own coverage button, the offline-map screen) record no origin and
+     * the same editor (the map's own coverage button) record no origin and
      * keep the previous behaviour of staying on the map.
      *
      * This is the only kind of call that may open the editor: ordinary navigation never requests it.
@@ -579,11 +583,6 @@ internal class MainViewModel(
 
     fun openTerritoryManagement() {
         manualRoute.value = AppRoute.TerritoryManagement
-        clearFeedback()
-    }
-
-    fun openOfflineMaps() {
-        manualRoute.value = AppRoute.OfflineMapManagement
         clearFeedback()
     }
 

@@ -1,5 +1,41 @@
 # Bee Search handoff
 
+## Current task — D105 Area management in Settings (2026-10-10)
+
+I6 CLOSED / COMMITTED / PUSHED at 5376e53478774734ea778157fb58c2e77143c937;
+OWNER toolbar visual PASS. D105 OWNER PASS; OWNER authorizes its separate commit/push before GPS
+recovery work. No cleanup, no I7. Protected verifier TOML remains intentionally dirty and untouched.
+
+D105 accepted, linked from the bounded accepted subitem of I006. Area entry moves Objects→Settings
+after Territory management. Single per-Territory DataStore Area and 1..N fragments unchanged;
+no Room/schema/codec/wire changes. Duplicate Offline Maps route removed, main-map availability
+action points to Area. Ready map → Replace via existing shared SAF session; initial load retains
+discovery. Back → Settings (checklist origin → checklist). Existing fragments edit through
+View on map→Edit sections. I6 territory-scoped queries, FilterSet, toolbar and temporal semantics retained.
+
+Required quality tasks PASS in build/area-quality-final.log, JVM887/887, lint0errors42warnings6hints.
+Focused JVM Area/display172 + help19 PASS. Final test APK assemble/compile PASS; final lint PASS
+in build/area-lint-final.log. Android: core69/69 PASS (build/area-android-core-final.log), Settings5/5
+and other map-loading11/11 PASS in the affected17 run; its initial-load fixture was corrected from
+Ready to Missing and that test PASS in core69. Five other editor scenarios PASS independently
+(build/area-editor-five-final.log). Total90 distinct Android tests PASS; the remaining existing
+aFinishedEditorSessionNeverReopensOnALaterVisit crashes with SIGSEGV in libmaplibre.so RenderThread
+on emulator-5554, both combined and isolated. Do not count aborted runs as passes or change the
+unchanged map engine for this navigation task. Final independent review follows these last changes.
+Verification closure follow-up: Samsung RFCY90MBYVZ / SM-S938B available, fontScale1.7. DEV in-place
+install passed after package/signature checks. Objects excludes Area; Settings→Area and Back→Settings
+passed; existing DEV Area shows 1 fragment / 0.4 km² / Replace map. Shared picker opened and cancelled,
+no import. Existing fragment editor opened and cancelled without edits; four later Area-map visits
+showed no editor replay or crash. DataStore/manifest/PMTiles SHA-256 inventories unchanged.
+Evidence: build/d105-closure/. Five isolated emulator repetitions: 2 PASS, 3 native SIGSEGV crashes
+in libmaplibre MapRenderer::render / Vulkan RenderThread on Android10 x86_64. Test and BeeMap lifecycle
+are unchanged from baseline; the test directly drives BeeMap without D105 navigation. Classification:
+intermittent native verification issue, no demonstrated D105 regression; exact native cause unknown.
+Independent closure review B0/H0/M1: strict M0 not reached. No production/test changes in follow-up.
+OWNER accepts D105; the independent native emulator M1 remains known verification debt, explicitly
+not a D105 blocker. GPS OFF→ON recovery is separate work and must not enter the D105 commit.
+Earlier sections below are historical pre-commit continuation context.
+
 ## Current I6 — D104 main-map toolbar owner prototype (2026-10-10)
 
 Current dirty I6 retained; HEAD 20a7c55835f2d129908da899f743e9583414f42a. NO git add/commit/push;

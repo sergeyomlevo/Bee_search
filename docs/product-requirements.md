@@ -1,5 +1,14 @@
 # Bee Search — Product Requirements
 
+## Area navigation — D105
+
+Area is configuration of the current Territory, not a research object. Settings provides its entry
+after Territory management; Objects retains ObservationPoint/Hollow/LogHive. One Territory has
+at most one Area, with one or more fragments defining whole-Area offline-map coverage.
+Area offers one map action: `Загрузить карту` without a ready map, `Заменить карту` when ready.
+The separate Settings Offline Maps entry is removed; existing import and Area workflows are reused.
+The unified map and `Данные на карте` remain scoped to current Territory, without another selector.
+
 ## 1. Назначение документа
 
 Этот документ описывает функциональные требования к мобильному приложению **Bee Search**, предназначенному для проведения полевых наблюдений за мечеными пчёлами.

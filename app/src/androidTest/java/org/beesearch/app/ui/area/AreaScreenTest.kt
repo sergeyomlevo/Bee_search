@@ -22,11 +22,12 @@ import org.beesearch.app.ui.map.MapPackageAvailability
 import org.beesearch.app.ui.map.ActiveMapPackage
 import org.beesearch.app.ui.map.MapPackageManifest
 import java.io.File
+import org.beesearch.app.ui.map.LOAD_AREA_MAP_LABEL
 import org.beesearch.app.ui.map.SEND_AREA_LABEL
+import org.beesearch.app.ui.map.REPLACE_AREA_MAP_LABEL
 import org.beesearch.app.ui.map.VIEW_AREA_ON_MAP_LABEL
 import org.beesearch.app.ui.map.areaUnionKm2
 import org.beesearch.app.ui.map.formatSquareKilometers
-import org.beesearch.app.ui.objects.ObjectsScreen
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -93,21 +94,6 @@ class AreaScreenTest {
                 )
             }
         }
-    }
-
-    @Test
-    fun objectsScreenOffersTheAreaObject() {
-        var opened = false
-        composeRule.setContent {
-            Bee_searchTheme {
-                ObjectsScreen(onBack = {}, onOpenArea = { opened = true }, onOpenObservationPoints = {})
-            }
-        }
-
-        composeRule.onNodeWithTag("objects-area").assertIsDisplayed()
-        composeRule.onNodeWithText("Ареал").assertIsDisplayed()
-        composeRule.onNodeWithTag("objects-area").performClick()
-        composeRule.runOnIdle { assertTrue(opened) }
     }
 
     @Test
@@ -183,9 +169,14 @@ class AreaScreenTest {
 
     @Test
     fun aLoadedMapIsReportedOnTheCardWithoutTechnicalDetails() {
-        show(MapAreaReadResult.Present(area), mapReady = true)
+        var replacementRequested = false
+        show(MapAreaReadResult.Present(area), mapReady = true, onLoadMap = { replacementRequested = true })
 
         composeRule.onNodeWithTag(AREA_MAP_READY_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText(REPLACE_AREA_MAP_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithText(LOAD_AREA_MAP_LABEL).assertDoesNotExist()
+        composeRule.onNodeWithTag(LOAD_AREA_MAP_TAG).performClick()
+        composeRule.runOnIdle { assertTrue(replacementRequested) }
         composeRule.onNodeWithTag(AREA_MAP_GUIDANCE_TAG).assertDoesNotExist()
         composeRule.onNodeWithText(AREA_MAP_READY_LABEL).assertIsDisplayed()
         // The status names no package, path, hash or identifier.

@@ -2,6 +2,10 @@
 
 Статус: APPROVED · 2026-10-02
 
+D105 context invariant: current Territory scopes the entire unified map and its research queries.
+«Данные на карте» has no additional Territory selector; visibility/FilterSet persistence stays
+per Territory. Area management belongs to Settings after Territory management, outside Objects.
+
 Утверждённая текстовая UI specification. При approval внесены три owner decisions: состояние «Данные
 на карте» сохраняется после перезапуска приложения (§20), состояние принадлежит конкретной Territory
 (§20), поведение accordion по умолчанию после появления второго фильтра сознательно отложено (§7).

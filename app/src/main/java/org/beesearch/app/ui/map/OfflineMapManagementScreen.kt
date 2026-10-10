@@ -29,7 +29,8 @@ import org.beesearch.app.data.exchange.ExchangeFolder
 import org.beesearch.app.domain.model.Territory
 
 /**
- * Administrative offline-map page (Settings → Офлайн-карты).
+ * Retained administrative rendering. D105 removes its top-level entry and navigation route;
+ * the Area screen now owns the shared load/replace flow.
  *
  * State A = the current active Map Package (readiness vs desired coverage).
  * State B = the outcome of the last import/replacement attempt made here.

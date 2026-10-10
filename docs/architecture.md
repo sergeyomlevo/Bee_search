@@ -1,5 +1,15 @@
 # Bee Search — Architecture
 
+## D105 navigation consolidation
+
+Settings owns entry to the current Territory's Area after Territory management. Objects owns research
+record browsing only. The OfflineMapManagement navigation route is removed; main-map map-availability
+actions also lead to Area. Area continues to use `rememberMapPackageImportSession` and
+`MapPackageStore.import`: replacement starts the existing SAF picker, initial loading retains discovery.
+Map-package services, validation, atomic activation and serialization remain unchanged.
+The single per-Territory DataStore Area value, not Room, enforces 0..1 Area; fragments remain 1..N.
+Research map queries keep current-Territory SQL predicates and per-Territory display persistence.
+
 ## 1. Назначение документа
 
 Этот документ описывает техническую архитектуру мобильного приложения **Bee Search**.

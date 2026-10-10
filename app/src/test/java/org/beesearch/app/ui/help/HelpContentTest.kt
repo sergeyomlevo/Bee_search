@@ -267,7 +267,7 @@ class HelpContentTest {
         assertTrue(text, text.contains("Работает без интернета"))
         assertTrue(text, text.contains("Требует интернета"))
         assertTrue(text, text.contains("без сети"))
-        assertTrue(text, text.contains("Офлайн-карты"))
+        assertTrue(text, text.contains("«Настройки» → «Ареал»"))
     }
 
     @Test

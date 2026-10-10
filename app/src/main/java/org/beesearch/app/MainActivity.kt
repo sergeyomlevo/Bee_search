@@ -46,7 +46,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import org.beesearch.app.domain.model.PhysicalObjectType
 import org.beesearch.app.data.objectexport.physicalObjectCollectionExportFileName
 import org.beesearch.app.ui.map.CurrentTerritoryScreen
-import org.beesearch.app.ui.map.OfflineMapManagementScreen
 import org.beesearch.app.ui.area.AreaRoute
 import org.beesearch.app.ui.area.AreaViewRoute
 import org.beesearch.app.ui.backup.BackupRoute
@@ -213,7 +212,7 @@ private fun BeeSearchApp(
                         onCreateTerritory = viewModel::createTerritory,
                         onUpdateTerritory = viewModel::updateTerritory,
                         onDeleteTerritory = viewModel::deleteTerritory,
-                        onOpenOfflineMaps = viewModel::openOfflineMaps,
+                        onOpenArea = viewModel::openArea,
                         onOpenHelp = viewModel::openHelp,
                         onOpenInitialSetup = viewModel::openInitialSetup,
                         onOpenBackup = viewModel::openBackup,
@@ -234,7 +233,6 @@ private fun BeeSearchApp(
                     )
                     AppRoute.Objects -> ObjectsScreen(
                         onBack = viewModel::openCurrentTerritory,
-                        onOpenArea = viewModel::openArea,
                         onOpenObservationPoints = viewModel::openPoints,
                         onOpenHollows = { viewModel.openPhysicalObjectList(PhysicalObjectType.HOLLOW) },
                         onOpenLogHives = { viewModel.openPhysicalObjectList(PhysicalObjectType.LOG_HIVE) },
@@ -303,7 +301,7 @@ private fun BeeSearchApp(
                         exchangeStorage = application.container.exchangeStorage,
                         onCreate = { viewModel.openAreaSectionsEditor(returnToView = false) },
                         onViewOnMap = viewModel::openAreaView,
-                        onBack = viewModel::returnFromSetupDestination,
+                        onBack = viewModel::closeArea,
                     )
                     AppRoute.AreaView -> AreaViewRoute(
                         territory = currentTerritory,
@@ -345,14 +343,6 @@ private fun BeeSearchApp(
                         onSelectTerritory = viewModel::setCurrentTerritory,
                         onCreateTerritory = viewModel::createTerritory,
                     )
-                    AppRoute.OfflineMapManagement -> OfflineMapManagementScreen(
-                        territory = currentTerritory,
-                        mapAreaStore = application.container.mapAreaStore,
-                        mapPackageStore = application.container.mapPackageStore,
-                        exchangeStorage = application.container.exchangeStorage,
-                        onBack = viewModel::returnToStartup,
-                        onEditCoverageOnMap = viewModel::openMapWithCoverageEdit,
-                    )
                     is AppRoute.CurrentTerritory -> CurrentTerritoryScreen(
                         territory = currentTerritory,
                         mapAreaStore = application.container.mapAreaStore,
@@ -378,7 +368,7 @@ private fun BeeSearchApp(
                         onReturnToObjectCard = currentRoute.returnToObject?.let { { viewModel.returnFromPhysicalObjectMap() } },
                         onOpenObjects = viewModel::openObjects,
                         onOpenSettings = viewModel::openSettings,
-                        onOpenOfflineMaps = viewModel::openOfflineMaps,
+                        onOpenOfflineMaps = viewModel::openArea,
                         onOpenTerritories = viewModel::openTerritoryManagement,
                         areaEditorRequest = areaEditorRequestToken,
                         onAreaEditorRequestHandled = viewModel::consumeAreaEditorRequest,

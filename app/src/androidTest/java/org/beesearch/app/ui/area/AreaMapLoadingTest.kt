@@ -1,5 +1,6 @@
 package org.beesearch.app.ui.area
 
+import android.accessibilityservice.AccessibilityService
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -8,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import java.nio.file.Files
 import java.time.Instant
@@ -93,6 +95,7 @@ class AreaMapLoadingTest {
         importResult: MapPackageImportResult = activated(),
         availability: MapPackageAvailability = MapPackageAvailability.Missing,
         areaStore: MapAreaStore = RecordingAreaStore(area),
+        onDiscovery: () -> Unit = {},
     ): FakePackageStore {
         val store = FakePackageStore(importResult, availability)
         val canonicalStore = if (read is MapAreaReadResult.Absent) AbsentAreaStore else areaStore
@@ -107,7 +110,10 @@ class AreaMapLoadingTest {
                     },
                     mapPackageStore = store,
                     mapDiscovery = object : AreaMapDiscovery {
-                        override suspend fun discover(expectedAreaStem: String) = discovery
+                        override suspend fun discover(expectedAreaStem: String): AreaMapDiscoveryResult {
+                            onDiscovery()
+                            return discovery
+                        }
                     },
                     exchangeStorage = BeeSearchExchangeStorage(root, "Test"),
                     onCreate = {},
@@ -147,6 +153,42 @@ class AreaMapLoadingTest {
 
         composeRule.onNodeWithTag(LOAD_AREA_MAP_TAG).assertIsDisplayed()
         composeRule.onNodeWithText(LOAD_AREA_MAP_LABEL).assertIsDisplayed()
+    }
+
+    @Test
+    fun aReadyMapUsesTheReplacementPickerWithoutRediscoveringPackages() {
+        var discoveryCalls = 0
+        show(
+            discovery = AreaMapDiscoveryResult.None,
+            availability = MapPackageAvailability.Ready(activated().activePackage),
+            onDiscovery = { discoveryCalls++ },
+        )
+
+        composeRule.onNodeWithText("Заменить карту").performClick()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val targetPackage = instrumentation.targetContext.packageName
+        try {
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                instrumentation.uiAutomation.rootInActiveWindow?.packageName
+                    ?.toString()
+                    ?.endsWith(".documentsui") == true
+            }
+            val pickerRoot = instrumentation.uiAutomation.rootInActiveWindow
+            assertTrue(
+                "Replacement must open the system document picker",
+                pickerRoot?.packageName?.toString()?.endsWith(".documentsui") == true,
+            )
+
+            // Replacement starts the shared picker/import session directly; it must not run the
+            // filename discovery branch used only by the initial load action.
+            assertEquals(0, discoveryCalls)
+        } finally {
+            instrumentation.uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString() == targetPackage
+            }
+        }
+        composeRule.waitForIdle()
     }
 
     @Test
@@ -264,7 +306,7 @@ class AreaMapLoadingTest {
         val store = show(
             discovery = AreaMapDiscoveryResult.One(v12),
             importResult = activated(),
-            availability = MapPackageAvailability.Ready(activated().activePackage),
+            availability = MapPackageAvailability.Missing,
             areaStore = areaStore,
         )
 

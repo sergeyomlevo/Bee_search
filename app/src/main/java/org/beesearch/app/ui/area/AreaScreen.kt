@@ -58,6 +58,8 @@ import org.beesearch.app.ui.map.MapAreaStore
 import org.beesearch.app.ui.map.MapPackageAvailability
 import org.beesearch.app.ui.map.MapPackageImportResult
 import org.beesearch.app.ui.map.MapPackageStore
+import org.beesearch.app.ui.map.REPLACE_AREA_MAP_DESCRIPTION
+import org.beesearch.app.ui.map.REPLACE_AREA_MAP_LABEL
 import org.beesearch.app.ui.map.SEND_AREA_DESCRIPTION
 import org.beesearch.app.ui.map.SEND_AREA_LABEL
 import org.beesearch.app.ui.map.VIEW_AREA_ON_MAP_DESCRIPTION
@@ -213,6 +215,14 @@ internal fun AreaRoute(
     fun startMapLoading() {
         val current = area ?: return
         if (discovering) return
+        // Reuse the replacement entry from the former Offline Maps page. Discovery is only for
+        // initial loading; replacing an installed map starts the same shared SAF import session.
+        if (mapAvailability is MapPackageAvailability.Ready) {
+            message = null
+            coverageMismatch = false
+            importSession.startFromPicker()
+            return
+        }
         discovering = true
         message = null
         coverageMismatch = false
@@ -506,8 +516,22 @@ private fun AreaCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag(LOAD_AREA_MAP_TAG)
-                    .semantics { contentDescription = LOAD_AREA_MAP_DESCRIPTION },
-            ) { Text(if (discovering) "Поиск карты…" else LOAD_AREA_MAP_LABEL) }
+                    .semantics {
+                        contentDescription = if (mapAvailability is MapPackageAvailability.Ready) {
+                            REPLACE_AREA_MAP_DESCRIPTION
+                        } else {
+                            LOAD_AREA_MAP_DESCRIPTION
+                        }
+                    },
+            ) {
+                Text(
+                    when {
+                        discovering -> "Поиск карты…"
+                        mapAvailability is MapPackageAvailability.Ready -> REPLACE_AREA_MAP_LABEL
+                        else -> LOAD_AREA_MAP_LABEL
+                    },
+                )
+            }
             if (mapAvailability is MapPackageAvailability.Ready) {
                 Text(
                     text = AREA_MAP_READY_LABEL,

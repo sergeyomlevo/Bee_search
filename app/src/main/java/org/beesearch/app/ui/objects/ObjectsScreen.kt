@@ -27,7 +27,6 @@ import androidx.compose.ui.platform.testTag
 @Composable
 internal fun ObjectsScreen(
     onBack: () -> Unit,
-    onOpenArea: () -> Unit,
     onOpenObservationPoints: () -> Unit,
     onOpenHollows: () -> Unit = {},
     onOpenLogHives: () -> Unit = {},
@@ -42,15 +41,6 @@ internal fun ObjectsScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            ListItem(
-                headlineContent = { Text(AREA_OBJECT_TITLE) },
-                supportingContent = { Text("Именованная область территории и её участки офлайн-карты") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenArea)
-                    .testTag("objects-area"),
-            )
-            HorizontalDivider()
             ListItem(
                 headlineContent = { Text("Точки наблюдения") },
                 supportingContent = { Text("Таблица и история наблюдений") },
@@ -81,5 +71,3 @@ internal fun ObjectsScreen(
         }
     }
 }
-
-internal const val AREA_OBJECT_TITLE = "Ареал"

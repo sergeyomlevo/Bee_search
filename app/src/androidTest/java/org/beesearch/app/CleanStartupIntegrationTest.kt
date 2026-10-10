@@ -421,6 +421,25 @@ class CleanStartupIntegrationTest {
     }
 
     @Test
+    fun areaManagementReturnsToSettingsAndKeepsChecklistOrigin() = runBlocking {
+        val viewModel = newViewModel()
+        viewModel.openSettings()
+        awaitRoute(viewModel, AppRoute.Settings)
+        viewModel.openArea()
+        awaitRoute(viewModel, AppRoute.Area)
+        viewModel.openAreaView()
+        awaitRoute(viewModel, AppRoute.AreaView)
+        viewModel.openArea()
+        viewModel.closeArea()
+        awaitRoute(viewModel, AppRoute.Settings)
+
+        viewModel.openSetupArea()
+        awaitRoute(viewModel, AppRoute.Area)
+        viewModel.closeArea()
+        awaitRoute(viewModel, AppRoute.InitialSetup)
+    }
+
+    @Test
     fun nonMapPointAndPhysicalObjectRoutesKeepTheirExistingBackTargets() = runBlocking {
         val viewModel = newViewModel()
         val pointId = UUID.randomUUID()

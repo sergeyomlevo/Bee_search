@@ -52,7 +52,7 @@ internal fun SettingsScreen(
     territories: List<Territory>,
     currentTerritoryId: UUID?,
     onBack: () -> Unit,
-    onOpenOfflineMaps: () -> Unit = {},
+    onOpenArea: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
     onOpenInitialSetup: () -> Unit = {},
     onOpenBackup: () -> Unit = {},
@@ -159,20 +159,6 @@ internal fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                tonalElevation = 1.dp,
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Text("Офлайн-карты", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Покрытие, состояние активной карты, импорт и замена.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    TextButton(onClick = onOpenOfflineMaps) { Text("Открыть") }
-                }
-            }
             SettingsDestination(
                 title = "Резервное копирование",
                 description = "Доступ к папке резервных копий Bee Search.",
@@ -248,6 +234,15 @@ internal fun SettingsScreen(
                     else { onUpdateTerritory(edit); editingTerritory = null }
                 }, enabled = codeValue.isNotBlank() && nameValue.isNotBlank() && regionValue.isNotBlank() && districtValue.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(if (edit == null) "Добавить территорию" else "Сохранить") }
             }
+            SettingsDestination(
+                title = "Ареал",
+                description = territories.firstOrNull { it.id == currentTerritoryId }?.let {
+                    "Участки и офлайн-карта территории «${it.name}»."
+                } ?: "Сначала выберите текущую территорию.",
+                testTag = "settings-area",
+                enabled = currentTerritoryId != null,
+                onOpen = onOpenArea,
+            )
         }
     }
     deleteObserver?.let { observer -> AlertDialog(onDismissRequest = { deleteObserver = null }, title = { Text("Удалить наблюдателя?") }, text = { Text(observer.displayName) }, confirmButton = { TextButton(onClick = { onDeleteObserver(observer); deleteObserver = null }) { Text("Удалить") } }, dismissButton = { TextButton(onClick = { deleteObserver = null }) { Text("Отмена") } }) }
@@ -259,6 +254,7 @@ private fun SettingsDestination(
     title: String,
     description: String,
     testTag: String,
+    enabled: Boolean = true,
     onOpen: () -> Unit,
 ) {
     Surface(
@@ -269,7 +265,7 @@ private fun SettingsDestination(
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(description, style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = onOpen, modifier = Modifier.testTag(testTag)) { Text("Открыть") }
+            TextButton(onClick = onOpen, enabled = enabled, modifier = Modifier.testTag(testTag)) { Text("Открыть") }
         }
     }
 }

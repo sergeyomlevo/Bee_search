@@ -277,6 +277,13 @@ research semantics and requires a separate durable decision.
 
 **Status:** `idea`
 
+**Accepted bounded implementation (OWNER, 2026-10-10):** Area management moves from Objects
+to Settings after Territory management; Area owns the shared load/replace offline-map entry.
+The duplicate Settings Offline Maps entry is removed. `Territory → 0..1 Area → 1..N fragments`
+and their whole-Area coverage remain unchanged. This subitem is **accepted / implemented** under
+[D105](decisions.md#d105--area-management-in-settings-and-unified-offline-map-entry); it does not
+accept the broader Settings redesign/autosave idea below. No separate visualization Territory selector.
+
 **Description:** Redesign Settings as a small navigation section rather than a
 single technical form. The top-level Settings screen should use a standard back
 arrow and contain entries for `Настройки пользователя`, `Помощь`, and
