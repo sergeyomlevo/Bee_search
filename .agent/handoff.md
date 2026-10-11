@@ -1,6 +1,41 @@
 # Bee Search handoff
 
-## Current task — Location OFF→ON recovery (2026-10-10)
+## Current task — I7 closure: Temporal roadmap I1–I7 CLOSED (2026-10-11)
+
+I7 CLOSED / VERIFIED / OWNER ACCEPTED. TEMPORAL ROADMAP I1–I7 CLOSED. No temporal
+defect was found. This entry records the accepted I7 outcome and its remaining
+verification debt. It changes no production code, no tests and no device state, and
+re-verifies nothing on hardware.
+
+I7 was the device/deployment acceptance stage for the temporal work. Its closure is
+OWNER-accepted; the temporal implementation (I1–I6) is already committed and is not
+modified by this entry.
+
+Remaining verification debt (not temporal product defects):
+
+1. `MapDataPanelTest.numericRangesApplyOpenBoundsAndLocalResetKeepsPeriod` — test
+   infrastructure verification debt, explicitly not a temporal product defect.
+   Investigate Activity / `ComposeTestRule` / `setContent` / interaction ordering. Do
+   not record the cause as "slow device" and do not increase timeouts before the cause
+   is established.
+2. I7 had no pre-run DB fingerprint on the Samsung device, so byte-for-byte immutability
+   of the database is NOT proven, although application, DB, DataStore and user state
+   were confirmed intact indirectly. At the next pre-authorized instrumented run on the
+   owner device, apply a safe pre/post fingerprint verification.
+3. The physical timezone switch was deliberately not repeated in I7. The timezone
+   invariant is confirmed by implementation and tests; this is a residual physical
+   verification note, not a blocker.
+4. A connected Gradle task can affect a device that appears during the run. Future
+   device-changing runs require explicit target protection, now required by
+   `AGENTS.md` §17 "Device target isolation".
+
+Process rules recorded with this closure: `AGENTS.md` §17 requires device target
+isolation (`ANDROID_SERIAL`, re-verified after toolchain changes, STOP on an unexpected
+device), and §20 requires PAC DECLARATION FIRST — declare before inspection, because an
+inspection classified as `read`/`partial` closes the declaration window exactly like a
+mutation.
+
+## Previous task — Location OFF→ON recovery (2026-10-10)
 
 D105 OWNER PASS, committed/pushed separately at 85e384d2f845d72b83f8fb8b48e486d92f13d46e
 (`feat: move area management to settings`); main==origin/main. Known native MapLibre emulator M1

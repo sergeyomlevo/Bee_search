@@ -802,6 +802,29 @@ evidence: the package update time, or the installed APK SHA.
 
 Prefer an emulator or a separate device for baseline connected comparisons.
 
+### Device target isolation
+
+Before any Android command that can change a device — installing an APK, running
+instrumented tests, clearing or modifying app data, or otherwise altering device
+state — establish which exact device it targets.
+
+Broad `connected*` tasks must not be run against an ambiguous device set. When more
+than one device is attached, restrict the run to the intended serial with
+`ANDROID_SERIAL`. For the current toolchain this is the confirmed mechanism for
+targeting a connected run, but treat it as an observed property, not a permanent
+guarantee: re-verify it after any substantial Android, AGP or Gradle toolchain
+change instead of assuming it still holds.
+
+If another device appears while a potentially device-changing operation is running
+— especially the owner's Samsung phone — and target isolation is not guaranteed,
+STOP the operation.
+
+Intentional install, uninstall, `pm clear`, and changes to the database, DataStore,
+media or map packages on the owner physical device require explicit authorization
+unless the current task already granted it.
+
+Read-only `adb` inspection is not restricted by this rule.
+
 ---
 
 ## 18. Documentation Discipline
@@ -880,6 +903,30 @@ For non-trivial tasks:
 
 Do not perform unrelated cleanup during a focused task unless necessary for
 correctness.
+
+### Change declaration — declare first
+
+When a change-bearing task requires `pac_declare_change`, make the declaration in
+that turn before any tool call that can close the declaration window — including
+shell or repository inspection that is not guaranteed to be classified as a fully
+resolved read. The operational rule is: **PAC DECLARATION FIRST** — declare, then
+inspect.
+
+Read-only is not by itself a sufficient guarantee. An inspection the host
+classifies as `read`/`partial` or as `unknown` closes the window as
+`unresolved_effect`, exactly like a mutating call, and the window never reopens
+within that turn. The window belongs to one turn: it is not persistent and is not
+inherited from another turn, session or process.
+
+If the window is already closed before the declaration:
+
+- do not circumvent the prerequisite;
+- do not attempt to reopen the window in that turn;
+- STOP change-bearing work in that turn;
+- the next turn starts with a new open window, and the declaration must again be
+  its first relevant tool call.
+
+No DSH restart, new session or new process is required or helps.
 
 ---
 
