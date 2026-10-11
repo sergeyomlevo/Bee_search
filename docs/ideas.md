@@ -846,3 +846,74 @@ I011, метод анализа вероятного гнезда — темой
 Distinguish immutable research fixation moment and captured calendar date from technical row creation/modification. Inspection is separate from its parent object. Legacy timestamps require evidence and separate approval before promotion to fixation.
 
 **Authoritative decision:** [D103](decisions.md#d103--physical-object-fixation-moment-and-modification-boundary); precise model and compatibility: [temporal design §25](temporal-data-model-design.md#25-owner-correction-physical-object-fixation-moment) and [data model](data-model.md#временные-факты-объекта).
+
+## I018 — Server / PC split for central storage and evolving analytics
+
+**Status:** `idea`
+
+**Description:** Explore a Bee Search architecture in which the server and the
+research PC have deliberately different responsibilities. Field Android devices
+remain offline-first and synchronize collected research data with a central
+server. The server acts as the durable shared data layer for observations from
+multiple observers and Territories, while the analytical block is developed and
+run primarily on a synchronized PC rather than being embedded in the server from
+the beginning.
+
+The server should contain the stable, conservative part of the system: a central
+database for accumulated Bee Search research data, media/storage integration,
+synchronization interfaces, backup/operational protection, user identity and
+access control, and only sufficiently tested functionality for viewing or
+serving data. What a user can view should depend on the user's authorization
+level; the exact role/access model is not decided yet.
+
+The PC should synchronize the dataset needed for research and contain the
+actively evolving analytical environment. This is where nest-distance models,
+per-bee and cross-point analysis, wind-aware experiments, clustering, spatial
+analysis, statistics, and later other analytical methods can be developed,
+compared, recalculated, and debugged without repeatedly changing the production
+server. The PC analytical environment may change frequently while the server
+remains comparatively stable.
+
+Keep primary observations separate from derived analytical results. Analysis on
+the PC must not rewrite the original field observations merely because an
+algorithm or interpretation changes. Derived results should retain enough
+provenance to identify the analytical method/version and inputs that produced
+them. A later workflow may allow reviewed/approved analytical results to be
+published back to the server for authorized display, while experimental results
+remain local to the analytical environment.
+
+The intended information flow is conceptually:
+
+`Android observers -> central server -> synchronized analytical PC`
+
+with a controlled return path such as:
+
+`analytical PC -> reviewed/published derived results -> server`.
+
+This should not be treated as unrestricted bidirectional database replication.
+Ownership and synchronization rules for primary records, corrections, media,
+conflicts, and published derived results must be designed explicitly before
+implementation.
+
+**Motivation / expected value:** Bee Search is expected to accumulate data from
+multiple observers and Territories, while the analytical methods are still a
+research subject and will need repeated development and revision. Keeping the
+experimental analytical block on the PC makes that work easier and safer,
+without coupling every analytical experiment to production-server deployment.
+At the same time, a central server provides one durable shared database and a
+controlled way to expose stable information according to access level.
+
+**Dependencies / prerequisites:** Before implementation, define the server/PC
+architecture, synchronization ownership rules, conflict handling, authentication
+and authorization model, media synchronization/storage, primary-versus-derived
+data boundary, analytical-result provenance/versioning, and publication flow.
+The concrete technology stack is deliberately not selected by this idea and
+should follow from those requirements rather than be chosen first.
+
+**Notes:** This entry records the initial architectural discussion so it does not
+need to be reconstructed later. It is not yet an accepted server architecture or
+implementation task. In particular, it does not yet decide backend language,
+API framework, database technology, web UI technology, deployment platform, or
+the exact access-role hierarchy. Stable analytical functions may later be moved
+to the server after they have been validated, but that is a future decision,
+not a requirement of the initial design.
