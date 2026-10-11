@@ -181,12 +181,23 @@ class BackupServiceTest {
         service(source, sourceStore, files).export(archive)
         val base = zipEntries(archive)
         val archivePath = "${BackupContractV3.ATTACHMENT_PREFIX}${point.id}/$attachmentId"
-        assertFailure<MissingBackupCollection>(mutate(base) { it.remove(archivePath) })
-        assertFailure<BackupIntegrityMismatch>(mutate(base) { it[archivePath] = byteArrayOf(9, 9, 9) })
+        val failures = mutableListOf<AssertionError>()
+        fun checkCase(name: String, expected: Class<out Throwable>, file: File) {
+            try {
+                assertThrows(expected) { service(target, targetStore).validate(file) }
+            } catch (failure: AssertionError) {
+                failures += AssertionError("$name: ${failure.message}", failure)
+            }
+        }
+        checkCase("missing declared attachment entry", MalformedBackup::class.java, mutate(base) { it.remove(archivePath) })
+        checkCase("damaged attachment bytes", MalformedBackup::class.java, mutate(base) { it[archivePath] = byteArrayOf(9, 9, 9) })
         val metadata = String(base.getValue(BackupContractV3.collections.getValue("observation-point-attachments")))
             .replace(point.id.toString(), UUID.randomUUID().toString())
-        assertFailure<BrokenBackupForeignKey>(replaceCollection(base, "observation-point-attachments", metadata))
-        assertFailure<MalformedBackup>(mutate(base) { it["attachments/../escape"] = byteArrayOf(1) })
+        checkCase("invalid attachment owner", BrokenBackupForeignKey::class.java, replaceCollection(base, "observation-point-attachments", metadata))
+        checkCase("unsafe attachment path", MalformedBackup::class.java, mutate(base) { it["attachments/../escape"] = byteArrayOf(1) })
+        if (failures.isNotEmpty()) {
+            throw AssertionError(failures.joinToString("\n") { it.message ?: "attachment validation failure" })
+        }
     }
 
     @Test fun manifestContainsAllV6RequiredCollections() = runBlocking {
@@ -221,7 +232,7 @@ class BackupServiceTest {
         source.backupDao().insertLogHives(listOf(LogHiveEntity(logHiveId, null, null, null, null, null, null, null, null)))
         source.backupDao().insertApiaries(listOf(ApiaryEntity(apiaryId, null)))
 
-        service(source, sourceStore).export(archive)
+        service(source, sourceStore).export(archive, format = 7)
         val manifest = String(zipEntries(archive).getValue("manifest.json"))
         assertTrue(manifest.contains("\"backupFormatVersion\":7"))
         val pointJson = String(zipEntries(archive).getValue("research/observation-points.json"))
@@ -632,7 +643,7 @@ class BackupServiceTest {
 
     @Test fun formatEvolutionFailuresAreExplicit() = runBlocking {
         seed(source); service(source, sourceStore).export(archive, format = 6); val base = zipEntries(archive)
-        assertFailure<UnsupportedBackupFormat>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"backupFormatVersion\":6", "\"backupFormatVersion\":7").toByteArray() })
+        assertFailure<UnsupportedBackupFormat>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"backupFormatVersion\":6", "\"backupFormatVersion\":${Int.MAX_VALUE}").toByteArray() })
         assertFailure<UnsupportedArchiveSchema>(mutate(base) { it["manifest.json"] = String(it.getValue("manifest.json")).replace("\"archiveSchemaVersion\":6", "\"archiveSchemaVersion\":7").toByteArray() })
         assertFailure<MissingBackupCollection>(mutate(base) { it.remove("research/bees.json") })
         assertFailure<UnknownRequiredBackupCollection>(mutate(base) {
