@@ -1,5 +1,13 @@
 # Bee Search — Architecture
 
+## D106 — Territory user cartography boundaries
+
+[D106](decisions.md#d106--territory-user-cartography-domain-boundaries-and-staged-roadmap)
+фиксирует будущие domain capabilities и roadmap; физические Room/files contracts ещё открыты.
+Canonical identity/metadata/provenance отделяются от managed source/package files и небольшого
+device-local presentation/installation state. Backup/snapshot contracts эволюционируют вместе
+с capability, raster получает отдельный contract, не vector MapPackage validator.
+
 ## D105 navigation consolidation
 
 Settings owns entry to the current Territory's Area after Territory management. Objects owns research
@@ -2290,7 +2298,8 @@ persisted типом без пользовательского жизненно�
 **Статус:** ACCEPTED · owner approval 2026-10-08 · [D102](decisions.md#d102--map-overlay-rendering-split-и-lifecycle-safety).
 Основание — два Samsung DEV/device spike и последующий review:
 [durable evidence summary](map-overlay-lifecycle-evidence.md). Принято архитектурное разделение и
-lifecycle/safety contract; production runtime overlay registry и общая карта данных не реализованы.
+lifecycle/safety contract; production runtime overlay registry ещё не реализован.
+Общая исследовательская карта уже реализована в I6 (§73.4); D106 расширяет её пользовательской картографией.
 Причина разделения — разные свойства механизмов: runtime MapLibre Source/Layer принадлежит текущему
 Style, который заменяется при смене basemap; Compose overlays рисуются поверх карты и не требуют
 MapLibre style restoration. Координатные markers продолжают использовать projection текущей карты.
@@ -2393,15 +2402,32 @@ DEBUG-only preview не меняет production marker path. Owner Samsung S25 U
 переведён на утверждённую пиктограмму ObservationPoint 32 dp через `ResearchObjectMarker`, включая
 selected halo; Hollow/LogHive ждут своего экрана карты, Trap/Apiary остаются reserved definitions.
 
-Territory Data Map, независимое включение слоёв и Layers/Filters UI остаются идеей I016
-(`docs/ideas.md`).
+Приведённый marker follow-up описывает этапы принятия D102. Текущее I6 отображает
+ObservationPoint/Hollow/LogHive на основной карте (§73.4), а не только в прежнем Points Browser.
+Исследовательская часть Territory Data Map и независимые visibility/filters реализованы;
+более широкий scope I016 сохраняется как idea, принятая пользовательская картография — D106.
+
+### Пользовательская картография — D106
+
+GPX/UserPath/raster используют общий будущий Registry и принятый lifecycle contract выше,
+без отдельных workaround mechanisms. Stage 0 prerequisite для Stage 1/2/4; FieldPoint зависит
+от него только при выборе MapLibre renderer. DEV/test-only fixture Stage 0 допустима без
+domain entities, изменения research data и release behavior. SymbolLayer для FieldPoint —
+кандидат до interaction/accessibility/performance проверки на Samsung.
+Conceptual stack `basemap → user raster → field cartography → research → analysis` не задаёт
+физический z-order между Compose и MapLibre; anchors/order внутри surfaces определяются specification.
+Raster catalog принадлежит Territory, installation — устройству; vector manifest и Area
+full-coverage gate к raster не применяются.
 
 ## 73.4. Реализованная общая карта данных: display state и его фильтры
 
 **Статус:** реализация утверждённой поверхности · 2026-10-09. Утверждённые основания —
 `docs/ui/mockups/unified-territory-layers-v2-1.md` (APPROVED UI DIRECTION) и
 `docs/ui/unified-territory-map-display-spec.md` (APPROVED specification). I016 в `docs/ideas.md`
-сохраняет статус `idea`; reconciliation статуса — отдельный documentation follow-up.
+сохраняет статус `idea` для более широких будущих частей; принятая картография определена D106.
+Её display controls расширяют направление «Данные на карте» по отдельной UI specification,
+без пятой toolbar action. Stage 1 обязательно включает минимальный GPX visibility control.
+Правило отсутствия disabled placeholders в этой панели не распространяется на create-record chooser.
 
 Разделение ответственности после реализации:
 

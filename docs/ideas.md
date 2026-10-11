@@ -542,29 +542,31 @@ development documentation and can be adopted before I010 is fully implemented.
 
 **Status:** `idea`
 
+**Accepted portions:** [D106](decisions.md#d106--territory-user-cartography-domain-boundaries-and-staged-roadmap)
+принимает external GPX import/viewing (Stage 1) и UserPath из track/segment/sample range (Stage 2),
+snapshot geometry, persisted provenance и backup obligations. Более широкий scope остаётся idea;
+recorder, полноценный editor, automatic operations и сложная проходимость deferred.
+
 **Description:** Поверх независимой базовой карты пользователь сможет
-импортировать GPX-трек, записанный Bee Search или сторонним приложением.
+импортировать GPX-трек, записанный сторонним приложением; собственная запись Bee Search отложена.
 Импорт сначала остаётся фактическим треком, а не становится автоматически
 картографическим объектом. Пользователь сможет подтвердить весь трек или его
-участок как собственную дорогу либо тропу; подтверждённая линия отображается
+участок как собственную дорогу, тропу, путь подхода или другое; самостоятельная линия отображается
 поверх базовой карты.
 
 **Motivation / expected value:** В полевой работе встречаются используемые
 дороги и тропы, которых нет на базовой карте, но которые пользователь уже
 прошёл или проехал и зафиксировал GPX-треком.
 
-**Dependencies / prerequisites:** Для будущей реализации потребуются отдельные
-решения о проверке/выборе трека или участка, отображении слоя и метаданных:
-тип (`дорога` / `тропа`), проходимость (`автомобиль` / `пешком` /
-`неизвестно`), источник (`GPX` / собственная запись / ручное создание) и дата
-последнего подтверждения на местности. Запись GPX непосредственно Bee Search —
-отдельное будущее развитие; для первой реализации достаточно импорта
-существующего GPX.
+**Dependencies / prerequisites:** Stage 0 Registry обязателен для Stage 1/2.
+Specifications определят parser/storage, backup evolution и UX выбора samples.
+Explicit optional field confirmation date/Observer приняты D106; import/GPX timestamps
+не заменяют подтверждение. Классификатор проходимости, recorder и ручное рисование отложены.
 
 **Notes:** Собственные объекты Bee Search не меняют базовые OSM-данные или
 тайлы. В перспективе слой должен поддерживать offline-использование,
-экспорт/импорт и резервное копирование. Сейчас это только идея: не определяет
-Room schema, UI, конкретный формат хранения или implementation milestone.
+экспорт/импорт и резервное копирование. Принятые архитектура и roadmap определены D106,
+но Room schema, точный UI и формат хранения здесь не определяются.
 
 ## I012 — Compact Bee / FlightCycle matrix
 
@@ -597,6 +599,11 @@ The first research workflow should not require Bee Search to control the aircraf
 ## I014 — User georeferenced raster layers from old maps and imagery
 
 **Status:** `idea`
+
+**Accepted portions:** [D106](decisions.md#d106--territory-user-cartography-domain-boundaries-and-staged-roadmap)
+принимает Territory-owned RasterLayer catalog и отдельную device-local installation (Stage 4,
+после Stage 0), несколько prepared raster materials и display controls. Конкретный raster
+package contract, heavy-byte protection/transfer и более широкий scope идеи остаются открытыми.
 
 **Description:** Allow Bee Search to display user-supplied georeferenced raster material as an optional offline overlay over or alongside the modern base map. Typical sources include scanned or photographed old detailed paper maps, historical aerial photographs, satellite imagery, or other raster material useful for field navigation and interpretation.
 
@@ -756,12 +763,13 @@ synchronization; authentication/source provenance; protocol/versioning; отде
 
 **Status:** `idea`
 
-**Description:** В перспективе карта должна стать единой картой исследовательских данных Territory
-(Territory Data Map), а не набором почти одинаковых браузеров для каждого типа объекта. На одной
-карте пользователь независимо включает и выключает тематические слои: `ObservationPoint`, Дупло
-(`Hollow`), Колода (`LogHive`), Пасека (`Apiary`), будущие `Inspection` и будущие аналитические
-результаты. Отдельный map browser для каждого типа объекта оправдан только при доказанной
-необходимости: общая карта Territory должна решать задачу лучше.
+**Description / current state:** I6 уже реализует unified research map текущей Territory:
+ObservationPoint/Hollow/LogHive, независимые visibility, FilterSet, DAY/MONTH/YEAR и numeric filters,
+marker → preview → record (architecture §73.4). D104 фиксирует четыре toolbar actions.
+Apiary/Inspection и analytical modes остаются будущими частями этой идеи.
+Пользовательская картография и её staged roadmap приняты
+[D106](decisions.md#d106--territory-user-cartography-domain-boundaries-and-staged-roadmap);
+это расширение текущей карты, не новая глобальная карта.
 
 Практический исследовательский сценарий — видеть одновременно, например,
 `ObservationPoint + Hollow + Apiary`, и визуально исследовать взаимное расположение: находится ли
@@ -802,9 +810,10 @@ georeferenced rasters (I014) → пользовательские полевые
 `LogHive`, `Apiary`, будущие `Inspection`) → аналитические overlays (I001 и последующие derived
 results). Пользовательские полевые данные и raster layers не запекаются в raster/vector basemap и
 остаются видимыми независимо от выбранной базовой карты. Механизм отображения этих классов данных —
-design proposal в `architecture.md` (раздел 73.3).
+ACCEPTED D102 в `architecture.md` (§73.3), дополненный D106. Этот stack концептуальный,
+не общий физический z-order между MapLibre и Compose. Polygons остаются deferred.
 
-**Наблюдаемое состояние (OBSERVED, 2026):** на экране карты один селектор подложек со списком
+**Исторический контекст (до I6, не текущее состояние):** на экране карты один селектор подложек со списком
 `Онлайн карта` / `Векторная карта` (в DEV дополнительно `Спутник Sentinel` и `Гибрид`); выбор —
 transient UI state, он не сохраняется и сбрасывается при пересоздании экрана. Смена режима заменяет
 весь MapLibre style (`setStyle`), а собственные маркеры Bee Search рисуются Compose-overlay поверх
@@ -815,26 +824,26 @@ transient UI state, он не сохраняется и сбрасывается
 `Territory + year`, произвольного диапазона нет; у объектов Territory есть только полный список без
 временного фильтра.
 
-**Motivation / expected value:** пространственные вопросы («это дупло рядом с пасекой?», «эти точки
-в возможной зоне лёта?») требуют сейчас переключения между экранами и не видны как одна картина.
+**Motivation / expected value:** До I6 пространственные вопросы («это дупло рядом с пасекой?», «эти точки
+в возможной зоне лёта?») требовали переключения между экранами и не были видны как одна картина.
 Единая карта с независимыми слоями даёт прямое сравнение расположения наблюдений, найденных
 объектов и пасек, а произвольный период позволяет смотреть конкретный выезд, сезон или всю историю.
 
-**Открытые вопросы (не решены этой идеей):** окончательные названия и количество map modes; состав
-и порядок кнопок; обязателен ли UI вида `КАРТА | ГИБРИД` (это пример, а не решение); судьба
+**Открытые вопросы (не решены этой идеей):** окончательные названия и количество будущих map modes
+(toolbar order уже принят D104); обязателен ли UI вида `КАРТА | ГИБРИД` (это пример, а не решение); судьба
 `ONLINE`, `VECTOR` и `SENTINEL`; Room schema пользовательских полевых объектов; конкретная модель
 `Inspection`; архитектура аналитических overlays и конкретные радиусы; формат пользовательских raster
 packages сверх уже принятых решений.
 
-**Dependencies / prerequisites:** mockup-first проектирование панели слоёв и фильтров до реализации
-(`docs/ui/Создание интерфейсов.md`); observable reads объектов Territory (сейчас список объектов
-читается одноразово, а точки — потоком).
+**Dependencies / prerequisites:** Research panel и observable Territory map reads уже реализованы
+в I6. Расширение панели пользовательской картографией требует отдельной UI specification и
+mockup-first workflow (`docs/ui/Создание интерфейсов.md`); Stage 1/2/4 требуют Stage 0 по D106.
 Пользовательские georeferenced rasters остаются темой I014, GPX и собственные дороги/тропы — темой
 I011, метод анализа вероятного гнезда — темой I001; здесь фиксируется только их место в общей
 архитектуре карты, без дублирования их содержания.
 
-**Notes:** Это IDEA, а не accepted requirement: она не меняет текущий UI, не выбирает названия
-режимов, не определяет Room schema и не отменяет существующие источники карты. Независимое
+**Notes:** Статус IDEA сохраняется для более широкого scope; принятые части описаны D102/D104/D106
+и §73.4. Идея не выбирает будущие названия режимов, не определяет Room schema и не отменяет источники карты. Независимое
 включение тематических слоёв — принцип: рост числа слоёв не должен превращаться в рост числа
 верхнеуровневых экранов.
 

@@ -3691,3 +3691,190 @@ Existing fragments are edited through `Посмотреть на карте → 
 Current Territory is the context of the unified map and research SQL queries, not a visualization
 filter: no Territory selector in `Данные на карте`. Display/FilterSet state remains per Territory.
 Backlog pointer: [I006](ideas.md#i006--settings-information-architecture-and-autosave).
+
+---
+
+# D106 — Territory user cartography: domain boundaries and staged roadmap
+
+**Статус:** ACCEPTED · 2026-10-11 · утверждено владельцем проекта.
+
+Приняты логическая предметная модель и порядок развития пользовательской картографии.
+Это не утверждение Room schema, конкретных таблиц или physical storage layout; функции
+этапов ниже ещё не реализованы. Полная принятая модель фиксируется здесь, смежные документы
+содержат уточнения своих границ и ссылки.
+
+## Предметная модель и принадлежность
+
+```text
+Territory
+├── FieldPoint
+├── TrackImport
+│   ├── immutable original GPX
+│   └── SourceTrack (<trk>)
+│       └── TrackSegment (<trkseg>)
+│           └── ordered source samples
+├── UserPath
+│   ├── own canonical geometry
+│   └── PathSourceLink → source provenance
+└── RasterLayer
+    ├── Territory-owned catalog/metadata
+    └── device-local package installation
+```
+
+Пользовательская картография и domain provenance принадлежат Territory, а не Area.
+Basemap, Area, offline coverage, local package installation и runtime map state остаются
+device-local infrastructure. Пользовательская геометрия может выходить за Area; Territory
+не превращается в геометрический polygon. Общая универсальная FieldFeature table ради
+разных геометрий не вводится; общие value/render components допустимы.
+
+**FieldPoint** — пользовательская картографическая отметка места, не ObservationPoint,
+PhysicalObject или PhysicalPlace. D015 остаётся действующим для research domain:
+PhysicalPlace в смысле data-model §71 — потенциальное место повторных исследований.
+Совпадение координат не создаёт связей. Минимальная будущая модель точки: coordinates,
+name, optional description и свободная типовая подпись, creator/provenance, technical
+timestamps и optional factual observation date. Стоянка, переправа, ориентир, препятствие
+и подход — примеры, не закрытый taxonomy.
+
+**TrackImport** — импортированная запись Bee Search с сохраняемым immutable original GPX.
+Первая версия использует запись внешнего приложения. Original — primary source material
+и evidence; не допускаются неявные smoothing, snapping, interpolation, gap filling,
+destructive merge, перестановка samples по timestamp или исправление измерений.
+SourceTrack и TrackSegment производны от соответствующих `<trk>`/`<trkseg>` original GPX,
+не создаются вручную и не существуют без TrackImport. Сохраняются XML order, несколько
+tracks/segments, реальные gaps, nullable timestamps/elevation и поддерживаемые source
+attributes. Между tracks/segments не создаются соединительные линии. Vendor extensions
+не обязательно структурированно разбирать в первой версии: exact original сохраняется,
+supported parser profile и поддерживаемые данные должны быть явно описаны.
+
+SourceTrack/TrackSegment не имеют самостоятельного destructive delete lifecycle; их можно
+скрывать и не использовать. Удаление source material выполняется на уровне TrackImport.
+
+**UserPath** — самостоятельное знание о дороге, тропе, пути подхода или другом пути.
+Подход без физической дороги не называется дорогой. Принята snapshot-семантика: собственная
+canonical geometry хранится, отображается без повторного GPX parsing, входит в backup и
+не изменяется автоматически после обновления parser/index. Persisted logical relation
+**PathSourceLink** хранит provenance к SourceTrack, TrackSegment или sample range, а не
+необходимую для отображения геометрию. Один source может породить несколько путей; один
+путь может иметь несколько source links. Автоматические merge/averaging не выполняются.
+
+Первая версия UserPath позволяет создать путь из целого SourceTrack, TrackSegment или
+диапазона samples одного сегмента: выбрать источник → начало → конец → preview → сохранить.
+Границы привязываются к существующим samples; новые измеренные точки не интерполируются.
+Multipart UX целого track определяется Stage 2 specification, без фиктивных соединений gaps.
+Это не полноценный line editor.
+
+**Удаление TrackImport — RESTRICT**, если хотя бы один PathSourceLink зависит от него или
+его source track/segment. Пользователь не сможет удалить такой source GPX, пока существуют
+зависимые links. Это осознанное ограничение первой версии, несмотря на самостоятельность
+геометрии UserPath. Автоматический detach и молчаливое удаление provenance запрещены;
+операция явного отказа от provenance сейчас не принята и не проектируется.
+
+## Identity, provenance и время
+
+Identity основана на локальных UUID и допускает будущий обмен данными одной Territory
+между observers/устройствами. Identity TrackImport, SourceTrack, исходный порядок
+track/segment/sample и SHA-256 original bytes — разные понятия: hash не заменяет identity
+записи Bee Search. Rebuild/reparse, parser upgrade, backup/restore и exchange не должны
+молча менять logical source addressing или перенаправлять PathSourceLink на другой участок.
+Normalized index допустим для display/search/selection/performance; его physical layout открыт.
+
+Создатель записи, импортировавший GPX, автор из GPX и подтверждающий Observer — разные роли.
+UserPath допускает explicit optional factual confirmation date и confirming Observer.
+Imported_at, created_at, GPX metadata time и sample timestamp не являются автоматическим
+полевым подтверждением. Соблюдается существующее разделение factual time и technical timestamps.
+Удаление Observer не должно молча разрушать provenance; specification следует существующему
+Bee Search Observer lifecycle pattern, а отклонение требует обоснования. Конкретные FK и
+nullable/RESTRICT mechanics остаются implementation decision.
+
+## RasterLayer и границы хранения
+
+RasterLayer — Territory-owned catalog/material/provenance, отдельно от device-local package
+installation. Missing bytes не удаляют catalog. Допустимы несколько растров и частичное
+покрытие; полного покрытия Area не требуется. Материалом может быть геопривязанный скан,
+историческая карта или подготовленный ортофотоплан; обычный JPEG с GPS не является автоматически
+ортофотопланом. Georeferencing, photogrammetry, orthomosaic и tile pyramid/raster PMTiles
+могут подготавливаться на ПК.
+
+Для raster нужен отдельный versioned package/manifest contract (Stage 4). Существующие vector
+MapPackageContract, manifest и Area full-coverage validator не являются raster contract.
+Catalog/identity/provenance — domain data; managed source/package bytes — files; небольшое
+device-local display/installation state отделяется от domain. Точный Room/files storage layout
+здесь не принимается.
+
+## Backup и переносимость
+
+Новые долговечные данные интегрируются в существующие backup/snapshot contracts одновременно
+с capability, без параллельной backup system. Защищаются FieldPoint identity/coordinates/
+metadata/provenance; UserPath identity/canonical geometry/metadata/links; TrackImport identity,
+original GPX bytes, metadata, source identity/provenance mapping и пользовательские annotations.
+Original GPX без Bee Search metadata — не полноценный backup TrackImport.
+
+Normalized index можно не сохранять только если вся logical source addressing для PathSourceLink
+детерминированно восстанавливается из immutable original GPX **и canonical Bee Search
+identity/provenance metadata**. Provenance не может существовать только в disposable index.
+
+**Known open implementation risk:** действующие Complete Backup limits ещё не подтверждены
+на реалистичном архиве пользовательской картографии. Entry-count behavior и metadata/другие
+budgets проверяются в Stage 1 specification/acceptance; текущее числовое ограничение не становится
+вечным invariant. Упаковка GPX и необходимая эволюция contract остаются инженерным решением.
+**Stage 1 exit gate:** успешный Complete Backup + restore original GPX вместе с canonical
+identity/provenance без silent omission. До этого original GPX нельзя считать гарантированно
+защищённым. Если полный backup невозможен — explicit fail-closed, не сообщение об успехе.
+
+Raster catalog/metadata сохраняются, но не доказывают защиту package bytes. Нельзя объявлять
+material полностью защищённым, если единственная необходимая копия bytes остаётся в app-private
+storage. Heavy-byte protection/transfer policy определяется до Stage 4 implementation.
+Complete Backup, user export/import и future Territory sync — разные механизмы; GPX export
+не заменяет backup. D080 Exchange infrastructure сохраняется; новые подпапки и portable formats
+определяются в specifications, не здесь.
+
+## Rendering, lifecycle и UI
+
+Действует [D102](#d102--map-overlay-rendering-split-и-lifecycle-safety) / architecture §73.3:
+MapLibre Sources/Layers — GPX/bulk geometry, UserPath, raster; Compose сохраняет существующие
+interactive research overlays. FieldPoint SymbolLayer — предпочтительный кандидат, не окончательное
+решение: нужны hit testing, touch/accessibility/interaction и Samsung performance verification.
+Conceptual stack `basemap → user raster → field cartography → research presentation → analysis`
+не задаёт физический z-order между MapLibre и Compose. Anchors/order внутри surfaces — specification.
+
+Один общий runtime Overlay Registry по D102 восстанавливает owned overlays после setStyle(),
+с актуальным fully loaded Style, generation/request identity, stale rejection, Sources-before-Layers,
+deterministic restore и collision/fail-closed semantics, включая Territory switching. Отдельные
+workaround lifecycle mechanisms для GPX/UserPath/raster не допускаются.
+
+I6 unified research map уже реализован; пользовательская картография расширяет его. Четыре зоны
+toolbar сохраняются. Display visibility/opacity/ordering — presentation/device-local state.
+Направление управления — `Визуализация → Данные на карте`, с отдельной UI specification расширения.
+Stage 1 включает минимальный доступный GPX visibility control. Правило отсутствия disabled
+placeholders относится только к этой панели (§73.4), не к CreateRecordTypeChooserDialog.
+
+## Принятый staged roadmap
+
+| Stage | Capability / exit obligations |
+|---|---|
+| 0 | Общий Overlay Registry по D102: style restoration, stale generations, Territory switching, ownership/collisions/order; Samsung verification. Разрешена DEV/test-only overlay fixture без domain entities, изменения research data или release behavior; GPX ради fixture не требуется. |
+| 1 | External GPX import/viewing offline: immutable original, multiple tracks/segments, gaps/nullable attributes, stable source identity, visibility, restart/restore, Complete Backup integration и обязательный roundtrip exit gate выше. |
+| 2 | UserPath из whole track/segment/sample range; preview, own geometry, PathSourceLink, metadata/visibility, safe delete, backup/restore; без полноценного editor. |
+| 3 | FieldPoint: minimal metadata, creation по координате карты, display/visibility, backup/restore; renderer проверяется отдельно. |
+| 4 | Raster catalog, отдельный package contract, prepared import/validation/local installation, missing/reinstall, multiple materials, visibility/opacity/order, heavy-byte protection/transfer и Samsung verification. |
+
+Stage 0 — prerequisite для Stage 1, 2 и 4. Stage 3 зависит от Stage 0 только если выбранный
+renderer использует MapLibre runtime overlays; при обосновании Stage 3 может предшествовать Stage 2.
+Нумерация отражает основной dependency/order с этим исключением, не порядок дерева сущностей.
+
+## Deferred / open
+
+Recorder и foreground/background recording, GIS/vertex editor, свободное рисование, automatic
+merge/averaging/destructive dedup, сложная проходимость, polygons, server sync/conflicts, PC analytics,
+phone photogrammetry/raw drone processing отложены. Не вводятся server_id, sync_status/version,
+tombstones и device ownership protocol.
+
+Room schema/table names, normalized storage и UUID/ordinal/parser-version mapping, parser library,
+import limits, transactions/hash API, GPX backup packaging/new limits, exchange formats, FieldPoint
+taxonomy/renderer, multipart UserPath UX, raster manifest/size/heavy-byte transport и sync protocol
+остаются open engineering decisions соответствующих specifications. Они учитывают существующие
+UUID, SHA-256/byte-length checks, managed storage, staging/validation/atomic publication, Room
+transactions, backup/snapshot и fail-closed patterns, без преждевременной конкретизации здесь.
+
+Backlog: I011/I014/I016 отражают принятые части ссылкой сюда; их более широкий scope остаётся
+idea. I015 synchronization и I018 server/PC analytics не принимаются этим решением.

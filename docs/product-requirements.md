@@ -690,6 +690,14 @@ bounds и независимыми zoom/provider/lifecycle. Contours, hillshade 
 
 ## 17.1. Отображение исследовательских данных на карте
 
+Утверждённое будущее расширение — [D106](decisions.md#d106--territory-user-cartography-domain-boundaries-and-staged-roadmap):
+импорт и offline-просмотр внешнего GPX с сохранением original/tracks/segments/gaps и управлением
+visibility; создание UserPath из track/segment/sample range; пользовательские FieldPoint;
+prepared raster overlays с visibility/opacity/ordering. Эти capabilities ещё не реализованы,
+не заменяют research data и не добавляют новую глобальную карту/пятую toolbar action.
+Stage 1 требует Complete Backup/restore original GPX с canonical identity/provenance без потерь;
+невозможность полного backup сообщается явным отказом. Recorder остаётся deferred.
+
 Основная карта показывает исследовательские объекты текущей территории, а нижняя панель карты несёт
 четыре равные icon-only зоны `Анализ | Визуализация | Объекты | Настройки` (D104). Анализ пока
 зарезервирован и недоступен; Визуализация открывает существующие `Данные на карте` и управляет

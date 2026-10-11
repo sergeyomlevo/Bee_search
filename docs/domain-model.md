@@ -43,6 +43,10 @@ device-local настройкой.
 
 `Territory` — долговременная область исследования, внутри которой создаются точки наблюдений.
 
+Territory также владеет принятой будущей пользовательской картографией: FieldPoint,
+TrackImport, UserPath и RasterLayer catalog/provenance ([D106](decisions.md#d106--territory-user-cartography-domain-boundaries-and-staged-roadmap)).
+Это логическая принадлежность данных, не определение Territory геометрическим polygon.
+
 Территория используется для:
 
 * логического объединения данных;
@@ -101,7 +105,9 @@ Package гарантирует локальную доступность под�
 
 При этом сама карта не рассматривается как самостоятельная предметная сущность наблюдения.
 
-Картографические данные, состояние их загрузки и выбранная область являются локальной технической инфраструктурой конкретного устройства.
+Данные базовой карты, состояние их загрузки и выбранная Area/offline coverage являются
+локальной технической инфраструктурой конкретного устройства. Basemap infrastructure,
+local package installation и runtime map state сохраняют эту device-local принадлежность.
 
 Они не являются свойствами исследовательской сущности `Territory`. Territory
 можно создать и использовать без offline package; отсутствие package не
@@ -111,6 +117,11 @@ Package гарантирует локальную доступность под�
 разные Territory на устройстве могут иметь разный map context. Сами rectangle
 geometry, download state и map resources остаются device-local infrastructure,
 не становятся Room research entities и в текущем milestone не сохраняются.
+
+Эта граница не распространяется на Territory-owned пользовательские картографические данные:
+FieldPoint, TrackImport, UserPath и RasterLayer catalog/domain provenance (D106).
+Они не принадлежат Area и не обязаны помещаться в её coverage; installation raster package
+остаётся device-local. Area не переносится в Room domain model.
 
 ---
 

@@ -1,5 +1,15 @@
 # Bee Search — Data Model
 
+## D106 — logical user cartography model
+
+[D106](decisions.md#d106--territory-user-cartography-domain-boundaries-and-staged-roadmap)
+принимает Territory-owned FieldPoint, TrackImport → SourceTrack → TrackSegment → ordered samples,
+UserPath с собственной snapshot geometry и persisted PathSourceLink, RasterLayer catalog с отдельной
+device-local installation. Это будущая логическая модель, не новая Room schema. Original GPX и
+canonical identity/provenance metadata защищаются совместно; source addressing не живёт только
+в disposable index. TrackImport delete — RESTRICT при зависимых links. Физическая схема и
+Observer FK mechanics определяются specifications с сохранением существующего lifecycle pattern.
+
 ## D105 — preserved Territory/Area cardinality
 
 `Territory → 0..1 Area → 1..N fragments → whole-Area offline-map coverage` is unchanged.
@@ -1845,6 +1855,10 @@ ObservationPoint 2
 Для текущей задачи достаточно координат.
 
 Если в будущем появится необходимость анализировать серии наблюдений именно как повторения одного постоянного места, возможность отдельной сущности `PhysicalPlace` может быть рассмотрена позднее.
+
+FieldPoint по D106 — картографическая отметка, не такая исследовательская PhysicalPlace,
+не ObservationPoint и не PhysicalObject. D015 остаётся действующим для research domain;
+совпадение координат не создаёт автоматических связей и не вводит PhysicalPlace.
 
 ---
 
