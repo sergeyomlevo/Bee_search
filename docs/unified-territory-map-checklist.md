@@ -174,3 +174,13 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 - Отмечать пункт `[x]` только тогда, когда существует evidence или owner approval, требующиеся
   именно для этого пункта.
 - Обновлять этот checklist в том же commit, который завершает стадию, когда это уместно.
+
+## D106 Stage 0 — Overlay Registry (2026-10-12)
+
+- [x] Production runtime registry and one guarded style session in BeeMap, both FIELD/AREA_VIEW.
+- [x] Opaque scope/revision, retained ownership journal, collision and unsafe-attachment handling.
+- [x] Permanent opt-in native synthetic fixture; research/GPS/Area remain Compose.
+- [x] JVM/build/lint and opt-in emulator fixture gates; see `map-overlay-lifecycle-evidence.md` for actual counts.
+- [ ] Deliberately delayed SDK request, profile-specific visual/restore budget and field regression verification.
+- [ ] Owner-authorized physical Samsung verification. Not performed in this task.
+- Stage 1 GPX is not started; no empty GIS controls or new persistent data were added.

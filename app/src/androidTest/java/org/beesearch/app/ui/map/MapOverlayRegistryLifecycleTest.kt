@@ -1,0 +1,271 @@
+package org.beesearch.app.ui.map
+
+import android.net.Uri
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import org.beesearch.app.BeeMapProfile
+import org.beesearch.app.ui.theme.Bee_searchTheme
+import org.beesearch.app.domain.location.LocationUiState
+import org.junit.Assert.assertEquals
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.Assume.assumeTrue
+import org.junit.runner.RunWith
+import org.maplibre.android.MapLibre
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.Layer
+import org.maplibre.android.style.sources.Source
+
+/**
+ * Native MapLibre lifecycle proof for D106 Stage 0.
+ *
+ * These tests are opt-in because the native renderer is environment-sensitive. Run with
+ * `-Pandroid.testInstrumentationRunnerArguments.beeOverlayRegistry=true` on an emulator.
+ */
+@RunWith(AndroidJUnit4::class)
+class MapOverlayRegistryLifecycleTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Before
+    fun optInBeforeNativeMapCreation() {
+        assumeTrue(
+            "Pass beeOverlayRegistry=true to run native MapLibre lifecycle tests",
+            InstrumentationRegistry.getArguments().getString("beeOverlayRegistry") == "true",
+        )
+    }
+
+    @Test
+    fun sdkSessionRestoresFixtureAcrossReloadAndScopeChange() {
+        val session = createSession()
+        val overlay = overlayRegistryFixture(visible = false)
+
+        onMain {
+            session.sync("scope-a", listOf(overlay))
+            session.requestStyle(testProfile(OVERLAY_REGISTRY_FIXTURE_STYLE_A))
+        }
+        awaitStyle(session)
+        onMain {
+            assertEquals(1, countSources(session, overlay))
+            assertEquals(1, countLayers(session, overlay))
+            assertEquals("none", layerVisibility(session, overlay))
+        }
+        val firstSource = onMainValue {
+            session.currentStyle!!.getSource(MapOverlayRegistry.sourceId(overlay.key, "points"))
+        }
+        assertEquals(true, onMainValue { session.currentStyle!!.json.contains("Overlay Registry Fixture A") })
+
+        val firstStyle = onMainValue { session.currentStyle }
+        onMain { session.requestStyle(testProfile(OVERLAY_REGISTRY_FIXTURE_STYLE_B)) }
+        awaitStyle(session, firstStyle)
+        onMain {
+            assertEquals(1, countSources(session, overlay))
+            assertEquals(1, countLayers(session, overlay))
+            session.sync("scope-b", listOf(overlay.copy(visible = true)))
+            assertEquals(1, countSources(session, overlay))
+            assertEquals(1, countLayers(session, overlay))
+            assertEquals("visible", layerVisibility(session, overlay))
+        }
+        val secondSource = onMainValue {
+            session.currentStyle!!.getSource(MapOverlayRegistry.sourceId(overlay.key, "points"))
+        }
+        assertEquals(true, onMainValue { session.currentStyle!!.json.contains("Overlay Registry Fixture B") })
+        check(firstSource !== secondSource) { "Style reload must create fresh Source objects" }
+
+        val secondStyle = onMainValue { session.currentStyle }
+        onMain { session.requestStyle(testProfile(OVERLAY_REGISTRY_FIXTURE_STYLE_A)) }
+        awaitStyle(session, secondStyle)
+        onMain {
+            assertEquals(1, countSources(session, overlay))
+            assertEquals(1, countLayers(session, overlay))
+            assertEquals(true, session.currentStyle!!.json.contains("Overlay Registry Fixture A"))
+        }
+        val thirdSource = onMainValue {
+            session.currentStyle!!.getSource(MapOverlayRegistry.sourceId(overlay.key, "points"))
+        }
+        check(secondSource !== thirdSource) { "Every style attachment must create fresh Source objects" }
+        onMain {
+            session.release()
+            assertEquals(true, session.isReleased)
+        }
+    }
+
+    @Test
+    fun foreignStyleIdsAreNotAdoptedOrRemoved() {
+        val session = createSession()
+        val foreignSource = MapOverlayRegistry.sourceId(OVERLAY_REGISTRY_FIXTURE_KEY, "points")
+        val foreignLayer = MapOverlayRegistry.layerId(OVERLAY_REGISTRY_FIXTURE_KEY, "circles")
+        onMain {
+            session.requestStyle(testProfile("""
+                {"version":8,"name":"foreign","sources":{"$foreignSource":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"$foreignLayer","type":"circle","source":"$foreignSource"}]}
+            """))
+        }
+        awaitStyle(session)
+        val heldStyle = onMainValue { session.currentStyle!! }
+        onMain {
+            session.sync("scope-a", listOf(overlayRegistryFixture()))
+            assertEquals(OverlayResult.ID_COLLISION, session.registry.failures[OVERLAY_REGISTRY_FIXTURE_KEY])
+            assertEquals(1, countSources(session, overlayRegistryFixture()))
+            assertEquals(1, countLayers(session, overlayRegistryFixture()))
+        }
+        onMain { session.release() }
+        assertEquals(true, onMainValue { heldStyle.getSource(foreignSource) != null })
+        assertEquals(true, onMainValue { heldStyle.getLayer(foreignLayer) != null })
+    }
+
+    @Test
+    fun actualBeeMapHostProvidesAndReleasesOverlaySession() {
+        val captured = AtomicReference<MapLibreOverlaySession?>()
+        val visible = mutableStateOf(true)
+        val round = mutableIntStateOf(0)
+        val mode = mutableStateOf(BeeMapMode.FIELD)
+        composeRule.setContent {
+            Bee_searchTheme {
+                if (visible.value) {
+                    key(round.intValue) {
+                        BeeMap(
+                            territoryId = null,
+                            territoryName = null,
+                            areaStore = NoOpAreaStore,
+                            packageStore = NoOpPackageStore,
+                            locationState = LocationUiState.PermissionRequired,
+                            locationPermissionGranted = false,
+                            onRequestLocationPermission = {},
+                            onRequestCreateRecord = { _, _ -> },
+                            runtimeOverlays = listOf(overlayRegistryFixture()),
+                            overlayScope = "fixture-scope",
+                            mode = mode.value,
+                            onOverlaySessionReady = captured::set,
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitUntil(15_000) { onMainValue { captured.get()?.currentStyle?.isFullyLoaded == true } }
+        val session = requireNotNull(captured.get())
+        composeRule.waitUntil(15_000) { onMainValue { session.currentStyle?.getLayer(MapOverlayRegistry.layerId(OVERLAY_REGISTRY_FIXTURE_KEY, "circles")) != null } }
+        assertEquals(false, onMainValue { session.isReleased })
+        val initialStyle = onMainValue { session.currentStyle }
+        onMain { session.requestStyle(testProfile(OVERLAY_REGISTRY_FIXTURE_STYLE_A)) }
+        awaitStyle(session, initialStyle)
+        onMain {
+            session.sync("fixture-scope-b", listOf(overlayRegistryFixture(revision = 2L, visible = false)))
+            assertEquals(1, countSources(session, overlayRegistryFixture()))
+            assertEquals(1, countLayers(session, overlayRegistryFixture()))
+            assertEquals("none", layerVisibility(session, overlayRegistryFixture()))
+            session.restoreIfCurrent()
+        }
+        val first = session
+        composeRule.runOnIdle { visible.value = false }
+        composeRule.waitForIdle()
+        assertEquals(true, onMainValue { session.isReleased })
+        composeRule.runOnIdle { visible.value = true; mode.value = BeeMapMode.AREA_VIEW; round.intValue++ }
+        composeRule.waitUntil(15_000) { captured.get() != null && captured.get() !== first }
+        val recreated = requireNotNull(captured.get())
+        composeRule.waitUntil(15_000) { onMainValue { recreated.currentStyle?.getLayer(MapOverlayRegistry.layerId(OVERLAY_REGISTRY_FIXTURE_KEY, "circles")) != null } }
+        onMain { recreated.release() }
+    }
+
+    private fun createSession(): MapLibreOverlaySession {
+        val latch = CountDownLatch(1)
+        val session = AtomicReference<MapLibreOverlaySession?>()
+        composeRule.setContent {
+            AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                factory = { view ->
+                    MapLibre.getInstance(view)
+                    MapView(view).also { mapView ->
+                        mapView.onCreate(null)
+                        mapView.onStart()
+                        mapView.onResume()
+                        mapView.getMapAsync { map ->
+                            session.set(MapLibreOverlaySession(mapView, map))
+                            latch.countDown()
+                        }
+                    }
+                },
+                onRelease = { view ->
+                    session.get()?.release()
+                    view.onPause()
+                    view.onStop()
+                    view.onDestroy()
+                },
+            )
+        }
+        check(latch.await(15, TimeUnit.SECONDS)) { "MapLibre map did not become ready" }
+        return requireNotNull(session.get())
+    }
+
+    private fun awaitStyle(session: MapLibreOverlaySession, previous: Style? = null) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15)
+        while (System.nanoTime() < deadline) {
+            var ready = false
+            instrumentation.runOnMainSync {
+                val style = session.currentStyle
+                ready = style?.isFullyLoaded == true && (previous == null || style !== previous)
+            }
+            if (ready) return
+            Thread.sleep(50)
+        }
+        error("MapLibre style did not become fully loaded")
+    }
+
+    private fun countSources(session: MapLibreOverlaySession, overlay: MapOverlay<Source, Layer>): Int =
+        session.currentStyle?.sources?.count { it.id == MapOverlayRegistry.sourceId(overlay.key, "points") } ?: 0
+
+    private fun countLayers(session: MapLibreOverlaySession, overlay: MapOverlay<Source, Layer>): Int =
+        session.currentStyle?.layers?.count { it.id == MapOverlayRegistry.layerId(overlay.key, "circles") } ?: 0
+
+    private fun layerVisibility(session: MapLibreOverlaySession, overlay: MapOverlay<Source, Layer>): String? =
+        session.currentStyle?.getLayer(MapOverlayRegistry.layerId(overlay.key, "circles"))?.visibility?.value
+
+    private fun testProfile(json: String) = BeeMapProfile(
+        profileId = "overlay-registry-fixture",
+        profileVersion = "test",
+        datasetVersion = "test",
+        styleVersion = "test",
+        styleJson = json.trimIndent(),
+        sourceMaxZoom = 20.0,
+        uiMaxZoom = 20.0,
+    )
+
+    private fun onMain(block: () -> Unit) =
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(block)
+
+    private fun <T> onMainValue(block: () -> T): T {
+        var value: T? = null
+        onMain { value = block() }
+        @Suppress("UNCHECKED_CAST")
+        return value as T
+    }
+
+    private object NoOpAreaStore : MapAreaStore {
+        override suspend fun load(territoryId: java.util.UUID, territoryName: String?) = MapAreaReadResult.Absent
+        override suspend fun create(territoryId: java.util.UUID, name: String, bounds: List<MapGeoBounds>) = MapAreaChangeResult.Refused("fixture")
+        override suspend fun updateBounds(territoryId: java.util.UUID, bounds: List<MapGeoBounds>) = MapAreaChangeResult.Refused("fixture")
+        override suspend fun rename(territoryId: java.util.UUID, name: String) = MapAreaChangeResult.Refused("fixture")
+        override suspend fun delete(territoryId: java.util.UUID) = MapAreaChangeResult.Refused("fixture")
+        override suspend fun clear(territoryId: java.util.UUID) = Unit
+        override suspend fun snapshot(territoryId: java.util.UUID): String? = null
+        override suspend fun restore(territoryId: java.util.UUID, value: String?) = Unit
+    }
+
+    private object NoOpPackageStore : MapPackageStore {
+        override suspend fun loadActive(territoryId: java.util.UUID, desiredCoverage: List<MapCoverageFragment>) = MapPackageAvailability.Missing
+        override suspend fun import(territoryId: java.util.UUID, desiredCoverage: List<MapCoverageFragment>, manifestUri: Uri, pmtilesUri: Uri): MapPackageImportResult = MapPackageImportResult.Rejected("fixture")
+        override suspend fun clear(territoryId: java.util.UUID) = Unit
+    }
+}

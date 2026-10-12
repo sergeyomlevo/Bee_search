@@ -1,6 +1,32 @@
 # Bee Search handoff
+## Current task — D106 Stage 0 Overlay Registry (2026-10-12)
 
-## Current task — I7 closure: Temporal roadmap I1–I7 CLOSED (2026-10-11)
+IMPLEMENTED / AUTOMATED GATES PASS / PHYSICAL SAMSUNG VERIFICATION PENDING.
+Independent clone: C:\App\Bee_search_stage0_overlay_registry.
+Task branch: task/d106-stage0-overlay-registry; canonical baseline a8939f504219d5133f54b1a9bfd958f7587d8083.
+Owner authorized one local implementation commit; no push/merge/rebase or automatic Stage 1 work.
+PAC tool unavailable; this task used the explicit one-time owner authorization and scoped escalations.
+
+MapOverlayRegistry and MapLibreOverlaySession implement runtime Sources/Layers ownership, opaque
+scope/revision, marker-correlated style callbacks/listeners, visibility, retained journal and safe
+retired-scope cleanup. BeeMap keeps both initial style requests through the same session. Existing
+research/GPS/Area Compose paths and persistence are unchanged. Runtime factories and tests add no GIS entity.
+
+Baseline JVM897/897; final JVM927/927 (Registry/correlation30/30), Debug/Beta/Release compilation,
+assembleDebug, compileDebugAndroidTestKotlin, assembleDebugAndroidTest and lintDebug PASS.
+Lint0errors44warnings6hints. emulator-5554/API29 opt-in native3/3 PASS, no skipped/aborted;
+FIELD/AREA_VIEW recreation and original Style metadata readback covered. Independent Luna review:
+initial blockers corrected, production re-review has no blocking issue.
+Evidence: docs/map-overlay-lifecycle-evidence.md, build/evidence/{baseline,final-gates,native-gate}.log.
+No Samsung operation; protected main verifier SHA remains 7388F2F233AB86694C69F15CB0BF8076C39A65932D2248D44046CFE2E46A1F31.
+Release checkout/Beta archives not modified. Room14/CompleteBackupV8/SnapshotV3 unchanged.
+
+Next action belongs to OWNER after implementation review: authorize remaining physical Samsung
+style/recreation/transition/budget and field regressions, and separately close delayed SDK-request debt.
+Do not start GPX or automatically continue another stage. This entry is not a FULLY VERIFIED claim.
+
+
+## Previous task — I7 closure: Temporal roadmap I1–I7 CLOSED (2026-10-11)
 
 I7 CLOSED / VERIFIED / OWNER ACCEPTED. TEMPORAL ROADMAP I1–I7 CLOSED. No temporal
 defect was found. This entry records the accepted I7 outcome and its remaining

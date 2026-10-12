@@ -2298,7 +2298,7 @@ persisted типом без пользовательского жизненно�
 **Статус:** ACCEPTED · owner approval 2026-10-08 · [D102](decisions.md#d102--map-overlay-rendering-split-и-lifecycle-safety).
 Основание — два Samsung DEV/device spike и последующий review:
 [durable evidence summary](map-overlay-lifecycle-evidence.md). Принято архитектурное разделение и
-lifecycle/safety contract; production runtime overlay registry ещё не реализован.
+lifecycle/safety contract; production runtime overlay registry реализован в D106 Stage 0; verification status — ниже.
 Общая исследовательская карта уже реализована в I6 (§73.4); D106 расширяет её пользовательской картографией.
 Причина разделения — разные свойства механизмов: runtime MapLibre Source/Layer принадлежит текущему
 Style, который заменяется при смене basemap; Compose overlays рисуются поверх карты и не требуют
@@ -2409,7 +2409,7 @@ ObservationPoint/Hollow/LogHive на основной карте (§73.4), а н
 
 ### Пользовательская картография — D106
 
-GPX/UserPath/raster используют общий будущий Registry и принятый lifecycle contract выше,
+GPX/UserPath/raster будут использовать общий Stage 0 Registry и принятый lifecycle contract выше,
 без отдельных workaround mechanisms. Stage 0 prerequisite для Stage 1/2/4; FieldPoint зависит
 от него только при выборе MapLibre renderer. DEV/test-only fixture Stage 0 допустима без
 domain entities, изменения research data и release behavior. SymbolLayer для FieldPoint —
@@ -2418,6 +2418,46 @@ Conceptual stack `basemap → user raster → field cartography → research →
 физический z-order между Compose и MapLibre; anchors/order внутри surfaces определяются specification.
 Raster catalog принадлежит Territory, installation — устройству; vector manifest и Area
 full-coverage gate к raster не применяются.
+
+### D106 Stage 0 implementation (2026-10-12)
+
+Runtime infrastructure implemented; native and physical verification status is recorded in
+`map-overlay-lifecycle-evidence.md`. Stage 1 is not started. Research markers, GPS/target/guide
+and Area coverage remain Compose-owned; there are no new user controls or persisted GIS data.
+
+`BeeMap` owns one `MapLibreOverlaySession` per MapView. FIELD and AREA_VIEW retain both existing
+initial/effect style requests, all routed through this session. Its `MapOverlayRegistry<Source,
+Layer>` owns registrations, opaque content scope, revisions, visibility and the mutation journal.
+The presentation owner supplies the scope; BeeMap defaults it to the current Territory UUID.
+Registry itself has no Territory, Area, database or feature-type knowledge. MapView release
+invalidates the session, removes listeners and clears SDK references before `onDestroy()`.
+
+Style request generation is recorded before setStyle and does not discard the previous journal.
+A unique app request marker is carried in standard non-rendering root metadata
+`beesearch:overlay-request`. Setter callback and loaded listener use one restore entry point:
+marker, host, request, actual/current Style identity and fully-loaded state must all match.
+This relies on version-pinned Native 13.5.1 getStyleJson returning the original loaded JSON;
+see the evidence document. An unscoped failure event does not fail a newer request by assumption.
+No completion of superseded setters, automatic retry or recovery scheduler is required.
+
+Factories provide fresh standard SDK Source/Layer objects from prepared snapshots. A small generic
+mutation target makes Registry decisions JVM-testable without Android mocks. Source/Layer keys
+are lowercase ASCII letters/digits/hyphens, length 1..64; full IDs use a length-prefixed overlay key
+under `beesearch-overlay-`. All collisions are checked before additions. Resources are journaled
+only after successful adds; identity proof is required before visibility changes and removals.
+Sources precede dependent Layers; removals reverse this dependency. Geometry/membership/order
+changes rebuild owned resources in deterministic `(order, overlay key)` order above basemap layers;
+visibility-only changes do not rebuild them. Existing basemap sources/layers are not owned.
+
+Scope changes invalidate preparation tokens and retire the previous scope. Retired/unregistered
+resources can be cleaned from an actual ready old attachment even if a newer style request has
+not succeeded. New resources are attached only after current request correlation. A safely cleaned
+per-overlay failure is isolated; unknown partial SDK changes or failed cleanup make only that
+attachment unsafe until a confirmed new Style. Latest desired registrations are retained.
+
+The permanent opt-in androidTest fixture is synthetic GeoJSON/CircleLayer, with no Room,
+DataStore, map-package or GIS entity dependency. It is absent from all application variants.
+Room v14, Complete Backup V8, Snapshot V3 and existing DataStore contracts are unchanged.
 
 ## 73.4. Реализованная общая карта данных: display state и его фильтры
 
@@ -2455,7 +2495,7 @@ SavedObjectMarkersOverlay поверх MapView в FIELD-режиме (Compose, �
 - overlay не рисуется в dedicated map modes (участки/выбор положения объекта): эти режимы владеют
   жестами карты, и research-маркеры не должны в них вмешиваться; режим `AREA_VIEW` остаётся чистым
   просмотром Ареала;
-- MapLibre runtime Source/Layer этим этапом не вводились: registry §73.3 остаётся нереализованным и
+- MapLibre runtime Source/Layer этим этапом не вводились: registry §73.3 реализован отдельно в D106 Stage 0 и
   нужен только стадиям с MapLibre layers (I014/I011/I001).
 
 Открытый пункт перед rollout общей карты: Compose marker scale/performance benchmark

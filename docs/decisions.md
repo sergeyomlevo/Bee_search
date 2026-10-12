@@ -3700,7 +3700,7 @@ Backlog pointer: [I006](ideas.md#i006--settings-information-architecture-and-aut
 
 Приняты логическая предметная модель и порядок развития пользовательской картографии.
 Это не утверждение Room schema, конкретных таблиц или physical storage layout; функции
-этапов ниже ещё не реализованы. Полная принятая модель фиксируется здесь, смежные документы
+Stage 1–4 ниже ещё не реализованы; implementation status Stage 0 приведён отдельно. Полная принятая модель фиксируется здесь, смежные документы
 содержат уточнения своих границ и ссылки.
 
 ## Предметная модель и принадлежность
@@ -3861,6 +3861,17 @@ placeholders относится только к этой панели (§73.4), 
 Stage 0 — prerequisite для Stage 1, 2 и 4. Stage 3 зависит от Stage 0 только если выбранный
 renderer использует MapLibre runtime overlays; при обосновании Stage 3 может предшествовать Stage 2.
 Нумерация отражает основной dependency/order с этим исключением, не порядок дерева сущностей.
+
+## Stage 0 implementation status — 2026-10-12
+
+**IMPLEMENTED / AUTOMATED GATES PASS / PHYSICAL SAMSUNG VERIFICATION PENDING.**
+
+Runtime Registry and guarded BeeMap integration implemented under the owner-approved Stage 0
+implementation task. Strategy C: production infrastructure plus permanent opt-in instrumentation-only
+synthetic fixture; existing research/GPS/Area Compose overlays remain unchanged. No Stage 1 code,
+persistence, backup, version or signing change. Automation/native/Samsung verification status is
+recorded in [lifecycle evidence](map-overlay-lifecycle-evidence.md#d106-stage-0--2026-10-12).
+Samsung verification is not closed by this implementation; the accepted Stage 0 exit obligation remains.
 
 ## Deferred / open
 

@@ -79,3 +79,68 @@ recreation/return-to-map and stale work; bounded restore frame budget; basemap-s
 transition/flicker UX; regression checks after substantial MapLibre upgrades. These do not block
 acceptance. Separate Samsung marker visual pass must verify shape-first type identity, selected type
 preservation and vector/Sentinel/raster/Hybrid contrast. Exact icons/colours/sizes are not approved.
+
+## D106 Stage 0 — 2026-10-12
+
+**IMPLEMENTED / AUTOMATED GATES PASS / PHYSICAL SAMSUNG VERIFICATION PENDING.**
+Owner-approved implementation from `a8939f504219d5133f54b1a9bfd958f7587d8083`, independent clone
+`C:\App\Bee_search_stage0_overlay_registry`, branch `task/d106-stage0-overlay-registry`.
+No physical-device operations, release checkout changes or Stage 1 implementation.
+
+### Request correlation evidence
+
+Callback/listener correlation uses a unique app-owned marker in the standard non-rendering root
+metadata property `beesearch:overlay-request`. This is app request identity, not SDK-provided
+request identity. Generation and marker are stored before setStyle, including synchronous paths.
+Both signals use actual/current Style identity, loaded state and the marker read from Style.json.
+Stale setter callbacks cannot perform cleanup or restore. Unscoped loaded/failure events can clean
+only retired journal resources whose actual attachment/ownership is still provable.
+
+Primary sources inspected for Android 13.5.1:
+
+- [Root metadata specification](https://maplibre.org/maplibre-style-spec/root/#metadata): metadata does not influence rendering.
+- [Style::Impl](https://github.com/maplibre/maplibre-native/blob/android-v13.5.1/src/mbgl/style/style_impl.cpp): load stores `json = json_`; getJSON returns that string.
+- [Android JNI](https://github.com/maplibre/maplibre-native/blob/android-v13.5.1/platform/android/MapLibreAndroid/src/cpp/native_map_view.cpp): getStyleJson returns native Style.getJSON.
+- [MapLibreMap.java](https://github.com/maplibre/maplibre-native/blob/android-v13.5.1/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java): setter clears old Style; callback/getter coordination is not per-request SDK identity.
+
+The opt-in native test read the marker back across A -> B -> A, confirmed distinct markers,
+fresh SDK Source objects and exactly one fixture Source/Layer per Style. Existing metadata is
+preserved; an existing reserved marker causes a refusal rather than overwrite. Resource IDs,
+Sources/Layers, camera settings and basemap composition are unchanged by the marker.
+
+### Automated evidence
+
+Baseline: `:app:testDebugUnitTest :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin`
+passed before source edits: 897 tests, 0 failures/errors/skipped. No prior-run count was reused.
+
+Final batch (Gradle 9.5.0, isolated task-local Gradle/Android user homes and temp directories):
+`:app:testDebugUnitTest :app:compileDebugKotlin :app:compileBetaKotlin :app:compileReleaseKotlin
+:app:assembleDebug :app:compileDebugAndroidTestKotlin :app:assembleDebugAndroidTest :app:lintDebug`
+passed. JVM: 927 tests, including 30 Registry/correlation tests, 0 failures/errors/skipped.
+Lint: 0 errors, 44 warnings, 6 hints; new LogNotTimber warnings follow the existing Android Log
+pattern and add no dependency. Full JVM also exercises existing map/Area/display/location/heading logic.
+An offline packaging attempt lacked a cached coroutines-test artifact; it was downloaded only into
+the task-local cache. Interim compilation/test assertion failures were corrected; none remain.
+
+Native: `ANDROID_SERIAL=emulator-5554`, Android 10/API29 `BeeSearch_ZIP64_API29`.
+Only `org.beesearch.app.dev` and `.dev.test`; artifact application IDs checked before the run.
+`:app:connectedDebugAndroidTest` with runner arguments
+`class=org.beesearch.app.ui.map.MapOverlayRegistryLifecycleTest`, `beeOverlayRegistry=true`:
+3 tests, 0 failures/errors/skipped/aborted, PASS. Connected target isolation and the existing
+leave-APKs-installed policy were retained. No device PoC/import suite or destructive cleanup ran.
+
+Tests cover standalone SDK restoration/visibility/scope/collision and actual BeeMap FIELD ->
+disposal -> AREA_VIEW recreation. They do not prove all field workflows, GPS/sensor behavior,
+profile-specific visual ordering, large-data frame budget or physical ergonomics.
+JVM proves out-of-order request/data completion; a deliberately delayed SDK/network request
+was not exercised and remains separate SDK verification debt.
+
+Local artifacts: `build/evidence/baseline.log`, `final-gates.log`, `native-gate.log`, JVM XML under
+`app/build/test-results/testDebugUnitTest`, native XML under
+`app/build/outputs/androidTest-results/connected/debug`. These logs are ignored artifacts,
+not the sole durable source of this summary. DEV APK SHA-256:
+`13296FFD2C04AD0A3F40312F15422D90B072771E35A678E95A35F96279CFC286`.
+
+Independent read-only Luna review identified callback correlation and retired-scope cleanup issues;
+root corrected them and added regression tests. Re-review found no blocking production issue.
+Physical Samsung verification was explicitly prohibited in this task and is not closed here.

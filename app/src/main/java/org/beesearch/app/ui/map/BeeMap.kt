@@ -72,7 +72,6 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
-import org.maplibre.android.maps.Style
 
 internal enum class BeeMapMode {
     FIELD,
@@ -136,10 +135,25 @@ internal fun BeeMap(
     onEditAreaSections: () -> Unit = {},
     /** The участки editor session ended, however it ended, and the host may restore its route. */
     onCoverageSessionEnded: () -> Unit = {},
+    runtimeOverlays: List<MapOverlay<org.maplibre.android.style.sources.Source, org.maplibre.android.style.layers.Layer>> = emptyList(),
+    overlayScope: Any? = territoryId,
+    onOverlaySessionReady: (MapLibreOverlaySession) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
-    val mapViewLifecycle = remember { MapViewLifecycleController() }
+    var overlaySession by remember { mutableStateOf<MapLibreOverlaySession?>(null) }
+    val latestOverlays by rememberUpdatedState(runtimeOverlays)
+    val latestOverlayScope by rememberUpdatedState(overlayScope)
+    val latestSessionReady by rememberUpdatedState(onOverlaySessionReady)
+    val mapViewLifecycle = remember {
+        MapViewLifecycleController { view ->
+            overlaySession?.takeIf { it.owns(view) }?.release()
+            overlaySession = null
+        }
+    }
+    LaunchedEffect(overlaySession, overlayScope, runtimeOverlays) {
+        overlaySession?.sync(overlayScope, runtimeOverlays)
+    }
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var gpsScreenPosition by remember { mutableStateOf<Offset?>(null) }
@@ -438,6 +452,11 @@ internal fun BeeMap(
                     mapView = view
                     view.onCreate(null)
                     view.getMapAsync { mapInstance ->
+                        if (!mapViewLifecycle.owns(view)) return@getMapAsync
+                        val session = MapLibreOverlaySession(view, mapInstance)
+                        overlaySession = session
+                        session.sync(latestOverlayScope, latestOverlays)
+                        latestSessionReady(session)
                         map = mapInstance
                         mapInstance.setMaxZoomPreference(onlineMapProfile.uiMaxZoom)
                         initialCamera?.let { saved ->
@@ -446,7 +465,7 @@ internal fun BeeMap(
                                 .bearing(saved.bearing).tilt(saved.tilt).build()
                             mapCenter = MapTarget(saved.latitude, saved.longitude)
                         }
-                        mapInstance.setStyle(Style.Builder().fromJson(onlineMapProfile.styleJson))
+                        session.requestStyle(onlineMapProfile)
                         mapZoom = mapInstance.cameraPosition.zoom
                     }
                 }
@@ -891,9 +910,7 @@ internal fun BeeMap(
         if (camera.zoom > profile.uiMaxZoom) {
             mapInstance.cameraPosition = CameraPosition.Builder(camera).zoom(profile.uiMaxZoom).build()
         }
-        mapInstance.setStyle(Style.Builder().fromJson(profile.styleJson)) {
-            Log.d("BeeMap", "style loaded profile=${profile.profileId} center=${mapInstance.cameraPosition.target} zoom=${mapInstance.cameraPosition.zoom}")
-        }
+        overlaySession?.requestStyle(profile)
     }
 }
 
@@ -1084,10 +1101,12 @@ private fun isMapPositionVisible(position: Offset, mapView: MapView?): Boolean =
         position.x in 0f..mapView.width.toFloat() &&
         position.y in 0f..mapView.height.toFloat()
 
-private class MapViewLifecycleController {
+private class MapViewLifecycleController(private val beforeRelease: (MapView) -> Unit) {
     private var mapView: MapView? = null
     private var started = false
     private var resumed = false
+
+    fun owns(view: MapView): Boolean = mapView === view
 
     fun attach(view: MapView) {
         check(mapView == null || mapView === view) { "A MapView is already attached" }
@@ -1118,6 +1137,7 @@ private class MapViewLifecycleController {
         if (mapView !== view) return
         pauseIfNeeded(view)
         stopIfNeeded(view)
+        beforeRelease(view)
         view.onDestroy()
         mapView = null
     }
