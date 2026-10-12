@@ -1,6 +1,10 @@
 # Map overlay lifecycle — durable device evidence
 
-> Current D106 Stage0 closure (2026-10-12):
+> Current D106 Stage0 verification (2026-10-12): **STAGE0_VERIFICATION_PASS within the declared
+> emulator + Samsung scope.** Samsung ONLINE and AreaEditor recreation methods PASS; emulator
+> retains its known pre-Stage0 blocker. See Samsung physical closure for scope and remaining UNKNOWNs.
+
+> Previous emulator-only D106 Stage0 closure (2026-10-12):
 > **EMULATOR_VERIFICATION_PASS_WITH_KNOWN_PREEXISTING_NATIVE_BLOCKER / SAMSUNG_VERIFICATION_GO.**
 > ONLINE and the known AreaEditor recreation method remain BLOCKED, not PASS; physical verification
 > is NOT PERFORMED. Earlier NO-GO attempts are historical. See the final independent-gates section
@@ -596,3 +600,90 @@ Independent evidence review verified each PASS, no hidden skip or retry. Current
 GO with the frozen known blockers; GO authorizes planning a separate physical verification task,
 not Samsung execution here. Native full ONLINE/known-editor assertions and visual/performance/GPS/
 sensor/field ergonomics remain for another valid environment. Stage1 is not started.
+
+## Samsung physical closure — formerly emulator-blocked assertions (2026-10-12)
+
+**SAMSUNG_STAGE0_BLOCKED_ASSERTIONS_PASS.** Combined with the separately recorded emulator
+EMULATOR_VERIFICATION_PASS_WITH_KNOWN_PREEXISTING_NATIVE_BLOCKER, the result is
+**STAGE0_VERIFICATION_PASS within the declared emulator + Samsung verification scope.**
+The earlier emulator-only unverified labels describe that environment; the two assertion groups
+below are now physically verified. This does not claim general MapLibre stability or performance.
+
+### SAMSUNG PHYSICAL EVIDENCE
+
+Owner authorized only ONLINE and the known AreaEditor recreation method, in that order and with
+stop-on-failure policy. Samsung SM-S938B, Android16/API36; serial recorded in local device-identity/
+devices evidence, every adb command used explicit RFCY90MBYVZ. Image fingerprint recorded locally.
+Before mutation: DEVversionCode7/versionName1.3.0 and testpackage present; foreground launcher.
+Source checkout C:\App\Bee_search_stage0_overlay_registry, HEADab24fff9591d0c4cdb4db59aca063825ef845fa3;
+production baseline1e88fe8765f1ab7a32ae6aeff129635d2d936185, identical app/src/main tree hash.
+Index empty; only incoming docs/decisions.md diff existed, outside verification commit and unchanged.
+
+Built :app:assembleDebug :app:assembleDebugAndroidTest with the established offline Gradle9.5.0/
+task-local cache/temp environment, PASS17s. Packages verified org.beesearch.app.dev and
+org.beesearch.app.dev.test, Debug variant. APKs:
+- app/build/outputs/apk/debug/app-debug.apk, SHA256
+  13296FFD2C04AD0A3F40312F15422D90B072771E35A678E95A35F96279CFC286.
+- app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk, SHA256
+  A850A4ED5804680361194D0DFA152412488FA49A31C4E3541AABC29C080BA914.
+
+Both installed with adb -s RFCY90MBYVZ install -r; Success. Existing DEV/test data directories and
+firstInstallTime retained (DEV ceDataInode438163/deDataInode424656). DEVversionCode became8, the
+already existing Stage0 build version; no source version bump/signing/config change. DEV/test
+force-stop only before installation/second gate. No pm clear/uninstall/permission grant/settings
+change/user-map import or modification. Stable/release and Beta before/after version/update-time/
+data-inode metadata match; no operations targeted their app data. This is update-in-place/package
+metadata evidence, not a full file-by-file DEV database audit.
+
+Exact executed commands, one method each:
+
+```powershell
+& $adb -s RFCY90MBYVZ shell am instrument -w -r -e class 'org.beesearch.app.ui.map.MapOverlayProductionProfilesTest#fieldProfileRestoresRegistryOverlayAndPreservesStyleResources' -e beeOverlayRegistry true org.beesearch.app.dev.test/androidx.test.runner.AndroidJUnitRunner
+& $adb -s RFCY90MBYVZ shell am instrument -w -r -e class 'org.beesearch.app.ui.map.AreaEditorEntryUiTest#aFinishedEditorSessionNeverReopensOnALaterVisit' -e beeOverlayRegistry true org.beesearch.app.dev.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+| Physical gate | Result | Started/PASS | Failures/skips/aborts | JUnit seconds | Observed wall seconds |
+|---|---|---|---|---:|---:|
+| ONLINE full production profile | PASS | 1/1 | 0/0/0 | 0.860 | 2.047 |
+| AreaEditor recreation method | PASS | 1/1 | 0/0/0 | 1.704 | 2.694 |
+
+ONLINE completed the complete unchanged assertion sequence: current native Style fully loaded,
+current request metadata readback, exact application Source/Layer parity with exact closed SDK
+infrastructure allowance, no unexpected extras, original JSON Source/Layer structure parity,
+Registry fixture attach and hidden visibility, reload and fresh Source/Layer objects, stale callback
+refusal/no current-resource mutation, session release and normal test-rule MapView teardown.
+Cleanup coverage is limited to assertions and normal teardown already present in this test;
+no new cleanup assertion or production logging was added.
+
+AreaEditor method completed explicit open, request consumption, Done/session finish, all four
+keyed MapView recreations with no editor panel, final handledRequests==1 and normal teardown.
+No JUnit failure, ignored/skipped test, process crash, native Fatal signal or AndroidRuntime fatal
+was observed in either run. No Samsung baseline reproduction, broader physical suite or emulator
+crash diagnosis ran.
+
+Bounded visual evidence: one screenshot per short run, captured via exec-out screencap to host
+artifacts only. ONLINE frame (~1.54s) shows grey map surface without resolved tile detail; its timing
+is transient, so tile visual readiness/absence of a persistent blank state is not established by it.
+AreaEditor frame (~1.53s) visibly shows rendered world map, target and ordinary controls, no editor
+panel. Screenshots do not constitute continuous flicker/restart observation. No obvious pathological
+behavior was established; no performance benchmark or subjective smoothness PASS is claimed.
+
+### EMULATOR EVIDENCE CARRIED FORWARD
+
+Emulator classification remains EMULATOR_VERIFICATION_PASS_WITH_KNOWN_PREEXISTING_NATIVE_BLOCKER.
+Physical PASS closes only the two missing assertion groups; it does not relabel emulator crashes
+PASS or fixed. KNOWN PRE-STAGE0 EMULATOR NATIVE BLOCKER — ROOT CAUSE UNKNOWN. Exact baseline
+proof remains in the bounded diagnosis section. No general cause attribution or SDK defect decision.
+
+Evidence: build/evidence/samsung-blocked-assertions with device identity, before/installed/after
+package metadata, source/index/diff/APK/build provenance, and online/area-recreation directories
+containing instrumentation output, result.json, logcat and bounded PNG captures. Serial/timestamps
+remain in local evidence. No source/test change required; operational documentation only updated.
+Production/config/dependencies, Room14/BackupV8/SnapshotV3/DataStore/Area ownership/version/signing
+unchanged. Protected main/release checkouts preserved. No Stage1 code, no push.
+
+Remaining topics outside this declared verification scope: emulator root cause, full tile visual/
+readiness checks, performance/large marker budget, GPS/heading/field ergonomics and any separately
+open delayed SDK-request experiment. These are not asserted PASS by the two physical gates.
+Next action belongs to owner: review and accept the combined scoped Stage0 evidence; do not
+start a subsequent stage automatically.

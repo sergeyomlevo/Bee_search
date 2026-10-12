@@ -1,5 +1,23 @@
 # Bee Search handoff
-## Current closure — remaining independent emulator gates (2026-10-12)
+## Current task — Samsung closure of emulator-blocked assertions (2026-10-12)
+
+SAMSUNG_STAGE0_BLOCKED_ASSERTIONS_PASS / STAGE0_VERIFICATION_PASS within declared combinedscope.
+Samsung SM-S938B Android16/API36, explicitdevice serial in local evidence. ONLINE1/1PASS then
+AreaEditorrecreation1/1PASS(all4iterations/handledRequests1), no failures/skips/native/processcrash.
+Only two authorizedphysicalmethods ran. DEV/test install-r preserved data directories/firstInstallTime;
+DEVversion7->existingStage0version8 expected, no sourceversion/signing/configchange. Stable/Beta metadata
+unchanged, no clear/uninstall/settings/userfiles/mapoperations. No code/testfix needed.
+Verification sourceab24fff, production1e88fe8 byteequivalent; same app/testSHA13296...FC286/A850...A914.
+assembleDebug/AndroidTestPASS17s. Earlier JVM927/compile/lint gates remainvalid; no broadphysicalsuite.
+EmulatorstatusretainedPASS_WITH_KNOWN_PREEXISTING_NATIVE_BLOCKER; rootcauseUNKNOWN, notfixed.
+ONLINEscreenshotgreytransient(notvisualreadinessPASS); Area screenshotrenderedmap/noeditorpanel.
+No performance/generalMapLibre stability claim. Visual/performance/GPS/heading remainseparatetopics.
+Evidence docs/map-overlay-lifecycle-evidence.md and build/evidence/samsung-blocked-assertions.
+Only lifecycle evidence/checklist/handoff updated; incomingdecisionsdiff untouched; no push.
+Nextactiononly: owner review/accept combined scopedStage0 evidence. Do not automaticallystartStage1.
+
+## Previous emulator closure
+
 
 EMULATOR_VERIFICATION_PASS_WITH_KNOWN_PREEXISTING_NATIVE_BLOCKER / SAMSUNG_VERIFICATION_GO.
 Owner replaced ONLINEFULLPASS prerequisite. ONLINE and known AreaEditor recreation method frozen

@@ -1,6 +1,10 @@
 # Unified Territory Data Map — execution checklist
 
-> Current D106 Stage0 closure (2026-10-12):
+> Current D106 Stage0 verification (2026-10-12): **STAGE0_VERIFICATION_PASS within the declared
+> emulator + Samsung scope.** Samsung ONLINE and AreaEditor recreation methods PASS; emulator
+> retains its known pre-Stage0 blocker. See Samsung physical closure for scope and remaining UNKNOWNs.
+
+> Previous emulator-only D106 Stage0 closure (2026-10-12):
 > **EMULATOR_VERIFICATION_PASS_WITH_KNOWN_PREEXISTING_NATIVE_BLOCKER / SAMSUNG_VERIFICATION_GO.**
 > ONLINE and the known AreaEditor recreation method remain BLOCKED, not PASS; physical verification
 > is NOT PERFORMED. Earlier NO-GO attempts are historical. See the final independent-gates section
@@ -234,7 +238,11 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
       ONLINE FULL PASS first. No retry/known AreaEditor rerun or production change.
 - Emulator closure incomplete / SAMSUNG_VERIFICATION_NO_GO / no new commit. See lifecycle evidence.
 
-### Current emulator closure — replacement owner rule (2026-10-12)
+### Historical emulator-only closure — replacement owner rule (2026-10-12)
+
+Snapshot before Samsung verification. The two-method NOT VERIFIED / physical NOT PERFORMED
+items below are superseded for those two methods by the Samsung closure section; emulator crash
+results remain blocked, and broader visual/performance/field obligations remain separate.
 
 - [x] ACTIVE_VECTOR/SENTINEL/HYBRID real-profile gates PASS with corrected strict parity contract.
 - [x] MapDataWiring5/5, MapResearchObjectsQuery3/3, MapCenterTarget2/2, CoverageSelection12/12 PASS.
@@ -246,3 +254,16 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 - SAMSUNG_VERIFICATION_GO under updated owner rule; earlier prerequisite/NO-GO entries are historical.
   Known blocker classification unchanged, root cause UNKNOWN. No production fix or Stage1 work.
   See final independent-gates section of lifecycle evidence for exact commands and blocked assertions.
+
+### Samsung closure of emulator-blocked assertions (2026-10-12)
+
+- [x] ONLINE full production-profile method1/1 PASS on SamsungSM-S938B/Android16/API36.
+- [x] Known AreaEditor recreation method1/1 PASS, all four recreations and handledRequests==1.
+- [x] No native/process crash/assertion failure/skip; DEV/test update-in-place, data directories retained.
+- [x] SAMSUNG_STAGE0_BLOCKED_ASSERTIONS_PASS; combined STAGE0_VERIFICATION_PASS within declared scope.
+- Emulator status retained separately; known pre-Stage0 emulator native blocker root cause UNKNOWN,
+  not fixed and not relabeled PASS. Current physical results supersede earlier physical-NOT-PERFORMED
+  entries only for these two methods. No broader physical suite or Stage1 work.
+- [ ] Visual readiness/performance/GPS/heading/field ergonomics beyond the two test assertions.
+  See Samsung physical closure section of lifecycle evidence for provenance, bounded screenshots
+  and exact commands. No general MapLibre stability or performance acceptance is claimed.
