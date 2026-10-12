@@ -1,5 +1,92 @@
 # Bee Search handoff
-## Current task — D106 Stage 0 Overlay Registry (2026-10-12)
+## Current closure — remaining independent emulator gates (2026-10-12)
+
+EMULATOR_VERIFICATION_PASS_WITH_KNOWN_PREEXISTING_NATIVE_BLOCKER / SAMSUNG_VERIFICATION_GO.
+Owner replaced ONLINEFULLPASS prerequisite. ONLINE and known AreaEditor recreation method frozen
+BLOCKED_BY_PREEXISTING_NATIVE_FAILURE, not rerun/notPASS. Unfinished assertions explicitly listed
+in docs/map-overlay-lifecycle-evidence.md; rootcause stillUNKNOWN. Physical Samsung NOT PERFORMED.
+13 independentgates/31testsPASS: three realproductionprofiles, MapDataWiring5/Query3/Center2/Coverage12,
+enhancedstartup-recreation1, five individualAreaEditor methods. No failure/skip/abort/newnativecrash.
+FIELD gens1->2 metadata coherent; firsthostreleased; recreated AREA_VIEWnewhost/gen1, unique resources.
+JVM927/927 and compile/assemble/lint0errors44warnings6hints remaingreen; no source/test edits thisrun.
+Production1e88fe8 unchanged, appSHA13296...FC286;testSHAA850...A914. Only task-local evidence/docs
+updated in this run; earlier authorized androidTest and documentation diff preserved. No push.
+Main/release/protected file and Room14/BackupV8/SnapshotV3/DataStore/Area/version/signing preserved.
+Evidence build/evidence/independent-remaining and final lifecycle-evidence section. No Stage1 work.
+Next action only: owner-authorized Samsung verification of unverified native and physical obligations.
+Do not install/run on Samsung automatically. This is not FULLY VERIFIED.
+
+## Previous parity-contract task
+
+
+SDK_OWNED proven from android-v13.5.1 AnnotationManager source: automatic source
+org.maplibre.annotations and point layer org.maplibre.annotations.points. Exact closed-set SDK
+separation and strict application parity in androidTest helper;7contracttestsPASS. No genericfilter.
+Current-task edits only profile-test two assertion calls and new MapOverlayResourceParityTest.kt;
+previous closure test/docs diff retained. Production1e88fe8/config/dependencies unchanged.
+BuildgatesPASS;JVM927/927;lint0errors44warnings6hints. AppSHA13296...FC286 unchanged;
+testSHAA850A4ED5804680361194D0DFA152412488FA49A31C4E3541AABC29C080BA914 installed emulatoronly.
+ONLINE rerun once BLOCKED_BY_PREEXISTING_NATIVE_FAILURE (same RenderThread/MapRenderer+151/
+PC/BuildID), noJUnitassertion. ONLINE individualassertions not proven completed. No retry.
+OwnerSection7 ONLINEFULLPASS prerequisite not met: otherprofiles/remgatesNOT_RUN_WITH_REASON.
+EMULATORCLOSUREINCOMPLETE / SAMSUNG_VERIFICATION_NO_GO. No new commit or push;Samsunguntouched.
+Evidence docs/map-overlay-lifecycle-evidence.md and build/evidence/parity-contract.
+Nextowneraction: decide explicitly if isolated remaininggates may proceed on knownblockedONLINE,
+replacing current FULLPASS prerequisite. No productionfix or architecturechange.
+
+## Previous remaining-gates attempt
+
+
+EMULATOR_VERIFICATION_FAIL / SAMSUNG_VERIFICATION_NO_GO. No new commit/push.
+Stage0 production1e88fe8 unchanged, current test-only APK installed on emulator-5554;
+appSHA13296FFD2C04AD0A3F40312F15422D90B072771E35A678E95A35F96279CFC286,
+testSHA00A79C25F01FC8ADB992B512EBF2C8E874CCB8E4D1BDE600ECB72814FBCE08D3.
+Required eight build gates PASS; JVM927/927; lint0errors44warnings6hints.
+ONLINE profile isolated gate JUnit1failure: expected native sources omit org.maplibre.annotations,
+actual includes it plus all expected profile/owned IDs. Fullyloaded/metadata assertions completed;
+layer/JSON parity/fullrestore/reload/recreation later assertions NOT reached. Not provenproductiondefect.
+Owner policy requires stop: remaining gates NOT_RUN_WITH_REASON, no fixes/retries.
+Known AreaEditor recreation method BLOCKED_BY_PREEXISTING_NATIVE_FAILURE, excluded/not rerun.
+No native crash in this attempt. Samsung untouched. Source/test edits from earlier task retained.
+Evidence docs/map-overlay-lifecycle-evidence.md; build/evidence/remaining-gates.
+One next action: verify extra source provenance and expected native-source-set contract before
+separately authorized test-side correction/rerun. Do not change production or bypass the assertion.
+
+## Previous bounded diagnosis
+
+
+PREEXISTING_OR_ENVIRONMENTAL_SUPPORTED: exact1e88fe8 and immediate parent a8939f5 snapshots,
+one isolated failing-method execution each, same emulator/API29/Gradle9.5.0/Debug/process/command,
+byte-identical libmaplibre.so. Both PROCESS_CRASH SIGSEGV/null/RenderThread/MapRenderer::render+151,
+same PC and BuildId. No Kotlin assertion stack. Additional runs/secondary variation not needed.
+No production/test changes or new commit in diagnosis; prior test/docs diff retained. Evidence/docs
+updated intentionally. Environment-only versus preexisting lifecycle cause remains UNKNOWN; no
+Stage0-specific regression is supported. Native closure tests remain incomplete, not PASS.
+SAMSUNG_REMAINS_NO_GO pending prior profile/regression obligations and owner gate decision.
+Emulator DEV/test currently baseline pair; explicitly reinstall intended Stage0 APKs for later checks.
+Next owner action only: decide accounting for proven pre-Stage0 crash in remaining closure gate.
+Evidence: docs/map-overlay-lifecycle-evidence.md; build/evidence/diagnosis. Samsung untouched.
+
+## Previous closure attempt
+
+
+BLOCKED — ACTION REQUIRED / SAMSUNG VERIFICATION: NO-GO. No new commit, no push.
+Starting/current HEAD1e88fe8765f1ab7a32ae6aeff129635d2d936185, task/d106-stage0-overlay-registry.
+Test/docs-only diff: controller reflection constructor fix, enhanced BeeMap startup fixture,
+new opt-in four production-profile native tests, evidence/checklist/handoff. Production unchanged.
+JVM927/927 and all eight compile/assemble/lint gates PASS; lint0errors44warnings6hints.
+MapViewLifecycleControllerTest4/4 PASS on emulator-5554/API29.
+AreaEditorEntryUiTest6 planned,2 completed,1passed/1XMLfailure; native SIGSEGV at
+libmaplibre.so MapRenderer::render during aFinishedEditorSessionNeverReopensOnALaterVisit.
+Four tests uncompleted; remaining classes/profile/startup native gates NOT RUN. Crash cause UNKNOWN;
+not established as production defect or environment-only abort. No retries or production fixes.
+Reports/logcat saved per class under build/evidence/closure; see docs/map-overlay-lifecycle-evidence.md.
+Independent test-diff review found no blocker/high finding; execution closure remains blocked.
+Next owner action: decide scoped crash diagnosis/baseline comparison. Do not commit, use Samsung,
+start Stage1 or bypass the native gate. Baseline897 XML not archived; final927 XML confirmed.
+
+## Previous implementation task (prior automated evidence)
+
 
 IMPLEMENTED / AUTOMATED GATES PASS / PHYSICAL SAMSUNG VERIFICATION PENDING.
 Independent clone: C:\App\Bee_search_stage0_overlay_registry.

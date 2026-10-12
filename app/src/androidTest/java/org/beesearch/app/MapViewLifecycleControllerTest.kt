@@ -92,7 +92,14 @@ class MapViewLifecycleControllerTest {
     private class LifecycleFixture {
         val owner = RecordingLifecycleOwner()
         val view: RecordingMapView
-        private val controller = ReflectedMapViewLifecycleController()
+        private var beforeReleaseCount = 0
+        private val controller = ReflectedMapViewLifecycleController { mapView ->
+            beforeReleaseCount += 1
+            assertEquals(
+                0,
+                (mapView as RecordingMapView).callbacks.count { it == "onDestroy" },
+            )
+        }
         private var observer: LifecycleEventObserver? = null
 
         init {
@@ -114,6 +121,7 @@ class MapViewLifecycleControllerTest {
             owner.handle(Lifecycle.Event.ON_DESTROY)
             observer?.let(owner.registry::removeObserver)
             controller.release(view)
+            assertEquals(1, beforeReleaseCount)
         }
     }
 
@@ -155,9 +163,14 @@ class MapViewLifecycleControllerTest {
         }
     }
 
-    private class ReflectedMapViewLifecycleController {
+    private class ReflectedMapViewLifecycleController(
+        beforeRelease: (MapView) -> Unit,
+    ) {
         private val type = Class.forName("org.beesearch.app.ui.map.MapViewLifecycleController")
-        private val instance = type.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
+        private val instance = type
+            .getDeclaredConstructor(kotlin.jvm.functions.Function1::class.java)
+            .apply { isAccessible = true }
+            .newInstance(beforeRelease)
         private val attach = type.getDeclaredMethod("attach", MapView::class.java).apply { isAccessible = true }
         private val onEvent = type
             .getDeclaredMethod("onEvent", MapView::class.java, Lifecycle.Event::class.java)

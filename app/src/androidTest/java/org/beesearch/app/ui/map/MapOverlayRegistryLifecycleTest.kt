@@ -1,6 +1,8 @@
 package org.beesearch.app.ui.map
 
 import android.net.Uri
+import android.util.Log
+import org.json.JSONObject
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -128,6 +130,8 @@ class MapOverlayRegistryLifecycleTest {
     @Test
     fun actualBeeMapHostProvidesAndReleasesOverlaySession() {
         val captured = AtomicReference<MapLibreOverlaySession?>()
+        val startupSignals = mutableListOf<String>()
+        val listeners = mutableListOf<Pair<MapView, MapView.OnDidFinishLoadingStyleListener>>()
         val visible = mutableStateOf(true)
         val round = mutableIntStateOf(0)
         val mode = mutableStateOf(BeeMapMode.FIELD)
@@ -147,7 +151,21 @@ class MapOverlayRegistryLifecycleTest {
                             runtimeOverlays = listOf(overlayRegistryFixture()),
                             overlayScope = "fixture-scope",
                             mode = mode.value,
-                            onOverlaySessionReady = captured::set,
+                            onOverlaySessionReady = { readySession ->
+                                captured.set(readySession)
+                                // Test-side observation before BeeMap starts its initial request.
+                                val field = MapLibreOverlaySession::class.java.getDeclaredField("hostView")
+                                    .apply { isAccessible = true }
+                                val view = field.get(readySession) as MapView
+                                val listener = MapView.OnDidFinishLoadingStyleListener {
+                                    val style = readySession.currentStyle
+                                    val marker = style?.let { JSONObject(it.json)
+                                        .optJSONObject("metadata")?.optString(MapLibreOverlaySession.REQUEST_METADATA) }
+                                    startupSignals += "generation=${readySession.currentGeneration},marker=$marker,ready=${style?.isFullyLoaded}"
+                                }
+                                view.addOnDidFinishLoadingStyleListener(listener)
+                                listeners += view to listener
+                            },
                         )
                     }
                 }
@@ -157,6 +175,20 @@ class MapOverlayRegistryLifecycleTest {
         val session = requireNotNull(captured.get())
         composeRule.waitUntil(15_000) { onMainValue { session.currentStyle?.getLayer(MapOverlayRegistry.layerId(OVERLAY_REGISTRY_FIXTURE_KEY, "circles")) != null } }
         assertEquals(false, onMainValue { session.isReleased })
+        composeRule.waitForIdle()
+        onMain {
+            val style = requireNotNull(session.currentStyle)
+            val marker = JSONObject(style.json).getJSONObject("metadata")
+                .getString(MapLibreOverlaySession.REQUEST_METADATA)
+            check(marker.endsWith(":${session.currentGeneration}"))
+            check(session.currentGeneration > 0)
+            assertEquals(1, countSources(session, overlayRegistryFixture()))
+            assertEquals(1, countLayers(session, overlayRegistryFixture()))
+            assertEquals(emptyMap<String, OverlayResult>(), session.registry.failures)
+            Log.i("OverlayRegistryStartup", "initial/effect requests=${session.currentGeneration}; signals=$startupSignals; finalMarker=$marker")
+            listeners.forEach { (view, listener) -> view.removeOnDidFinishLoadingStyleListener(listener) }
+            listeners.clear()
+        }
         val initialStyle = onMainValue { session.currentStyle }
         onMain { session.requestStyle(testProfile(OVERLAY_REGISTRY_FIXTURE_STYLE_A)) }
         awaitStyle(session, initialStyle)
@@ -175,7 +207,17 @@ class MapOverlayRegistryLifecycleTest {
         composeRule.waitUntil(15_000) { captured.get() != null && captured.get() !== first }
         val recreated = requireNotNull(captured.get())
         composeRule.waitUntil(15_000) { onMainValue { recreated.currentStyle?.getLayer(MapOverlayRegistry.layerId(OVERLAY_REGISTRY_FIXTURE_KEY, "circles")) != null } }
-        onMain { recreated.release() }
+        onMain {
+            val marker = JSONObject(requireNotNull(recreated.currentStyle).json)
+                .getJSONObject("metadata").getString(MapLibreOverlaySession.REQUEST_METADATA)
+            check(marker.endsWith(":${recreated.currentGeneration}"))
+            assertEquals(1, countSources(recreated, overlayRegistryFixture()))
+            assertEquals(1, countLayers(recreated, overlayRegistryFixture()))
+            Log.i("OverlayRegistryStartup", "recreated AREA_VIEW requests=${recreated.currentGeneration}; finalMarker=$marker")
+            listeners.forEach { (view, listener) -> view.removeOnDidFinishLoadingStyleListener(listener) }
+            listeners.clear()
+            recreated.release()
+        }
     }
 
     private fun createSession(): MapLibreOverlaySession {

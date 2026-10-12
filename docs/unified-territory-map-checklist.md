@@ -1,5 +1,11 @@
 # Unified Territory Data Map — execution checklist
 
+> Current D106 Stage0 closure (2026-10-12):
+> **EMULATOR_VERIFICATION_PASS_WITH_KNOWN_PREEXISTING_NATIVE_BLOCKER / SAMSUNG_VERIFICATION_GO.**
+> ONLINE and the known AreaEditor recreation method remain BLOCKED, not PASS; physical verification
+> is NOT PERFORMED. Earlier NO-GO attempts are historical. See the final independent-gates section
+> of lifecycle evidence for current results and the explicit unverified assertions.
+
 Операционный checklist работ по I016. Это **не** specification и **не** источник project truth: он не
 заменяет и не переопределяет accepted decisions, requirements, domain или data model. Authoritative
 остаётся в `docs/decisions.md`, `docs/architecture.md`, `docs/data-model.md`,
@@ -184,3 +190,59 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 - [ ] Deliberately delayed SDK request, profile-specific visual/restore budget and field regression verification.
 - [ ] Owner-authorized physical Samsung verification. Not performed in this task.
 - Stage 1 GPX is not started; no empty GIS controls or new persistent data were added.
+
+### Targeted emulator closure attempt (2026-10-12)
+
+- [x] Test-only constructor compatibility fix: all four MapViewLifecycleControllerTest methods PASS.
+- [x] Current JVM 927/927, Debug/Beta/Release and androidTest compilation/assembly, lint PASS.
+- [ ] Existing BeeMap regression closure: AreaEditorEntryUiTest ABORTED by native SIGSEGV in
+      MapRenderer::render during return/recreation; XML 2 completed, 1 pass, 1 failure, 4 uncompleted.
+      Remaining targeted classes NOT RUN. Cause UNKNOWN; no production change or new commit.
+- [ ] Four real production profile factories: opt-in tests added and compile; native NOT RUN.
+- [ ] Enhanced actual BeeMap double-startup/recreation fixture: compiles; current native NOT RUN.
+- SAMSUNG VERIFICATION: NO-GO until the unexplained native crash and remaining gates are resolved.
+  Evidence, exact commands, baseline XML and lint clarifications: `map-overlay-lifecycle-evidence.md`.
+  No Stage 1 work or physical-device operation performed.
+
+### Bounded crash attribution (2026-10-12)
+
+- [x] Exact pre-Stage0 baseline comparison: one isolated execution per state, matching SIGSEGV /
+      RenderThread / MapRenderer::render+151 in both. PREEXISTING_OR_ENVIRONMENTAL_SUPPORTED.
+- [ ] Native closure gates remain incomplete; comparison does not count crashes as PASS or waive
+      the four production profiles/remaining regression tests. SAMSUNG_REMAINS_NO_GO.
+- No production fix supported by comparison; no new commit. See bounded diagnosis evidence.
+
+### Remaining emulator gates attempt (2026-10-12)
+
+- [x] Stage0 DEV/test APK restored; JVM927/927, required compilation/assembly/lint remain PASS.
+- [ ] ONLINE production profile: STAGE0_VERIFICATION_FAIL at exact native source-set parity;
+      actual adds org.maplibre.annotations. Native load/metadata passed preceding assertions,
+      subsequent assertions unverified. Production defect not established; no correction attempted.
+- [ ] Remaining profiles/BeeMap/startup/non-blocked AreaEditor methods NOT_RUN_WITH_REASON:
+      required stop after JUnit failure. Known AreaEditor blocker excluded, not rerun.
+- EMULATOR_VERIFICATION_FAIL / SAMSUNG_VERIFICATION_NO_GO. No new native crash or commit.
+  Full evidence/provenance: latest section in `map-overlay-lifecycle-evidence.md`.
+
+### Test-only native parity contract (2026-10-12)
+
+- [x] SDK ownership proven from MapLibre13.5.1 AnnotationManager; exact SDK source/point-layer
+      separation preserves exact application parity. No broad namespace exception.
+- [x] Seven negative/positive contract tests PASS; JVM927/927 and required build/lint gates PASS.
+- [ ] ONLINE native full verification: BLOCKED_BY_PREEXISTING_NATIVE_FAILURE on one run,
+      exact recorded baseline family, no JUnit assertion. Individual assertions remain unverified.
+- [ ] Other profiles and remaining gates NOT_RUN_WITH_REASON: latest owner Section7 requires
+      ONLINE FULL PASS first. No retry/known AreaEditor rerun or production change.
+- Emulator closure incomplete / SAMSUNG_VERIFICATION_NO_GO / no new commit. See lifecycle evidence.
+
+### Current emulator closure — replacement owner rule (2026-10-12)
+
+- [x] ACTIVE_VECTOR/SENTINEL/HYBRID real-profile gates PASS with corrected strict parity contract.
+- [x] MapDataWiring5/5, MapResearchObjectsQuery3/3, MapCenterTarget2/2, CoverageSelection12/12 PASS.
+- [x] Five non-blocked AreaEditor methods and enhanced FIELD/startup/disposal/AREA_VIEW fixture PASS.
+- [x] Remaining independent gates13/13, tests31/31, no failures/skips/aborts/new native signature.
+- [x] Owner-rule classification: EMULATOR_VERIFICATION_PASS_WITH_KNOWN_PREEXISTING_NATIVE_BLOCKER.
+- [ ] Frozen ONLINE and known AreaEditor recreation assertions remain NOT VERIFIED; blocked, not PASS.
+- [ ] Physical Samsung/visual/performance/field verification. NOT PERFORMED here.
+- SAMSUNG_VERIFICATION_GO under updated owner rule; earlier prerequisite/NO-GO entries are historical.
+  Known blocker classification unchanged, root cause UNKNOWN. No production fix or Stage1 work.
+  See final independent-gates section of lifecycle evidence for exact commands and blocked assertions.
