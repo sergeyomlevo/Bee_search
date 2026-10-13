@@ -1,5 +1,25 @@
 # Bee Search handoff
-## Current task — D106 post-Stage-1 clean baseline (2026-10-13)
+## Current task — D106 Stage 1C OWNER acceptance (2026-10-13)
+
+OWNER-ACCEPTED — DESIGN CONTRACT ONLY — [Stage 1C processing design](../docs/d106-stage1c-gpx-implementation-contract.md).
+Final independent control review ACCEPT: BLOCKER/HIGH/MEDIUM0/LOW1; R1/R3/R4 CLOSED,
+M1–M3 regression NONE. Non-blocking review-heading LOW intentionally retained.
+Reviewed design includes
+GUARD_SDK_AGREEMENT, assertion-level JVM/Android proof split and reproducible resource
+evidence with objective failures/UNKNOWN; compact R5 audit map uses existing variants.
+M1–M3 mechanisms, Stage 1A and accepted substantive Stage 1B semantics are preserved.
+OWNER accepted on2026-10-13; implementation NOT started and NOT authorized.
+Conditional platform XmlPullParser + strict input/lexical guard recommendation; S01–S18
+runtime capabilities are NOT VERIFIED. API37 source inspected; API29/37 endpoint probes pending.
+92 fixture families mapped; G11–G20 and full coordinator/persistence/protection/UI
+assertions remain future owners. Five bounded implementation slices; pure S2 JVM proof
+does not bypass required S1 qualification for integrated XML processing.
+Documentation-only acceptance closure; no code/test/fixture/generator/dependency/build/device work.
+Next technical step: D106 Stage 1 Slice 1 — XML/security capability proof.
+Slice1 has NOT started and is NOT authorized by this task; separate explicit OWNER
+authorization is required before it. Runtime qualification remains pending; no push.
+
+## Previous task — D106 post-Stage-1 clean baseline (2026-10-13)
 
 Stage 1A and Stage 1B ACCEPTED WITH AMENDMENTS; documentation-only design closure.
 [Stage 1A](../docs/d106-stage1-gpx-spec.md) remains product truth;

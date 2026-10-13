@@ -694,3 +694,10 @@ changes, device actions or Stage2–4. Documentation-only acceptance commit is s
 Design acceptance is closed. Next possible action: prepare a separate parser/profile/
 security-fixture and canonical-model implementation contract and obtain OWNER
 authorization. Do not implement automatically or reopen accepted Stage0 verification.
+
+## 22. Stage 1C implementation-design follow-up
+
+[Stage 1C implementation contract](d106-stage1c-gpx-implementation-contract.md) is
+OWNER-ACCEPTED on2026-10-13, DESIGN CONTRACT ONLY. It does not redefine this accepted
+Stage 1B contract or authorize implementation. Slice1 and security capability proof
+require separate explicit OWNER authorization; runtime qualification remains pending.

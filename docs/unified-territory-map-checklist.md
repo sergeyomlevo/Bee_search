@@ -286,3 +286,12 @@ results remain blocked, and broader visual/performance/field obligations remain 
 - [x] OWNER accepted with LOW-1…LOW-6; unknown decisions.md NO-GO hunk excluded from commit.
 - [ ] Separate parser/fixture implementation contract and OWNER authorization.
 - No parser/test/fixture/migration/UI/build/device work completed by this design task.
+
+## D106 Stage 1C — ACCEPTED design contract (2026-10-13)
+
+- [x] Repository-grounded [processing implementation design](d106-stage1c-gpx-implementation-contract.md) prepared; all92 fixture families mapped.
+- [x] M1–M3 documentation revision prepared: bounded references, explicit attribute checks/normalization; no new input ceiling or runtime PASS.
+- [x] Final R1/R3/R4 documentation amendments prepared; compact R5 audit map added; M1–M3 mechanisms preserved.
+- [x] Final control review ACCEPT (BLOCKER/HIGH/MEDIUM0/LOW1); R1/R3/R4 CLOSED, M1–M3 regression NONE; OWNER accepted design only on2026-10-13.
+- [ ] Separate explicit OWNER authorization for Slice1; implementation NOT started, XML/security runtime qualification pending.
+- Documentation acceptance only; no parser/fixture/code/dependency/build/device work or runtime PASS.
