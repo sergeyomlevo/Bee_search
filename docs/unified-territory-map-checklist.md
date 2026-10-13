@@ -293,5 +293,6 @@ results remain blocked, and broader visual/performance/field obligations remain 
 - [x] M1–M3 documentation revision prepared: bounded references, explicit attribute checks/normalization; no new input ceiling or runtime PASS.
 - [x] Final R1/R3/R4 documentation amendments prepared; compact R5 audit map added; M1–M3 mechanisms preserved.
 - [x] Final control review ACCEPT (BLOCKER/HIGH/MEDIUM0/LOW1); R1/R3/R4 CLOSED, M1–M3 regression NONE; OWNER accepted design only on2026-10-13.
-- [ ] Separate explicit OWNER authorization for Slice1; implementation NOT started, XML/security runtime qualification pending.
-- Documentation acceptance only; no parser/fixture/code/dependency/build/device work or runtime PASS.
+- [x] Separate explicit OWNER authorization for Slice1 granted on2026-10-13; bounded XML/security capability slice implemented.
+- [x] Slice1 evidence closure: fresh frozen-current FULL25/25 on API29/API37; explicit actual serials and source/build/installed APK correspondence, pre/post source hashes equal. Earlier23+3 revisions remain history in [Stage1C §25](d106-stage1c-gpx-implementation-contract.md#25-slice-1-execution-evidencestatus--2026-10-13). Final independent re-review pending; no OWNER implementation acceptance inferred.
+- Stage1C design acceptance is separate from scoped Slice1 qualification; full GPX/profile/core/import/storage/protection/render/UI and Slice2+ remain pending. No commit/push authorization.

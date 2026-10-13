@@ -891,3 +891,238 @@ commit/staging/push or Stage2–4.
 Next technical step: **D106 Stage 1 Slice 1 — XML/security capability proof**.
 It has NOT started and is NOT authorized by this acceptance. Separate explicit OWNER
 authorization is required before Slice1; declared runtime qualification gates remain pending.
+
+## 25. Slice 1 execution evidence/status — 2026-10-13
+
+**Frozen-current-source rerun PASS — evidence closure complete; final independent re-review pending.**
+Separate OWNER authorization dated2026-10-13 covered Slice1 implementation/qualification.
+Sections1–24 remain the accepted design; their acceptance-time “not started/not authorized”
+statements describe that earlier task. This evidence does not authorize Slice2+, commit or push.
+
+Baseline: `task/d106-stage0-overlay-registry`, HEAD
+`13a4e75eb163e939e488d92e1cc5c3c0b66eba57`; initially clean/index empty.
+PAC tool genuinely unavailable; fresh explicit OWNER fallback used, no simulated declaration.
+
+### Tested implementation and runtime identity
+
+Reusable internal `data/gpx` components: GpxRawInput (exact bytes/count/SHA), GpxInput
+(strict envelope/Reader), GpxXmlLexical (scalar/name/reference helpers), GpxXmlGuard
+(bounded lexical transducer), GpxXmlSemantics (bounded transient agreement witness),
+AndroidGpxXmlReader (fresh configured provider/two-pass verification/normalized adapter),
+and GpxXmlBoundary (typed bounded failures/counters). No GPX domain tree, UUID allocation,
+CM1, managed-copy storage, coordinator, persistence or map integration was added.
+
+Earlier qualification chronology (historical, NOT primary current-revision proof):
+- Earlier JVM record24/24; JVM tests were not rerun during evidence closure.
+- Earlier core Android revision:23/23 per endpoint using the core APK hashes below.
+- Later targeted probe revision:3/3 per endpoint (API29:60.550s/API37:63.703s), including
+  an updated compound test and added predefined/supplementary probes. The old23+3
+  accounting is retained as history and is superseded by the complete frozen-current25 runs below.
+- GpxXmlSecurityMatrixTest.kt CHANGED between these earlier core/probe inventories:
+  earlier-core SHA C69663A9E9C2D89D7CB82DD6E28469F6298E45BB14B22E45A8BE7950E1E78749;
+  frozen-current SHA529F411E22BAD82FCB89102B8F18FED1E016B6EFD910A5C5D0E1247C4FE0A5C8.
+  Thus those runs were not one unchanged source revision. GpxInput.kt/GpxInputTest.kt
+  also have different exact byte hashes after the previously recorded trailing-EOF cleanup.
+  The prior unqualified statement about unchanged production is replaced by this chronology;
+  only THIS evidence-closure cycle proves all production/test bytes unchanged pre/post.
+No Activity/MapLibre/native fixture was initialized by the scoped XML runs.
+
+| Earlier historical endpoint | AVD/serial | Image | Actual provider/configuration | Earlier core result |
+|---|---|---|---|---|
+| API29 / Android10 / x86_64 | BeeSearch_ZIP64_API29 / emulator-5554 | android-29;google_apis;x86_64 revision13 | com.android.org.kxml2.io.KXmlParser; namespaces=true, docdecl=false, relaxed=false, validation=false | 23/23;69.062s |
+| API37 / Android17 / x86_64 | BeeSearch_XML_API37 / emulator-5556 | android-37.0;google_apis;x86_64 revision6 | Same provider class; same checked created-parser feature states | 23/23;86.646s |
+
+API29 fingerprint: `google/sdk_gphone_x86_64/generic_x86_64:10/QSR1.211112.011/13135432:userdebug/dev-keys`.
+API37 fingerprint: `google/sdk_gphone64_x86_64/emu64xa:17/CE2A.260420.019/15611780:userdebug/dev-keys`.
+Emulator37.1.11.0 build15917651; API29/API37 boot/API checked with explicit serial.
+Execution was sequential; each AVD stopped before the other booted; both stopped afterward.
+Both config.ini SHA values unchanged; no wipe, snapshot save/deletion, physical-device work
+or DEV data clear/uninstall. Only DEV/test APK updates via serial-scoped install -r -t.
+
+Earlier core/probe APK SHA256 (historical; not the new frozen-current build):
+- DEV: `F3963A06DB6E71CBC31A33652F4A3CD99FD931C77B7D5699D065CBE487D989A1`.
+- Core23-test APK: `167402C6E696EA44D94B3CA96874C2537918172050CAEED9CFBC4519ED423D20`.
+- Final3-probe APK: `E17B7ACEF140787CA1B16BFBADC41A9A66637C2A6336F860EEC43E6CE5ADE6F9`.
+
+Local raw evidence is under `build/evidence/d106-slice1/` (ignored build artifacts,
+not staged): final build logs, api29/api37 qualification.txt and measurements.txt,
+final-maxima.txt/final-maxima-measurements.txt, tested-source-hashes.json/final-source-hashes.json,
+apk-hashes.json/final-probe-apk-hash.json, before/after AVD hashes.
+Earlier inventories and logs are retained. The fresh frozen/post-run inventories below
+establish exact current-source provenance independently of the earlier revisions.
+
+### Capability assertions and structural argument
+
+| Gate / existing family variants | Evidence on both endpoints |
+|---|---|
+| Created parser configuration / F13 positive capability | Fresh public XmlPullParserFactory; set and read back namespace=true, DOCDECL=false, relaxed=false before input is opened |
+| Encoding / E subset | UTF8/no BOM/BOM, UTF16LE/BE BOM; malformed UTF8, broken/odd UTF16, truncation, declaration mismatch/unsupported encoding, UTF32 rejection; strict REPORT Reader |
+| DTD/entities/I/O / F01–F07/F09 variants | Declarations rejected before SDK delivery, including second-pass mutation; custom undefined references rejected; SYSTEM/PUBLIC/file/network/parameter/recursive inputs blocked; loopback connections0 and parser-thread StrictMode signals[] |
+| M1 / B08/G09 variants | Million-leading-zero decimal text plus decimal/hex reference variants (JVM also million-zero hex); bounded numeric state, short reference re-emission; malformed/illegal scalars reject; original exact-byte SHA/length unchanged; all five predefined names, escaped markup and nonrecursive reference-like text checked |
+| M2 / F08 variants | Lexical QName/xmlns duplicates before delivery; adapter expanded (URI,local) duplicates, alias prefixes, distinct URIs, default/unbound/reserved namespaces; ignored subtrees checked; independent URI assertions |
+| M3 / B08 variants | Literal TAB/CR/LF/CRLF normalize before origin is lost; referenced TAB/CR/LF/SPACE preserved; actual provider values match literal independent expectations |
+| GUARD_SDK_AGREEMENT | Bounded S/E/T/C/P witness plus lexical attribute/namespace reconciliation; adjacent text/CDATA/entity fragments compared semantically; missing/different observations fail; counters are additional evidence |
+| Chunks / B08/E variants | Raw stream chunks1/2/3/7/64; UTF8 multibyte, UTF16 units/supplementary characters, quotes/references/CRLF/declarations/opaque constructs; same independent normalized values |
+| Limits / G01/G05/G06/G07/G09 subset | 16MiB and2million event triplets; depth32/over;64 attributes including xmlns/over;8192-scalar token bounds, declaration triplet, max compound START, ignored content |
+| Cancellation / INPUT_IO_ERROR | Actual second-pass cancellation at checkpoint10000 terminates at10000, opens2, no verified/Accepted result; repeat-source SHA/length mismatch and open/read failures abort with bounded categories |
+
+S18 architecture gate: the guard classifies and bounds each lexical piece before handing
+it to SDK; one UTF16 unit is delivered per Reader read. Logical text stays bounded across
+references/CDATA fragments. Comments/CDATA/PI have fixed delimiter lookahead; attribute
+count and each name/value are bounded. The maximal tested START has an8192-scalar
+supplementary element name,64 distinct8192-scalar supplementary attribute names and64 values of8192 U+10FFFF scalars
+represented as bounded references: largest piece6308099 UTF16 units.
+Supplementary text/comment/CDATA/PI and8192-reference logical text runs were also tested;
+max parser-visible PI16388/text reference spelling81920 UTF16 units.
+This compound bound derives from G06/G09, not a new product ceiling.
+Numeric references retain no complete raw digits, and emit at most a fixed scalar spelling.
+Pending start-fact and semantic-witness queues are fixed provider-qualification backpressure;
+overflow returns SECURITY_CONFIGURATION_UNAVAILABLE, never a new accepted-input limit.
+Legal depth/sibling/mixed-content probes passed; largest observed pending-start count2.
+No tree/namespace-binding engine/profile/canonical builder was introduced in the guard.
+
+Finite direct-provider20,000-scalar text/comment/CDATA/PI/attribute probes returned
+large values (PI includes target/separator); they intentionally bypass the guard.
+**CONTEXT ONLY**, not architecture failure or standalone provider security qualification.
+Installed API37 source inspection is now backed by evidence-closure/sdk-source-identities.json
+and sdk-source-excerpts.txt: sources;android-37.0 revision2; KXmlParser.java lines1481–1526
+(fillBuffer stops when its requested minimum is available), StringPool.java lines26–33
+(fixed512-entry source cache). Full source/package SHA identities are recorded.
+This is SOURCE EVIDENCE ONLY for the installed SDK source, not API29/device bytecode or
+runtime proof. The earlier inspection lacked a durable source hash; this current read-only
+snapshot does not retroactively establish the earlier inspection's exact byte identity.
+No source download/install or new web research was performed.
+
+### Earlier resource measurement records — historical context
+
+Full per-scenario records are in each endpoint measurements.txt. The following exact/max
+examples use inherited ceilings bytes16777216/token8192/attrs64/depth32/events2000000.
+All rows:2 passes, bytes read in each pass=input bytes; decoded UTF16 counts in each pass
+recorded separately from input bytes (Unicode scalar/UTF16/UTF8 units are not conflated); configuration/fingerprints above; max pending
+start facts1; cancellation NOT_APPLICABLE; violations NONE; OOM NO; final VERIFIED_XML,
+exact original SHA/length checked, no public partial result.
+
+| API | Scenario | Input bytes / bytes per pass | Decoded UTF16/pass | Delivered UTF16 | Events/depth/token | Elapsed ms | Largest piece UTF16 | Heap before→after bytes | ART allocation delta bytes |
+|---|---|---|---|---|---|---|---|---|---|
+| 29 | G09-declaration-8192 | 8354 | 8354 | 8354 | 11/3/8192 | 21.570 | 8196 | 34331408→37792528 | 3461120 |
+| 29 | G07-exact | 4000122 | 4000122 | 4000121 | 2000000/2/34 | 5698.833 | 77 | 75949416→13386720 | 1193111552 |
+| 29 | S18-text | 8314 | 8314 | 8313 | 4/1/8192 | 27.377 | 8192 | 24576224→5896648 | UNKNOWN |
+| 29 | S18-reference | 1000127 | 1000127 | 127 | 4/1/34 | 934.715 | 77 | 16211728→5787520 | 56676352 |
+| 29 | G01-exact | 16777216 | 16777216 | 16777215 | 2050/1/8192 | 18702.427 | 8199 | 209651888→29668280 | 1097338880 |
+| 37 | G09-declaration-8192 | 8354 | 8354 | 8354 | 11/3/8192 | 259.035 | 8196 | 30316320→33834784 | 3518464 |
+| 37 | G07-exact | 4000122 | 4000122 | 4000121 | 2000000/2/34 | 7980.102 | 77 | 46986064→12276560 | 1233907712 |
+| 37 | S18-text | 8314 | 8314 | 8313 | 4/1/8192 | 43.643 | 8192 | 22537040→5059408 | 4177920 |
+| 37 | S18-reference | 1000127 | 1000127 | 127 | 4/1/34 | 1092.575 | 77 | 9282384→5096272 | 65257472 |
+| 37 | G01-exact | 16777216 | 16777216 | 16777215 | 2050/1/8192 | 21747.382 | 8199 | 143123280→30466896 | 1433923584 |
+| 29 | S18-unicode-pi | 32894 | 16510 | 16509 | 4/1/8192 | 23.760 | 16388 | 20160256→22470400 | 2310144 |
+| 29 | S18-dense-reference | 82042 | 82042 | 82041 | 4/1/8192 | 127.637 | 81920 | 23211776→36933376 | 13721600 |
+| 29 | S18-max-start-tag | 7373181 | 6308221 | 6308220 | 5/2/8192 | 7931.811 | 6308099 | 267493120→52874680 | 539590704 |
+| 37 | S18-unicode-pi | 32894 | 16510 | 16509 | 4/1/8192 | 47.743 | 16388 | 18736960→21411648 | 2674688 |
+| 37 | S18-dense-reference | 82042 | 82042 | 82041 | 4/1/8192 | 181.560 | 81920 | 21907264→34969408 | 13062144 |
+| 37 | S18-max-start-tag | 7373181 | 6308221 | 6308220 | 5/2/8192 | 8624.673 | 6308099 | 130347888→50709360 | 887853152 |
+
+Time: System.nanoTime around the whole verification. Heap before/after:
+Runtime.totalMemory-freeMemory (includes test corpus/runtime, not isolated provider peak).
+Allocation: Debug.getRuntimeStat art.gc.bytes-allocated difference when monotonic;
+reset/nonmonotonic/unavailable values=UNKNOWN. Heap peak and provider-internal isolated
+allocation/read-ahead bytes=UNKNOWN; largest guard piece/pending facts and delivered
+UTF16 counts are observed boundary measurements, not those unavailable internal metrics.
+Structural prevention is primary; favorable heap measurements alone do not prove S18.
+Universal syscall tracing=UNKNOWN; zero local I/O observations supplement the structural
+declaration/reference barrier and Reader-only/no-resolver design.
+No RAM/time production threshold or capacity promise added; G21/full storage/presentation/
+protection measurements and full GPX processing remain later slices.
+
+### Commands, failures and scope
+
+Task-local GRADLE_USER_HOME/ANDROID_USER_HOME/TEMP and process-local ANDROID_HOME;
+existing Gradle9.5.0 direct launcher, --project-dir this checkout, --offline --no-daemon
+--max-workers=2, kotlin.compiler.execution.strategy=in-process.
+Executed targeted :app:testDebugUnitTest --tests org.beesearch.app.data.gpx.*,
+:app:compileDebugAndroidTestKotlin, :app:assembleDebug and :app:assembleDebugAndroidTest.
+Runtime per explicit serial: adb install -r -t DEV/test APKs; adb shell am instrument
+-w -r -e class org.beesearch.app.data.gpx.GpxXmlCapabilityTest,org.beesearch.app.data.gpx.GpxXmlSecurityMatrixTest
+org.beesearch.app.dev.test/androidx.test.runner.AndroidJUnitRunner.
+No broad connected/native suite, full JVM regression, beta/release/lint or Samsung run.
+
+First API29 run19/20 exposed a new adapter diagnostic mapping defect for the provider's
+unbound-prefix RuntimeException. Fixed in Slice1, final runs above supersede it; failure
+log retained. New declaration counting and source IO/UTF32 classification were corrected
+before final qualification, without accepted semantic changes. An initial build approval
+review rejected checkout scope; explicit Set-Location/--project-dir established the
+authorized checkout before successful builds; no wrong-checkout build evidence claimed.
+
+Stage1A/1B and Stage1C requirements,92 families/20 numerical families, identity/CM1,
+restore/protection, Territory/Area and all domain budgets unchanged. No dependency,
+Gradle/config, Room/DataStore, backup/snapshot, MapLibre/Registry/BeeMap, UI or release change.
+Index empty; worktree intentionally uncommitted for independent review. Commit/push NOT
+PERFORMED. Slice2+ NOT authorized. Next: OWNER/reviewer inspection; stop pending separate
+commit/continuation authorization.
+
+### Frozen-current-source evidence closure after independent review
+
+**PASS — EVIDENCE CLOSURE COMPLETE. READY FOR FINAL INDEPENDENT RE-REVIEW.**
+This narrow OWNER-authorized cycle changed no production or test source. No OWNER
+acceptance of Slice1 implementation, Slice2 authorization, staging, commit or push is implied.
+
+Primary evidence: `build/evidence/d106-slice1/evidence-closure/`.
+Before build/qualification, all7 production +5 JVM/Android test files were frozen in
+`frozen-source.json` (relative paths, byte lengths, SHA256); after both runs,
+`post-run-source.json` was regenerated and matched exactly.
+Both inventory SHA256 values:
+`1FE815F5D536D45E04BC0AEF9F8E58712EB69F91BF3158420DB1DC3F6C87EF2C`.
+`correspondence.json` connects this inventory, build log, APK hashes, exact commands,
+actual endpoint properties and successful25-test results. No mtime-only provenance.
+
+Both APKs were rebuilt from the frozen revision using the existing offline Gradle
+launcher, --rerun-tasks :app:assembleDebug :app:assembleDebugAndroidTest:
+BUILD SUCCESSFUL,73 tasks executed. DEV package org.beesearch.app.dev;
+test package org.beesearch.app.dev.test. Built hashes:
+- DEV: `7FD4785D2971168269A69305E45496D72F9A3377D523D2302A2A4194F0B60941`.
+- androidTest: `C68CD2F8105070EE3D82391E563B386FDF1806FAB2746D466388B421D6C3854B`.
+
+Serial-scoped pm path + sha256sum proved installed DEV/test hashes equal this same
+built pair on EACH endpoint. Installed-path/hash records, install results and explicit
+instrumentation commands are in each api29/api37 directory.
+
+| Primary frozen-current run | Actual AVD / serial | Actual runtime | Result |
+|---|---|---|---|
+| API29 | BeeSearch_ZIP64_API29 / emulator-5554 | API29; Android10; x86_64 | OK (25 tests);68.805s |
+| API37 | BeeSearch_XML_API37 / emulator-5556 | API37; Android17; x86_64 | OK (25 tests);87.279s |
+
+Fingerprints are the two recorded endpoint fingerprints above. Actual serials were
+confirmed by adb devices -l, emu avd name and serial-scoped getprop; historical serials
+were not assumed. Each directory contains devices.txt, avd-name.txt, properties.json,
+instrumentation-command.txt, qualification.txt and measurements.txt. Exactly25 completed
+successful method executions per endpoint; no failed/skipped/aborted execution.
+API29 stopped before API37 boot; devices-between-endpoints.txt proves no connected
+emulator. Both stopped afterward, devices-after-all.txt empty. AVD config hashes match
+before/after; no wipe, data clear, uninstall, snapshot deletion/save or physical-device work.
+Primary measurements are the NEW evidence-closure/api29/api37/measurements.txt records;
+the resource table above remains earlier historical measurement context.
+
+The25-method set includes finiteUnguardedProviderCharacterizationIsContextOnly.
+That method has no independent semantic/security assertion: it logs finite unguarded
+provider behavior and is CONTEXT ONLY. Its completion is not independent proof of
+a security invariant and is not an architecture-failure gate. The other assertive
+checks and the reviewed structural argument provide qualification evidence.
+No assertion, test organization, tentative sink or feature policy was changed here.
+
+#### API37 provisioning provenance — OWNER-confirmed historical fact
+
+OWNER explicitly confirmed that a SEPARATE authorized environment-preparation task
+completed BEFORE Slice1 implementation/qualification and returned READY. It installed
+`system-images;android-37.0;google_apis;x86_64`, revision6, and created
+`BeeSearch_XML_API37`. That task verified Android17/API37/x86_64/sys.boot_completed=1,
+reporting historical serial emulator-5556. It installed no Bee Search APK, ran no tests
+and implemented no Slice1 code. This is OWNER-confirmed preparation provenance,
+separate from the new runtime rerun records.
+Current installed-package-metadata.json independently records the existing image ID/revision.
+This evidence-closure cycle reused the existing AVD/image: no reinstall, recreation or
+configuration change. Slice1 itself did NOT provision API37.
+
+F-1 CLOSED: complete25-test current frozen revision passed on both endpoints.
+F-2 CLOSED: actual serial/property/command records and installed APK hashes preserved.
+F-3 CLOSED: separate OWNER-authorized pre-Slice1 provisioning recorded without attributing
+it to Slice1. Source/test hashes unchanged after qualification; HEAD13a4e75 and index empty.
+Next: final independent re-review. No implementation polishing or continuation authorized.

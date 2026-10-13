@@ -1,5 +1,27 @@
 # Bee Search handoff
-## Current task — D106 Stage 1C OWNER acceptance (2026-10-13)
+## Current task — D106 Stage 1 Slice 1 evidence closure after independent review
+
+PASS — EVIDENCE CLOSURE COMPLETE; READY FOR FINAL INDEPENDENT RE-REVIEW.
+Narrow OWNER authorization; PAC unavailable, explicit fallback used. HEAD13a4e75,
+branch task/d106-stage0-overlay-registry; existing Slice1 work remains uncommitted.
+No production/test edits: frozen7 production +5 test files matched exactly post-run.
+Inventory SHA2561FE815F5D536D45E04BC0AEF9F8E58712EB69F91BF3158420DB1DC3F6C87EF2C.
+Fresh rebuild and FULL current25-test Android runs: API29 OK25/68.805s on emulator-5554;
+API37 OK25/87.279s on emulator-5556. Actual device/AVD/properties/commands and installed
+APK hashes preserved; same built DEV/test pair on both; sequential, both AVDs stopped.
+One of25 methods is unguarded context-only characterization, not independent security proof.
+Earlier23+3 revisions/GpxXmlSecurityMatrixTest changes remain explicitly historical in
+[Stage1C §25](../docs/d106-stage1c-gpx-implementation-contract.md#25-slice-1-execution-evidencestatus--2026-10-13).
+OWNER-confirmed API37 preparation preceded Slice1: official android-37.0 google_apis x86_64
+revision6, BeeSearch_XML_API37, READY; no app/tests during preparation. No reprovisioning here.
+Source observations substantiated by installed-source identities/excerpts, not runtime proof.
+Evidence: build/evidence/d106-slice1/evidence-closure, including correspondence.json.
+Accepted Stage1A/1B/Stage1C technical requirements unchanged; UNKNOWN peak/isolation metrics
+remain UNKNOWN, no new threshold. LOW code observations intentionally not addressed.
+Index EMPTY; no stage/commit/push, Samsung or Slice2. Next: final independent re-review;
+no OWNER acceptance or continuation authorization inferred.
+
+## Previous task — D106 Stage 1C OWNER acceptance (2026-10-13)
 
 OWNER-ACCEPTED — DESIGN CONTRACT ONLY — [Stage 1C processing design](../docs/d106-stage1c-gpx-implementation-contract.md).
 Final independent control review ACCEPT: BLOCKER/HIGH/MEDIUM0/LOW1; R1/R3/R4 CLOSED,
