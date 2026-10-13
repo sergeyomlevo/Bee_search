@@ -267,3 +267,22 @@ results remain blocked, and broader visual/performance/field obligations remain 
 - [ ] Visual readiness/performance/GPS/heading/field ergonomics beyond the two test assertions.
   See Samsung physical closure section of lifecycle evidence for provenance, bounded screenshots
   and exact commands. No general MapLibre stability or performance acceptance is claimed.
+
+## D106 Stage 1A — accepted specification (2026-10-12)
+
+- [x] OWNER accepted Stage 1A with resource-budget and hidden-residency amendments.
+      Single normative detail: [Stage 1 GPX specification](d106-stage1-gpx-spec.md).
+- [x] Stage 0 prerequisite accepted within declared emulator + Samsung scope;
+      known pre-Stage0 emulator blocker stays separate, root cause UNKNOWN.
+- [x] Stage 1B parser/profile/security and identity design prepared and OWNER accepted.
+- [ ] Separately authorize implementation; no GPX code/migration/UI/build/device action
+      is completed by recording the specification.
+- [ ] Measure four budget domains using aggregate multi-Territory corpus and relevant
+      physical evidence; provisional ceilings are not final capacity guarantees.
+
+## D106 Stage 1B — accepted technical contract (2026-10-13)
+
+- [x] Accepted technical contract: [parser/profile/security and identity contract](d106-stage1b-gpx-parser-identity-contract.md).
+- [x] OWNER accepted with LOW-1…LOW-6; unknown decisions.md NO-GO hunk excluded from commit.
+- [ ] Separate parser/fixture implementation contract and OWNER authorization.
+- No parser/test/fixture/migration/UI/build/device work completed by this design task.

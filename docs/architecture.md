@@ -2419,6 +2419,11 @@ Conceptual stack `basemap → user raster → field cartography → research →
 Raster catalog принадлежит Territory, installation — устройству; vector manifest и Area
 full-coverage gate к raster не применяются.
 
+Stage 1A: [accepted GPX specification](d106-stage1-gpx-spec.md) is the detailed
+import/storage/protection/presentation contract. Implementation is not started;
+budgets are provisional in four domains, and presentation materializes the visible
+set rather than retaining all hidden geometry.
+
 ### D106 Stage 0 implementation (2026-10-12)
 
 Runtime infrastructure implemented; native and physical verification status is recorded in

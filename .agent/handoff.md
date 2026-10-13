@@ -1,5 +1,42 @@
 # Bee Search handoff
-## Current task — Samsung closure of emulator-blocked assertions (2026-10-12)
+## Current task — D106 Stage 1A/1B OWNER acceptance closure (2026-10-13)
+
+Stage 1A and Stage 1B ACCEPTED WITH AMENDMENTS; documentation-only design closure.
+[Stage 1A](../docs/d106-stage1-gpx-spec.md) remains product truth;
+[Stage 1B](../docs/d106-stage1b-gpx-parser-identity-contract.md) is the derived technical contract.
+Independent review ACCEPT WITH NON-BLOCKING AMENDMENTS; BLOCKER0/HIGH0,
+MEDIUM1 documentation/provenance only. LOW-1…LOW-6 incorporated,92 fixture families;
+no runtime/implementation PASS inferred. Identity/security/provisional budgets preserved.
+
+Pre-existing unknown-provenance decisions.md hunk after Stage0 implementation status,
+containing BLOCKED — ACTION REQUIRED / SAMSUNG VERIFICATION: NO-GO, is intentionally
+EXCLUDED FROM COMMIT, unstaged and preserved in worktree. Dirty status is expected.
+Canonical committed Stage0 scoped verification is carried by e2d74cc
+(docs: record D106 Stage 0 Samsung verification) and its lifecycle/checklist evidence:
+STAGE0_VERIFICATION_PASS within declared emulator + Samsung scope.
+Do not reopen Stage0, diagnose its known pre-Stage0 emulator blocker or broaden claims.
+The pre-existing checklist ../decisions.md broken link is outside this task.
+
+One local Stage1A/1B documentation commit authorized after staged-diff checks; no push.
+No production/tests/fixtures/dependencies/persistence/build/device implementation.
+Next possible action only: prepare a separate Stage1 parser/profile/security-fixture
+and canonical-model implementation contract; implementation needs OWNER authorization.
+
+## Previous task — D106 Stage 1A accepted specification recorded (2026-10-12)
+
+OWNER accepted Stage 1A with amendments. Single normative specification:
+[docs/d106-stage1-gpx-spec.md](../docs/d106-stage1-gpx-spec.md).
+GPX implementation NOT STARTED. Four budget domains remain provisional; hidden GPX
+imports prefer unregister and do not require full native residency.
+Stage 0 accepted STAGE0_VERIFICATION_PASS within declared emulator + Samsung scope.
+Known pre-Stage0 emulator blocker remains separate, root cause UNKNOWN; do not reopen
+it or broaden visual/performance/GPS/heading/ergonomic claims.
+Documentation-only task: no code/tests/migration/dependency/build/device changes.
+Incoming unrelated decisions.md hunk retained outside this task.
+Next action only: prepare Stage 1B — parser/profile/security fixtures + canonical
+identity model. Do not implement without a separate task.
+
+## Previous task — Samsung closure of emulator-blocked assertions (2026-10-12)
 
 SAMSUNG_STAGE0_BLOCKED_ASSERTIONS_PASS / STAGE0_VERIFICATION_PASS within declared combinedscope.
 Samsung SM-S938B Android16/API36, explicitdevice serial in local evidence. ONLINE1/1PASS then

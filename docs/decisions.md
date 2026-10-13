@@ -3862,6 +3862,25 @@ Stage 0 — prerequisite для Stage 1, 2 и 4. Stage 3 зависит от Sta
 renderer использует MapLibre runtime overlays; при обосновании Stage 3 может предшествовать Stage 2.
 Нумерация отражает основной dependency/order с этим исключением, не порядок дерева сущностей.
 
+## Stage 1A specification acceptance — 2026-10-12
+
+**ACCEPTED WITH AMENDMENTS; GPX implementation NOT STARTED.**
+The single detailed contract is [D106 Stage 1 GPX specification](d106-stage1-gpx-spec.md):
+external import/storage/offline viewing, canonical identity and original-byte protection.
+OWNER amendments separate four provisional budget domains and materialize the visible
+presentation set; hidden imports prefer unregister through the unchanged Registry.
+Stage 0 is accepted within its declared emulator + Samsung scope; the known pre-Stage0
+emulator blocker remains separate. Stage 1B acceptance is recorded below; implementation remains unauthorized.
+
+## Stage 1B contract acceptance — 2026-10-13
+
+**ACCEPTED WITH AMENDMENTS — OWNER.**
+[Canonical Stage 1B contract](d106-stage1b-gpx-parser-identity-contract.md) accepts
+parser/profile/security and canonical identity boundaries, with LOW-1…LOW-6 clarified.
+Logical UUID/address, exact-original SHA/length and CM1 remain distinct;
+CM1 is not a deduplication, uniqueness or persistence-key rule.
+Implementation is not authorized; next work requires a separate implementation contract.
+
 ## Stage 0 implementation status — 2026-10-12
 
 **IMPLEMENTED / AUTOMATED GATES PASS / PHYSICAL SAMSUNG VERIFICATION PENDING.**
