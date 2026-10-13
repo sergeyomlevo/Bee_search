@@ -95,7 +95,7 @@ Closed · 2026-10-08: initial spike + targeted lifecycle closure + review; owner
 - [x] Owner production-map verification: real saved points appear in the correct places, types and
       selected state on the production map — OWNER PASS · 2026-10-09. Nearby markers may overlap at low
       zoom (interacting touch targets); the owner accepted this, 32 dp stays unchanged and
-      clustering/spiderfy are out of D102 scope ([D102](../decisions.md)).
+      clustering/spiderfy are out of D102 scope ([D102](decisions.md)).
       A type without a real record in the owner's database cannot be verified and must be reported as
       an evidence limitation, not seeded with fake data.
 

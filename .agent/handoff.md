@@ -1,5 +1,5 @@
 # Bee Search handoff
-## Current task — D106 Stage 1A/1B OWNER acceptance closure (2026-10-13)
+## Current task — D106 post-Stage-1 clean baseline (2026-10-13)
 
 Stage 1A and Stage 1B ACCEPTED WITH AMENDMENTS; documentation-only design closure.
 [Stage 1A](../docs/d106-stage1-gpx-spec.md) remains product truth;
@@ -8,19 +8,25 @@ Independent review ACCEPT WITH NON-BLOCKING AMENDMENTS; BLOCKER0/HIGH0,
 MEDIUM1 documentation/provenance only. LOW-1…LOW-6 incorporated,92 fixture families;
 no runtime/implementation PASS inferred. Identity/security/provisional budgets preserved.
 
-Pre-existing unknown-provenance decisions.md hunk after Stage0 implementation status,
-containing BLOCKED — ACTION REQUIRED / SAMSUNG VERIFICATION: NO-GO, is intentionally
-EXCLUDED FROM COMMIT, unstaged and preserved in worktree. Dirty status is expected.
-Canonical committed Stage0 scoped verification is carried by e2d74cc
-(docs: record D106 Stage 0 Samsung verification) and its lifecycle/checklist evidence:
-STAGE0_VERIFICATION_PASS within declared emulator + Samsung scope.
-Do not reopen Stage0, diagnose its known pre-Stage0 emulator blocker or broaden claims.
-The pre-existing checklist ../decisions.md broken link is outside this task.
+The unknown-provenance decisions.md NO-GO hunk was intentionally EXCLUDED FROM
+acceptance commit e36b115. On2026-10-13 OWNER explicitly recognized that old
+SAMSUNG VERIFICATION: NO-GO text as obsolete after committed Stage0 verification
+e2d74cc (docs: record D106 Stage 0 Samsung verification), and authorized its removal.
+Exact preflight proved it was the only worktree change; file-level restore removed
+only that uncommitted hunk. decisions.md now matches accepted HEAD.
+The preservation/exclusion notes in acceptance artifacts describe their historical
+e36b115 snapshot; this cleanup supersedes the prior operational dirty-worktree note.
 
-One local Stage1A/1B documentation commit authorized after staged-diff checks; no push.
+Canonical Stage0 remains STAGE0_VERIFICATION_PASS within declared emulator + Samsung
+scope; no verification reopening, emulator-crash investigation or broader claims.
+Stage1A/1B semantics and canonical files remain unchanged. The single pre-existing
+checklist ../decisions.md link is corrected to decisions.md; target verified.
+Cleanup uses one small local documentation commit; no push.
+
 No production/tests/fixtures/dependencies/persistence/build/device implementation.
-Next possible action only: prepare a separate Stage1 parser/profile/security-fixture
-and canonical-model implementation contract; implementation needs OWNER authorization.
+Next possible action only: separately OWNER-authorized Stage1C design task — parser/
+canonical-model/security-fixture implementation contract. Stage1C and implementation
+are NOT STARTED by this cleanup.
 
 ## Previous task — D106 Stage 1A accepted specification recorded (2026-10-12)
 
