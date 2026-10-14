@@ -1126,3 +1126,130 @@ F-2 CLOSED: actual serial/property/command records and installed APK hashes pres
 F-3 CLOSED: separate OWNER-authorized pre-Slice1 provisioning recorded without attributing
 it to Slice1. Source/test hashes unchanged after qualification; HEAD13a4e75 and index empty.
 Next: final independent re-review. No implementation polishing or continuation authorized.
+## 26. Slice 2 execution/status — 2026-10-14
+
+**PASS — PURE JVM CORE; UNCOMMITTED / READY FOR INDEPENDENT REVIEW.**
+Separate explicit OWNER authorization covers this Slice2 only, including canonical
+values/time. It authorizes no staging/commit/push or Slice3. PAC is unavailable;
+fresh explicit OWNER authorization fallback used. Starting clean task checkout:
+`task/d106-stage0-overlay-registry`, HEAD `bf36ddd481ca6a04d572635699095417f991173e`.
+Slice1 was OWNER-accepted and committed at that baseline. Sections1–24 and the entire
+Slice1 evidence chronology in §25 are unchanged; this section does not requalify XML.
+
+### Components and invariants
+
+- `domain/gpx/GpxCanonicalModel.kt`: immutable draft/metadata/track/segment/sample;
+  defensive frozen lists retain empty nodes, parent-local zero-based ordinals and
+  source order. Constructor/copy validation retains those invariants; retained caller
+  lists and mutable casts cannot modify the graph. One freeze per list, no append
+  API with repeated full geometry copies. Profile provenance is a fixed technical
+  token `GPX_1_1_STAGE_1`, separate from the declared GPX1.1 version and absent from CM1.
+- `domain/gpx/GpxCanonicalValues.kt`: scalar-count validation before trim, exact
+  ASCII decimal grammar → BigDecimal → canonical plain text, exact coordinate bounds,
+  nullable elevation without a new range. G10 coordinate/time128 and G09 elevation8192
+  remain inherited ceilings; metadata uses G08. No binary float/locale conversion.
+  Time preserves raw decoded text, uses explicit lexical/year/fraction/offset checks
+  and strict java.time calendar construction; MISSING/UTC/NO_ZONE/UNSUPPORTED have
+  coherent nullable seconds/nanos. Years1–9999 including representable UTC, ≤9 fraction
+  digits, valid24:00 rollover and ±14:00 endpoints; no guessed zone or truncation.
+- `data/gpx/GpxCm1Encoder.kt`: exact Stage1B §8 version1 schema, checked sizing then
+  caller-owned OutputStream writing. Structural sizes only are cached (identity keys,
+  no second sample tree/full CM1 buffer). Checked add/multiply/u32 are used by the real
+  sizing/header paths; overflow tests exercise those helpers without giant allocation.
+  Cancellation/IO propagate; caller must discard partial comparison output on failure.
+
+The domain files import only Java standard value/collection APIs, never Slice1/XML,
+Android, data/persistence or renderer types. No logical IDs, UUID allocation, SHA or
+CM1 digest/dedup/uniqueness/storage wire format is introduced. Original-byte identity,
+Territory ownership/Area non-ownership and restore without GPX reparsing remain intact.
+Primary API research used the existing platform mechanisms, not a new dependency:
+[BigDecimal](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/math/BigDecimal.html),
+[LocalDateTime](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/LocalDateTime.html),
+[ZoneOffset](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/ZoneOffset.html).
+These references are API evidence, not Android runtime execution in Slice2.
+
+### Pure assertion coverage — not full mixed-family qualification
+
+Normative basis: Stage1A §§5–6; Stage1B §§4–8/11/14–15; this contract §§9–11/15/17.
+All22 requested row subsets below are JVM core assertions only. Actual XML extraction,
+normalization/provider→same-tree/CM1 remains a separate S3/S4 integration obligation.
+No new family IDs: the Stage1B corpus remains92 families, G01–G20 remain20 boundaries.
+
+| Row | Slice2 assertion / test owner |
+|---|---|
+| A01 | Singleton/null model + independent literal CM1 oracle; Model/Encoder tests |
+| A02 | Unsorted ordered samples/ordinals and encoded order; Model/Encoder |
+| A03 | Ordered segments and observable boundaries; Model/Encoder |
+| A04 | Multiple ordered tracks including empty nodes; Model/Encoder |
+| A05 | Supported exact metadata/elevation/raw+UTC time fields; all three tests |
+| A06 | Supplementary Unicode, strict scalar validation, no NFC, UTF8 byte lengths; all three |
+| A07 | Exact legal coordinate endpoints; Values |
+| A09 | Offset/nanoseconds/raw time and produced CM1 fields; Values/Encoder |
+| B06 | Signed zero and leading/trailing zero equivalence; Values/Encoder |
+| C01 | Different high-precision decimals retained in values/CM1; Values/Encoder |
+| C02 | Permutation changes ordered material; Encoder |
+| C03 | Reversal changes ordered material; Encoder |
+| C04 | Segment split/empty node changes material; Encoder |
+| C05 | Track/segment permutation with new encounter ordinals differs; Encoder |
+| C06 | Creator/source/track metadata changes, null/empty/space distinctions; Model/Encoder |
+| C08 | Elevation null/zero/value distinguished; Encoder |
+| C09 | Raw-time change including same instant differs in full CM1; Values/Encoder |
+| D09 | Exact out-of-range rejection, lon+180 excluded; Values |
+| D10 | Invalid numeric grammar/locale/non-ASCII/exponent/nonfinite; Values |
+| D14 | NO_ZONE/unsupported time retains raw/null UTC vs fatal malformed elevation; Values/Encoder |
+| F12 | Bounded numeric analysis, no float overflow, grammar vs limit category; Values |
+| G10 | 127/128/129 decoded scalar variants BEFORE trim, supplementary-count helper; Values |
+
+H05 material-only subset: separately constructed canonical trees yield identical CM1.
+Actual restart/restore/logical IDs/protection are NOT tested or implemented. Closed CM1
+schema/tag audit proves the produced material has no extra context fields. Unsupported
+XML content exclusion itself remains XML integration, not a claimed pure parser PASS.
+
+### Independent oracle and execution evidence
+
+`GpxCm1EncoderTest.a01LiteralIndependentGoldenCm1` contains hand-authored literal hex,
+not encoder-generated expected bytes. Manual lengths: sample66, samples-list77,
+segment92, segments-list103, track132, tracks-list143, root195; magic/version10 →205 bytes.
+An independent read-only framing auditor checks other vectors' tags/kinds/UTF8 values;
+it does not produce goldens. Other tests cover streaming output, checked overflow,
+cancellation/IO, immutable aliases and constructor/copy invariants.
+
+Actual commands used the existing cached Gradle9.5.0 launcher (same wrapper version),
+explicit task checkout and existing task-local offline caches. Process-local only:
+GRADLE_USER_HOME=`build/gradle-home`, ANDROID_HOME=existing SDK, ANDROID_USER_HOME=
+`build/android-user-home`, TEMP/TMP=`build/tmp`. No global setting/local.properties edit.
+Gradle daemon used its already-cached Temurin25; Java source/target remains11.
+
+```powershell
+$taskRoot='C:\App\Bee_search_stage0_overlay_registry'
+$gradle='C:\Users\user\.gradle\wrapper\dists\gradle-9.5.0-bin\bvnork1r7n8i6kp5cnkibsc9q\gradle-9.5.0\bin\gradle.bat'
+& $gradle --project-dir $taskRoot --offline --no-daemon --max-workers=2 '-Djava.io.tmpdir=C:\App\Bee_search_stage0_overlay_registry\build\tmp' '-Pkotlin.compiler.execution.strategy=in-process' :app:testDebugUnitTest --tests 'org.beesearch.app.domain.gpx.*' --tests 'org.beesearch.app.data.gpx.GpxCm1EncoderTest'
+& $gradle --project-dir $taskRoot --offline --no-daemon --max-workers=2 '-Djava.io.tmpdir=C:\App\Bee_search_stage0_overlay_registry\build\tmp' '-Pkotlin.compiler.execution.strategy=in-process' :app:testDebugUnitTest
+```
+
+| Executed gate | Actual result |
+|---|---|
+| Targeted current Slice2 JVM | BUILD SUCCESSFUL;37 tests = Model8 + Values14 + Encoder15;0 failures/errors/skips |
+| Required full offline JVM | BUILD SUCCESSFUL;988 tests/115 classes;0 failures/errors/skips |
+| Affected compilation | compileDebugKotlin + compileDebugUnitTestKotlin successful in targeted run |
+| Diff/scope | git diff --check PASS; index EMPTY; no stage/commit/push/device use |
+
+Local raw evidence: `build/evidence/d106-slice2/targeted.log`, `targeted-xml/`,
+`full-jvm.log`, `full-jvm-xml/`, `results.json`, `source.json` (six new source/test files).
+Source inventory SHA256: `0E722DD8998BC0884FFC354215D348A615B418CB97B4E8191BB77794BA235834`.
+The initial attempt failed compilation of the new model alias test (missing generic
+argument in MutableList cast); fixed locally to MutableList<*> and rerun successfully.
+`initial-compile-failure.log` preserves that attempt. Existing SnapshotJson/backup-test
+compiler and DataStore/Unsafe JVM warnings were observed and left unchanged.
+
+Decomposition: three cohesive production files, each below300 lines; model ownership,
+canonical values and CM1 encoding remain separate. Delegated workers were unavailable
+(service usage limit before any file creation), so root implemented and performed the
+adversarial self-review with reduced independence. No independent reviewer PASS is
+claimed; the uncommitted diff awaits independent review/OWNER decision.
+
+Remaining obligations: XML integration/extraction and actual pipeline enforcement of
+value bounds, full H05 persistence/protection and near-ceiling canonical-memory/resource
+measurements remain future gates. The1000-sample counting-sink test proves streaming
+API behavior, not100000-sample RAM/capacity. No Android runtime result or new production
+RAM/time/precision/input ceiling is claimed here. Slice3+ remain unauthorized.

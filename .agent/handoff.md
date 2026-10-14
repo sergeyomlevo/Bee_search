@@ -1,5 +1,24 @@
 # Bee Search handoff
-## Current task — D106 Stage 1 Slice 1 evidence closure after independent review
+## Current task — D106 Stage 1 Slice 2 pure canonical core (2026-10-14)
+
+PASS within pure JVM scope; UNCOMMITTED / READY FOR INDEPENDENT REVIEW.
+OWNER separately authorized model/canonical values (including time)/exact decimal/CM1.
+Starting clean HEAD bf36ddd481ca6a04d572635699095417f991173e; Slice1 OWNER-accepted
+and committed locally there. PAC unavailable; fresh explicit authorization fallback.
+Three new production +three JVM test files; no Slice1/Stage1A/Stage1B changes.
+Frozen list ownership, exact decimal/time, streamed CM1, independent205-byte A01 hex.
+Targeted37/37 and full offline JVM988/988 in115 classes, zero failures/errors/skips;
+compilation and diff check PASS. Index EMPTY, no staging/commit/push or device use.
+Detailed22 pure row subsets +H05 material subset and exact commands/source hashes:
+[Stage1C §26](../docs/d106-stage1c-gpx-implementation-contract.md#26-slice-2-executionstatus--2026-10-14).
+Raw local evidence build/evidence/d106-slice2; initial new-test compile error preserved,
+fixed within Slice2 then rerun. Root self-review only (delegation service unavailable),
+not independent acceptance. XML extraction/bound integration remains S3/S4; H05 restore
+and capacity/memory evidence remain future. Slice3+ NOT AUTHORIZED.
+Next: independent review of the complete uncommitted Slice2 diff; no implementation
+continuation or commit authorization inferred.
+
+## Previous task — D106 Stage 1 Slice 1 evidence closure after independent review
 
 PASS — EVIDENCE CLOSURE COMPLETE; READY FOR FINAL INDEPENDENT RE-REVIEW.
 Narrow OWNER authorization; PAC unavailable, explicit fallback used. HEAD13a4e75,
