@@ -1,5 +1,34 @@
 # Bee Search handoff
-## Current state — D106 Stage 1 Slice 3 qualified / independent review PASS (2026-10-14)
+
+## Current state — D106 Stage 1 Slice 4 qualified / awaiting independent review (2026-10-14)
+
+Baseline/current HEAD fd8e4dbf004e0def176bbe2b53efae805bf492c1,
+branch task/d106-stage0-overlay-registry. Slice3 CLOSED / OWNER-accepted / qualified
+within profile-parser scope, locally committed as that HEAD; push NOT PERFORMED.
+S3 history below and Stage1C §§27–28 remain the pre-commit chronology.
+
+Fresh OWNER S4 authorization only; PAC tool unavailable, fallback recorded.
+S4 QUALIFIED WITHIN DECLARED BOUNDARY/RESOURCE SCOPE, not OWNER acceptance.
+Production unchanged;5 new JVM/Android test/generator files and3 status docs,
+unstaged/uncommitted for review. Contract-derived scope/evidence:
+`build/evidence/d106-slice4/scope-matrix.md` and `attempt-3/`.
+Frozen106 GPX inputs pre/post MATCH, digest
+88C41139C66A1BD15DFB4BA0A3507D66177C36CB800C54407DB50EEC22080709.
+Targeted JVM11/11; full1018/118 classes,0 failures/errors/skips; build PASS.
+Sequential API29 emulator-5554 and API37 emulator-5556 each48/48 PASS
+(37 regressions +11 S4 methods),44 S4 generated executions each including30
+G01–G10 below/exact/over cases. B05 event oracle/CM1, F03 test-owned file canary/F09 no-I/O observers,
+100000-sample canonical memory, two-pass reads/cancel/late EOF/close covered.
+Same frozen source/APK pair, both emulators stopped, AVD configs unchanged;
+physical device never targeted. Exact heap peak UNKNOWN; no invented RAM/time cap.
+Detailed results and hashes: [Stage1C §29](../docs/d106-stage1c-gpx-implementation-contract.md#29-slice-4-executionstatus--2026-10-14).
+
+Next: independent review of complete S4 unstaged diff. No staging/commit/push.
+Slice5 NOT AUTHORIZED / NOT STARTED. Coordinator/persistence/storage/UUIDs,
+publication/protection/presentation, full H05 restore-without-reparse and future
+storage/protection/aggregate capacity gates remain open; Stage1 is not complete.
+
+## Historical pre-commit state — D106 Stage 1 Slice 3 qualified / independent review PASS (2026-10-14)
 
 **QUALIFIED WITHIN DECLARED PROFILE-PARSER SCOPE — ATTEMPT-2 PASS,
 INDEPENDENT READ-ONLY REVIEW PASS CONFIRMED.** HEAD remains

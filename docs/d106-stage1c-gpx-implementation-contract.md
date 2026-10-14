@@ -1540,3 +1540,171 @@ integration remain unimplemented/unqualified. Full H05 restore-without-GPX-repar
 implementation/proof remains future; the accepted restore requirement is unchanged.
 No later gate is closed by this S3 PASS. No commit exists for Slice3; no push occurred.
 This documentation task authorizes no further implementation or staging/commit/push.
+
+## 29. Slice 4 execution/status — 2026-10-14
+
+**D106 STAGE 1 SLICE 4 QUALIFIED WITHIN DECLARED BOUNDARY/RESOURCE SCOPE.**
+Uncommitted/unstaged; independent OWNER/reviewer inspection remains next. This is
+qualification evidence, not OWNER acceptance or Stage1 completion. Slice5 NOT STARTED
+and NOT AUTHORIZED. No commit/push performed by this task.
+
+### 29.1 Baseline, scope and implementation
+
+Started CLEAN/index EMPTY on task/d106-stage0-overlay-registry at
+fd8e4dbf004e0def176bbe2b53efae805bf492c1, subject
+`feat(gpx): implement D106 Stage 1 Slice 3`, parent db03b897e3cc0e995368551c510f7c8d9a93a8a3.
+Slice3 is CLOSED / OWNER-accepted / qualified within its declared profile-parser scope
+and locally committed as fd8e4dbf004e0def176bbe2b53efae805bf492c1; push NOT PERFORMED.
+The pre-commit records in §§27–28 remain historical and unchanged.
+S3 frozen inventory83/83 MATCH, digest96F479A3A0C86EAEC35C226BD918DFD857482FF3E2BAB0F0E6731F0ED49A3488;
+corrected B08 remains E8C7C969721BF4A2CA7F97845799487BF7FE530A1F707BA02AB7CAB19B5F4AA8.
+PAC tool unavailable: fresh explicit OWNER S4 authorization used; no simulated declaration.
+
+Before implementation, mechanically derived Stage1B §§11–14 / this contract §§15–17
+scope in ignored `build/evidence/d106-slice4/scope-matrix.md`. S4 owns all input
+G01–G10, E/F security/encoding regressions, cancellation/resource observations and
+G21/H07 memory subset; no storage/protection G11–G20 or full aggregate integration.
+All accepted enforcement already exists in S1–S3. Production code was NOT changed;
+no closed-slice repair, new numerical ceiling, dependency or second parser.
+
+New qualification files (test-only):
+- `app/src/test/java/org/beesearch/app/domain/gpx/GpxProfileBoundaryTest.kt`
+- `app/src/test/java/org/beesearch/app/data/gpx/GpxXmlBoundaryTest.kt`
+- `app/src/androidTest/java/org/beesearch/app/data/gpx/GpxBoundaryCorpus.kt`
+- `app/src/androidTest/java/org/beesearch/app/data/gpx/GpxBoundaryMeasurement.kt`
+- `app/src/androidTest/java/org/beesearch/app/data/gpx/GpxBoundaryDeviceTest.kt`
+
+J(core): hand-normalized lazy profile events, raw counting/digest and lexical guard
+helpers; no JVM XML-provider claim. A(XML): actual qualified S1 chain → S3 profile →
+S2 immutable canonical graph/CM1. M: transport, cancellation, heap/allocation and
+bounded guard-state records, supplementing structural proof.
+
+### 29.2 Frozen revision and executed qualification
+
+Ignored evidence: `build/evidence/d106-slice4/attempt-3/`. Freeze2026-10-14T15:17:38.9409121Z;
+all106 GPX production/JVM/Android/corpus inputs included, source-pre/source-post
+106/106 MATCH, SHA25688C41139C66A1BD15DFB4BA0A3507D66177C36CB800C54407DB50EEC22080709.
+Status docs were unchanged during qualification and updated only after final source
+comparison; they are not parser inputs. No source/test/generator edit after freeze.
+
+Established task-local Gradle9.5.0 cache/SDK paths; offline, no-daemon, max-workers2,
+process-local temp, Kotlin in-process. Exact argument arrays/timing/logs saved in
+`targeted-command.json`, `full-command.json`, `build-command.json` and adjacent logs.
+Targeted `:app:testDebugUnitTest --tests org.beesearch.app.domain.gpx.GpxProfileBoundaryTest
+--tests org.beesearch.app.data.gpx.GpxXmlBoundaryTest --rerun-tasks`:11/11 PASS,2 classes.
+Full `:app:testDebugUnitTest --rerun-tasks`:1018/1018 PASS,118 classes,0 failures/errors/skips.
+`:app:assembleDebug :app:assembleDebugAndroidTest --rerun-tasks`:PASS.
+
+Same DEV APK24037620B9807BDDD3DA1C169A9FE02829F2BE02B64F684B0815A0B5CC17364E
+and androidTest APK596CA48B07744E7A2B788292C0810F677486B0F0090326637277B3F377C57737
+built once for ATTEMPT3 and installed hashes verified on both endpoints; no rebuild between them.
+Direct serial-scoped `am instrument -w -r -e class` selected only
+GpxXmlCapabilityTest/GpxXmlSecurityMatrixTest/GpxProfileDeviceTest/GpxBoundaryDeviceTest
+under org.beesearch.app.dev.test/androidx.test.runner.AndroidJUnitRunner.
+48 methods =37 existing GPX regression +11 S4, not44 generated executions or52 S3 rows.
+The existing context-only unguarded provider method remains context, not independent
+proof. No MapLibre/native fixture/Activity was initialized by the selected XML tests.
+
+| Endpoint | Serial / runtime | Instrumentation | S4 generated executions |
+|---|---|---|---|
+| BeeSearch_ZIP64_API29 | emulator-5554 / Android10 API29 x86_64 |48/48 PASS,187.491s,0 failures/skips |44, including30 boundary cases |
+| BeeSearch_XML_API37 | emulator-5556 / Android17 API37 x86_64 |48/48 PASS,243.789s,0 failures/skips |44, including30 boundary cases |
+
+Both provider com.android.org.kxml2.io.KXmlParser, namespaces=true/docdecl=false/
+relaxed=false/validation=false. Fingerprints and AVD/API/boot identity, exact commands,
+installed APK hashes, method list/results and logcat saved per endpoint. Existing S3
+manifest conformance52 rows (38 accepted/14 rejected) also reran successfully.
+API29 stopped and launcher/QEMU processes absent before API37 boot; API37 stopped
+and final emulator/QEMU count0. AVD configuration hashes unchanged. Physical device
+was visible unauthorized in discovery only, never serial-targeted; no physical action.
+
+### 29.3 Boundaries, resource and cancellation results
+
+All following triplets executed on JVM and actual integrated Android API29/API37:
+below/exact ACCEPTED; over LIMIT_EXCEEDED, no partial canonical output.
+
+| Family | Below / exact / over | Counting owner / semantics |
+|---|---|---|
+| G01 |16777215 /16777216 /16777217 bytes |Raw input; Android includes UTF8 BOM + bounded comments |
+| G02 |127 /128 /129 tracks |Profile; empty tracks included |
+| G03 |4095 /4096 /4097 segments |Profile; across2 tracks, empty segments included |
+| G04 |99999 /100000 /100001 samples |Profile; integrated across2 segments |
+| G05 |31 /32 /33 depth |Guard; root-inclusive, ignored subtree |
+| G06 |63 /64 /65 lexical attributes |Guard/SDK reconciliation; xmlns included |
+| G07 |1999999 /2000000 /2000001 events |Guard/SDK logical normalization, not callback totals |
+| G08 |1023 /1024 /1025 code points |Profile; supplementary scalars, split-surrogate JVM variants |
+| G09 |8191 /8192 /8193 decoded token scalars |Guard; ignored content, no callback reset |
+| G10 |127 /128 /129 decoded lexical scalars |Before trim; pure coordinate/time + actual XML coordinate integration |
+
+B05: accepted comments-added/removed preserve canonical/CM1 material while bytes
+change. Independent total-event algebra:8 core START/END +2 per ignored empty x +1
+per comment, with even/odd adjustment. Comment-only9/10 cases and2million-event
+one-byte chunk variant assert CM1 equality/event counts. No counter oracle generated
+from production parser. G09 million-digit leading-zero reference resolves scalar49
+(latitude1), accepted with bounded reference state/emission; no raw-reference limit.
+F09: integrated ignored schemaLocation/stylesheet/XInclude remains canonical-equal
+with UNSUPPORTED_CONTENT warning. Warmed parser-thread StrictMode signals[], loopback
+connections0 on both APIs; structural no-resolver/Reader/guard argument remains primary.
+Best-effort observers are not universal syscall proof (UNKNOWN).
+
+F03 adds an explicit deterministic test-owned file canary: atomic create refuses an
+existing cache file, setup I/O occurs before StrictMode, an actual file-entity DTD is
+rejected as SECURITY_REJECTED:DECLARATION_BARRIER during preflight (one input open,
+owned stream closed, no provider-facing second-pass input), StrictMode signals[],
+canary bytes unchanged, only the created file deleted. Canary unchanged alone is
+not absence-of-read proof; combine the observer with structural declaration denial.
+All42 measured parse records plus F03 and F09 observer records per endpoint are preserved
+in logcat; parsed42-record JSON and independent60-result cross-endpoint table in
+`api29/resource-records.json`, `api37/resource-records.json`, `boundary-results.json`.
+They include inherited config, input/counts, pass/read/close/EOF observations, elapsed,
+Runtime heap snapshots/max, ART allocated-byte delta, relevant bounded state and outcome.
+The interval includes production parsing and post-result assertions; fixture generation
+precedes it. ART deltas are process-wide observations and may include framework/thread
+allocation, not an isolated production allocation profile.
+Rejected/cancelled guard delivery/state unavailable through final-result API is UNKNOWN.
+Exact heap peak is UNKNOWN; snapshots and cumulative allocation are not peak memory.
+
+At100000 samples:2400131 raw bytes/pass,2 passes,200008 logical events; canonical
+1 track/2 segments/100000 samples accepted on both. API29 measured parse+validation interval4.567197800s,
+heap66858976→31791720 bytes, allocated744196528 bytes; API37 measured interval5.625145348s,
+heap43275376→39265392 bytes, allocated687497216 bytes. These are observations,
+not new capacity guarantees or RAM/time thresholds. Guard maxPiece80 UTF16 units,
+maxPending1, maxToken33, maxDepth4 on this corpus. No OOM/bound corruption observed.
+Structural review: append-only owned lists, one reference-list freeze per completed
+node, O(N) canonical graph; no repeated full-tree copying or retained original XML.
+Pass1 creates no canonical graph. Test input allocation precedes parse measurements.
+
+Near100000 cancellation in pass1/pass2 at2162704 bytes, and after verified EOF/close,
+all terminated at the requesting checkpoint, closed owned streams and returned no
+partial graph. JVM separately exercises cancellation before and after canonical freeze.
+Late second-pass EOF/read and close failure return INPUT_IO_ERROR, no Accepted result.
+Tentative parser state clears on abort/failure/finish; counter arithmetic is checked
+or bounded before increment/allocation. Structural review saved separately.
+
+### 29.4 Scope and remaining gates
+
+Stage1C §§1–26 and historical §§27–28 preserved byte-for-byte as the original prefix.
+Slice1–3 production/tests/corpus bytes unchanged (including committed manifest terminal
+TAB empty-warnings representation). Only5 new test/generator files +3 status docs;
+index EMPTY, no commit/push. No device provisioning, wipe, uninstall or pm clear.
+
+Still OPEN: S5 parser boundary handoff/typed result/coordinator integration; actual
+persistence, managed-original storage, logical identity allocation/addressing,
+publication/protection, full H05 restore without GPX reparsing, presentation and future
+storage/protection/aggregate capacity domains. G11–G20 and full G21/H07 integration
+are not qualified here. Stage1/GPX import as a whole is NOT complete. Slice5 remains
+NOT AUTHORIZED / NOT STARTED. Next: independent review of the unstaged S4 diff.
+### 29.5 Attempt chronology
+
+ATTEMPT1 is preserved under `build/evidence/d106-slice4/attempt-1/`: frozen106
+inputs digest3EF692921D65037F4A9F20FA54ADF72E1D1F1C7859F621FF8548338644B5D4CF,
+JVM11/1018 and both APIs47/47 PASS (191.781s/251.152s), test APK5D40C40F...2230CDC2.
+Final §16 audit identified an evidence gap: the old file:///d106-unowned F03 probe
+was not a test-owned canary. No production defect was established. One new S4
+canary method was added; earlier green runs are historical, not final qualification.
+ATTEMPT2 was frozen but NOT RUN, superseded before execution to make the canary
+filename deterministic with no-overwrite ownership. Its frozen inventory is retained.
+ATTEMPT3 is the final current qualification above: same106-file inventory scope,
+new digest88C41139...22080709, fresh full JVM/build and both APIs48/48 PASS,
+44 generated executions each (42 measured parses +F03/F09 observers),30 triplet
+cases each. All attempts remain distinct; no historical evidence was overwritten.
