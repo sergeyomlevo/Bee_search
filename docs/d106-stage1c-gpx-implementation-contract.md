@@ -1128,6 +1128,10 @@ it to Slice1. Source/test hashes unchanged after qualification; HEAD13a4e75 and 
 Next: final independent re-review. No implementation polishing or continuation authorized.
 ## 26. Slice 2 execution/status — 2026-10-14
 
+The execution record below is historical pre-review/pre-commit evidence. Its pending/
+uncommitted wording is superseded only by the post-review/local-commit status at the
+end of this section; implementation/test evidence and its original chronology remain unchanged.
+
 **PASS — PURE JVM CORE; UNCOMMITTED / READY FOR INDEPENDENT REVIEW.**
 Separate explicit OWNER authorization covers this Slice2 only, including canonical
 values/time. It authorizes no staging/commit/push or Slice3. PAC is unavailable;
@@ -1253,3 +1257,28 @@ value bounds, full H05 persistence/protection and near-ceiling canonical-memory/
 measurements remain future gates. The1000-sample counting-sink test proves streaming
 API behavior, not100000-sample RAM/capacity. No Android runtime result or new production
 RAM/time/precision/input ceiling is claimed here. Slice3+ remain unauthorized.
+
+### Post-review / OWNER acceptance / local commit — 2026-10-14
+
+**CURRENT STATUS: SLICE 2 CLOSED WITHIN ITS DECLARED PURE-JVM SCOPE.**
+After the uncommitted implementation and verification recorded above, independent
+implementation review returned **ACCEPT**, BLOCKER/HIGH/MEDIUM **0/0/0**. OWNER then
+accepted Slice2 (model/canonical values/exact decimal/canonical time/CM1) within that
+scope and authorized exactly one controlled local commit of the reviewed state.
+The commit-only task made no source/test/documentation/evidence changes and reran no
+tests; the historical37/37 targeted and988/988 full JVM results predate the commit.
+
+- Local commit: `ae291906b186e2c8fdda94e167af7f07e4dac620`.
+- Parent: `bf36ddd481ca6a04d572635699095417f991173e`.
+- Subject: `feat(gpx): implement D106 Stage 1 Slice 2`.
+- Commit contains exactly the reviewed9 project paths; build/evidence was not committed.
+- Push: **NOT PERFORMED**; no push authorization.
+- Slice1 remains accepted/qualified, CLOSED, previously committed locally as the parent.
+- Slice3: **NOT AUTHORIZED / NOT STARTED**; no further implementation is authorized.
+
+This closure does not qualify XML extraction, XML→canonical/provider→canonical parity,
+XML→CM1 integration or actual XML-pipeline enforcement of value bounds. Full H05
+persistence/restore/protection/logical-ID behavior and near-ceiling canonical-memory,
+resource/capacity evidence remain future gates. Restore without GPX reparsing remains
+an accepted requirement, not a Slice2 restore implementation or runtime claim.
+This post-commit housekeeping updates status only; no staging/commit/push is authorized.

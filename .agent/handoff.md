@@ -1,5 +1,25 @@
 # Bee Search handoff
-## Current task — D106 Stage 1 Slice 2 pure canonical core (2026-10-14)
+## Current state — D106 Stage 1 Slice 2 post-commit closure (2026-10-14)
+
+HEAD: ae291906b186e2c8fdda94e167af7f07e4dac620.
+Parent: bf36ddd481ca6a04d572635699095417f991173e.
+Subject: feat(gpx): implement D106 Stage 1 Slice 2.
+Slice1: ACCEPTED/QUALIFIED, previously committed locally as the parent, CLOSED.
+Slice2: independent implementation review ACCEPT (BLOCKER/HIGH/MEDIUM0/0/0), then
+OWNER acceptance and authorization for exactly one local commit of the reviewed state.
+Exactly9 reviewed paths committed; build/evidence excluded. Slice2 CLOSED within its
+pure-JVM model/canonical values/exact decimal/canonical time/CM1 scope. Push NOT
+PERFORMED; no push authorization. Slice3 NOT AUTHORIZED / NOT STARTED.
+XML extraction, XML→canonical/provider parity, XML→CM1 and actual XML enforcement of
+value bounds remain future gates, as do full H05 persistence/restore/protection/logical
+IDs and near-ceiling canonical-memory/resource/capacity evidence. No further work authorized.
+Historical implementation/test evidence (37/37 targeted,988/988 full JVM) is preserved:
+[Stage1C §26](../docs/d106-stage1c-gpx-implementation-contract.md#26-slice-2-executionstatus--2026-10-14).
+The status subsection there records review→OWNER acceptance→local commit chronology.
+This housekeeping changes documentation only; no tests/devices/evidence changes,
+staging/commit/push or Slice3 work. Earlier pending/uncommitted notes below are historical.
+
+## Previous task — D106 Stage 1 Slice 2 implementation (historical pre-review/pre-commit state)
 
 PASS within pure JVM scope; UNCOMMITTED / READY FOR INDEPENDENT REVIEW.
 OWNER separately authorized model/canonical values (including time)/exact decimal/CM1.
