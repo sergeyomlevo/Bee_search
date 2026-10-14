@@ -1,5 +1,65 @@
 # Bee Search handoff
-## Current state — D106 Stage 1 Slice 2 post-commit closure (2026-10-14)
+## Current state — D106 Stage 1 Slice 3 qualified / independent review PASS (2026-10-14)
+
+**QUALIFIED WITHIN DECLARED PROFILE-PARSER SCOPE — ATTEMPT-2 PASS,
+INDEPENDENT READ-ONLY REVIEW PASS CONFIRMED.** HEAD remains
+ db03b897e3cc0e995368551c510f7c8d9a93a8a3, branch task/d106-stage0-overlay-registry.
+Slice1/2 remain CLOSED. Slice3 remains UNCOMMITTED/UNSTAGED; no commit/push occurred.
+
+Chronology: ATTEMPT1 correctly stopped on API29 (35/37) because new B08 encoded
+forbidden U+0001; API37 was not run. OWNER then authorized only B08 fixture correction
+and fresh qualification. Two bytes changed long decimal ...001 to ...049 (U+0031,
+latitude1), preserving63 digits/66-character reference and328-byte file. No Kotlin,
+TSV or other fixture changed. The stopped ATTEMPT1 record below is historical;
+its failure/next-action wording is superseded by this current state and Stage1C §28.
+
+ATTEMPT2 frozen83-file source/test/corpus inventory matched83/83 pre/post; SHA256:
+96F479A3A0C86EAEC35C226BD918DFD857482FF3E2BAB0F0E6731F0ED49A3488.
+Fresh targeted JVM19/19; full JVM1007/116 classes,0 failures/errors/skips; Android
+build PASS. Sequential API29 emulator-5554 and API37 emulator-5556 each passed37/37
+methods and completed52/52 manifest rows (38 accepted,14 rejected), including all
+post-B08 rows and B01/B08 CM1 equality. Same frozen source, DEV/test APK pair,
+expectations and test set on both; both AVDs stopped, no physical-device use.
+
+OWNER reports independent DeepSeek read-only artifact review: PASS CONFIRMED,
+0 BLOCKER/HIGH/MEDIUM,1 LOW (stale current status, addressed by this documentation
+sync), otherwise INFO. Reviewer reran no Gradle/tests/emulators/adb and edited no files.
+Evidence: build/evidence/d106-slice3/attempt-2; [current record and APK hashes](../docs/d106-stage1c-gpx-implementation-contract.md#28-slice-3-attempt-2-pass--current-qualification-status-2026-10-14).
+
+Slice4/5 NOT STARTED / NOT AUTHORIZED. Boundary/resource triplets, near-ceiling
+canonical memory, later processor/coordinator/persistence/identity/publication/
+protection/presentation and full H05 restore-without-reparse gates remain open.
+Stage1 is not complete. Next: review this documentation-only diff and await a
+separate OWNER acceptance/commit decision; no implementation/staging/commit/push
+is authorized by this status synchronization.
+
+## Historical ATTEMPT 1 — D106 Stage 1 Slice 3 stopped qualification (2026-10-14)
+
+Starting/current HEAD db03b897e3cc0e995368551c510f7c8d9a93a8a3; branch
+ task/d106-stage0-overlay-registry. Started CLEAN/index EMPTY. Slice1/2 remain CLOSED;
+no accepted implementation was changed. Separate OWNER authorization covered Slice3
+only; PAC unavailable, fresh authorization fallback. Five new production files,
+two tests and76 corpus files remain UNCOMMITTED/UNSTAGED (83 new paths).
+
+FAIL / NOT QUALIFIED: final frozen JVM19/19 and full1007/1007 passed; APK build passed.
+API29 emulator-5554 ran37 methods:35 pass,2 fail, both new profile methods hitting
+B08.xml. Its long numeric reference ends in001, denoting forbidden XML U+0001, not
+text digit1 (U+0031). Slice1 correctly returned MALFORMED_XML:REFERENCE_SCALAR.
+This is a new fixture defect, not an observed closed Slice1/2 production defect.
+Per runtime-failure STOP, fixture/expectation was not changed; API37 was NOT RUN.
+API29 stopped; final device list EMPTY; existing AVD configs unchanged, no physical use.
+
+Final source-pre/source-post inventory83/83 identical; SHA256
+B289A88DFC79C108DE454493C599FEEEE8E785A181FF01742E83804F9BDD9FDC.
+Evidence: build/evidence/d106-slice3; details, intended52-family J/A mapping, commands,
+APK hashes and honest chronology: [Stage1C §27](../docs/d106-stage1c-gpx-implementation-contract.md#27-slice-3-executionstatus--2026-10-14).
+Next: OWNER/reviewer review of the fixture defect and separately authorized targeted
+correction plus fresh frozen JVM/API29/API37 runs. No correction after STOP was made.
+No Slice3 acceptance. Slice4/5 NOT AUTHORIZED. No staging/commit/push. Earlier Slice2
+statements that Slice3 was unauthorized are historical and superseded by this task's
+separate authorization, not permission for further implementation after this stop.
+
+## Previous state — D106 Stage 1 Slice 2 post-commit closure (historical, 2026-10-14)
 
 HEAD: ae291906b186e2c8fdda94e167af7f07e4dac620.
 Parent: bf36ddd481ca6a04d572635699095417f991173e.

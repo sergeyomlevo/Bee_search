@@ -1282,3 +1282,261 @@ persistence/restore/protection/logical-ID behavior and near-ceiling canonical-me
 resource/capacity evidence remain future gates. Restore without GPX reparsing remains
 an accepted requirement, not a Slice2 restore implementation or runtime claim.
 This post-commit housekeeping updates status only; no staging/commit/push is authorized.
+
+## 27. Slice 3 execution/status — 2026-10-14
+
+**HISTORICAL ATTEMPT 1.** Result, stop and next-action statements in this section
+record the state before the separately authorized fixture-only retry. They are
+preserved as evidence; §28 supersedes their CURRENT operational status. Accepted
+requirements and the ATTEMPT-1 failure are not rewritten.
+
+**RESULT: FAIL — qualification stopped after API29 test-corpus failure.**
+Slice3 is NOT QUALIFIED, NOT OWNER-accepted and remains UNCOMMITTED/UNSTAGED.
+This records a new fixture defect, not a demonstrated violation in the closed
+Slice1/2 production implementation. API37 was deliberately NOT RUN after the failure.
+Slice4/5, commit and push remain NOT AUTHORIZED. Stage1 is not complete.
+
+### Authorization, baseline and component boundary
+
+Separate explicit OWNER authorization covered profile interpretation, XML→canonical
+integration and JVM/API29/API37 verification only. PAC was unavailable; the fresh
+OWNER authorization fallback was used, without simulating a declaration.
+Started CLEAN with EMPTY index on task/d106-stage0-overlay-registry at
+`db03b897e3cc0e995368551c510f7c8d9a93a8a3` in the isolated task checkout.
+Sections1–26 are preserved verbatim; accepted Stage1A/1B and closed Slice1/2 code
+were not modified. External API/profile research used the official GPX1.1 schema
+and Android XmlPullParser documentation; the accepted Bee Search subset governs.
+
+Five new production files (under app/src/main/java/org/beesearch/app/):
+- domain/gpx/GpxProfileEvent.kt — normalized facts, bounded warning/result/address types;
+- domain/gpx/GpxProfileSchema.kt — supported parent/order/cardinality projection;
+- domain/gpx/GpxProfileDraftBuilder.kt — tentative owned builders and immutable freeze;
+- domain/gpx/GpxProfileParser.kt — pure event state machine, not another XML parser;
+- data/gpx/AndroidGpxProfileReader.kt — bridge through unchanged AndroidGpxXmlReader.verify.
+
+New tests: domain/gpx/GpxProfileParserTest.kt in src/test/java and
+ data/gpx/GpxProfileDeviceTest.kt in src/androidTest/java, under org/beesearch/app.
+Corpus: app/src/test/resources/gpx/slice3/, 74 XML literals and two TSV files.
+No model/value/CM1 duplication, UUID allocation, storage, publication, Territory,
+Room, UI or renderer integration. Pure production profile files have no data/XML
+or Android dependency. Each production file is below300 lines; lexical security,
+provider adaptation, profile rules, builders and canonical values stay separate.
+
+The intended implementation preserves source order/zero-based ordinals, empty
+tracks/segments and singletons; calls Slice2 exact coordinate/elevation/time helpers;
+keeps ignored subtrees non-canonical; summarizes only accepted warning categories
+with counts/first bounded address. The final immutable graph is returned only after
+upstream EOF/security/source-equality/close and profile completion succeed. Rejection,
+cancellation and late IO discard tentative state. These statements describe code
+and the successful subsets below, not full Slice3 qualification.
+
+### Contract-derived coverage and proof boundary
+
+Basis: Stage1B §§3–8/11–15; Stage1C §§4/15/17. Mechanically selected S3 subset:
+
+| Families | Intended assertion | Proof layer / limitation |
+|---|---|---|
+| A01–A09 | Structure/order/empty/singleton, metadata, values/time | J normalized facts; A real XML; A01 independent literal205-byte CM1 |
+| B01–B09 | Canonical equivalence under lexical/non-canonical changes | J core where independent of XML; A encoding/token/reference integration |
+| C01–C09 | Ordered/material differences and ignored C07 equality | J core + A XML→canonical/CM1 |
+| D01–D14 | Zero samples, structure/value rejection and warnings | J profile cases + A actual XML/category precedence |
+| E01–E04,E10 | Supported encoding envelope / XML1.1 rejection | A actual qualified input chain; not a pure-profile JVM claim |
+| F08,F09 | XML duplicates and ignored/schema/PI profile behavior | F08 A; F09 J profile + A; existing S1 no-IO regressions separate |
+| G02,G03,G04,G08 | Inherited profile count/text helpers and small cases | J core + A small fixtures; S4 numerical triplets/resources NOT qualified |
+
+Total52 existing families, not a replacement92-family corpus. Exact assertion→J/A
+method→expected category mapping is committed-candidate `coverage.tsv`; `manifest.tsv`
+lists52 primary XML rows, with22 additional isolated variants. No new family ID.
+JVM uses hand-authored normalized events, not SAX/DOM or another XML parser.
+JVM evidence is not actual XML evidence. Existing Slice2 pure proof is not reopened.
+
+This is an INTENDED coverage map, not52 runtime PASSes: the primary Android loop and
+pair loop aborted at B08. Other independent methods ran, but unvisited loop rows
+must not be treated as covered by that run. B05 event-budget work, F09 broader
+observation/resource evidence, G02–04/G08 boundary/resource triplets and other S4
+limits remain future gates. S5/coordinator/identity/publication and full H-family
+persistence/restore/protection/presentation remain future; restore without GPX
+reparsing remains accepted and unimplemented here.
+
+### Frozen revision, build and JVM evidence
+
+Local ignored evidence: `build/evidence/d106-slice3/`.
+`source-pre.json` and `source-post.json` each inventory all83 new source/test/corpus
+paths with byte lengths and SHA256. Both inventories have SHA256:
+`B289A88DFC79C108DE454493C599FEEEE8E785A181FF01742E83804F9BDD9FDC`.
+83/83 files matched after the run; no source changes after the final freeze.
+Earlier revision evidence is retained in `initial-revision/`: targeted19/full1007
+passed there, but androidTest compilation found an extra closing parenthesis in
+new C04 expected-tree code. Only that syntax error was fixed, then a new freeze and
+all final JVM/build runs were executed. No earlier result substitutes for final proof.
+
+Existing cached Gradle9.5.0 launcher and task-local offline cache were used. Only
+process-local GRADLE_USER_HOME=build/gradle-home, ANDROID_HOME=existing SDK,
+ANDROID_USER_HOME=build/android-user-home and TEMP/TMP=build/tmp; no global setting
+or local.properties change. Common arguments:
+`--project-dir <task-checkout> --offline --no-daemon --max-workers=2 -Djava.io.tmpdir=<task-checkout>\build\tmp -Pkotlin.compiler.execution.strategy=in-process`.
+Final task arguments and observed results:
+
+| Task arguments | Result |
+|---|---|
+| :app:testDebugUnitTest --tests org.beesearch.app.domain.gpx.GpxProfileParserTest --rerun-tasks |19 tests/1 class;0 failures/errors/skips; BUILD SUCCESSFUL |
+| :app:testDebugUnitTest --rerun-tasks |1007 tests/116 classes;0 failures/errors/skips; BUILD SUCCESSFUL |
+| :app:assembleDebug :app:assembleDebugAndroidTest --rerun-tasks |BUILD SUCCESSFUL; Kotlin/app/androidTest compilation succeeded |
+
+Logs, timing JSON and copied JUnit XML retain final command results. Existing unrelated
+compiler/DataStore warnings were left unchanged. No MapLibre/native test class/activity
+was selected or initialized for XML qualification; packaging the existing app still
+includes its existing native libraries.
+
+Built and installed-on-API29 APK SHA256 (aapt confirmed DEV IDs before installation):
+- org.beesearch.app.dev: `24037620B9807BDDD3DA1C169A9FE02829F2BE02B64F684B0815A0B5CC17364E`.
+- org.beesearch.app.dev.test: `F7DA91B3898B41472154F08D647B4DB9167260070A6DCD58801FF885341AE54B`.
+`apk-inventory.json`, aapt package records and API29 installed-base-APK sha256sum
+records connect the frozen source/build with the actual runtime pair. adb process
+exit0 alone was NOT treated as PASS: the instrumentation result reports failures.
+
+### API29 runtime failure and stop
+
+AVD BeeSearch_ZIP64_API29; actual serial emulator-5554; API29/Android10/x86_64;
+sys.boot_completed=1. Fingerprint:
+`google/sdk_gphone_x86_64/generic_x86_64:10/QSR1.211112.011/13135432:userdebug/dev-keys`.
+Observed provider `com.android.org.kxml2.io.KXmlParser;api=29`;
+configuration namespaces=true;docdecl=false;relaxed=false;validation=false.
+Direct serial-scoped command (no broad connected task):
+
+```text
+adb -s emulator-5554 shell am instrument -w -r -e class org.beesearch.app.data.gpx.GpxXmlCapabilityTest,org.beesearch.app.data.gpx.GpxXmlSecurityMatrixTest,org.beesearch.app.data.gpx.GpxProfileDeviceTest org.beesearch.app.dev.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Runner: Time73.254s; **Tests run:37, Failures:2**. Status records contain35 successes
+and2 failures. The existing25 Slice1 methods completed successfully; one is finite
+unguarded provider characterization/context, not an independent security assertion.
+New Slice3 methods:10 succeeded,2 failed:
+- everySlice3FamilyHasAnIndependentFixtureAndExpectedOutcome;
+- actualXmlPairsHaveIndependentCanonicalAndCm1Relationships.
+
+Both fail at the same new B08.xml attribute literal `lat="&#000...001;"` (ellipsis
+here abbreviates actual leading zeroes). Its numeric value is1, hence forbidden
+XML1.0 U+0001, NOT the character digit1 (U+0031). The correct Slice1 lexical barrier
+rejects it in preflight as **MALFORMED_XML:REFERENCE_SCALAR**. Thus the fixture is
+not a valid canonical-equivalence vector. No closed Slice1/2 defect or guard/provider
+semantic disagreement is demonstrated by this failure. Root owns the fixture error;
+prior read-only review did not detect it and is not runtime proof.
+
+Per the task's runtime-failure stop rule, B08 expectation/input was NOT altered after
+this run. No fallback, relaxed guard, dependency or new ceiling was introduced.
+API37 AVD exists but was NOT BOOTED/TESTED; no API37 Slice3 PASS is claimed. API29 was
+serial-identified and stopped; final adb devices list EMPTY. Both original AVD
+config hashes match the preflight values; no wipe/clear/uninstall/snapshot deletion,
+physical-device command, SDK provisioning or AVD recreation occurred.
+
+### Remaining decision / qualification work
+
+Slice3 is not ready for acceptance. Minimum next action for OWNER/reviewer: review
+the new B08 fixture defect, then separately allow a targeted fixture correction and
+fresh frozen-current JVM/API29/API37 verification. Digit1 can be represented by a
+numeric reference to codepoint49 (decimal) or31 (hex); no production security change
+is indicated. That correction and rerun have NOT been performed after the stop.
+No Slice4/5 implementation is authorized. Index remains EMPTY; no stage/commit/push.
+
+## 28. Slice 3 ATTEMPT 2 PASS — current qualification status (2026-10-14)
+
+**D106 STAGE 1 SLICE 3 QUALIFIED WITHIN DECLARED PROFILE-PARSER SCOPE.**
+**ATTEMPT-2 PASS; INDEPENDENT READ-ONLY REVIEW PASS CONFIRMED.**
+This is the current operational status, superseding the historical ATTEMPT-1 stop
+in §27. Slice3 remains UNCOMMITTED/UNSTAGED; no commit/push has occurred. No Slice4/5
+work has started or is authorized. All of D106 Stage1 is NOT complete.
+
+### Preserved chronology and one-file correction
+
+ATTEMPT1 remains FAIL / NOT QUALIFIED: fresh JVM19/19/full1007 passed, API29 ran37
+methods with35 successes/2 failures at B08, and API37 was NOT RUN after STOP.
+The new B08 fixture's long decimal reference denoted forbidden XML1.0 U+0001;
+Slice1 correctly rejected MALFORMED_XML:REFERENCE_SCALAR. No closed Slice1/2
+production defect was established. Historical83-file inventory digest:
+`B289A88DFC79C108DE454493C599FEEEE8E785A181FF01742E83804F9BDD9FDC`.
+ATTEMPT-1 evidence was preserved byte-for-byte (282 files), not relabelled PASS.
+
+OWNER subsequently authorized only the known fixture correction and complete fresh
+qualification. Only `app/src/test/resources/gpx/slice3/B08.xml` changed between the
+715 inventoried project paths; exactly two bytes changed, offsets248/249 (zero-based).
+The328-byte fixture and63-digit/66-character long-leading-zero decimal reference
+shape were preserved. Old/new reference spellings:
+
+```text
+&#000000000000000000000000000000000000000000000000000000000000001;
+&#000000000000000000000000000000000000000000000000000000000000049;
+```
+
+The scalar changed from U+0001 to U+0031, ASCII DIGIT ONE; canonical latitude is1.
+Old B08 SHA256:
+`B9A72D05B7F10820FF605BD8F1965FDABFBEF0C5BA5B93C85B18E6C3F0D56C84`.
+Corrected/current B08 SHA256:
+`E8C7C969721BF4A2CA7F97845799487BF7FE530A1F707BA02AB7CAB19B5F4AA8`.
+Production Kotlin, test Kotlin, manifest/coverage/other TSV and all other fixtures
+were unchanged. No implementation repair, relaxed guard, new limit or dependency.
+
+### Frozen-current qualification evidence
+
+ATTEMPT2 evidence is separate: `build/evidence/d106-slice3/attempt-2/`.
+`source-pre.json`/`source-post.json` cover83 source/test/corpus files;83/83 MATCH.
+Both have SHA256:
+`96F479A3A0C86EAEC35C226BD918DFD857482FF3E2BAB0F0E6731F0ED49A3488`.
+This digest belongs to ATTEMPT2 only. No source changed after freeze or between APIs.
+The retry deliberately left these three status documents unchanged until this
+separate documentation-only synchronization; no qualification evidence is rewritten.
+
+| Fresh gate | ATTEMPT-2 result |
+|---|---|
+| GpxProfileParserTest targeted JVM |19/19 PASS;0 failures/errors/skips |
+| Complete offline JVM |1007 tests/116 classes;0 failures/errors/skips |
+| DEV + androidTest build |PASS; fresh assembleDebug/assembleDebugAndroidTest |
+| API29 BeeSearch_ZIP64_API29, emulator-5554 |Android10/API29/x86_64;37/37 PASS,70.505s |
+| API37 BeeSearch_XML_API37, emulator-5556 |Android17/API37/x86_64;37/37 PASS,90.232s |
+| Complete mapped corpus, EACH API |52/52 rows:38 accepted graphs +14 expected rejections |
+| B08, EACH API |ACCEPTED; latitude1; padded reference retained; B01/B08 CM1 equality PASS |
+| Previously unvisited post-B08 rows |Executed on BOTH endpoints |
+
+Actual provider on both endpoints: `com.android.org.kxml2.io.KXmlParser`;
+configuration namespaces=true;docdecl=false;relaxed=false;validation=false.
+Same frozen source, instrumentation set, fixture expectations and exact built/installed
+APK pair were used on both endpoints; tested canonical/XML semantics agree.
+DEV APK SHA256:
+`24037620B9807BDDD3DA1C169A9FE02829F2BE02B64F684B0815A0B5CC17364E`.
+androidTest APK SHA256:
+`13057187E61AC9D0DD021AC849B033637019186DBEB92B0E9E4D14F70250CBDF`.
+
+37 instrumentation methods and52 manifest rows are distinct counts. The completed
+52-row assertion loop validates expected graphs/categories; accepted rows additionally
+have per-family logs, rejected rows have less granular logging. Full runner summaries
+and status records establish PASS, not INSTRUMENTATION_CODE:-1 alone. One unchanged
+Slice1 method is context-only provider characterization, not independent security proof.
+
+API29/API37 ran sequentially; both stopped, final device inventory and emulator
+process checks empty. Existing AVD configurations were preserved. No physical device,
+SDK provisioning, wipe/clear/uninstall, Slice4/5, stage/commit/push occurred.
+Exact commands, JUnit XML, instrumentation/logcat, installed APK correspondence,
+source inventories and digests remain in the separate ATTEMPT-2 evidence area.
+
+### Independent review and present authorization boundary
+
+OWNER supplied the subsequent independent DeepSeek READ-ONLY artifact-review result:
+**PASS CONFIRMED;0 BLOCKER,0 HIGH,0 MEDIUM,1 LOW; otherwise INFO observations.**
+Reviewer independently inspected repository/evidence correspondence, two-byte B08
+correction (including reconstruction of old bytes), APK-contained corrected fixture,
+full corpus/test results, frozen inventories, endpoint isolation/stop and Git state.
+Reviewer ran no Gradle/tests/emulators/adb and modified no files. Its one LOW was
+stale current status in these three documents; this synchronization addresses that
+status discrepancy only. INFO items do not authorize implementation or new tests.
+This records the review result supplied by OWNER, not a new runtime/review execution.
+
+Scope remains the accepted S3 profile/JVM + actual XML→canonical/CM1 subset mapped
+in §15, not a new qualification of every assertion in all92 fixture families.
+Still OPEN: Slice4 boundary/resource evidence, applicable G02–G04/G08 below/exact/over
+triplets, B05 event-budget work, later F09 observation/resource evidence and near-ceiling
+canonical-memory/resource proof. Slice5 processor boundary/coordinator handoff and
+future coordinator/persistence/logical identity/publication/protection/presentation
+integration remain unimplemented/unqualified. Full H05 restore-without-GPX-reparse
+implementation/proof remains future; the accepted restore requirement is unchanged.
+No later gate is closed by this S3 PASS. No commit exists for Slice3; no push occurred.
+This documentation task authorizes no further implementation or staging/commit/push.
