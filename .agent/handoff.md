@@ -1,6 +1,41 @@
 # Bee Search handoff
 
-## Current state — closed Slice1 cancellation corrective requalified (2026-10-14)
+## Current state — D106 Stage1 Slice5 processor handoff qualified (2026-10-15)
+
+**D106 STAGE 1 SLICE 5 QUALIFIED WITHIN DECLARED PROCESSOR-HANDOFF SCOPE.**
+Starting/current HEAD e5cabea2823aadd24ba5c76fe02ab5887fb83cf0,
+branch task/d106-stage0-overlay-registry. Slice4 accepted local commit67a55452599a57d44d884d5c3dee57df7bfd5313;
+accepted cancellation corrective e5cabea is part of the closed chain. No push.
+Older pre-commit states below and Stage1C §§27–30 are historical.
+
+S5 adds only internal GpxParseResult/GpxProcessor and JVM/device conformance tests.
+Existing open lambda and closed two-pass reader/profile chain are reused unchanged.
+Accepted carries canonical draft, exact original SHA/length and frozen warnings;
+Rejected is typed/bounded. Cancellation remains the SAME throwable with suppressed
+close failure. No partial Accepted, persistent UUID, owner choice, storage or dedup.
+
+ATTEMPT1: targeted16/16 (10 S5+6 corrective); full1034/120 classes with0 failures/errors/skips;
+all7 build/lint gates PASS. Sequential API29/API37 each64/64 (52 closed+12 S5), same
+frozen source/APKs/method set; both stopped, no physical device. Input→canonical→CM1
+matches the independent literal/direct oracle; original identity remains separate.
+New S5 two-pass probe:9417bytes,300samples,2 opens/passes;56.5357ms API29 /37.0661ms API37.
+Unmeasured heap peak/allocation/actual events UNKNOWN, no new threshold.
+
+Closed108/108 unchanged:365C0281EEA2228F72242B79DB5E75D09766B06A4C203C84BC9845ABF29EA18C.
+S5 superset112/112 pre/post MATCH:65585099B560BE247E5E32B7F604E911D6D16648E61EEE8FB9DB1D8CFD359005.
+Historical S5 scope-matrix.md unchanged (9896bytes,02D961A5...5C81AB3).
+Evidence: `build/evidence/d106-slice5/attempt-1/`, execution matrix and coverage.tsv.
+[Stage1C §31](../docs/d106-stage1c-gpx-implementation-contract.md#31-slice5-processor-handoff--executionstatus-2026-10-15)
+contains frozen/APK hashes, commands/results and the future-owner integration contract.
+
+Next: independent review and OWNER acceptance. Changes UNSTAGED/UNCOMMITTED;
+index EMPTY, no commit/push. STOP: do not start future-owner work. Actual coordinator,
+Territory/Observer request capture, persistent IDs/Room/managed original/duplicates,
+publication/protection/Backup/Snapshot, full G11–G21/H01–H07 integration (especially H05
+restore WITHOUT reparsing), UI/MapLibre/Registry remain OPEN. Stage1 is NOT complete.
+
+
+## Historical pre-commit state — closed Slice1 cancellation corrective requalified (2026-10-14)
 
 **CORRECTED AND REQUALIFIED — READY FOR INDEPENDENT REVIEW.** HEAD remains
 `67a55452599a57d44d884d5c3dee57df7bfd5313`, task/d106-stage0-overlay-registry.

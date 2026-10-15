@@ -1808,3 +1808,197 @@ is claimed. Actual coordinator, logical IDs/addressing, Room, managed original,
 duplicate/reimport workflow, publication/protection, backup/snapshot, full H05 restore
 without GPX reparsing, presentation/MapLibre/Registry and future capacity gates remain
 open. Stage1 as a whole is NOT complete. Do not resume S5 or any future-owner work.
+
+## 31. Slice5 processor handoff — execution/status (2026-10-15)
+
+**D106 STAGE 1 SLICE 5 QUALIFIED WITHIN DECLARED PROCESSOR-HANDOFF SCOPE.**
+This is frozen-current qualification for independent review, not OWNER acceptance,
+commit or completion of Stage1 as a whole. All changes remain UNSTAGED/UNCOMMITTED.
+
+### 31.1 Baseline, scope and implementation
+
+Starting/current HEAD e5cabea2823aadd24ba5c76fe02ab5887fb83cf0,
+parent67a55452599a57d44d884d5c3dee57df7bfd5313, branch task/d106-stage0-overlay-registry;
+clean worktree/empty index verified before work. The parent is the accepted local
+Slice4 commit. e5cabea is the accepted cancellation-corrective commit,
+`fix(gpx): preserve cancellation during source close`; no push was performed.
+Historical §§27–30 retain their original pre-commit status and chronology.
+The separate prior S5 preflight STOP remains valid historical evidence.
+
+Fresh OWNER authorization covers S5 only. PAC was unavailable: first tool metadata
+search for pac_declare_change in ALL_TOOLS returned no matches. OWNER fallback used.
+Scope was mechanically derived before edits in ignored evidence
+`build/evidence/d106-slice5/scope-matrix-execution.md`; per-assertion proof and future
+ownership are in `coverage.tsv`. The corrected mandatory CLOSED Android baseline is
+52 methods (48 pre-corrective plus4 cancellation corrective), not48 across five groups.
+
+Exactly4 new source/test inputs:
+
+- `app/src/main/java/org/beesearch/app/data/gpx/GpxParseResult.kt`
+- `app/src/main/java/org/beesearch/app/data/gpx/GpxProcessor.kt`
+- `app/src/test/java/org/beesearch/app/data/gpx/GpxProcessorTest.kt`
+- `app/src/androidTest/java/org/beesearch/app/data/gpx/GpxProcessorDeviceTest.kt`
+
+Production types are internal. Processor uses the existing repeatable open lambda
+and defaults to AndroidGpxProfileReader.parse; no new source interface, second parser,
+canonical model or CM1 implementation. An internal completed-read function seam
+isolates JVM result/terminal-check logic; Android tests use the real default chain.
+No closed Slice1–Slice4/corrective input changed. No new dependency or numerical cap.
+
+Accepted hands forward the same immutable canonical draft, exact original identity
+and frozen profile warnings. Rejected contains a fixed category and finite reason
+code/optional supported address; no raw source/URI/exception text. Completed differing
+passes or expected-descriptor mismatch reject INPUT_IO_ERROR/SOURCE_CHANGED. Truncated
+malformed second input retains the closed first-observed MALFORMED_XML precedence.
+Cancellation rethrows the SAME object with the corrective suppressed close failure;
+standalone source-close failure remains INPUT_IO_ERROR/source-close. No unsuccessful
+terminal path returns Accepted. Closed profile abort/clear behavior is reused.
+
+### 31.2 Frozen-current JVM, build/lint and Android evidence
+
+ATTEMPT1 evidence: `build/evidence/d106-slice5/attempt-1/`.
+Targeted command uses :app:testDebugUnitTest --tests org.beesearch.app.data.gpx.GpxProcessorTest
+--tests org.beesearch.app.data.gpx.GpxCancellationCloseTest --rerun-tasks:
+16/16 PASS,2 classes (10 S5 +6 corrective). Full :app:testDebugUnitTest --rerun-tasks:
+1034/1034 PASS,120 classes,0 failures/errors/skips. Exact launcher/environment/args,
+logs, timing and copied JUnit XML are retained per run.
+
+All required gates PASS: :app:compileDebugKotlin, :app:compileBetaKotlin,
+:app:compileReleaseKotlin, :app:compileDebugAndroidTestKotlin, :app:assembleDebug,
+:app:assembleDebugAndroidTest and :app:lintDebug. Offline controlled Gradle invocation
+uses --no-daemon --max-workers=2 and in-process Kotlin; no tooling/dependency change.
+
+After JVM/build/lint, source freeze at2026-10-15T06:28:12Z:
+
+- New S5 inputs4/4 pre/post MATCH, digest
+  `A791538D2E0F7252485E78D964BD8D7641E4360DC001E4DF9CEE38B202BA4F04`.
+- CLOSED post-corrective subset108/108 unchanged, digest
+  `365C0281EEA2228F72242B79DB5E75D09766B06A4C203C84BC9845ABF29EA18C`.
+- Current S5 superset112/112 pre/post MATCH, separate digest
+  `65585099B560BE247E5E32B7F604E911D6D16648E61EEE8FB9DB1D8CFD359005`.
+
+Historical S4 digest88C41139...22080709 is not the current closed-chain identity.
+The same deterministic ordered path/bytes/SHA JSON procedure reproduces closed108.
+Source bytes also match the snapshot taken before JVM; nothing changed after freeze.
+A final APK build ran after freeze; no rebuild between endpoints.
+
+DEV APK SHA256:
+`49820A970382626A05CFB640E084DD65DCBB095B6781A3788925DF9FE1AD7DC1`.
+androidTest APK SHA256:
+`11A59566BD880F146570FCF8B77D93F124310FC8814782766718455CE82F0F2A`.
+Application IDs were verified as org.beesearch.app.dev / org.beesearch.app.dev.test.
+Installed APK hashes on both endpoints equal that exact pair.
+
+| Group | Class | Methods each endpoint |
+|---|---|---:|
+| Capability | GpxXmlCapabilityTest |10|
+| SecurityMatrix | GpxXmlSecurityMatrixTest |15|
+| ProfileDevice | GpxProfileDeviceTest |12|
+| BoundaryDevice | GpxBoundaryDeviceTest |11|
+| CancellationClose | GpxCancellationCloseDeviceTest |4|
+| New S5 | GpxProcessorDeviceTest |12|
+
+Pre-corrective subtotal48 +corrective4 =closed52; new N=12; total64.
+Both actual individual method lists agree byte-for-byte after sorting by class/test;
+all52 closed and all12 S5 PASS. Method outcomes, not INSTRUMENTATION_CODE alone, prove it.
+
+| Endpoint | Identity | Runner result |
+|---|---|---|
+| BeeSearch_ZIP64_API29 / emulator-5554 | Android10 / API29 / x86_64; google/sdk_gphone_x86_64/generic_x86_64:10/QSR1.211112.011/13135432:userdebug/dev-keys |64/64 PASS,0 failures;186.851s|
+| BeeSearch_XML_API37 / emulator-5556 | Android17 / API37 / x86_64; google/sdk_gphone64_x86_64/emu64xa:17/CE2A.260420.019/15611780:userdebug/dev-keys |64/64 PASS,0 failures;272.731s|
+
+Provider on both: com.android.org.kxml2.io.KXmlParser; namespaces=true,
+docdecl=false, relaxed=false, validation=false. Same frozen source/APK pair,
+class set and expectations; sequential endpoints; both stopped with0 emulator
+processes/device entries left and unchanged AVD config hashes. No physical device,
+SDK/AVD provisioning, uninstall, clear or wipe. Exact serial-scoped installation,
+identification and instrumentation commands are retained in each api*/adb-commands.jsonl.
+
+Processor assertions prove canonical/identity/warnings handoff, two independent opens,
+chunk changes, second-open/read/close failures, mutation/truncation, late descriptor
+rejection, cancellation before/in/between/after passes, original cancellation identity
+and suppressed close failure, no partial Accepted, and no silent merge.
+A01 uses the closed independent205-byte literal CM1 and hand-authored canonical oracle;
+processor/direct canonical CM1 agrees. Comment variants retain canonical/CM1 while
+original SHA/length is independently checked per byte array. CM1 is never dedup identity.
+Existing S3 complete52-row corpus and S4 generated/resource regressions remain green.
+
+### 31.3 Two-pass measurement gate
+
+Historical preflight decision B retained: NEW minimal S5 seam measurement required.
+Closed S4 measurements do not alone measure the new processor handoff. The new probe
+uses deterministic300-sample input,9417 bytes,2 opens/2 passes,9417 bytes read per pass,
+EOF and single close per completed stream. Derived generator event oracle606 is not
+an observed provider event count. Processor-only elapsed: API29 56535700ns (56.5357ms),
+API37 37066100ns (37.0661ms). API/runtime/fingerprint and exact record are preserved in
+api*/processor-measurement.txt and logcat. Heap peak, allocation and actual event count
+are UNKNOWN; no exact heap claim, RAM/time threshold or admission limit was introduced.
+Successful semantic assertions and measurements do not imply future aggregate capacity.
+
+### 31.4 Future-owner integration contract
+
+GpxProcessor.process accepts a repeatable `() -> InputStream`, optional expected
+GpxOriginalIdentity, and a caller cancellation checkpoint. The caller owns the opener
+and its repeatable-source availability; each successfully opened stream is owned and
+closed by the existing input chain. Complete success requires two independent opens,
+EOF/validation/source agreement/close and final cancellation checks. No whole-file
+buffer is added by S5 to fake repeatability.
+
+Accepted returns the immutable canonical draft, exact original SHA256/byte length and
+frozen warnings (including unsupported content/time counts and supported addresses).
+The exact original descriptor describes original bytes, not normalized XML or CM1.
+The future managed-copy owner receives this descriptor and canonical material; S5
+neither publishes a durable original nor owns its filename, deletion or recovery.
+
+Consumers may encode the draft using the closed CM1 encoder for canonical comparison.
+CM1 is NOT persistent UUID, dedup/uniqueness/source key, ownership identity or backup
+wire format. Equal bytes/CM1 do not merge imports; future confirmation/fresh identity
+workflow remains mandatory under its own accepted contract.
+
+Rejected conveys only fixed accepted category and bounded context; no accepted draft
+is handed forward. Cancellation propagates as the same exception, never Rejected;
+secondary close failure remains suppressed, standalone close IO remains source-close.
+Future owners may rely on this no-partial-success boundary, not on persistence or
+publication having occurred. Tentative profile output is managed by the closed abort
+path; S5 adds no second sink or transaction architecture.
+
+The future coordinator must supply captured Territory/Observer/import-request context
+according to accepted ownership flow, completed repeatable source/descriptor as needed,
+admission/duplicate confirmation, persistent logical ID allocation and subsequent
+storage/publication policy. Processor never discovers current Territory/Area/Observer,
+retargets an import, generates a UUID/time identity or changes CM1 for ownership.
+Persistent SegmentUUID+ordinal addressing belongs to the future persistence owner.
+
+S5 does NOT own actual coordinator, Room/schema/migration, durable managed-original
+lifecycle, duplicate confirmation, visibility publication, protection, Complete Backup,
+Snapshot, restore, UI, SAF or MapLibre/Registry. Those owners must independently satisfy
+the remaining accepted integration/capacity gates before their domains are complete.
+
+### 31.5 Remaining gates and preserved history
+
+Every G11–G21 and H01–H07 disposition is recorded individually in the execution matrix
+and coverage evidence. G11=Imports1024/Territory READY inventory+candidate (coordinator),
+G12=Samples200000/Territory persisted inventory+candidate; neither is a parser limit.
+G13=current Backup64 entries; G14=16MiB metadata/entry; G15=64MiB aggregate metadata.
+G16=proposed V9 GPXsamples64MiB/entry; G17=256MiB total metadata; G18=4096 entries.
+G19=Snapshot64MiB compressed; G20=128MiB uncompressed. G21 has no invented fixed promise;
+full storage/app-wide/presentation/RAM/staging aggregate qualification remains future.
+
+H01–H05 have only the narrow comparison/no-merge/ownership-exclusion/retained-canonical
+handoff assertions proven here. Their actual confirmation, persistent records/IDs,
+viewing/missing-original policy and restore remain open. In particular full H05 requires
+restore with fixed identities WITHOUT GPX reparsing; S5 canonical stability does not
+close it. H06 visibility/stale-scope and H07 aggregate multi-Territory integration remain
+future. Actual coordinator, logical IDs, Room, managed original, duplicate workflow,
+publication/protection, Complete Backup/Snapshot and presentation/MapLibre/Registry
+are NOT implemented or qualified. Stage1 as a whole is NOT complete.
+
+Historical stopped-S5 scope-matrix.md remains9896bytes,
+SHA256 `02D961A5A989D9CD9DAB2862D24D1CC0ED02D21D99F394655A55B16345C81AB3`.
+The complete prior Stage1C §§1–30 prefix remains136262bytes,
+SHA256 `2958BF2D984A250E46D7DE87E8166AE058B76DC160344D9D530161E5E0BD0123`.
+Its accepted missing terminal newline was not normalized: separators and this §31
+were appended after the existing final byte. No earlier execution evidence was rewritten.
+
+Current next gate: independent review and OWNER acceptance of this unstaged diff.
+Index EMPTY. Commit NOT PERFORMED. Push NOT PERFORMED. No future-owner work begun.
