@@ -11,6 +11,7 @@ import java.nio.charset.CharacterCodingException
 import java.nio.charset.Charset
 import java.nio.charset.CodingErrorAction
 import java.util.Locale
+import java.util.concurrent.CancellationException
 
 /**
  * The raw-byte and encoding boundary for Slice 1.
@@ -100,6 +101,18 @@ internal class GpxInput(
         }
     }
 
+    /** Preserve only in-flight cancellation; other close precedence remains unchanged. */
+    internal fun closePreservingCancellation(cancellation: CancellationException?) {
+        if (cancellation == null) {
+            close()
+        } else {
+            try {
+                close()
+            } catch (cleanup: Throwable) {
+                if (cleanup !== cancellation) cancellation.addSuppressed(cleanup)
+            }
+        }
+    }
     override fun close() {
         if (!closed) {
             decodedReader.close()

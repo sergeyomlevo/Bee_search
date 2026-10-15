@@ -1,6 +1,37 @@
 # Bee Search handoff
 
-## Current state — D106 Stage 1 Slice 4 qualified / awaiting independent review (2026-10-14)
+## Current state — closed Slice1 cancellation corrective requalified (2026-10-14)
+
+**CORRECTED AND REQUALIFIED — READY FOR INDEPENDENT REVIEW.** HEAD remains
+`67a55452599a57d44d884d5c3dee57df7bfd5313`, task/d106-stage0-overlay-registry.
+Slice4 was OWNER-accepted and locally committed at that HEAD; no push.
+The pre-commit S4 status below and Stage1C §§27–29 are historical.
+
+S5 preflight found that source-close IOException could replace in-flight cancellation.
+S5 stopped; a separate OWNER-authorized corrective cycle changed only GpxInput and
+both AndroidGpxXmlReader cleanup owners. Same CancellationException now escapes;
+bounded close failure is suppressed. Standalone close classification and all other
+primary/close behavior remain unchanged. No S5 production implementation was started.
+
+ATTEMPT1: corrective4/4 pre/post MATCH, digest
+`2818045720D6394EED61F2E6C3571582BBEF8C4C24602E66F669E6C66B43E6F3`;
+combined current GPX108/108 MATCH, digest
+`365C0281EEA2228F72242B79DB5E75D09766B06A4C203C84BC9845ABF29EA18C`.
+Old S4 digest88C41139...22080709 remains historical (2 intentional production changes,
+104 other inputs unchanged). Targeted GPX JVM97/10 classes including6 corrective;
+full JVM1024/119 classes,0 failures/errors/skips; all7 build/lint gates PASS.
+Sequential API29 emulator-5554 and API37 emulator-5556 each52/52 PASS
+(48 regression +4 corrective), same frozen source/APK pair and installed hashes;
+both stopped, no physical device. Evidence and exact commands:
+`build/evidence/d106-slice1-cancellation-corrective/`; [Stage1C §30](../docs/d106-stage1c-gpx-implementation-contract.md#30-closed-slice1-cancellation-corrective--executionstatus-2026-10-14).
+
+Next: independent corrective review and OWNER acceptance. Diff UNSTAGED/UNCOMMITTED;
+no commit/push. Slice5 NOT STARTED / BLOCKED UNTIL CORRECTIVE ACCEPTANCE and fresh
+OWNER continuation. No coordinator/persistence/UUID/storage/protection/restore/UI work.
+Stage1 as a whole is NOT complete.
+
+
+## Historical pre-commit state — D106 Stage 1 Slice 4 qualification (2026-10-14)
 
 Baseline/current HEAD fd8e4dbf004e0def176bbe2b53efae805bf492c1,
 branch task/d106-stage0-overlay-registry. Slice3 CLOSED / OWNER-accepted / qualified

@@ -1708,3 +1708,103 @@ ATTEMPT3 is the final current qualification above: same106-file inventory scope,
 new digest88C41139...22080709, fresh full JVM/build and both APIs48/48 PASS,
 44 generated executions each (42 measured parses +F03/F09 observers),30 triplet
 cases each. All attempts remain distinct; no historical evidence was overwritten.
+
+## 30. Closed Slice1 cancellation corrective — execution/status (2026-10-14)
+
+**CORRECTED AND REQUALIFIED — READY FOR INDEPENDENT REVIEW.** This is a separate
+OWNER-authorized corrective cycle, not Slice5 qualification or OWNER acceptance.
+Starting/current HEAD: `67a55452599a57d44d884d5c3dee57df7bfd5313`, branch
+`task/d106-stage0-overlay-registry`; clean worktree/empty index verified before edits.
+That HEAD is the OWNER-accepted local Slice4 commit, parent fd8e4dbf..., subject
+`test(gpx): qualify D106 Stage 1 Slice 4`. No push occurred.
+
+### 30.1 Discovery, contract and narrow correction
+
+Slice1 was previously accepted. Later S5 preflight discovered a combined-failure
+counterexample: an in-flight CancellationException was replaced by a source-close
+IOException translated to `INPUT_IO_ERROR:source-close`. S5 stopped before production
+implementation. Its ignored preflight evidence remains historical and unchanged.
+
+Stage1B §12 and Stage1C S15/§13 require abort/discard and cancellation rethrow.
+The contracts do not specify a general primary-versus-close precedence matrix.
+This correction changes only cancellation preservation: the SAME cancellation object
+escapes both preflight and parser-pass cleanup. A secondary bounded source-close
+failure is attached as suppressed, following existing project cleanup conventions;
+it is not made the cause or a new public result category. Without in-flight
+cancellation, existing close behavior/precedence remains unchanged, including
+standalone `INPUT_IO_ERROR:source-close`. No new general error policy was introduced.
+
+Production changes are limited to:
+- `app/src/main/java/org/beesearch/app/data/gpx/GpxInput.kt`: cohesive internal
+  cancellation-aware close helper; original close and constructor behavior retained.
+- `app/src/main/java/org/beesearch/app/data/gpx/AndroidGpxXmlReader.kt`: capture/rethrow
+  cancellation and use that helper in both existing owner-finally blocks.
+
+The constructor already preserves the primary throwable and was not changed.
+Guard/raw close delegation and profile abort/rethrow were inspected and retained.
+Decoder/security/provider/profile/value/model/CM1/identity/limits semantics were not
+redesigned. No dependency or Slice5 processor/result file was added.
+
+### 30.2 Frozen-current qualification
+
+New tests:
+- `app/src/test/java/org/beesearch/app/data/gpx/GpxCancellationCloseTest.kt` (6 methods).
+- `app/src/androidTest/java/org/beesearch/app/data/gpx/GpxCancellationCloseDeviceTest.kt`
+  (4 methods; success plus each-pass standalone close and cancellation/close variants).
+
+ATTEMPT1 was frozen BEFORE final JVM/build/Android runs. Corrective inventory4/4
+pre/post MATCH, SHA256:
+`2818045720D6394EED61F2E6C3571582BBEF8C4C24602E66F669E6C66B43E6F3`.
+Combined current GPX inventory108/108 pre/post MATCH, SHA256:
+`365C0281EEA2228F72242B79DB5E75D09766B06A4C203C84BC9845ABF29EA18C`.
+Old accepted Slice4 inventory digest
+`88C41139C66A1BD15DFB4BA0A3507D66177C36CB800C54407DB50EEC22080709`
+remains historical: two production files intentionally differ;104 other inputs match.
+Do not describe the corrected chain as the old106/106 revision.
+
+Targeted corrective + existing GPX JVM:97/97,10 classes, including6 corrective tests.
+Full JVM:1024/1024,119 classes. Both have0 failures/errors/skips.
+All seven gates PASS: compileDebugKotlin, compileBetaKotlin, compileReleaseKotlin,
+compileDebugAndroidTestKotlin, assembleDebug, assembleDebugAndroidTest, lintDebug.
+Offline/no-daemon/max-workers2/in-process compiler and task-local temp/cache setup
+were used; exact launcher, argument arrays, logs and JUnit XML are in evidence.
+
+One APK pair was built after freeze and used unchanged on both endpoints:
+- DEV SHA256 `8FEE95D15FED8E5EE29EE1B9C36B63E7362C381D504495DA02420D17CBB9324C`.
+- androidTest SHA256 `9DC589E1CD3BC9A8B1E3351BF349E3718F4F4F3B014CE6EBC61AB8C1334183D8`.
+
+| Endpoint | Actual serial | Result | Instrumentation time |
+|---|---|---|---|
+| BeeSearch_ZIP64_API29, Android10/API29/x86_64 | emulator-5554 |52/52 PASS|191.346s|
+| BeeSearch_XML_API37, Android17/API37/x86_64 | emulator-5556 |52/52 PASS|248.771s|
+
+Each endpoint ran48 existing GPX regression methods plus4 corrective methods,
+using actual AndroidGpxProfileReader/AndroidGpxXmlReader, not an alternate parser.
+Provider: com.android.org.kxml2.io.KXmlParser; namespaces=true,docdecl=false,
+relaxed=false,validation=false. Direct assertions prove same-object cancellation,
+bounded suppressed close failure and no returned canonical success on BOTH passes;
+standalone close failure remains exact INPUT_IO_ERROR:source-close. Successful
+canonical parsing and existing Slice1–Slice4 regression remain green. The pre-existing
+EOF-close/finally retry on standalone close failure was not changed into a new policy.
+Success is based on OK(52 tests) and52 individual passed outcomes, not code-1 alone.
+
+Endpoints were sequential, both stopped with no remaining device/emulator process,
+and AVD configs unchanged. Explicit serial-scoped identification/install/instrumentation
+commands and installed APK hash correspondence were preserved. No physical device,
+uninstall/clear/wipe/provisioning, dependency change, staging, commit or push.
+
+Evidence: `build/evidence/d106-slice1-cancellation-corrective/contract-audit.md` and
+`attempt-1/`: source/combined inventories, JVM summaries/XML/logs, build-gates/APK
+inventory, endpoint commands/identity/method lists/results/stop and correspondence.
+Historical Slice1–Slice4 evidence and the entire prior Stage1C prefix through §29
+are preserved; this section records the later discovery and corrective qualification.
+
+### 30.3 Current boundary / next action
+
+Corrective diff remains UNSTAGED/UNCOMMITTED for independent review and separate
+OWNER acceptance. Slice5 implementation is NOT STARTED / BLOCKED UNTIL CORRECTIVE
+ACCEPTANCE; a fresh OWNER continuation decision is required. No Slice5 qualification
+is claimed. Actual coordinator, logical IDs/addressing, Room, managed original,
+duplicate/reimport workflow, publication/protection, backup/snapshot, full H05 restore
+without GPX reparsing, presentation/MapLibre/Registry and future capacity gates remain
+open. Stage1 as a whole is NOT complete. Do not resume S5 or any future-owner work.

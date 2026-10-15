@@ -7,6 +7,7 @@ import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
 import java.io.IOException
 import java.io.Reader
+import java.util.concurrent.CancellationException
 
 /** A bounded observation from the Android XML provider; it is not a canonical GPX model. */
 internal data class GpxXmlObservation(
@@ -60,17 +61,22 @@ internal object AndroidGpxXmlReader {
 
         val preflightMetrics = GpxXmlMetrics()
         val preflightInput = GpxInput(openSource(open), GpxXmlLimits(), preflightMetrics, checkCancellation)
+        var preflightCancellation: CancellationException? = null
         val preflightIdentity = try {
             val guard = GpxXmlGuard(preflightInput.reader, metrics = preflightMetrics, checkCancellation = checkCancellation, collectStarts = false)
             drainGuard(guard, checkCancellation)
             preflightInput.identity()
+        } catch (cancelled: CancellationException) {
+            preflightCancellation = cancelled
+            throw cancelled
         } finally {
-            preflightInput.close()
+            preflightInput.closePreservingCancellation(preflightCancellation)
         }
 
         val parseMetrics = GpxXmlMetrics()
         val input = GpxInput(openSource(open), GpxXmlLimits(), parseMetrics, checkCancellation)
         val observations = ParseAccumulator(observe)
+        var parseCancellation: CancellationException? = null
         return try {
             val guard = GpxXmlGuard(input.reader, metrics = parseMetrics, checkCancellation = checkCancellation, collectStarts = true)
             try {
@@ -191,8 +197,11 @@ internal object AndroidGpxXmlReader {
                 configuration = "namespaces=true;docdecl=false;relaxed=false;validation=" +
                     parser.getFeature(XmlPullParser.FEATURE_VALIDATION),
             )
+        } catch (cancelled: CancellationException) {
+            parseCancellation = cancelled
+            throw cancelled
         } finally {
-            input.close()
+            input.closePreservingCancellation(parseCancellation)
         }
     }
 
