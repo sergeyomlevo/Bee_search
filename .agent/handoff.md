@@ -1,12 +1,33 @@
 # Bee Search handoff
 
-Persistence continuation: [Stage1D contract](../docs/d106-stage1d-gpx-persistence-contract.md)
-is OWNER-ACCEPTED; D1/D2 are recorded in decisions.md.
-Documentation baseline HEAD: 3a67dc5d2bb112cf82b4cb932624240592641e42.
-The Slice5 HEAD below records its earlier closure baseline.
-No persistence implementation started. Next: prepare a separate implementation
-task for the first Persistence Foundation Slice;
-Stage1 remains OPEN. Earlier next-step wording below predates this continuation.
+## Current continuation — Stage1D Implementation Slice1, OWNER-ACCEPTED / PASS
+
+The [Stage1D contract](../docs/d106-stage1d-gpx-persistence-contract.md) remains
+OWNER-ACCEPTED. Persistence Foundation Slice1 is implemented and qualified within
+its declared foundation scope; implementation is OWNER-ACCEPTED / PASS.
+Independent DeepSeek review: 0 BLOCKER/HIGH/MEDIUM, 6 non-blocking INFO; no INFO remediation.
+Qualification baseline/HEAD: f753f9ef339f94fffe2f58d74689fd400d0c2f73,
+task/d106-stage0-overlay-registry. OWNER authorized one local acceptance commit; no push.
+
+Room15 adds exactly five GPX tables, explicit14→15 migration, shared structural
+triggers and fail-closed definition verification, exact canonical mapping and
+PENDING transactions/cleanup/count facts. Territory/Observer deletion guards include
+imports/jobs. No READY writer or user import route; D1/D2 and closed GPX code unchanged.
+
+Frozen ATTEMPT1:564 qualification inputs pre/post MATCH;
+0DB264A569618C6B4D364568D972C4D710D8251FB83A81D5F88AA3413D7AFECF.
+Closed S5 inputs112/112 unchanged. Targeted9/9; full1043/121 classes,0 failures/errors/skips;
+all7 compile/build/lint gates PASS. Sequential API29/API37 each151/151 methods:
+64 closed GPX +74 Room/repository regression +13 new persistence/migration.
+Same frozen APK pair and method set; both emulators stopped; physical device untouched.
+Evidence: build/evidence/d106-stage1d-slice1/attempt-1/ (ignored).
+Development compile/test-fixture corrections precede freeze; their logs remain under
+the sibling development/ directory. No failed frozen attempt was replaced.
+
+Next: a separately authorized task is required for further implementation. Coordinator,
+managed originals, recovery, admission, Backup/Snapshot/Restore and UI remain future
+stages. Stage1 and full H05 remain OPEN. No automatic continuation.
+Earlier Slice5 and other next-step wording below records historical closure states.
 
 ## Current state — D106 Stage1 Slice5 processor handoff CLOSED / OWNER-accepted (2026-10-15)
 

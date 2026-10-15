@@ -300,6 +300,9 @@ internal interface PhysicalObjectSequenceDao {
 
 @Dao
 internal interface ObserverDao {
+    @Query("SELECT (SELECT COUNT(*) FROM gpx_imports WHERE importing_observer_id = :id) + (SELECT COUNT(*) FROM gpx_import_jobs WHERE importing_observer_id = :id)")
+    abstract suspend fun countGpxReferences(id: UUID): Long
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(observer: ObserverEntity)
 

@@ -545,3 +545,7 @@ private data class NumberingScope(
     val observationYear: Int,
     val observerCode: String,
 )
+
+internal val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) { GpxPersistenceSchema.migrate(db) }
+}
