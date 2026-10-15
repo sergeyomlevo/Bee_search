@@ -1,5 +1,13 @@
 # Bee Search handoff
 
+Persistence continuation: [Stage1D contract](../docs/d106-stage1d-gpx-persistence-contract.md)
+is OWNER-ACCEPTED; D1/D2 are recorded in decisions.md.
+Documentation baseline HEAD: 3a67dc5d2bb112cf82b4cb932624240592641e42.
+The Slice5 HEAD below records its earlier closure baseline.
+No persistence implementation started. Next: prepare a separate implementation
+task for the first Persistence Foundation Slice;
+Stage1 remains OPEN. Earlier next-step wording below predates this continuation.
+
 ## Current state — D106 Stage1 Slice5 processor handoff CLOSED / OWNER-accepted (2026-10-15)
 
 **D106 STAGE 1 SLICE 5 CLOSED / OWNER-ACCEPTED / QUALIFIED WITHIN DECLARED PROCESSOR-HANDOFF SCOPE.**

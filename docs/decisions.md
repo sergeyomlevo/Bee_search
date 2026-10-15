@@ -3908,3 +3908,23 @@ transactions, backup/snapshot и fail-closed patterns, без преждевре
 
 Backlog: I011/I014/I016 отражают принятые части ссылкой сюда; их более широкий scope остаётся
 idea. I015 synchronization и I018 server/PC analytics не принимаются этим решением.
+
+
+## D106 persistence foundation OWNER decisions D1/D2
+
+**D1/D2: OWNER-APPROVED / EFFECTIVE.** These decisions remain effective and may
+be revised only by a technically justified OWNER decision.
+
+- **D1 — durable request/result correlation:** nullable request UUID on TrackImport;
+  no separate durable receipt table. Correlation is operational, not canonical GPX
+  identity; it is excluded from the canonical graph transported by Complete Backup
+  and Repository Snapshot and is NULL after their corresponding restores.
+- **D2 — first-slice Android Auto Backup/device transfer:** existing rules and Room
+  backup remain unchanged. User GPX import is not activated before the agreed
+  protection/restore gates. Android Auto Backup does not replace those mechanisms.
+
+The full [Stage1D Persistence Implementation Contract](d106-stage1d-gpx-persistence-contract.md)
+is **OWNER-ACCEPTED** after DeepSeek ACCEPT WITH CONDITIONS, incorporation of C1–C3
+and explicit OWNER agreement. Acceptance covers the Persistence Foundation contract
+and physical schema, not implementation completion or authorization. Recovery and
+protection/restore gates remain open. Stage1 remains OPEN.
