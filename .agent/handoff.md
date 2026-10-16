@@ -1,6 +1,43 @@
 # Bee Search handoff
 
-## Current status - Managed Original Store OWNER-ACCEPTED / PASS within scope (2026-10-16)
+## Current status — Coordinator / Journal / Recovery QUALIFIED through FILE_PUBLISHED (2026-10-16)
+
+Baseline `bd28079fca38154cc74a280d480cbf38d6c38ce0`. OWNER selected FILE_PUBLISHED
+as the terminal phase (decisions.md). Internal Coordinator composes the unchanged
+processor and Managed Original Store with checked journal transitions, stable IDs
+and atomic PENDING graph save. Prepared is not import success: no READY writer,
+admission, completed-request correlation, user-import or startup wiring. The
+future runtime owner must reconcile before exposing GPX data. Live retries honor
+captured-request cancellation; startup recovery uses persistent ownership and live
+Territory/Observer existence without choosing the current UI Territory.
+
+Targeted JVM2/2; full1051/123 classes,0 failures/errors/skips; all7 build/lint gates
+PASS. Same frozen APKs and exact202 unique-method set on sequential API29/API37:
+each202/202 PASS (181 existing+21 new), plus7/7 real host process-stop/recovery
+probes per API at COPYING, COPIED, PARSING, PARSED, STORE_FINAL_COPY,
+FINAL_VERIFIED and FILE_PUBLISHED. Early incomplete phases compensate without
+provider reopen; PARSED/verified publication recovers without reparse/new IDs;
+partial final copy fails closed and compensates; FILE_PUBLISHED remains PENDING.
+READY/foreign files are protected; failed cleanup retains ABORT journal/descriptor.
+Staging/witness remain until future completion or authorized abort.
+
+Frozen579/579 pre/post MATCH (577 source inputs+2 ignored helpers), digest
+`E691434EE72D5962D9271FD3668FDEBFDC013FA26848EE5EDB30188EE003C760`;
+closed GPX112/112 MATCH. Only GpxDao/GpxPersistenceStore changed intentionally in
+the preceding inventory. Parser, Original Store sources/tests and Room15 schema/
+migrations unchanged. Ignored evidence: `build/evidence/d106-coordinator/attempt-1/`
+(commands, identities, APK hashes, per-method outcomes, separate crash results).
+
+Real ENOSPC NOT TESTED; power-loss UNKNOWN; physical device NOT RUN. Predecessor
+API37 startup ANR exact cause remains UNKNOWN; settled current qualification PASS.
+No backup/media/UI changes; both AVDs stopped. One local implementation commit
+authorized after qualification; no push. Stage1/H05 OPEN. Stop for OWNER review.
+Next separately scoped work: READY transition, G11/G12 admission and completed
+request correlation, retaining ABORT-versus-READY serialization and existing
+protection/restore gates. Do not start automatically.
+
+
+## Historical acceptance - Managed Original Store OWNER-ACCEPTED / PASS within scope (2026-10-16)
 
 OWNER accepted the exclusive-publication Managed Original Store file Slice.
 Qualified production/test bytes remain unchanged: JVM1049/1049, all7 build/lint

@@ -3975,3 +3975,17 @@ implementation or new file-transfer policy is authorized by this documentation.
 
 The current development sequence is mirrored in the existing
 [execution checklist](unified-territory-map-checklist.md#owner-development-order--2026-10-16).
+
+
+## D106 Coordinator / Journal / Recovery terminal boundary — 2026-10-16
+
+**ACCEPTED — explicit OWNER decision.** The current Coordinator Slice ends at
+`FILE_PUBLISHED`: the verified original and complete graph are prepared, but the
+import remains `PENDING`, inaccessible to ordinary reads, and is not a successful
+user import. Cancellation and recovery cover all phases through this boundary.
+Recovery may prepare or compensate an operation; it never activates `READY`.
+Stable operation/original/graph identities and journal links are preserved.
+Completed user request/result correlation, `READY` activation, G11/G12 admission
+and final completion belong to a separately authorized subsequent Slice. No new
+journal phases or temporary admission bypass are introduced. Stage1/H05 OPEN;
+existing protection/restore and user-import activation gates remain binding.

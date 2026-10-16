@@ -41,6 +41,12 @@ internal abstract class GpxDao {
     @Query("SELECT * FROM gpx_import_jobs WHERE request_uuid = :requestUuid")
     abstract suspend fun jobByRequest(requestUuid: UUID): GpxImportJobEntity?
 
+    @Query("SELECT * FROM gpx_import_jobs ORDER BY request_uuid")
+    abstract suspend fun jobs(): List<GpxImportJobEntity>
+
+    @Query("DELETE FROM gpx_import_jobs WHERE request_uuid = :requestUuid AND intent = 'ABORT' AND import_id IS NULL AND phase != 'READY'")
+    abstract suspend fun deleteAbortedJob(requestUuid: UUID): Int
+
     @Query("SELECT * FROM gpx_source_tracks WHERE import_id = :importId ORDER BY ordinal")
     abstract suspend fun tracks(importId: UUID): List<GpxSourceTrackEntity>
 
