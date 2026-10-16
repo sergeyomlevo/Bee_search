@@ -27,6 +27,22 @@
 - I014 — user georeferenced rasters; I011 — GPX и пользовательские полевые данные; I001 —
   аналитические overlays.
 
+## OWNER development order — 2026-10-16
+
+Current planning decision: [unified local Complete Backup/Restore](decisions.md#unified-local-complete-backuprestore--owner-decision-2026-10-16).
+Continue D106, then the necessary user entities, media and user raster maps;
+return to the unified local Backup/Restore after the main stores stabilize.
+New stores must expose clear ownership/storage/enumeration/read/restore rules
+and join the common mechanism rather than add a separate backup per data type.
+Before full use with irreplaceable user data, Restore must be implemented and
+tested on a real device. Android Auto Backup remains unchanged and outside the
+current work plan unless a concrete need arises.
+
+This is a development sequence, not gate closure or runtime authorization.
+Stage1, H05 and the existing protection/restore gates remain OPEN; no user GPX
+import is activated. Earlier stage tables retain their capability/exit obligations.
+No speculative risk creates mandatory work without demonstrated impact.
+
 ## Done
 
 - [x] I016 сформулирована и temporal section reconciled.

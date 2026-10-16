@@ -3928,3 +3928,50 @@ is **OWNER-ACCEPTED** after DeepSeek ACCEPT WITH CONDITIONS, incorporation of C1
 and explicit OWNER agreement. Acceptance covers the Persistence Foundation contract
 and physical schema, not implementation completion or authorization. Recovery and
 protection/restore gates remain open. Stage1 remains OPEN.
+
+
+## Project navigation and auxiliary-directory placement — 2026-10-16
+
+**ACCEPTED — explicit OWNER instruction.** Use a compact root README and
+semantic local indexes with paths and short descriptions. Reuse existing
+contracts, decisions, handoff and checklist; do not duplicate their contents.
+New external Bee Search support directories belong below
+`C:\App\Bee_search_support`, grouped by purpose as needed. Existing Git
+checkouts/worktrees and path-dependent directories stay in place. Other
+existing folders may move only after ownership and path dependencies are
+checked; no directory is disposable merely because its name looks temporary.
+Current locations and migration checks: [workspace map](workspace-layout.md).
+
+
+## Unified local Complete Backup/Restore — OWNER decision, 2026-10-16
+
+**ACCEPTED — explicit OWNER instruction; implementation deferred.**
+
+- Goal: one extensible local Complete Backup/Restore covering the whole Room
+  database and permanent user files. New data types must join that mechanism
+  without redesigning its core; do not build a separate backup mechanism per type.
+- New file stores must define ownership, permanent storage, enumeration, reading
+  and restoration of their files. This records compatibility obligations, not
+  authorization to introduce a generic backup framework now.
+- Full Backup/Restore is not implemented in this task. At present there is
+  practically no substantial irreplaceable user data (OWNER assessment).
+- Development order: continue D106, then develop the necessary user entities,
+  media and user raster maps. Once the main stores stabilize, return to the
+  unified local Complete Backup/Restore. This order concerns development;
+  existing capability activation, protection and restore gates remain binding.
+- Before full operational use with irreplaceable user data, Restore must be
+  implemented and tested on a real device.
+- Android Auto Backup is outside the current plan. Leave the existing mechanism
+  and rules unchanged; do not investigate or configure it without a concrete need.
+- Hypothetical problems do not become mandatory work without demonstrated impact
+  on development.
+
+This decision changes planning priority, not completed verification history or
+accepted GPX contracts. D106 Stage1 and H05 remain OPEN; the existing protection/
+restore gates and user-import activation boundary are not waived. Existing
+Complete Backup and Repository Snapshot retain their distinct contracts; no
+codec, format, schema or runtime behavior is changed here. No Backup/Restore
+implementation or new file-transfer policy is authorized by this documentation.
+
+The current development sequence is mirrored in the existing
+[execution checklist](unified-territory-map-checklist.md#owner-development-order--2026-10-16).

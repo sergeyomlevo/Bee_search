@@ -87,6 +87,15 @@ required by the current task.
 
 ---
 
+### Navigation and auxiliary directories
+
+Start with [README.md](README.md), then the relevant local index; avoid broad
+reads when an entry point is available. Indexes route to authoritative documents
+and do not replace them. Update the relevant index when paths or roles change.
+New external auxiliary directories belong under `C:\App\Bee_search_support`;
+see [workspace layout](docs/workspace-layout.md). Existing linked checkouts and
+path-dependent folders stay in place unless a separate move is agreed.
+
 ## 3. Project Sources of Truth
 
 Detailed project knowledge lives in `docs/`.

@@ -1,5 +1,25 @@
 # Bee Search handoff
 
+## Navigation update — 2026-10-16
+
+Start with the [project map](../README.md) and [documentation index](../docs/README.md).
+The [workspace map](../docs/workspace-layout.md) records existing auxiliary
+directories and the new common parent `C:\App\Bee_search_support`. Existing
+folders have not moved. Changes are documentation-only; application code and GPX
+contracts remain unchanged. OWNER authorized one local documentation commit; no push.
+D106 status remains in the existing checklist.
+
+
+## OWNER Backup/Restore planning decision — 2026-10-16
+
+[Accepted decision](../docs/decisions.md#unified-local-complete-backuprestore--owner-decision-2026-10-16):
+continue D106, then the necessary user entities/media/user raster maps; return to
+one extensible local Complete Backup/Restore after the main stores stabilize.
+Restore on a real device is mandatory before full use with irreplaceable data.
+Existing Android Auto Backup is unchanged and outside the current work plan.
+Stage1/H05 and existing protection/restore/activation gates remain OPEN.
+No implementation is authorized by this docs-only task; stop after the local commit.
+
 ## Current continuation — Stage1D Implementation Slice1, OWNER-ACCEPTED / PASS
 
 The [Stage1D contract](../docs/d106-stage1d-gpx-persistence-contract.md) remains
