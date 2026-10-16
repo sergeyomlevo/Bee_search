@@ -1,5 +1,113 @@
 # Bee Search handoff
 
+## Current status - Managed Original Store OWNER-ACCEPTED / PASS within scope (2026-10-16)
+
+OWNER accepted the exclusive-publication Managed Original Store file Slice.
+Qualified production/test bytes remain unchanged: JVM1049/1049, all7 build/lint
+gates PASS; ATTEMPT6 API29 and API37 each181/181 PASS, plus separate FINAL_COPY and
+DIRECTORY_SYNC process-death/recovery2/2 PASS on each endpoint. Same frozen APKs
+and method set. Frozen572/572, diagnostic runner superset573/573 and closed GPX112/112 MATCH.
+Evidence: ignored `build/evidence/d106-managed-original-store/attempt-6/` and
+`diagnosis-1/`; historical failed attempts below remain preserved.
+
+Accepted limitations: real ENOSPC NOT TESTED; power-loss durability UNKNOWN;
+physical-device behavior NOT TESTED; exact old API37 startup ANR blocking call
+UNKNOWN despite successful settled-start qualification. These are not verified guarantees.
+API29 early emulator heap initialization issue was localized; no production fix
+was required during diagnosis. OWNER authorized one local finalization commit,
+including implementation/tests, corrected contract and acceptance status; no push.
+Stage1/H05 OPEN. Coordinator, READY activation and user GPX import remain future work.
+Next requires a separate scoped Coordinator/reconciliation task; no implementation
+or Backup/Restore work starts automatically.
+
+## Historical Android diagnosis - qualification completed before OWNER acceptance (2026-10-16)
+
+Targeted diagnosis preserved all implementation/test bytes and the accepted baseline
+`a31ce3abc24c7f16b79348e6590d0c4d44d93a34`. API29 ATTEMPT4/5 boot logs show
+zygote64 `-Xmx16m` before qemu-props delivered `dalvik.vm.heapsize=512m`;
+Android 10 AndroidRuntime uses 16m as the absent-property default. Controlled boot
+recorded zygote512m and actual test Runtime.maxMemory=536870912. The eight previously
+failing methods passed together8/8; no Store/fixture correction or heap increase.
+AVD config.ini files remain byte-identical.
+
+API37 ordinary cold launch, isolated capability and Store tests PASS. The old
+startup ANR occurred with high CPU/IO pressure; its retained DropBox trace is empty
+(EOFException), so the exact blocking call/root cause remains UNKNOWN. After boot
+settling, the same frozen APKs and same181-method set passed on both endpoints in
+ATTEMPT6: API29 181/181, API37 181/181, zero failures. Separate host-controlled
+process-stop/recovery probes at FINAL_COPY and DIRECTORY_SYNC PASS on each endpoint.
+This proves those process-death boundaries, not power-loss durability.
+
+Frozen572/572 pre/post MATCH, digest
+`1740C1111B3CB531015AF454DACE4F25C0771E9C8A29DD78922A51613318285F`;
+qualification plus the new ignored diagnostic runner573/573 MATCH, digest
+`DF41D336DF0F474534A1529254361E02177438AD2F501281B93F088B35B63AF9`.
+Closed GPX112/112 unchanged. Prior JVM1049/1049 and7 build/lint PASS remain applicable
+to unchanged inputs; not rerun during diagnosis. Evidence: ignored
+`build/evidence/d106-managed-original-store/diagnosis-1/` and `attempt-6/`.
+Historical failures remain preserved below and in ATTEMPTS1-5.
+
+Only handoff/checklist status updated after frozen verification. No production/test,
+Room/parser/media/backup changes; both emulators stopped; physical device untouched.
+No staging/commit/push. Real ENOSPC NOT TESTED; power-loss UNKNOWN. Stage1/H05 OPEN.
+Next: OWNER/independent review of the completed Android evidence and existing Store
+implementation. Do not start Coordinator, READY activation or Backup/Restore.
+
+## Historical continuation — exclusive Managed Original Store BLOCKED / NOT QUALIFIED (2026-10-16)
+
+OWNER authorized the targeted hard-link replacement. Baseline remains
+`a31ce3abc24c7f16b79348e6590d0c4d44d93a34`, branch `task/d106-stage0-overlay-registry`.
+[Store contract](../docs/D106_Managed_Original_Store_implementation_contract_2026-10-16.md)
+now specifies exclusive O-directory / O_CREAT|O_EXCL final creation, bound dev/ino
+proof plus retained operation witness and verified marker. Four internal production
+files, three test files and documentation remain unstaged; Room/parser/media/backup
+rules are unchanged. No implementation commit or push.
+
+Targeted JVM6/6; full1049 tests /122 classes,0 failures/errors/skips; all7 build/lint
+gates PASS, including recompilation/lint after the crash-fixture correction.
+ATTEMPT3 API29 body181/181 PASS, but the actual process-kill probe failed because its
+fixture fit one copy block. That failed attempt is preserved. Fixture now exceeds
+32KiB and asserts partial final length; production did not change for this fix.
+ATTEMPT4 API29 and bounded unchanged retry ATTEMPT5 each173/181 PASS,8 OOM failures
+(7 closed regression +1 new16MiB test), ART reports16MiB growth limit; origin UNKNOWN.
+ATTEMPT5 API37 stops after6/181 passes: Process crashed; ActivityManager records
+failed-to-complete-startup bg ANR. No mandatory Android PASS or process-death recovery
+claim. Same DEV/test APK pair, serial-scoped commands; both emulators stopped.
+
+Frozen572/572 pre/post MATCH, digest `1740C1111B3CB531015AF454DACE4F25C0771E9C8A29DD78922A51613318285F`;
+closed GPX112/112 unchanged. Evidence: `build/evidence/d106-managed-original-store/attempt-3/`
+through `attempt-5/` (ignored; historical attempts1/2 preserved).
+Next minimum step: diagnose the API29 ART limit and API37 startup failure before
+re-running the same mandatory frozen qualification. Do not weaken limits/tests or
+change AVD settings without an explicit basis/authorization. Real ENOSPC NOT TESTED;
+power-loss UNKNOWN; physical device untouched. Stage1/H05 OPEN. No Coordinator,
+READY activation, Room migration or Backup/Restore implementation.
+
+## Historical initial Managed Original Store STOP — hard-link publication (2026-10-16)
+
+Baseline a31ce3abc24c7f16b79348e6590d0c4d44d93a34, task/d106-stage0-overlay-registry.
+The supplied [full Store contract](../docs/D106_Managed_Original_Store_implementation_contract_2026-10-16.md)
+is preserved unchanged. Three internal production files and focused JVM/device tests
+are present, unstaged. No implementation commit: mandatory Android publication failed.
+
+Targeted JVM6/6; full1049/122 classes,0 failures/errors/skips; all7 build/lint gates PASS.
+ATTEMPT1 API29:155 existing regression methods PASS; the new crash methods failed
+at Os.link and the new Store class initially had a JUnit non-void measurement method.
+That test defect was corrected before the separate ATTEMPT2 focused diagnostic.
+ATTEMPT2 API29/API37 each13/21 PASS,8 FAIL: Os.link returns EACCES; SELinux denies
+{ link } for untrusted_app. Same APK pair/method set; both emulators stopped.
+The contract's hard-link publication/inode proof cannot qualify on these endpoints.
+No fallback, policy relaxation or alternative publication was introduced.
+
+Frozen diagnostic inputs571/571 pre/post MATCH; closed GPX112/112 unchanged.
+Evidence: build/evidence/d106-managed-original-store/attempt-1/ and attempt-2/ (ignored).
+Real process-kill recovery, post-link cancellation, publication cost and real ENOSPC
+remain unqualified; power-loss UNKNOWN. Physical device untouched.
+Next requires OWNER acceptance of a minimal publication-contract correction preserving
+no-replace and ownership. Do not resume implementation automatically. Stage1/H05 OPEN;
+Coordinator, READY activation, Room changes and Backup/Restore remain outside this task.
+No staging, commit or push.
+
 ## Navigation update — 2026-10-16
 
 Start with the [project map](../README.md) and [documentation index](../docs/README.md).
