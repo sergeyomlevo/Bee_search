@@ -1,6 +1,43 @@
 # Bee Search handoff
 
-## Current status — runtime reconciliation / READY access QUALIFIED; OWNER review pending (2026-10-17)
+## Current status — captured GPX request/workflow QUALIFIED; OWNER review pending (2026-10-17)
+
+Baseline `9f2b0605461dff110ea9933f8bfc9052fe92ba4b`; OWNER accepted that runtime
+Slice as PASS within scope. Internal AppContainer.gpxImportWorkflow exposes
+capture(displayName), execute(handle, open, confirmRepeatedOriginal=false), lookup(R).
+Capture creates one explicit intent with immutable Territory/nullable Observer,
+request UUID and technical metadata. Retain its handle for retries; execute never
+creates a replacement request. Consumed intent cannot authorize another job; durable
+READY lookup wins over lost delivery/current selection. After process loss, journal
+recovery uses saved context/IDs, not provider URI or a reconstructed handle.
+
+Runtime serializes whole live workflow against reconciliation. Shared transient
+SettingsSelectionGuard orders normal selection writes with final complete; A-B-A
+invalidates incomplete intent. No new persisted fields/counters. Cancellation/error
+between Prepared and complete delegates NonCancellable abort to Coordinator, preserving
+same cancellation and committed READY. Existing duplicate/admission rules stay there.
+User import remains unavailable (read-only false), no picker/UI/map/Registry route.
+
+Targeted JVM3/3; full1061/126 classes,0 failures/errors/skips; all7 build/lint PASS.
+ATTEMPT2 sequential API29/API37 each264/264 PASS (239 prior+6 settings regressions+
+19 new workflow/guard/crash methods), same APK pair/exact method set. Each plus5/5
+actual force-stop/recovery probes through workflow lookup, no new requests/IDs/source.
+Both AVDs stopped, no physical device. Freeze601/601 MATCH, digest
+`C8DB9F7F551F67069E5BB358332503D42A16520A5BE562C93AFFE666CC60F2E9`;
+closed GPX112/112 unchanged. Evidence: ignored `build/evidence/d106-workflow/attempt-2/`.
+ATTEMPT1 API29 focused12/13 failed due a still-armed cancellation fixture; preserved.
+ATTEMPT2 fixes its retry and adds both explicit post-Prepared failure regressions.
+
+Room15/schema, parser, Original Store, Coordinator/admission and backup/media remain
+unchanged. Protection/Restore/direct restore-writer integration, actual picker/provider
+permission workflow and UI are outside scope. Normal selection writes may await final
+completion/cleanup; a failed selection write can conservatively invalidate an intent.
+Real ENOSPC NOT TESTED; power-loss UNKNOWN; physical NOT RUN; historical API37 startup
+ANR exact cause UNKNOWN. Stage1/H05 OPEN. One local commit authorized after final
+scope checks, no push. Stop for OWNER review; separately agree the next activation/
+protection gate before adding a user entry. Do not start automatically.
+
+## Historical status — runtime reconciliation / READY access QUALIFIED; OWNER review pending (2026-10-17)
 
 Baseline `081a41cad7bcc36dc4734664c0df5d15932f287b`. OWNER accepted the preceding
 READY Slice as PASS within scope. Application.onCreate now starts reconciliation

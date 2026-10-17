@@ -2571,3 +2571,37 @@ startup gate and existing Coordinator writer serialization.
 API29/API37 runtime/application/main-thread access and fresh-process recovery
 proof: ignored build/evidence/d106-runtime/attempt-2/. No schema/parser/Coordinator/
 Original Store/media/backup/presentation contract changes. Stage1/H05 OPEN.
+
+
+## D106 — captured request / internal import workflow (2026-10-17)
+
+AppContainer.gpxImportWorkflow composes the existing runtime and Coordinator.
+capture() is a new explicit intent: immutable current Territory/nullable Observer,
+fresh R and clock-based technical metadata. Caller retains that handle; execute()
+consumes its permission once. A retry returns durable READY or continues an existing
+journal, never authorizes a new job from missing correlation. lookup(R) follows
+runtime reconciliation and reads durable correlation without creating an intent.
+Before journal creation a lost handle cannot be reconstructed as permission; after
+creation recovery uses existing journal/context/IDs and never reopens provider URI.
+
+GpxRuntime holds one gate across prepare/complete, excluding reconciliation/live
+workflow overlap, and invalidates its settled cache afterward for residual cleanup.
+No import state machine is copied. Existing Coordinator still owns files, journal,
+admission/current-Territory duplicate detection, IDs, ABORT and READY transaction.
+
+SettingsSelectionGuard is a process-local Mutex/revision shared with normal
+DataStoreSettingsRepository selection setters. Capture snapshots it; even A-B-A
+invalidates incomplete work. Final complete (including cleanup) holds that guard;
+selection writes serialize before it or after committed READY, without blocking the
+main thread. No-op UUID writes do not invalidate. A changed-selection write that
+fails may conservatively invalidate; no persisted counter or cross-DataStore/Room
+transaction is claimed. Direct Backup/Restore writers are not integrated here.
+The standard [DataStore API](https://developer.android.com/topic/libraries/architecture/datastore)
+and coroutine primitives are reused; no second settings store/framework is added.
+
+Cancellation/settings failure after Prepared but before complete is delegated to
+Coordinator.abort under NonCancellable. Same CancellationException escapes, secondary
+cleanup failure is suppressed, durable READY is preserved. Provider stream is only
+needed for initial copy; parser consumes managed staging. User import availability
+remains false with no override/picker/UI route; READY does not set map visibility.
+Evidence: ignored build/evidence/d106-workflow/attempt-2/. Stage1/H05 OPEN.

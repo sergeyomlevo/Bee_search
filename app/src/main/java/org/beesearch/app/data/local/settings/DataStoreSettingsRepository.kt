@@ -16,6 +16,9 @@ import org.beesearch.app.domain.model.AppSettings
 import org.beesearch.app.domain.repository.SettingsRepository
 import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private const val SETTINGS_NAME = "bee_search_settings"
 
@@ -27,9 +30,19 @@ private const val SETTINGS_NAME = "bee_search_settings"
  */
 internal val Context.settingsDataStore by preferencesDataStore(name = SETTINGS_NAME)
 
+/** Process-local selection invalidation and ordering with final GPX publication; no stored state. */
+internal class SettingsSelectionGuard {
+    private val mutex = Mutex()
+    private val epoch = AtomicLong()
+    val revision: Long get() = epoch.get()
+    fun invalidate() { epoch.incrementAndGet() }
+    suspend fun <T> withSelection(block: suspend () -> T): T = mutex.withLock { block() }
+}
+
 internal class DataStoreSettingsRepository(
     private val dataStore: DataStore<Preferences>,
     private val installStateDataStore: DataStore<Preferences>,
+    private val selectionGuard: SettingsSelectionGuard = SettingsSelectionGuard(),
 ) : SettingsRepository {
     /**
      * Portable device settings combined with the install-local offer state.
@@ -48,18 +61,21 @@ internal class DataStoreSettingsRepository(
 
     override suspend fun getSettings(): AppSettings = settings.first()
 
-    override suspend fun setCurrentTerritoryId(territoryId: UUID?) {
+    override suspend fun setCurrentTerritoryId(territoryId: UUID?) = selectionGuard.withSelection {
         dataStore.edit { preferences ->
+            if (preferences[CURRENT_TERRITORY_ID]?.let(::parseUuidOrNull) != territoryId) selectionGuard.invalidate()
             if (territoryId == null) {
                 preferences.remove(CURRENT_TERRITORY_ID)
             } else {
                 preferences[CURRENT_TERRITORY_ID] = territoryId.toString()
             }
         }
+        Unit
     }
 
-    override suspend fun setCurrentObserverId(observerId: UUID?) {
+    override suspend fun setCurrentObserverId(observerId: UUID?) = selectionGuard.withSelection {
         dataStore.edit { preferences ->
+            if (preferences[CURRENT_OBSERVER_ID]?.let(::parseUuidOrNull) != observerId) selectionGuard.invalidate()
             if (observerId == null) {
                 preferences.remove(CURRENT_OBSERVER_ID)
             } else {
@@ -68,6 +84,7 @@ internal class DataStoreSettingsRepository(
             // Legacy v4 state is deliberately ignored after the approved v5 reset.
             preferences.remove(LEGACY_OBSERVER_CODE)
         }
+        Unit
     }
 
     /**

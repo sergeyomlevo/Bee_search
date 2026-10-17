@@ -23,8 +23,8 @@ internal class GpxRuntimeUnavailableException(val reconciliation: GpxReconciliat
     IllegalStateException("GPX reconciliation incomplete", reconciliation.failure)
 
 /**
- * Application-owned first-access gate. No UI lifetime, provider access or new import route.
- * The Coordinator is private: runtime reconciliation precedes any future live-import wiring;
+ * Application-owned first-access gate. No UI lifetime or provider URI ownership.
+ * The Coordinator is private: runtime reconciliation precedes internal import workflow;
  * its existing process-wide writer mutex remains the authority for journal/file mutations.
  * Failed passes are retryable, never permission for extra cleanup at this boundary.
  */
@@ -43,6 +43,19 @@ internal class GpxRuntime(
     suspend fun reconcile(): GpxReconciliationResult = withContext(Dispatchers.IO) {
         gate.withLock { reconcileLocked() }
     }
+
+    /** Keep live orchestration and reconciliation mutually exclusive, including between passes. */
+    internal suspend fun <T> withImportCoordinator(block: suspend (GpxImportCoordinator) -> T): T =
+        withContext(Dispatchers.IO) {
+            gate.withLock {
+                val result = reconcileLocked()
+                if (!result.completed) throw GpxRuntimeUnavailableException(result)
+                try { block(coordinator) } finally {
+                    // A failed/cancelled operation may leave journal/cleanup debt for the next pass.
+                    settled = null
+                }
+            }
+        }
 
     /** READY is stored research data, not membership in the map's visible set. */
     suspend fun readReady(territoryId: UUID, importId: UUID): GpxStoredGraph? = withContext(Dispatchers.IO) {

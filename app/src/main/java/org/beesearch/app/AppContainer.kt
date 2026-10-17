@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.beesearch.app.data.gpx.GpxImportCoordinator
+import org.beesearch.app.data.gpx.GpxImportWorkflow
 import org.beesearch.app.data.gpx.GpxOriginalStore
 import org.beesearch.app.data.gpx.GpxRuntime
 import org.beesearch.app.data.local.room.GpxPersistenceStore
@@ -62,6 +63,7 @@ import org.beesearch.app.data.media.FileAwareObservationDataMaintenance
 import org.beesearch.app.data.media.FileAwarePhysicalObjectDeletion
 import org.beesearch.app.data.local.room.BeeSearchDatabase
 import org.beesearch.app.data.local.settings.DataStoreSettingsRepository
+import org.beesearch.app.data.local.settings.SettingsSelectionGuard
 import org.beesearch.app.data.local.settings.settingsDataStore
 import org.beesearch.app.data.local.settings.installStateDataStore
 import org.beesearch.app.data.local.settings.DataStoreMapAreaStore
@@ -119,10 +121,14 @@ internal class AppContainer(private val context: Context) {
     val physicalObjectMediaFileStore = PhysicalObjectMediaFileStore(context.filesDir, context.cacheDir)
     val weatherSyncScheduler = WorkManagerWeatherSyncScheduler(context)
 
+    private val selectionGuard = SettingsSelectionGuard()
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(
         dataStore = context.settingsDataStore,
         installStateDataStore = installStateDataStore(context),
+        selectionGuard = selectionGuard,
     )
+    // Internal application workflow only; no user picker/import action is registered.
+    val gpxImportWorkflow = GpxImportWorkflow(gpxRuntime, settingsRepository, selectionGuard, clock)
 
     /**
      * The Ареал of the current Territory.
