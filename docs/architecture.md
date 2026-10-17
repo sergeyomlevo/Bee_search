@@ -2547,3 +2547,27 @@ claim process-death recovery. FilterSet remains persisted separately.
 
 
 D103 physical temporal amendment: Room identity owns nullable fixationAt/updatedAt in addition to captured fixationDate and technical createdAt. Own property/coordinate/direct media edits stamp updatedAt in the same repository transaction; no-op/read/map/query operations do not. No Inspection capability was introduced. Current wire versions and guards: Complete Backup V8, Snapshot V3, physical single/collection Export V3 (ObservationPoint Export V2 unchanged). Legacy nullable fields are preserved without backfill. Full cards and map previews share fixation presentation and never use createdAt as fixation fallback.
+
+
+## D106 — runtime reconciliation and READY access (2026-10-17)
+
+BeeSearchApplication.onCreate starts AppContainer.startGpxReconciliation in an
+application-owned SupervisorJob/IO scope. This is a startup/first-access gate,
+not a service or scheduled worker. Store construction, Room opening and recovery
+stay behind suspend IO boundaries, following the
+[Android coroutine lifetime/main-safety guidance](https://developer.android.com/kotlin/coroutines/coroutines-best-practices).
+
+Internal GpxRuntime owns the private existing Coordinator and first-access Mutex.
+Concurrent callers serialize; a successful clean pass is cached. Failed passes
+remain retryable; readReady throws GpxRuntimeUnavailableException until a pass
+completes. Post-READY cleanup debt does not hide committed graphs and retries on
+later access. This boundary performs no extra compensation or file deletion.
+AppContainer.gpxRuntime.readReady(territoryId, importId) reuses GpxPersistenceStore
+and GpxStoredGraph, returning only READY in the requested Territory. Missing
+originals do not erase canonical geometry; READY does not select map layers.
+No prepare/complete runtime route is exposed. Future live import must honor the
+startup gate and existing Coordinator writer serialization.
+
+API29/API37 runtime/application/main-thread access and fresh-process recovery
+proof: ignored build/evidence/d106-runtime/attempt-2/. No schema/parser/Coordinator/
+Original Store/media/backup/presentation contract changes. Stage1/H05 OPEN.

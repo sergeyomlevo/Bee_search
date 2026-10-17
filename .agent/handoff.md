@@ -1,6 +1,39 @@
 # Bee Search handoff
 
-## Current status — internal READY Slice QUALIFIED; implementation OWNER review pending (2026-10-17)
+## Current status — runtime reconciliation / READY access QUALIFIED; OWNER review pending (2026-10-17)
+
+Baseline `081a41cad7bcc36dc4734664c0df5d15932f287b`. OWNER accepted the preceding
+READY Slice as PASS within scope. Application.onCreate now starts reconciliation
+through AppContainer on application-owned SupervisorJob/IO. GpxRuntime defers
+Store construction to IO, serializes startup/first access and calls the unchanged
+Coordinator. Successful clean passes are cached; failures gate reads and remain
+retryable. Committed READY remains readable despite retryable cleanup debt.
+Internal API: container.gpxRuntime.readReady(territoryId, importId). Existing Room
+model/validation are reused; PENDING/other Territory return no graph. Original
+availability does not erase canonical geometry. READY does not imply map visibility.
+No live-import route/raw Coordinator exposed. Future live import must honor the
+startup gate and existing Coordinator writer serialization.
+
+Targeted JVM3/3; full1058 tests/125 classes,0 failures/errors/skips; all7 build/lint
+PASS. ATTEMPT2: sequential API29/API37 each239/239 PASS (228 existing+9 runtime+2
+runtime crash methods), identical APK pair/exact method set, plus5/5 actual host
+force-stop/recovery probes each through GpxRuntime. Application/container and main
+first-access tests PASS. Both AVDs stopped; no physical device. Freeze593/593 MATCH,
+digest `2CEE06C64C5B05C079BA38AD462271D51856A7A820145BBCE26F693F9F40459F`;
+closed GPX112/112 unchanged. Evidence: ignored `build/evidence/d106-runtime/attempt-2/`.
+ATTEMPT1 retains successful JVM/build and focused API29 proof; its interrupted full
+Android result is not PASS. ATTEMPT2 reused unchanged inputs/APKs. Initial overlapping
+Gradle runs caused a KSP cache conflict; subsequent sequential full gates passed.
+
+Room15/schema, parser, Coordinator/admission, Original Store, media and backup rules
+unchanged. No user import/UI/Registry/protection/Restore. Real ENOSPC NOT TESTED;
+power-loss UNKNOWN; physical NOT RUN; historical API37 startup ANR exact cause
+UNKNOWN, not reproduced here. Stage1/H05 OPEN. One local implementation commit
+authorized after final scope checks, no push. Stop for OWNER review. Next separately
+authorized scope may address captured-request/import workflow subject to existing
+activation/protection gates. Do not start automatically.
+
+## Historical status — internal READY Slice QUALIFIED; implementation OWNER review pending (2026-10-17)
 
 Baseline `b14552762363f5adbff522a2b2888b2221571ebb`. Explicit OWNER READY rules and
 recovery clarification are recorded in decisions.md. Internal complete() finishes

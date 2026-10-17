@@ -3,6 +3,14 @@ package org.beesearch.app
 import android.app.Application
 import android.content.Context
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import org.beesearch.app.data.gpx.GpxImportCoordinator
+import org.beesearch.app.data.gpx.GpxOriginalStore
+import org.beesearch.app.data.gpx.GpxRuntime
+import org.beesearch.app.data.local.room.GpxPersistenceStore
 import org.beesearch.app.data.backup.BackupDocumentExporter
 import org.beesearch.app.data.backup.BackupService
 import org.beesearch.app.data.backuprepository.beeSearchBackupBootstrap
@@ -82,12 +90,31 @@ class BeeSearchApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container.weatherSyncScheduler.enqueue()
+        container.startGpxReconciliation()
     }
 }
 
 internal class AppContainer(private val context: Context) {
     private val clock = Clock.systemUTC()
     private val database = BeeSearchDatabase.create(context)
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val gpxPersistence = GpxPersistenceStore(database)
+    // The runtime defers private-path resolution until its suspend IO boundary.
+    val gpxRuntime = GpxRuntime(gpxPersistence) {
+        GpxImportCoordinator(gpxPersistence, GpxOriginalStore(context.filesDir))
+    }
+
+    fun startGpxReconciliation() = applicationScope.launch {
+        try {
+            val result = gpxRuntime.reconcile()
+            if (!result.completed) android.util.Log.w("GpxRuntime", "Reconciliation incomplete; GPX access remains gated", result.failure)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            // Even construction can fail (for example private-storage access). Retry on first access.
+            android.util.Log.w("GpxRuntime", "Initialization failed; GPX access remains gated", failure)
+        }
+    }
     val attachmentFileStore = ObservationAttachmentFileStore(context.filesDir, context.cacheDir)
     val physicalObjectMediaFileStore = PhysicalObjectMediaFileStore(context.filesDir, context.cacheDir)
     val weatherSyncScheduler = WorkManagerWeatherSyncScheduler(context)
