@@ -53,6 +53,12 @@ protection/restore gates. D1/D2 remain effective, revisable only through a techn
 justified OWNER decision. Separate explicit OWNER acceptance now also covers this
 Persistence Foundation contract and physical schema.
 
+**AMENDED 2026-10-17:** the sentence "User GPX import stays inactive until agreed
+protection/restore gates" is superseded. GPX protection/restore and H05 move to the
+future unified local Backup/Restore and no longer gate user GPX import
+([decisions.md](decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)).
+The Android Auto Backup part of D2 and D1 are unchanged.
+
 OBSERVED baseline: Room v14 with explicit migrations, Room2.8.4 and the existing
 millisecond Instant converter. Recheck before implementation. No qualification was
 rerun for this document. External research: not applicable to this documentation
@@ -342,6 +348,11 @@ Prior technical references, not new runtime proof:
 
 ## 7. Protection/restore compatibility — C2
 
+**Status 2026-10-17:** this compatibility contract moves to the future unified local
+Backup/Restore and is no longer a user-import activation gate
+([OWNER decision](decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)).
+The obligations below remain requirements of that future stage; H05 remains OPEN.
+
 | Data | Complete Backup / Repository Snapshot | Android Auto Backup under D2 |
 |---|---|---|
 | I/T/S/O, parent/ordinal relations | preserve | transferred with DB |
@@ -369,6 +380,12 @@ D2 intentionally leaves that mechanism unchanged. Restored journal reconciliatio
 future managed-original/staging rules must be settled before file lifecycle activation.
 The foundation must not create a production path admitting user GPX data ahead of
 agreed protection/restore gates; tests are not user capability activation.
+
+**AMENDED 2026-10-17:** the final sentence above is superseded — GPX protection/restore
+and H05 move to the future unified local Backup/Restore and no longer gate user import
+([decisions.md](decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)).
+The managed-original, integrity, ownership, cancellation and recovery rules remain
+mandatory; H05 remains OPEN.
 
 ## 8. Acceptance tests and build gates — future, NOT RUN
 
@@ -435,10 +452,16 @@ contract neither authorizes implementation nor staging/commit/push.
 OWNER explicitly accepted this Persistence Foundation contract: physical schema,
 correlation lifetime, structural-trigger mechanism, journal matrix, C1–C3 and the
 non-activation boundary. D1/D2 require no amendment. Implementation, recovery and
-protection/restore gates are not completed. Exact G12 formula,
+protection/restore work are not completed. Exact G12 formula,
 duplicate prompt scope and file recovery actions can remain for later contracts;
 the physical schema does not silently choose them.
 
 The first slice remains five-table persistence foundation with exact values and
 operational journal, no user import activation and no protection-completion claim.
 Stage1 stays OPEN. Documentation preparation creates no runtime/test evidence.
+
+**Status update 2026-10-17:** protection/restore no longer gates user import; it moves
+to the future unified local Backup/Restore and H05 remains OPEN there
+([OWNER decision](decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)).
+The no-user-import-activation statement above describes this foundation slice, not a
+current activation gate.

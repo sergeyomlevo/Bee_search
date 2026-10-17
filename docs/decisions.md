@@ -3817,9 +3817,14 @@ identity/provenance metadata**. Provenance не может существова�
 на реалистичном архиве пользовательской картографии. Entry-count behavior и metadata/другие
 budgets проверяются в Stage 1 specification/acceptance; текущее числовое ограничение не становится
 вечным invariant. Упаковка GPX и необходимая эволюция contract остаются инженерным решением.
-**Stage 1 exit gate:** успешный Complete Backup + restore original GPX вместе с canonical
-identity/provenance без silent omission. До этого original GPX нельзя считать гарантированно
-защищённым. Если полный backup невозможен — explicit fail-closed, не сообщение об успехе.
+**Former Stage 1 exit gate — superseded 2026-10-17:** успешный Complete Backup + restore
+original GPX вместе с canonical identity/provenance без silent omission. До этого original
+GPX нельзя считать гарантированно защищённым. Если полный backup невозможен — explicit
+fail-closed, не сообщение об успехе.
+[OWNER decision 2026-10-17](#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)
+moves this gate to the future unified local Backup/Restore; it no longer blocks Stage 1
+exit or user GPX import. The fail-closed/no-silent-omission rule remains binding for that
+future mechanism.
 
 Raster catalog/metadata сохраняются, но не доказывают защиту package bytes. Нельзя объявлять
 material полностью защищённым, если единственная необходимая копия bytes остаётся в app-private
@@ -3853,7 +3858,7 @@ placeholders относится только к этой панели (§73.4), 
 | Stage | Capability / exit obligations |
 |---|---|
 | 0 | Общий Overlay Registry по D102: style restoration, stale generations, Territory switching, ownership/collisions/order; Samsung verification. Разрешена DEV/test-only overlay fixture без domain entities, изменения research data или release behavior; GPX ради fixture не требуется. |
-| 1 | External GPX import/viewing offline: immutable original, multiple tracks/segments, gaps/nullable attributes, stable source identity, visibility, restart/restore, Complete Backup integration и обязательный roundtrip exit gate выше. |
+| 1 | External GPX import/viewing offline: immutable original, multiple tracks/segments, gaps/nullable attributes, stable source identity, visibility, restart/restore. **AMENDED 2026-10-17:** Complete Backup integration и обязательный roundtrip exit gate выше перенесены в будущий единый локальный Backup/Restore и больше не блокируют Stage 1 exit или пользовательский импорт ([OWNER decision](#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)). |
 | 2 | UserPath из whole track/segment/sample range; preview, own geometry, PathSourceLink, metadata/visibility, safe delete, backup/restore; без полноценного editor. |
 | 3 | FieldPoint: minimal metadata, creation по координате карты, display/visibility, backup/restore; renderer проверяется отдельно. |
 | 4 | Raster catalog, отдельный package contract, prepared import/validation/local installation, missing/reinstall, multiple materials, visibility/opacity/order, heavy-byte protection/transfer и Samsung verification. |
@@ -3923,11 +3928,17 @@ be revised only by a technically justified OWNER decision.
   backup remain unchanged. User GPX import is not activated before the agreed
   protection/restore gates. Android Auto Backup does not replace those mechanisms.
 
+  **AMENDED 2026-10-17:** the preceding activation sentence is superseded — user GPX
+  import is no longer gated on GPX protection/restore, which moves to the future
+  unified local Backup/Restore. The Android Auto Backup rules in this bullet remain
+  unchanged. See [D106 GPX activation gate corrected](#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17).
+
 The full [Stage1D Persistence Implementation Contract](d106-stage1d-gpx-persistence-contract.md)
 is **OWNER-ACCEPTED** after DeepSeek ACCEPT WITH CONDITIONS, incorporation of C1–C3
 and explicit OWNER agreement. Acceptance covers the Persistence Foundation contract
 and physical schema, not implementation completion or authorization. Recovery and
-protection/restore gates remain open. Stage1 remains OPEN.
+protection/restore remain open; since 2026-10-17 protection/restore no longer gates
+user import and moves to the future unified local Backup/Restore. Stage1 remains OPEN.
 
 
 ## Project navigation and auxiliary-directory placement — 2026-10-16
@@ -3973,6 +3984,13 @@ Complete Backup and Repository Snapshot retain their distinct contracts; no
 codec, format, schema or runtime behavior is changed here. No Backup/Restore
 implementation or new file-transfer policy is authorized by this documentation.
 
+**Update 2026-10-17:** the sentence above that the protection/restore gates and the
+user-import activation boundary "are not waived" is superseded by the OWNER decision
+to move GPX protection/restore into this future mechanism
+([decision](#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)). The
+deferral itself and the unchanged Complete Backup/Repository Snapshot contracts
+remain in force.
+
 The current development sequence is mirrored in the existing
 [execution checklist](unified-territory-map-checklist.md#owner-development-order--2026-10-16).
 
@@ -3987,8 +4005,10 @@ Recovery may prepare or compensate an operation; it never activates `READY`.
 Stable operation/original/graph identities and journal links are preserved.
 Completed user request/result correlation, `READY` activation, G11/G12 admission
 and final completion belong to a separately authorized subsequent Slice. No new
-journal phases or temporary admission bypass are introduced. Stage1/H05 OPEN;
-existing protection/restore and user-import activation gates remain binding.
+journal phases or temporary admission bypass are introduced. Stage1/H05 OPEN.
+**Update 2026-10-17:** the protection/restore and user-import activation gates are
+superseded by the [OWNER decision](#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17);
+GPX protection/restore moves to the future unified local Backup/Restore.
 
 ## D106 READY admission and recovery — 2026-10-17
 
@@ -4026,6 +4046,54 @@ UI/Registry, protection/Restore or Backup integration is activated by this decis
   operation staging/witness and journal, never its READY final original.
 
 Room remains v15. Existing Stage1A-D and Original Store contracts are preserved.
-Stage1/H05 and protection/restore/user-import activation gates remain OPEN. This
-accepts the rules and implementation scope, not the implementation's final OWNER
-acceptance or completion of the whole D106 Stage1.
+Stage1/H05 remain OPEN; the protection/restore/user-import activation gate is
+superseded by the OWNER decision of 2026-10-17 (GPX protection/restore and H05 move
+to the future unified local Backup/Restore). This accepts the rules and
+implementation scope, not the implementation's final OWNER acceptance or completion
+of the whole D106 Stage1.
+
+## D106 GPX activation gate corrected — OWNER decision, 2026-10-17
+
+**ACCEPTED — explicit OWNER instruction. Supersedes the earlier GPX protection/
+restore activation and Stage 1 exit-gate clauses listed below.**
+
+The OWNER decision on the unified local Complete Backup/Restore (2026-10-16) takes
+precedence over the earlier D106 requirement to implement separate GPX protection/
+restore before user GPX import. The earlier requirement to implement GPX support in
+Complete Backup or Repository Snapshot solely to enable user import is removed.
+
+- User GPX import is no longer gated on GPX Complete Backup/Repository Snapshot
+  protection or on H05. The remaining precondition is the approved OWNER UI
+  mockup (PNG+MD) and its implementation. No "experimental only" import
+  limitation is introduced by this decision.
+- GPX protection/restore and H05 move to the future unified local Backup/Restore
+  stage. H05 remains OPEN and is not claimed as verified.
+- Reliability obligations that are already implemented and qualified remain
+  mandatory: managed original storage, integrity verification, transactional
+  persistence, ownership, cancellation and recovery. This decision changes
+  sequencing, not those contracts.
+- Stage1 remains OPEN: the user import UI/picker, visibility/Registry/
+  presentation, remaining Stage1 exit gates and the unified Backup/Restore are
+  not completed.
+- Android Auto Backup rules remain unchanged.
+
+Superseded in part (explicitly, not silently):
+
+1. D2 activation sentence "User GPX import is not activated before the agreed
+   protection/restore gates".
+2. Stage 1 exit gate "успешный Complete Backup + restore original GPX..." and the
+   Stage 1 roadmap row requiring Complete Backup integration/roundtrip.
+3. Stage1A §12–§14 protection/restore exit gates and §16 "Protection is an exit
+   obligation"; the technical requirements remain obligations of the future
+   stage.
+4. Stage1D §7 user-import activation boundary and §10 protection/restore gate
+   statement.
+5. The 2026-10-16 note that protection/restore gates and the user-import
+   activation boundary "are not waived", the Coordinator decision clause and the
+   READY decision clause that keep protection/restore gates binding for user
+   import.
+6. product-requirements §17.1 "Stage 1 требует Complete Backup/restore..." and
+   checklist statements that the protection/restore gates block user import.
+
+H05, the unified local Backup/Restore and full GPX protection are not verified by
+this decision; no codec, restore, UI or runtime behavior is changed here.

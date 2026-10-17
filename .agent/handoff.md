@@ -1,6 +1,24 @@
 # Bee Search handoff
 
-## Current status — captured GPX request/workflow QUALIFIED; OWNER review pending (2026-10-17)
+## Current status — GPX activation gate corrected; user import may proceed (2026-10-17)
+
+OWNER decided that the unified local Complete Backup/Restore takes precedence over the
+earlier D106 requirement to implement separate GPX protection/restore before user GPX
+import. A separate GPX Complete Backup/Snapshot Slice is not required now. GPX
+protection/restore and H05 move to the future unified local Backup/Restore; H05 remains
+OPEN and is not claimed verified. This is documentation only: no code, Room, parser,
+Coordinator, tests, Android Auto Backup or runtime flag changed.
+
+User import is no longer gated on protection/restore. The remaining precondition is the
+OWNER-approved production UI mockup (PNG+MD) and its implementation (Stage1A §10);
+visibility/Registry/map and the unified Backup/Restore remain separate future work.
+Stage1 remains OPEN. The internal workflow stays `userImportAvailable=false` until an
+explicit UI Slice is authorized; no "experimental only" limitation is introduced.
+Decision: [decisions.md](../docs/decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17).
+Next permitted step: OWNER-approved GPX import UI mockup and the user entry slice; no
+backup or protection implementation starts automatically.
+
+## Historical status — captured GPX request/workflow QUALIFIED; OWNER review pending (2026-10-17)
 
 Baseline `9f2b0605461dff110ea9933f8bfc9052fe92ba4b`; OWNER accepted that runtime
 Slice as PASS within scope. Internal AppContainer.gpxImportWorkflow exposes

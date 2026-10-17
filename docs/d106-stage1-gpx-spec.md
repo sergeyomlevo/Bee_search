@@ -22,8 +22,11 @@ immutable original bytes. Area is device-local coverage, never GPX ownership.
 Area replacement/removal cannot remove or hide GPX by ownership side effect.
 
 In scope: multiple tracks/segments, real gaps, nullable supported values, stable
-identity/addressing, restart, minimal visibility, Complete Backup and Repository
-Snapshot coverage, byte-identical original and canonical identity/provenance restore.
+identity/addressing, restart, minimal visibility, and byte-identical original
+preservation. **AMENDED 2026-10-17:** separate GPX Complete Backup/Repository
+Snapshot coverage and restore move to the future unified local Backup/Restore and
+are not a Stage 1 or user-import activation gate (see
+[decisions.md](decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)).
 
 Out of scope: UserPath, PathSourceLink, FieldPoint, RasterLayer, recorder, editing,
 smoothing, snapping, interpolation, merging, route planning, sync, GPX removal UI,
@@ -298,6 +301,11 @@ sizes and final capacities must be measured.
 
 ## 12. Complete Backup
 
+**DEFERRED 2026-10-17:** GPX Complete Backup protection moves to the future unified
+local Backup/Restore stage and is not a Stage 1 exit or user-import activation gate
+([OWNER decision](decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)).
+The technical requirements below remain obligations of that future stage.
+
 DERIVED extension to existing versioned system. Proposed next contract V9 subject
 to baseline recheck: four canonical collections, typed original descriptors and streamed
 file payloads. Closed paths, exact hash/length, streamed sample JSONL. No original
@@ -313,6 +321,11 @@ readers reject new required contract. Post-commit settings failure follows retry
 semantics and never deletes committed restored originals.
 
 ## 13. Repository Snapshot
+
+**DEFERRED 2026-10-17:** GPX Repository Snapshot protection/restore moves to the
+future unified local Backup/Restore stage and is not a Stage 1 exit or user-import
+activation gate ([OWNER decision](decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)).
+The technical requirements below remain obligations of that future stage.
 
 Proposed V4: canonical GPX JSONL, typed original references (object identity/hash/length),
 external blobs and verified FULL protection. Existing Media/<SHA>.bin transport can
@@ -346,12 +359,19 @@ Specification acceptance does not execute these gates.
 | Build | Relevant/full JVM; Debug/Beta/Release compile; androidTest compile/assemble; assembleDebug; lint; diff hygiene |
 | Physical | Separately authorized DEV Samsung smoke, visual artifact comparison and declared corpus/presentation measurements |
 
-Before both protection roundtrips record bytes/digest/length, import/original/track/
-segment identities, sample addresses/order/values and provenance. Require equality
-after restore and byte-for-byte original comparison. A parser-forbidden restore test
-proves no reparsing. Include aggregate multi-Territory and missing/corrupt payload fixtures.
-Stage 1 cannot ship without both protection/restore gates. Known emulator blocker
-does not waive new assertion failures/native signatures or establish performance.
+**AMENDED 2026-10-17:** the GPX Backup and Snapshot rows above are no longer Stage 1
+exit or user-import activation gates; they move to the future unified local
+Backup/Restore ([OWNER decision](decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)).
+H05 remains OPEN there. The other gate rows remain applicable.
+
+When that future protection stage is implemented, before both protection roundtrips
+record bytes/digest/length, import/original/track/segment identities, sample
+addresses/order/values and provenance. Require equality after restore and byte-for-byte
+original comparison. A parser-forbidden restore test proves no reparsing. Include
+aggregate multi-Territory and missing/corrupt payload fixtures.
+Stage 1 no longer requires these protection/restore gates before ship or before user
+import. Known emulator blocker does not waive new assertion failures/native signatures
+or establish performance.
 
 ## 15. Expected changes and unchanged components
 
@@ -360,6 +380,10 @@ entities/DAOs/database/migration/schema; Territory/Observer guards; AppContainer
 feature snapshot producer/MainMapScreen/MapDataPanel; dedicated display settings;
 Complete Backup contract/capture/validation/activation; Snapshot contract/codec/capture/
 references/restore; existing protection capture/blob verification; tests/docs.
+
+**AMENDED 2026-10-17:** the Complete Backup/Snapshot GPX protection changes listed above
+move to the future unified local Backup/Restore stage and are not part of the current
+Stage 1 activation path ([OWNER decision](decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)).
 
 No expected change: Registry generic semantics, MapLibreOverlaySession, BeeMap
 lifecycle, profile factories, research/GPS/Area, MapPackage contracts, common research
@@ -372,9 +396,12 @@ wire versions evolve explicitly; baseline versions are not frozen.
 Stage 1B design is accepted; its technical contract is linked below.
 A separate implementation contract and OWNER authorization are required before coding.
 
-Then managed originals/Room/recovery → Complete Backup roundtrip → Snapshot
-protection/restore → visible overlay producer → approved UI/visibility → full gates/
-physical corpus. Protection is an exit obligation, not a deferred feature.
+Then managed originals/Room/recovery → visible overlay producer → approved UI/visibility
+→ full gates/physical corpus. **AMENDED 2026-10-17:** the former "Complete Backup
+roundtrip → Snapshot protection/restore" step and the sentence "Protection is an exit
+obligation, not a deferred feature" are superseded; GPX protection/restore is deferred
+to the future unified local Backup/Restore and is not a Stage 1 exit or user-import
+activation gate ([OWNER decision](decisions.md#d106-gpx-activation-gate-corrected--owner-decision-2026-10-17)).
 
 UNKNOWNs: parser allocation/platform security evidence; aggregate storage/presentation/
 protection measurements; provider failures; Snapshot restore integration effort;

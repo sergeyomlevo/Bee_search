@@ -695,8 +695,10 @@ bounds и независимыми zoom/provider/lifecycle. Contours, hillshade 
 visibility; создание UserPath из track/segment/sample range; пользовательские FieldPoint;
 prepared raster overlays с visibility/opacity/ordering. Эти capabilities ещё не реализованы,
 не заменяют research data и не добавляют новую глобальную карту/пятую toolbar action.
-Stage 1 требует Complete Backup/restore original GPX с canonical identity/provenance без потерь;
-невозможность полного backup сообщается явным отказом. Recorder остаётся deferred.
+**2026-10-17 (OWNER):** отдельная GPX-защита/восстановление в Complete Backup и Repository
+Snapshot больше не является условием Stage 1 или включения пользовательского GPX-импорта.
+Она переносится в будущий единый локальный Backup/Restore; H05 остаётся OPEN. Требование
+fail-closed без silent omission сохраняется для этого будущего механизма. Recorder остаётся deferred.
 
 Основная карта показывает исследовательские объекты текущей территории, а нижняя панель карты несёт
 четыре равные icon-only зоны `Анализ | Визуализация | Объекты | Настройки` (D104). Анализ пока
