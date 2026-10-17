@@ -12,8 +12,8 @@ import org.beesearch.app.domain.model.AppSettings
 import org.beesearch.app.domain.model.TerritoryRequiredException
 import org.beesearch.app.domain.repository.SettingsRepository
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GpxImportWorkflowTest {
@@ -46,8 +46,8 @@ class GpxImportWorkflowTest {
     }
 
     @Test
-    fun userImportRemainsGated() {
-        assertFalse(workflow(FakeSettings(AppSettings(territory, observer))).userImportAvailable)
+    fun userImportIsAuthorizedByApprovedUi() {
+        assertTrue(workflow(FakeSettings(AppSettings(territory, observer))).userImportAvailable)
     }
 
     private fun workflow(settings: FakeSettings) = GpxImportWorkflow(

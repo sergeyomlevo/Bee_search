@@ -28,7 +28,7 @@ internal class GpxImportWorkflow(
     private val selection: SettingsSelectionGuard,
     private val clock: Clock = Clock.systemUTC(),
     private val newRequestId: () -> UUID = UUID::randomUUID,
-) {
+) : GpxImportGateway {
     private val runtime by lazy(createRuntime)
     constructor(runtime: GpxRuntime, settings: SettingsRepository, selection: SettingsSelectionGuard,
                 clock: Clock = Clock.systemUTC(), newRequestId: () -> UUID = UUID::randomUUID) :
@@ -36,11 +36,11 @@ internal class GpxImportWorkflow(
 
     private val issuer = Any()
 
-    /** No UI route is activated before the accepted protection/restore gates. No override switch. */
-    val userImportAvailable: Boolean = false
+    /** User import UI is authorized by the approved mockup v1 (OWNER 2026-10-17). No override switch. */
+    val userImportAvailable: Boolean = true
 
     /** Call once for a new explicit intent, before source selection; retain the returned handle. */
-    suspend fun capture(displayName: String? = null): GpxCapturedRequest = selection.withSelection {
+    override suspend fun capture(displayName: String?): GpxCapturedRequest = selection.withSelection {
         val context = settings.getSettings()
         val territory = context.currentTerritoryId ?: throw TerritoryRequiredException()
         GpxCapturedRequest(GpxImportRequest(newRequestId(), territory,
@@ -48,11 +48,11 @@ internal class GpxImportWorkflow(
     }
 
     /** Read-only correlation after lost delivery/process restart; it never authorizes a new import. */
-    suspend fun lookup(requestUuid: UUID): GpxPreparationResult.Ready? =
+    override suspend fun lookup(requestUuid: UUID): GpxPreparationResult.Ready? =
         runtime.withImportCoordinator { it.lookup(requestUuid) }
 
-    suspend fun execute(captured: GpxCapturedRequest, open: () -> InputStream,
-                        confirmRepeatedOriginal: Boolean = false): GpxPreparationResult {
+    override suspend fun execute(captured: GpxCapturedRequest, open: () -> InputStream,
+                                 confirmRepeatedOriginal: Boolean): GpxPreparationResult {
         val request = captured.request
         if (captured.issuer !== issuer) return GpxPreparationResult.Failed(request.requestUuid,
             GpxPreparationResult.Kind.REQUEST)

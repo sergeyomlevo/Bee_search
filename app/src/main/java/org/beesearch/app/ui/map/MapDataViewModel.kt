@@ -78,6 +78,8 @@ internal data class MapDataUiState(
      */
     val panelOpen: Boolean = false,
     val openedType: MapDataType? = null,
+    /** Whether the open sheet shows the nested «Треки GPX» page. */
+    val gpxOpen: Boolean = false,
 ) {
     /** Only a currently visible, filtered real record can supply a preview or detail action. */
     val selectedMarker: MapObjectMarker?
@@ -112,6 +114,7 @@ internal class MapDataViewModel(
     private val selectedObjectId = MutableStateFlow<UUID?>(null)
     private val panelOpen = MutableStateFlow(false)
     private val openedType = MutableStateFlow<MapDataType?>(null)
+    private val gpxOpen = MutableStateFlow(false)
     private val refreshTrigger = MutableStateFlow(0)
     private val pendingSave = MutableStateFlow<SaveRequest?>(null)
 
@@ -132,7 +135,9 @@ internal class MapDataViewModel(
     }
 
     /** The sheet session as one value, so the UI state stays a five-flow combination. */
-    private val panelSession = combine(panelOpen, openedType) { open, type -> open to type }
+    private val panelSession = combine(panelOpen, openedType, gpxOpen) { open, type, gpx ->
+        Triple(open, type, gpx)
+    }
 
     val uiState: StateFlow<MapDataUiState> =
         combine(
@@ -150,6 +155,7 @@ internal class MapDataViewModel(
                 selectedObjectId = selected,
                 panelOpen = session.first,
                 openedType = session.second,
+                gpxOpen = session.third,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -204,6 +210,7 @@ internal class MapDataViewModel(
         availability.value = MapDataAvailability.EMPTY
         objects.value = MapObjectSets.EMPTY
         selectedObjectId.value = null
+        gpxOpen.value = false
         if (id == null) {
             // Without a Territory there is no research data to configure, so the panel that configures
             // it has nothing to show and is closed rather than left open over an empty map.
@@ -256,17 +263,31 @@ internal class MapDataViewModel(
      */
     fun openPanel() {
         openedType.value = null
+        gpxOpen.value = false
         panelOpen.value = true
     }
 
     /** Closes the sheet. Only an explicit user action does this. */
     fun closePanel() {
         openedType.value = null
+        gpxOpen.value = false
         panelOpen.value = false
+    }
+
+    /** Opens the nested «Треки GPX» page inside the open panel. */
+    fun openGpxTracks() {
+        openedType.value = null
+        gpxOpen.value = true
+    }
+
+    /** Returns from «Треки GPX» to the main panel, keeping the sheet open. */
+    fun closeGpxTracks() {
+        gpxOpen.value = false
     }
 
     /** Shows the filter screen of one type inside the open panel. */
     fun openTypeFilters(type: MapDataType) {
+        gpxOpen.value = false
         openedType.value = type
     }
 

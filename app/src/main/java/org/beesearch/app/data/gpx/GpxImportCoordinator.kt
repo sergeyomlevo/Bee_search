@@ -23,7 +23,7 @@ internal sealed interface GpxPreparationResult {
     data class Prepared(val requestUuid: UUID, val importId: UUID, val originalId: UUID) : GpxPreparationResult
     /** Committed result. Cleanup debt cannot undo this outcome. */
     data class Ready(val requestUuid: UUID, val importId: UUID, val originalId: UUID,
-                     val cleanupPending: Boolean = false) : GpxPreparationResult
+                     val cleanupPending: Boolean = false, val hasWarnings: Boolean = false) : GpxPreparationResult
     data class Aborted(val requestUuid: UUID) : GpxPreparationResult
     data class Failed(val requestUuid: UUID, val kind: Kind,
         val parse: GpxParseResult.Rejected? = null, val original: GpxOriginalStoreError? = null,
@@ -128,7 +128,9 @@ internal class GpxImportCoordinator(
     }
 
     private fun ready(row: GpxImportEntity, cleanupPending: Boolean = false) = GpxPreparationResult.Ready(
-        requireNotNull(row.requestUuid), row.id, row.originalObjectId, cleanupPending)
+        requireNotNull(row.requestUuid), row.id, row.originalObjectId, cleanupPending,
+        hasWarnings = row.unsupportedContentCount > 0 || row.unsupportedTimeCount > 0,
+    )
 
     private suspend fun completedResult(row: GpxImportEntity): GpxPreparationResult.Ready {
         val request = requireNotNull(row.requestUuid)

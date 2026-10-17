@@ -1,6 +1,39 @@
 # Bee Search handoff
 
-## Current status — GPX activation gate corrected; user import may proceed (2026-10-17)
+## Current status — GPX import UI implemented from OWNER-approved mockup v1 (2026-10-17)
+
+OWNER approved the reviewed `gpx-import-v1` PNG+MD (commit `a69eaf3`) and authorized this UI
+Slice. `userImportAvailable` is now true. The main «Данные на карте» panel has the `GPX`
+section and `Треки GPX` row after research data. The nested page has active `Импорт GPX`
+(`Добавить GPX-файл из памяти телефона`) and visible disabled `Показать трек`
+(`Выбрать сохранённый трек для карты`, `Скоро`). The system single-select OpenDocument
+picker is launched only after the existing workflow captured Territory/Observer/request;
+picker Back/cancel returns silently to the nested page. Progress, explicit Cancel/Back
+durable READY check, duplicate confirmation/decline, success/warning and the approved errors
+follow the MD; success does not enable map display or a track list. `Ready.hasWarnings` is
+an additive read-model field; no Room/parser/Coordinator/admission/Original Store/backup or
+map/Registry/visibility behavior changed. The UI split is `GpxTracksPage.kt` (nested
+navigation) and `GpxImportTask.kt` (task/result/dialog); `GpxImportViewModel` is the UI state
+machine and `GpxImportGateway` the test seam over the existing workflow.
+
+Verification on the final tree: full JVM1061/1061 (126 classes, 0 failures/errors/skips);
+all7 build/lint gates PASS; API29 focused58/58 PASS (35 MapDataPanel+8 new GPX panel+10 new
+ViewModel+5 wiring). API37 new ViewModel10/10 PASS; API37 Compose UI NOT RUN because Espresso
+3.5.1 calls removed `InputManager.getInstance` on the installed Android 17 API37 image
+(test-harness/toolchain incompatibility reproduced before these tests). Physical Samsung S25
+Ultra manual scenario NOT RUN. Frozen inputs manifest:
+`build/evidence/d106-stage1-gpx-ui/attempt-1/frozen-inputs.json` — 611/611 MATCH, digest
+`D12AB9C600C7CCFB6D249E058B2C15EF95FE66E3E5FEB0F6EEC3F99C5D22AA0C`; closed GPX112/112
+unchanged (`65585099B560BE247E5E32B7F604E911D6D16648E61EEE8FB9DB1D8CFD359005`).
+`freeze.json` also records the two baseline docs changes already present at the slice
+baseline (activation-gate documentation), not part of this UI change. Evidence is ignored.
+Stage1/H05 remain OPEN; one local implementation commit authorized after scope checks, no push.
+
+Next minimal step: physical Samsung S25 Ultra manual scenario from the approved MD, then the
+separately authorized track list/map visibility/Registry Slice. Do not implement those or
+Backup/Restore/Auto Backup automatically. Do not declare Stage1/H05 closed.
+
+## Historical status — GPX activation gate corrected; user import may proceed (2026-10-17)
 
 OWNER decided that the unified local Complete Backup/Restore takes precedence over the
 earlier D106 requirement to implement separate GPX protection/restore before user GPX

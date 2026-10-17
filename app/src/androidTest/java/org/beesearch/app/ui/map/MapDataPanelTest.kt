@@ -61,6 +61,20 @@ class MapDataPanelTest {
     private val year2024 = ResearchDateInterval(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31))
 
     @Test
+    fun gpxSectionFollowsResearchDataAndOpensTheTracksPage() {
+        setSheet()
+
+        rule.node("gpx-section").performScrollTo().assertIsDisplayed()
+        rule.node("gpx-tracks-row").performScrollTo().performClick()
+        rule.node("gpx-tracks-page").assertIsDisplayed()
+        rule.nodeText("Импорт GPX").assertIsDisplayed()
+        rule.nodeText("Показать трек").assertIsDisplayed()
+
+        rule.onNodeWithContentDescription("Назад").performClick()
+        rule.node(MAP_DATA_CONTENT_TAG).assertIsDisplayed()
+    }
+
+    @Test
     fun panelShowsOnlyTypesWithAUserReachableLifecycle() {
         setPanel()
         rule.node(MAP_DATA_CONTENT_TAG).assertIsDisplayed()
@@ -789,8 +803,10 @@ class MapDataPanelTest {
             },
             onOpenType = { type -> state = state.copy(openedType = type) },
             onCloseType = { state = state.copy(openedType = null) },
+            onOpenGpx = { state = state.copy(gpxOpen = true) },
+            onCloseGpx = { state = state.copy(gpxOpen = false) },
             // Closing the panel is what the ViewModel does too: the session ends with the sheet.
-            onDismiss = { state = state.copy(panelOpen = false, openedType = null) },
+            onDismiss = { state = state.copy(panelOpen = false, openedType = null, gpxOpen = false) },
         )
     }
 

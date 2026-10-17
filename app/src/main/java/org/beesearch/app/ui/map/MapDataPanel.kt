@@ -86,18 +86,50 @@ internal fun MapDataPanel(
     onOpenType: (MapDataType) -> Unit,
     onCloseType: () -> Unit,
     onDismiss: () -> Unit,
+    onOpenGpx: () -> Unit = {},
+    onCloseGpx: () -> Unit = {},
+    gpxImportState: GpxImportUiState = GpxImportUiState.Idle,
+    onStartGpxImport: () -> Unit = {},
+    onCancelGpxImport: () -> Unit = {},
+    onConfirmGpxDuplicate: () -> Unit = {},
+    onDeclineGpxDuplicate: () -> Unit = {},
+    onRetryGpxCheck: () -> Unit = {},
+    onGpxResultClose: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            // Import/check/duplicate are modal; only the explicit actions leave them.
+            when (gpxImportState) {
+                is GpxImportUiState.Importing,
+                is GpxImportUiState.Checking,
+                is GpxImportUiState.Duplicate -> Unit
+                is GpxImportUiState.Idle -> onDismiss()
+                // A result is owned by the task; scrim/swipe must not close it without clearing
+                // the task, otherwise reopening the panel would replay a stale result.
+                else -> onGpxResultClose()
+            }
+        },
         sheetState = sheetState,
         modifier = modifier.testTag(MAP_DATA_PANEL_TAG),
     ) {
-        // Back returns to the panel from a type screen and only then closes the panel; it never
-        // resets a filter and never changes visibility.
-        BackHandler(enabled = state.openedType != null) { onCloseType() }
+        // Back returns from the nested GPX page or a type screen before closing the panel; during an
+        // import it starts the durable-result check instead of pretending the import was cancelled.
+        BackHandler(
+            enabled = state.openedType != null || state.gpxOpen ||
+                gpxImportState !is GpxImportUiState.Idle,
+        ) {
+            when {
+                gpxImportState is GpxImportUiState.Importing -> onCancelGpxImport()
+                gpxImportState is GpxImportUiState.Duplicate -> onDeclineGpxDuplicate()
+                gpxImportState is GpxImportUiState.Checking -> Unit
+                gpxImportState !is GpxImportUiState.Idle -> onGpxResultClose()
+                state.gpxOpen -> onCloseGpx()
+                else -> onCloseType()
+            }
+        }
         MapDataPanelBody(
             state = state,
             openedType = state.openedType,
@@ -109,6 +141,15 @@ internal fun MapDataPanel(
             onResetPeriod = onResetPeriod,
             onResetFilters = onResetFilters,
             onDismiss = onDismiss,
+            onOpenGpx = onOpenGpx,
+            onCloseGpx = onCloseGpx,
+            gpxImportState = gpxImportState,
+            onStartGpxImport = onStartGpxImport,
+            onCancelGpxImport = onCancelGpxImport,
+            onConfirmGpxDuplicate = onConfirmGpxDuplicate,
+            onDeclineGpxDuplicate = onDeclineGpxDuplicate,
+            onRetryGpxCheck = onRetryGpxCheck,
+            onGpxResultClose = onGpxResultClose,
         )
     }
 }
@@ -131,19 +172,42 @@ internal fun MapDataPanelBody(
     onResetPeriod: (MapDataType) -> Unit,
     onResetFilters: () -> Unit,
     onDismiss: () -> Unit,
+    onOpenGpx: () -> Unit = {},
+    onCloseGpx: () -> Unit = {},
+    gpxImportState: GpxImportUiState = GpxImportUiState.Idle,
+    onStartGpxImport: () -> Unit = {},
+    onCancelGpxImport: () -> Unit = {},
+    onConfirmGpxDuplicate: () -> Unit = {},
+    onDeclineGpxDuplicate: () -> Unit = {},
+    onRetryGpxCheck: () -> Unit = {},
+    onGpxResultClose: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    if (openedType == null) {
-        MapDataPanelContent(
+    when {
+        gpxImportState !is GpxImportUiState.Idle -> GpxImportTask(
+            state = gpxImportState,
+            onCancel = onCancelGpxImport,
+            onRetryCheck = onRetryGpxCheck,
+            onChooseFile = onStartGpxImport,
+            onImportAnother = onStartGpxImport,
+            onDone = onGpxResultClose,
+            modifier = modifier,
+        )
+        state.gpxOpen -> GpxTracksPage(
+            onBack = onCloseGpx,
+            onImport = onStartGpxImport,
+            modifier = modifier,
+        )
+        openedType == null -> MapDataPanelContent(
             state = state,
             onVisibilityChange = onVisibilityChange,
             onOpenType = onOpenType,
             onResetFilters = onResetFilters,
+            onOpenGpx = onOpenGpx,
             onDismiss = onDismiss,
             modifier = modifier,
         )
-    } else {
-        MapDataFiltersScreen(
+        else -> MapDataFiltersScreen(
             state = state,
             type = openedType,
             onBack = onBack,
@@ -155,6 +219,13 @@ internal fun MapDataPanelBody(
             modifier = modifier,
         )
     }
+    if (gpxImportState is GpxImportUiState.Duplicate) {
+        GpxDuplicateDialog(
+            territoryName = gpxImportState.territoryName,
+            onConfirm = onConfirmGpxDuplicate,
+            onDecline = onDeclineGpxDuplicate,
+        )
+    }
 }
 
 @Composable
@@ -163,6 +234,7 @@ private fun MapDataPanelContent(
     onVisibilityChange: (MapDataType, Boolean) -> Unit,
     onOpenType: (MapDataType) -> Unit,
     onResetFilters: () -> Unit,
+    onOpenGpx: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -211,6 +283,14 @@ private fun MapDataPanelContent(
                 onOpen = { onOpenType(type) },
             )
         }
+
+        Text(
+            text = "GPX",
+            modifier = Modifier.testTag("gpx-section"),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        GpxEntryRow(onClick = onOpenGpx)
 
         Row(
             modifier = Modifier.fillMaxWidth(),

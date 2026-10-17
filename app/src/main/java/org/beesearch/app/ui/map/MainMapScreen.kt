@@ -1,6 +1,11 @@
 package org.beesearch.app.ui.map
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.ContentResolver
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -37,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.beesearch.app.BeeSearchApplication
 import org.beesearch.app.MapMeasurement
 import org.beesearch.app.ObservationPointCreationDraft
 import org.beesearch.app.domain.location.LocationUiState
@@ -99,6 +106,30 @@ internal fun CurrentTerritoryScreen(
         ),
     )
     val mapDataState by mapDataViewModel.uiState.collectAsStateWithLifecycle()
+
+    val application = LocalContext.current.applicationContext as BeeSearchApplication
+    val gpxImportViewModel: GpxImportViewModel = viewModel(
+        factory = GpxImportViewModel.factory(application.container.gpxImportWorkflow),
+    )
+    val gpxImportState by gpxImportViewModel.state.collectAsStateWithLifecycle()
+    val pickerRequest by gpxImportViewModel.pickerRequest.collectAsStateWithLifecycle()
+    val contentResolver = LocalContext.current.contentResolver
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) {
+            gpxImportViewModel.onPickerCancelled()
+        } else {
+            gpxImportViewModel.onFilePicked(
+                displayName = contentResolver.displayName(uri),
+                open = { contentResolver.openInputStream(uri) },
+            )
+        }
+    }
+    LaunchedEffect(pickerRequest) {
+        pickerRequest?.let { request ->
+            picker.launch(arrayOf("*/*"))
+            gpxImportViewModel.onPickerLaunched(request.token)
+        }
+    }
 
     // Display state belongs to one Territory, so the map always shows the state of the one it draws.
     LaunchedEffect(territory?.id) { mapDataViewModel.setTerritory(territory?.id) }
@@ -169,7 +200,22 @@ internal fun CurrentTerritoryScreen(
                 )
             }
             if (mapDataState.panelOpen) {
-                MapDataSurface(state = mapDataState, viewModel = mapDataViewModel)
+                MapDataSurface(
+                    state = mapDataState,
+                    viewModel = mapDataViewModel,
+                    gpxImportState = gpxImportState,
+                    onStartGpxImport = {
+                        gpxImportViewModel.beginImport(territory?.name.orEmpty())
+                    },
+                    onCancelGpxImport = gpxImportViewModel::cancelImport,
+                    onConfirmGpxDuplicate = gpxImportViewModel::confirmDuplicate,
+                    onDeclineGpxDuplicate = gpxImportViewModel::declineDuplicate,
+                    onRetryGpxCheck = gpxImportViewModel::retryCheck,
+                    onGpxResultClose = {
+                        gpxImportViewModel.reset()
+                        mapDataViewModel.closePanel()
+                    },
+                )
             }
             if (territory == null) {
                 Surface(
@@ -202,6 +248,13 @@ internal fun CurrentTerritoryScreen(
 internal fun MapDataSurface(
     state: MapDataUiState,
     viewModel: MapDataViewModel,
+    gpxImportState: GpxImportUiState = GpxImportUiState.Idle,
+    onStartGpxImport: () -> Unit = {},
+    onCancelGpxImport: () -> Unit = {},
+    onConfirmGpxDuplicate: () -> Unit = {},
+    onDeclineGpxDuplicate: () -> Unit = {},
+    onRetryGpxCheck: () -> Unit = {},
+    onGpxResultClose: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     MapDataPanel(
@@ -214,6 +267,15 @@ internal fun MapDataSurface(
         onOpenType = viewModel::openTypeFilters,
         onCloseType = viewModel::closeTypeFilters,
         onDismiss = viewModel::closePanel,
+        onOpenGpx = viewModel::openGpxTracks,
+        onCloseGpx = viewModel::closeGpxTracks,
+        gpxImportState = gpxImportState,
+        onStartGpxImport = onStartGpxImport,
+        onCancelGpxImport = onCancelGpxImport,
+        onConfirmGpxDuplicate = onConfirmGpxDuplicate,
+        onDeclineGpxDuplicate = onDeclineGpxDuplicate,
+        onRetryGpxCheck = onRetryGpxCheck,
+        onGpxResultClose = onGpxResultClose,
         modifier = modifier,
     )
 }
@@ -416,3 +478,14 @@ private fun AddPointGlyph() {
 }
 
 private fun Double.formatMeters(): String = "%.1f".format(this)
+
+/** Display name for the picked document; never used as import identity. */
+private fun ContentResolver.displayName(uri: Uri): String? {
+    val fromProvider = runCatching {
+        query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
+    }.getOrNull()
+    return fromProvider?.takeIf { it.isNotBlank() }
+        ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+}
