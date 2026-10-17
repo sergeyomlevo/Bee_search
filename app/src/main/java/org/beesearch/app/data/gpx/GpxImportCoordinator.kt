@@ -21,18 +21,21 @@ internal data class GpxImportRequest(
 internal sealed interface GpxPreparationResult {
     /** Prepared only: PENDING, invisible, no admission or successful import correlation. */
     data class Prepared(val requestUuid: UUID, val importId: UUID, val originalId: UUID) : GpxPreparationResult
+    /** Committed result. Cleanup debt cannot undo this outcome. */
+    data class Ready(val requestUuid: UUID, val importId: UUID, val originalId: UUID,
+                     val cleanupPending: Boolean = false) : GpxPreparationResult
     data class Aborted(val requestUuid: UUID) : GpxPreparationResult
     data class Failed(val requestUuid: UUID, val kind: Kind,
         val parse: GpxParseResult.Rejected? = null, val original: GpxOriginalStoreError? = null,
-        val cleanupPending: Boolean = false) : GpxPreparationResult
-    enum class Kind { REQUEST, PARSE, ORIGINAL, PERSISTENCE }
+        val cleanupPending: Boolean = false, val admission: GpxAdmissionRejection? = null) : GpxPreparationResult
+    enum class Kind { REQUEST, PARSE, ORIGINAL, PERSISTENCE, ADMISSION }
 }
 
 /**
  * Sole supported orchestration writer in this Slice; all instances and recovery share a mutex.
- * Use the same serialization boundary for future READY/admission/restore writers. No runtime
+ * READY/admission/ABORT and recovery share this serialization boundary. No runtime
  * entry point is wired. Blocking file calls run on IO; no coroutine suspends under the Store lock.
- * Staging/witness remain until the future completion Slice or an authorized abort.
+ * Preparation retains staging/witness; completion cleans them without deleting final.
  */
 internal class GpxImportCoordinator(
     private val persistence: GpxPersistenceStore,
@@ -48,6 +51,10 @@ internal class GpxImportCoordinator(
         return guarded(request.requestUuid, { owned }) {
             val context = currentCoroutineContext()
             val check = { context.ensureActive(); if (!isCapturedRequestCurrent()) throw RequestUnavailable() }
+            persistence.completed(request.requestUuid)?.let { row ->
+                require(row.territoryId == request.territoryId && row.importingObserverId == request.observerId)
+                return@guarded completedResult(row)
+            }
             val existing = persistence.journal(request.requestUuid)
             if (existing != null) {
                 require(existing.territoryId == request.territoryId && existing.importingObserverId == request.observerId)
@@ -84,20 +91,93 @@ internal class GpxImportCoordinator(
         }
     }
 
+    /** Finish a captured operation. Only an explicitly confirmed repeat may bypass the repeat gate. */
+    suspend fun complete(request: GpxImportRequest, confirmRepeatedOriginal: Boolean = false,
+                         isCapturedRequestCurrent: () -> Boolean): GpxPreparationResult {
+        var owned = false
+        return guarded(request.requestUuid, { owned }) {
+            persistence.completed(request.requestUuid)?.let { row ->
+                require(row.territoryId == request.territoryId && row.importingObserverId == request.observerId)
+                return@guarded completedResult(row)
+            }
+            val job = persistence.journal(request.requestUuid) ?: throw RequestUnavailable()
+            require(job.territoryId == request.territoryId && job.importingObserverId == request.observerId)
+            owned = true
+            val context = currentCoroutineContext()
+            val check = { context.ensureActive(); if (!isCapturedRequestCurrent()) throw RequestUnavailable() }
+            finishReady(job, confirmRepeatedOriginal, check)
+        }
+    }
+
+    /** Read-only correlation lookup never handles or consumes a request. */
+    suspend fun lookup(requestUuid: UUID): GpxPreparationResult.Ready? = withContext(Dispatchers.IO) {
+        lock.withLock { persistence.completed(requestUuid)?.let { ready(it) } }
+    }
+
+    private suspend fun finishReady(job: GpxImportJobEntity, confirmed: Boolean,
+                                    check: () -> Unit): GpxPreparationResult {
+        require(job.phase == "FILE_PUBLISHED" && job.intent == "CONTINUE")
+        check()
+        persistence.requirePending(job)
+        originals.openFinal(requireNotNull(job.originalObjectId), descriptor(job), check).use { }
+        checkpoint("BEFORE_READY")
+        check()
+        val row = persistence.publishReady(job, confirmed, check, checkpoint)
+        checkpoint("READY_COMMITTED")
+        return completedResult(row)
+    }
+
+    private fun ready(row: GpxImportEntity, cleanupPending: Boolean = false) = GpxPreparationResult.Ready(
+        requireNotNull(row.requestUuid), row.id, row.originalObjectId, cleanupPending)
+
+    private suspend fun completedResult(row: GpxImportEntity): GpxPreparationResult.Ready {
+        val request = requireNotNull(row.requestUuid)
+        return try {
+            val job = persistence.journal(request)
+            if (job != null) {
+                check(persistence.completed(request) == row)
+                val files = originals.inspectOperation(request, row.originalObjectId)
+                if (files.owned) originals.cleanupStaging(request, row.originalObjectId,
+                    GpxOriginalIdentity(row.originalByteLength, row.originalSha256), authorize = { true })
+                checkpoint("READY_STAGING_REMOVED")
+                persistence.forgetReady(job)
+            }
+            ready(row)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            ready(row, cleanupPending = true)
+        }
+    }
+
     /** Startup owner calls before exposing GPX reads; never reopens a provider URI. */
     suspend fun recover(): List<GpxPreparationResult> = withContext(Dispatchers.IO) {
         // The snapshot is not authorization: each item is re-read under the shared mutex.
         persistence.journals().map { saved ->
             guarded(saved.requestUuid, { true }) {
-                persistence.journal(saved.requestUuid)?.let { recoverJob(it) }
-                    ?: GpxPreparationResult.Aborted(saved.requestUuid)
+                persistence.completed(saved.requestUuid)?.let { completedResult(it) } ?: run {
+                    val current = persistence.journal(saved.requestUuid)
+                    if (current == null) GpxPreparationResult.Aborted(saved.requestUuid) else {
+                        val prepared = recoverJob(current)
+                        if (prepared is GpxPreparationResult.Prepared) {
+                            val published = requireNotNull(persistence.journal(saved.requestUuid))
+                            // OWNER clarification: non-repeats may complete; unconfirmed repeats must abort.
+                            persistence.rejectUnconfirmedRecoveryRepeat(published)
+                            val context = currentCoroutineContext()
+                            // Recheck current inventory in the READY transaction, never infer consent.
+                            finishReady(published, confirmed = false, check = { context.ensureActive() })
+                        } else prepared
+                    }
+                }
             }
         }
     }
 
     suspend fun abort(requestUuid: UUID): GpxPreparationResult = guarded(requestUuid, { true }) {
-        compensate(requestUuid)
-        GpxPreparationResult.Aborted(requestUuid)
+        persistence.completed(requestUuid)?.let { completedResult(it) } ?: run {
+            compensate(requestUuid)
+            GpxPreparationResult.Aborted(requestUuid)
+        }
     }
 
     private suspend fun recoverJob(job: GpxImportJobEntity, currentRequestCheck: (() -> Unit)? = null): GpxPreparationResult {
@@ -167,24 +247,32 @@ internal class GpxImportCoordinator(
                                 block: suspend () -> GpxPreparationResult): GpxPreparationResult = try {
         withContext(Dispatchers.IO) { lock.withLock { block() } }
     } catch (cancelled: CancellationException) {
-        if (owns()) try { cleanupUncancelled(request) } catch (cleanup: Exception) { cancelled.addSuppressed(cleanup) }
-        throw cancelled // SAME cancellation, including any suppressed input/close failure.
+        if (owns()) try { settleUncancelled(request) } catch (cleanup: Exception) {
+            if (cleanup !== cancelled) cancelled.addSuppressed(cleanup)
+        }
+        throw cancelled // SAME cancellation; committed success remains discoverable through lookup.
     } catch (failure: Exception) {
         var pending = false
-        if (owns()) try { cleanupUncancelled(request) } catch (cleanup: Exception) {
-            failure.addSuppressed(cleanup)
+        var completed: GpxPreparationResult.Ready? = null
+        if (owns()) try { completed = settleUncancelled(request) } catch (cleanup: Exception) {
+            if (cleanup !== failure) failure.addSuppressed(cleanup)
             pending = true // Durable journal remains for another recovery attempt.
         }
-        GpxPreparationResult.Failed(request, when (failure) {
+        completed ?: GpxPreparationResult.Failed(request, when (failure) {
             is RequestUnavailable -> GpxPreparationResult.Kind.REQUEST
             is ParseRejected -> GpxPreparationResult.Kind.PARSE
             is GpxOriginalStoreException -> GpxPreparationResult.Kind.ORIGINAL
+            is GpxAdmissionException -> GpxPreparationResult.Kind.ADMISSION
             else -> GpxPreparationResult.Kind.PERSISTENCE
-        }, (failure as? ParseRejected)?.result, (failure as? GpxOriginalStoreException)?.code, pending)
+        }, (failure as? ParseRejected)?.result, (failure as? GpxOriginalStoreException)?.code, pending,
+            (failure as? GpxAdmissionException)?.rejection)
     }
 
-    private suspend fun cleanupUncancelled(request: UUID) = withContext(NonCancellable) {
-        withContext(Dispatchers.IO) { lock.withLock { compensate(request) } }
+    private suspend fun settleUncancelled(request: UUID): GpxPreparationResult.Ready? = withContext(NonCancellable) {
+        withContext(Dispatchers.IO) { lock.withLock {
+            // Read durable state before ANY compensation; a failed lookup is not deletion authority.
+            persistence.completed(request)?.let { completedResult(it) } ?: run { compensate(request); null }
+        } }
     }
 
     private fun descriptor(job: GpxImportJobEntity) = GpxOriginalIdentity(

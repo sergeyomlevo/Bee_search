@@ -153,12 +153,12 @@ class GpxCoordinatorDeviceTest {
         }
         val saved = requireNotNull(db.gpxDao().jobByRequest(request.requestUuid))
         val originalId = requireNotNull(saved.originalObjectId)
-        val recovered = coordinator().recover().single() as GpxPreparationResult.Prepared
+        val recovered = coordinator().recover().single() as GpxPreparationResult.Ready
         assertEquals(saved.importId, recovered.importId)
         assertEquals(originalId, recovered.originalId)
         assertEquals(1, opens)
-        assertEquals("FILE_PUBLISHED", requireNotNull(db.gpxDao().jobByRequest(request.requestUuid)).phase)
-        assertNull(GpxPersistenceStore(db).readReady(recovered.importId))
+        assertNull(db.gpxDao().jobByRequest(request.requestUuid))
+        assertNotNull(GpxPersistenceStore(db).readReady(recovered.importId))
     }
 
     @Test
@@ -188,10 +188,11 @@ class GpxCoordinatorDeviceTest {
         } catch (_: Interruption) {
         }
         assertEquals("FILE_PUBLISHED", requireNotNull(db.gpxDao().jobByRequest(request.requestUuid)).phase)
-        val first = coordinator().recover().single() as GpxPreparationResult.Prepared
-        val second = coordinator().recover().single() as GpxPreparationResult.Prepared
+        val first = coordinator().recover().single() as GpxPreparationResult.Ready
+        val second = coordinator().lookup(request.requestUuid)
         assertEquals(first, second)
-        assertEquals("FILE_PUBLISHED", requireNotNull(db.gpxDao().jobByRequest(request.requestUuid)).phase)
+        assertTrue(coordinator().recover().isEmpty())
+        assertNull(db.gpxDao().jobByRequest(request.requestUuid))
     }
 
     @Test
@@ -343,7 +344,7 @@ class GpxCoordinatorDeviceTest {
     }
 
     @Test
-    fun completeFinalBeforeVerificationIsReconciledWithoutReadyActivation() = runBlocking {
+    fun completeFinalBeforeVerificationIsReconciledToReady() = runBlocking {
         val request = request(640)
         val interruptedStore = GpxOriginalStore(root) { stage ->
             if (stage == GpxOriginalStage.FINAL_COPY) throw Interruption()
@@ -355,9 +356,9 @@ class GpxCoordinatorDeviceTest {
         } catch (_: Interruption) {
         }
 
-        val recovered = coordinator().recover().single() as GpxPreparationResult.Prepared
-        assertEquals("FILE_PUBLISHED", requireNotNull(db.gpxDao().jobByRequest(request.requestUuid)).phase)
-        assertNull(GpxPersistenceStore(db).readReady(recovered.importId))
+        val recovered = coordinator().recover().single() as GpxPreparationResult.Ready
+        assertNull(db.gpxDao().jobByRequest(request.requestUuid))
+        assertNotNull(GpxPersistenceStore(db).readReady(recovered.importId))
     }
 
     @Test

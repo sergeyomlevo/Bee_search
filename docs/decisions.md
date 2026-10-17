@@ -3989,3 +3989,43 @@ Completed user request/result correlation, `READY` activation, G11/G12 admission
 and final completion belong to a separately authorized subsequent Slice. No new
 journal phases or temporary admission bypass are introduced. Stage1/H05 OPEN;
 existing protection/restore and user-import activation gates remain binding.
+
+## D106 READY admission and recovery — 2026-10-17
+
+**ACCEPTED — explicit OWNER authorization and recovery clarification.** This
+separately authorized Slice extends the preceding FILE_PUBLISHED preparation
+boundary to internal committed READY. Preparation remains PENDING; no user import,
+UI/Registry, protection/Restore or Backup integration is activated by this decision.
+
+- In the captured Territory, G11 is existing READY imports + one candidate <=1024.
+  G12 is actual samples of existing READY imports + actual samples of this PENDING
+  candidate <=200000. Time/elevation/visibility/CM1 do not filter samples. Other
+  PENDING candidates reserve neither quota; their file/resource usage remains a
+  separate domain. No persisted counters or new numerical limits are introduced.
+- Current journal/context/full graph, request admissibility, duplicate detection,
+  counts, READY publication, request_uuid correlation and journal READY/CONTINUE
+  are checked/written in one Room transaction. Supported completion, ABORT and
+  recovery writers share the Coordinator serialization boundary. File ownership
+  and SHA/length are verified before the transaction; Room/files are not one
+  atomic transaction. Existing I/T/S/O, sample addresses and canonical data remain.
+- Repeated-original detection covers READY imports in the captured Territory by
+  SHA-256 and byte length. CM1 does not deduplicate. Explicitly confirmed repeats
+  remain distinct imports with their already allocated independent identities.
+  The completed result of the same request is looked up first, without admission
+  or another import. Missing correlation does not authorize a consumed request.
+- Recovery may complete a prepared NON-repeated import without new confirmation,
+  subject to all other READY conditions. Confirmation is needed exclusively for
+  an actual repeated original. Recovery uses current DB inventory at READY, not
+  a pre-crash observation. An unproven repeat confirmation is never inferred;
+  reject and safely compensate that PENDING attempt. No confirmation field/table
+  is added. A new attempt requires a new request and explicit confirmation.
+- Quota failure or an unconfirmed repeat rejects READY and uses owned ABORT
+  compensation. Before compensation after ambiguous commit/delivery, read durable
+  state. Committed READY is preserved through cancellation and cleanup errors;
+  request correlation outlives journal cleanup. Cleanup removes only authorized
+  operation staging/witness and journal, never its READY final original.
+
+Room remains v15. Existing Stage1A-D and Original Store contracts are preserved.
+Stage1/H05 and protection/restore/user-import activation gates remain OPEN. This
+accepts the rules and implementation scope, not the implementation's final OWNER
+acceptance or completion of the whole D106 Stage1.

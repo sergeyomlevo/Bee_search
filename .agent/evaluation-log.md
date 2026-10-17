@@ -27,6 +27,15 @@ without sufficient evidence.
 
 Recorded signals follow; routine successful reviews are intentionally absent.
 
+### 2026-10-17 — governance_ambiguity_required_resolution / D106 READY recovery
+
+- Expected governance behavior: require explicit confirmation only for repeated originals; retain admission, ownership and integrity gates for every READY transition.
+- Actual behavior: automatic approval review repeatedly rejected the draft recovery patch as if every post-process-death import required confirmation, including non-repeated originals. The agent stopped without bypassing the rejection; OWNER explicitly clarified the distinction before continuation.
+- Severity/impact: implementation interruption and additional OWNER clarification; no unsafe recovery patch was applied and no commit/device qualification was claimed during the block.
+- Source of classification: root preliminary classification from the current-session rejection messages and explicit OWNER clarification, not a measure of governance coverage/effectiveness.
+- Evidence reference: current task "D106 READY Slice — OWNER clarification: recovery и подтверждение повторов"; accepted READY decision in docs/decisions.md; focused recovery non-repeat/repeat/current-inventory regression tests.
+- Preliminary disposition: resumed the preserved worktree under the clarified authorization; non-repeated recovery may complete, repeated recovery without provable confirmation must compensate. No protective gate was disabled.
+
 
 ### 2026-10-16 — adversarial_review_found_material_issue / D106 exclusive publication
 

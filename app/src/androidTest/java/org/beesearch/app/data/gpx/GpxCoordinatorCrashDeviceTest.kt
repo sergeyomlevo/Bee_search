@@ -69,14 +69,18 @@ class GpxCoordinatorCrashDeviceTest {
             val result = coordinator.recover().single()
             val shouldPrepare = boundary in setOf("PARSED", "FINAL_VERIFIED", "FILE_PUBLISHED")
             if (shouldPrepare) {
-                val prepared = result as GpxPreparationResult.Prepared
+                val prepared = result as GpxPreparationResult.Ready
                 assertEquals(before.importId, prepared.importId)
                 assertEquals(before.originalObjectId, prepared.originalId)
-                assertEquals(graph, persistence.readPending(prepared.importId))
-                assertNull(persistence.readReady(prepared.importId))
-                assertEquals("FILE_PUBLISHED", requireNotNull(persistence.journal(request)).phase)
-                assertEquals(listOf(result), coordinator.recover())
-                assertEquals(GpxPreparationResult.Aborted(request), coordinator.abort(request))
+                val ready = requireNotNull(persistence.readReady(prepared.importId))
+                assertEquals(graph?.canonical(), ready.canonical())
+                assertEquals(graph?.tracks, ready.tracks)
+                assertEquals(graph?.segments, ready.segments)
+                assertEquals(graph?.samples, ready.samples)
+                assertNull(persistence.journal(request))
+                assertTrue(coordinator.recover().isEmpty())
+                assertEquals(result, coordinator.lookup(request))
+                assertEquals(result, coordinator.abort(request))
             } else {
                 if (boundary == "STORE_FINAL_COPY") {
                     assertTrue(result is GpxPreparationResult.Failed)
@@ -86,7 +90,7 @@ class GpxCoordinatorCrashDeviceTest {
             }
             assertNull(persistence.journal(request))
             assertEquals(0L, persistence.counts(territory, "PENDING").imports)
-            assertEquals(0L, persistence.counts(territory, "READY").imports)
+            assertEquals(if (shouldPrepare) 1L else 0L, persistence.counts(territory, "READY").imports)
         } finally { db.close() }
         // Only the explicitly named, validated, unique test DB and sandbox are removed.
         assertTrue(context.deleteDatabase("$name.db"))

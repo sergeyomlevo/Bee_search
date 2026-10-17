@@ -38,6 +38,18 @@ internal abstract class GpxDao {
     @Query("SELECT * FROM gpx_imports WHERE id = :id AND publication_state = 'READY'")
     abstract suspend fun readyImportById(id: UUID): GpxImportEntity?
 
+    @Query("SELECT * FROM gpx_imports WHERE request_uuid = :requestUuid AND publication_state = 'READY'")
+    abstract suspend fun completedByRequest(requestUuid: UUID): GpxImportEntity?
+
+    @Query("SELECT COUNT(*) FROM gpx_imports WHERE territory_id = :territoryId AND publication_state = 'READY' AND original_sha256 = :sha COLLATE NOCASE AND original_byte_length = :length")
+    abstract suspend fun countRepeatedOriginal(territoryId: UUID, sha: String, length: Long): Long
+
+    @Query("UPDATE gpx_imports SET publication_state = 'READY', request_uuid = :request WHERE id = :id AND publication_state = 'PENDING' AND request_uuid IS NULL")
+    abstract suspend fun publishReady(id: UUID, request: UUID): Int
+
+    @Query("DELETE FROM gpx_import_jobs WHERE request_uuid = :request AND import_id = :id AND phase = 'READY' AND intent = 'CONTINUE'")
+    abstract suspend fun deleteReadyJob(request: UUID, id: UUID): Int
+
     @Query("SELECT * FROM gpx_import_jobs WHERE request_uuid = :requestUuid")
     abstract suspend fun jobByRequest(requestUuid: UUID): GpxImportJobEntity?
 

@@ -2,8 +2,10 @@ package org.beesearch.app.data.local.room
 
 import androidx.room.withTransaction
 import java.util.UUID
+import org.beesearch.app.data.gpx.GpxAdmissionException
+import org.beesearch.app.data.gpx.gpxAdmissionRejection
 
-/** Persistence boundary. No READY writer, UUID allocation, URI/file access or runtime wiring. */
+/** Persistence boundary. No UUID allocation, URI/file access or runtime wiring. */
 internal class GpxPersistenceStore(private val database: BeeSearchDatabase) {
     private val dao get() = database.gpxDao()
     private suspend fun <T> checked(block: suspend () -> T): T = database.withTransaction {
@@ -31,6 +33,59 @@ internal class GpxPersistenceStore(private val database: BeeSearchDatabase) {
         }
     }
     suspend fun readReady(id: UUID): GpxStoredGraph? = checked { dao.readyImportById(id)?.let { read(it) } }
+    /** Durable result lookup is separate from accepting/consuming a new request. */
+    suspend fun completed(request: UUID): GpxImportEntity? = checked {
+        dao.completedByRequest(request)?.also { row ->
+            read(row)
+            dao.jobByRequest(request)?.let { job -> validateReadyLink(job, row) }
+        }
+    }
+
+    /** Recovery has no durable user confirmation: an observed repeat MUST be rejected. */
+    suspend fun rejectUnconfirmedRecoveryRepeat(job: GpxImportJobEntity) = checked {
+        require(dao.jobByRequest(job.requestUuid) == job && job.intent == "CONTINUE")
+        val row = requirePendingLink(job)
+        if (dao.countRepeatedOriginal(job.territoryId, row.originalSha256, row.originalByteLength) > 0) {
+            throw GpxAdmissionException(org.beesearch.app.data.gpx.GpxAdmissionRejection.DUPLICATE_CONFIRMATION_REQUIRED)
+        }
+    }
+
+    /** Called only by the serialized Coordinator after current file ownership/integrity proof. */
+    suspend fun publishReady(job: GpxImportJobEntity, confirmRepeatedOriginal: Boolean,
+                             checkAdmissibility: () -> Unit,
+                             checkpoint: (String) -> Unit = {}): GpxImportEntity = checked {
+        require(job.phase == "FILE_PUBLISHED" && job.intent == "CONTINUE")
+        require(dao.jobByRequest(job.requestUuid) == job)
+        requireContext(job)
+        val graph = read(requirePendingLink(job))
+        checkAdmissibility()
+        gpxAdmissionRejection(dao.countImports(job.territoryId, "READY"),
+            dao.countSamples(job.territoryId, "READY"), dao.countImportSamples(graph.importRow.id),
+            dao.countRepeatedOriginal(job.territoryId, graph.importRow.originalSha256,
+                graph.importRow.originalByteLength) > 0, confirmRepeatedOriginal)?.let {
+            throw GpxAdmissionException(it)
+        }
+        check(dao.publishReady(graph.importRow.id, job.requestUuid) == 1)
+        checkpoint("READY_IMPORT_UPDATED")
+        check(dao.updateJob(job.copy(phase = "READY")) == 1)
+        checkpoint("READY_JOB_UPDATED")
+        checkAdmissibility()
+        graph.importRow.copy(publicationState = "READY", requestUuid = job.requestUuid)
+    }
+
+    suspend fun forgetReady(job: GpxImportJobEntity) = checked {
+        require(dao.jobByRequest(job.requestUuid) == job)
+        val row = requireNotNull(dao.completedByRequest(job.requestUuid))
+        validateReadyLink(job, row)
+        check(dao.deleteReadyJob(job.requestUuid, row.id) == 1)
+    }
+
+    private fun validateReadyLink(job: GpxImportJobEntity, row: GpxImportEntity) {
+        require(job.phase == "READY" && job.intent == "CONTINUE" && job.importId == row.id)
+        require(row.publicationState == "READY" && row.requestUuid == job.requestUuid)
+        validateLink(job, row)
+    }
+
     suspend fun readPending(id: UUID): GpxStoredGraph? = checked {
         dao.importById(id)?.takeIf { it.publicationState == "PENDING" }?.let { read(it) }
     }

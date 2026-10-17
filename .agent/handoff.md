@@ -1,6 +1,40 @@
 # Bee Search handoff
 
-## Current status — Coordinator / Journal / Recovery QUALIFIED through FILE_PUBLISHED (2026-10-16)
+## Current status — internal READY Slice QUALIFIED; implementation OWNER review pending (2026-10-17)
+
+Baseline `b14552762363f5adbff522a2b2888b2221571ebb`. Explicit OWNER READY rules and
+recovery clarification are recorded in decisions.md. Internal complete() finishes
+FILE_PUBLISHED to READY; prepare() still returns invisible PENDING preparation.
+G11 READY imports+candidate<=1024 and G12 actual READY samples+candidate<=200000
+are checked in the same Room transaction as publication/correlation/journal READY.
+No other PENDING reservations. Repeats use current READY SHA/length in captured
+Territory and require explicit confirmation; non-repeat recovery may complete
+without new consent. Unproven repeat confirmation rejects and compensates safely.
+Committed request lookup bypasses admission and prevents post-commit compensation.
+READY cleanup removes owned staging/witness and journal, preserving final and IDs.
+
+ATTEMPT3 final qualification: policy targeted JVM4/4, full1055/124 classes with
+0 failures/errors/skips; all7 build/lint gates PASS. Sequential API29/API37 each
+228/228 PASS (202 regression+24 READY+2 crash methods), same APK pair/exact method
+set, each plus5/5 real host force-stop/recovery probes at BEFORE_READY,
+READY_IMPORT_UPDATED, READY_JOB_UPDATED, READY_COMMITTED and READY_STAGING_REMOVED.
+Both AVDs stopped; no physical device. Source/helper freeze587/587 MATCH, digest
+`101775DDC403C452EDD8A9E6E10AE7AA036EAD4F59785AC92C9A31A3FB82BD12`;
+closed GPX112/112 unchanged. Ignored evidence: `build/evidence/d106-ready/attempt-3/`.
+ATTEMPT1 test-signature failure and ATTEMPT2 API29 pass remain historical; final
+attempt adds self-suppression cancellation protection and its Android regression.
+
+Room remains v15; schema/migrations, parser, Original Store, media, backup rules,
+Stage1A-D and accepted Original Store contract unchanged. No UI/Registry, runtime
+user-import or startup wiring, protection/Restore/Backup implementation. Real ENOSPC
+NOT TESTED; power-loss UNKNOWN; physical-device NOT RUN; predecessor API37 startup
+ANR exact cause UNKNOWN, not reproduced during settled current qualification.
+Stage1/H05 OPEN. One local implementation commit is authorized after final scope
+checks; no push. Stop for OWNER implementation review. Next separate scope may
+connect startup reconciliation and READY access; user import retains its existing
+activation/protection gates. Do not start automatically.
+
+## Historical status — Coordinator / Journal / Recovery QUALIFIED through FILE_PUBLISHED (2026-10-16)
 
 Baseline `bd28079fca38154cc74a280d480cbf38d6c38ce0`. OWNER selected FILE_PUBLISHED
 as the terminal phase (decisions.md). Internal Coordinator composes the unchanged
