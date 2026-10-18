@@ -284,14 +284,6 @@ private fun MapDataPanelContent(
             )
         }
 
-        Text(
-            text = "GPX",
-            modifier = Modifier.testTag("gpx-section"),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        GpxEntryRow(onClick = onOpenGpx)
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -306,6 +298,16 @@ private fun MapDataPanelContent(
                 modifier = Modifier.heightIn(min = 48.dp).testTag(MAP_DATA_DONE_TAG),
             ) { Text("Готово") }
         }
+
+        HorizontalDivider(modifier = Modifier.testTag("map-data-gpx-divider"))
+
+        Text(
+            text = "GPX",
+            modifier = Modifier.testTag("gpx-section"),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        GpxEntryRow(onClick = onOpenGpx)
     }
 }
 

@@ -1,12 +1,16 @@
 package org.beesearch.app.ui.map
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assert
@@ -29,6 +33,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.espresso.Espresso
 import java.time.LocalDate
@@ -89,6 +95,53 @@ class MapDataPanelTest {
         rule.nodeText("Ловушки").assertDoesNotExist()
         rule.node(MAP_DATA_RESET_TAG).assertIsDisplayed()
         rule.node(MAP_DATA_DONE_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun panelKeepsFooterBeforeGpxAndAllActionsReachableAtLargeFontScale() {
+        setPanel(
+            initial = DEFAULT_MAP_DATA_DISPLAY.withPeriod(MapDataType.HOLLOW, augustSeptember2026),
+            fontScale = 1.7f,
+            viewportHeight = 320.dp,
+        )
+
+        val researchTags = listOf(
+            MAP_DATA_SECTION_TAG,
+            *MapDataType.entries.map { "map-data-type-${it.name}" }.toTypedArray(),
+        )
+        val positionY = { tag: String ->
+            rule.node(tag).fetchSemanticsNode().positionInRoot.y
+        }
+        researchTags.map(positionY).zipWithNext().forEach { (upper, lower) ->
+            assertTrue("$researchTags must remain in visual order", upper <= lower)
+        }
+        val lastResearchY = positionY(researchTags.last())
+        val resetY = positionY(MAP_DATA_RESET_TAG)
+        val doneY = positionY(MAP_DATA_DONE_TAG)
+        val dividerY = positionY("map-data-gpx-divider")
+        val gpxHeadingY = positionY("gpx-section")
+        val gpxRowY = positionY("gpx-tracks-row")
+        assertTrue(lastResearchY <= resetY)
+        assertTrue(lastResearchY <= doneY)
+        assertTrue(resetY <= dividerY)
+        assertTrue(doneY <= dividerY)
+        assertTrue(dividerY <= gpxHeadingY)
+        assertTrue(gpxHeadingY <= gpxRowY)
+        assertTrue("GPX must require scrolling in the constrained viewport", gpxRowY >= with(rule.density) { 320.dp.toPx() })
+        rule.onAllNodesWithTag(MAP_DATA_RESET_TAG, useUnmergedTree = true).assertCountEquals(1)
+        rule.onAllNodesWithTag(MAP_DATA_DONE_TAG, useUnmergedTree = true).assertCountEquals(1)
+        rule.onAllNodesWithText("Готово", useUnmergedTree = true).assertCountEquals(1)
+
+        rule.node("gpx-tracks-row").performScrollTo().assertIsDisplayed().performClick()
+        assertTrue(state.gpxOpen)
+        rule.onNodeWithContentDescription("Назад").performClick()
+
+        rule.node(MAP_DATA_RESET_TAG).performScrollTo().performClick()
+        assertTrue(!closed)
+        assertNull(state.display.period(MapDataType.HOLLOW))
+        assertTrue(state.display.isVisible(MapDataType.HOLLOW))
+        rule.node(MAP_DATA_DONE_TAG).performScrollTo().performClick()
+        assertTrue(closed)
     }
 
     @Test
@@ -758,10 +811,17 @@ class MapDataPanelTest {
     private fun setPanel(
         initial: MapDataDisplayState = DEFAULT_MAP_DATA_DISPLAY,
         availability: MapDataAvailability = defaultAvailability(),
+        fontScale: Float = 1f,
+        viewportHeight: Dp? = null,
     ) {
         state = MapDataUiState(today = today, display = initial, availability = availability)
         closed = false
-        rule.setContent { MapDataHarness() }
+        rule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
+                MapDataHarness(viewportHeight)
+            }
+        }
     }
 
     /**
@@ -819,7 +879,7 @@ class MapDataPanelTest {
     )
 
     @Composable
-    private fun MapDataHarness() {
+    private fun MapDataHarness(viewportHeight: Dp? = null) {
         var openedType by remember { mutableStateOf<MapDataType?>(null) }
         MapDataPanelBody(
             state = state,
@@ -842,7 +902,10 @@ class MapDataPanelTest {
                 state = state.copy(display = state.display.withResetFilters())
             },
             onDismiss = { closed = true },
-            modifier = Modifier.fillMaxSize(),
+            onOpenGpx = { state = state.copy(gpxOpen = true) },
+            onCloseGpx = { state = state.copy(gpxOpen = false) },
+            modifier = if (viewportHeight == null) Modifier.fillMaxSize()
+            else Modifier.fillMaxWidth().height(viewportHeight),
         )
     }
 }
