@@ -18,9 +18,11 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
@@ -32,6 +34,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -67,10 +70,20 @@ class MapDataPanelTest {
     private val year2024 = ResearchDateInterval(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31))
 
     @Test
-    fun gpxSectionFollowsResearchDataAndOpensTheTracksPage() {
+    fun userDataSectionKeepsTracksAndDisabledMyPointsInOrder() {
         setSheet()
 
-        rule.node("gpx-section").performScrollTo().assertIsDisplayed()
+        rule.node("user-data-section").performScrollTo().assertIsDisplayed()
+        rule.nodeText("Треки").assertIsDisplayed()
+        rule.nodeText("Мои точки").assertIsDisplayed()
+        rule.onAllNodesWithText("Треки", useUnmergedTree = true).assertCountEquals(1)
+        rule.onAllNodesWithText("Мои точки", useUnmergedTree = true).assertCountEquals(1)
+        rule.node("user-points-row").assertIsNotEnabled()
+        rule.node("user-points-row").assertContentDescriptionEquals("Мои точки. Недоступно.")
+        rule.nodeText("GPX").assertDoesNotExist()
+        rule.nodeText("Треки GPX").assertDoesNotExist()
+        rule.nodeText("Импорт и показ сохранённых треков").assertDoesNotExist()
+
         rule.node("gpx-tracks-row").performScrollTo().performClick()
         rule.node("gpx-tracks-page").assertIsDisplayed()
         rule.nodeText("Импорт GPX").assertIsDisplayed()
@@ -78,6 +91,35 @@ class MapDataPanelTest {
 
         rule.onNodeWithContentDescription("Назад").performClick()
         rule.node(MAP_DATA_CONTENT_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun disabledMyPointsDoesNotOpenAnything() {
+        setPanel()
+
+        rule.node("user-points-row").performTouchInput { click() }
+        rule.node(MAP_DATA_CONTENT_TAG).assertIsDisplayed()
+        rule.node("gpx-tracks-page").assertDoesNotExist()
+        assertNull(state.openedType)
+        assertTrue(!state.gpxOpen)
+    }
+
+    @Test
+    fun userDataRowsRemainOrderedAndReachableAtLargeFontScale() {
+        setPanel(fontScale = 1.7f, viewportHeight = 320.dp)
+
+        val dividerY = rule.node("map-data-user-data-divider").fetchSemanticsNode().positionInRoot.y
+        val sectionY = rule.node("user-data-section").fetchSemanticsNode().positionInRoot.y
+        val tracksY = rule.node("gpx-tracks-row").fetchSemanticsNode().positionInRoot.y
+        val pointsY = rule.node("user-points-row").fetchSemanticsNode().positionInRoot.y
+        assertTrue(dividerY <= sectionY)
+        assertTrue(sectionY <= tracksY)
+        assertTrue(tracksY <= pointsY)
+
+        rule.node("gpx-tracks-row").performScrollTo().assertIsDisplayed()
+        rule.node("gpx-tracks-row").assertHeightIsAtLeast(MIN_TOUCH_TARGET)
+        rule.node("user-points-row").performScrollTo().assertIsDisplayed()
+        rule.node("user-points-row").assertHeightIsAtLeast(MIN_TOUCH_TARGET)
     }
 
     @Test
@@ -118,15 +160,17 @@ class MapDataPanelTest {
         val lastResearchY = positionY(researchTags.last())
         val resetY = positionY(MAP_DATA_RESET_TAG)
         val doneY = positionY(MAP_DATA_DONE_TAG)
-        val dividerY = positionY("map-data-gpx-divider")
-        val gpxHeadingY = positionY("gpx-section")
+        val dividerY = positionY("map-data-user-data-divider")
+        val gpxHeadingY = positionY("user-data-section")
         val gpxRowY = positionY("gpx-tracks-row")
+        val userPointsY = positionY("user-points-row")
         assertTrue(lastResearchY <= resetY)
         assertTrue(lastResearchY <= doneY)
         assertTrue(resetY <= dividerY)
         assertTrue(doneY <= dividerY)
         assertTrue(dividerY <= gpxHeadingY)
         assertTrue(gpxHeadingY <= gpxRowY)
+        assertTrue(gpxRowY <= userPointsY)
         assertTrue("GPX must require scrolling in the constrained viewport", gpxRowY >= with(rule.density) { 320.dp.toPx() })
         rule.onAllNodesWithTag(MAP_DATA_RESET_TAG, useUnmergedTree = true).assertCountEquals(1)
         rule.onAllNodesWithTag(MAP_DATA_DONE_TAG, useUnmergedTree = true).assertCountEquals(1)

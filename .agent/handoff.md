@@ -1,5 +1,38 @@
 # Bee Search handoff
 
+## Current task — universal user-data panel implemented (2026-10-18)
+
+OWNER approved the targeted UI revision. Main panel order is research rows ->
+their Reset/Done -> divider -> ПОЛЬЗОВАТЕЛЬСКИЕ ДАННЫЕ -> Треки -> Мои точки.
+No subtitles. Tracks opens the unchanged nested GPX page. My points is disabled
+with pin icon, arrow and accessibility semantics; no page/entity/persistence.
+GPX pipeline/import, research filters, map/layers and Auto Backup unchanged.
+Approved v1 PNG+MD updated; only frame1 lower112px changed, all other8 frames
+and research rows/buttons pixel-identical. Decision/product/workflow/UI docs
+and existing checklist synchronized with explicit OWNER A/B/C roadmap.
+
+Checks: DEV/androidTest assemblies and lint PASS; JVM12/12 PASS; API29 targeted
+61/61 PASS (MapDataPanel38+GPX UI8+ViewModel10+Wiring5). Actual emulator system
+fontScale1.7, full and constrained1080x1600: both rows readable, real scroll,
+disabled touch no-op, Tracks/arrow/system Back verified. AVD settings restored.
+Initial test compile missing-click-import failure retained, corrected run PASS.
+No full parser/Room/recovery rerun. Physical Samsung new UI NOT INSTALLED:
+separate OWNER permission required; prior4cdb640 device evidence remains prior.
+Evidence: ../build/evidence/d106-user-data-20261018/report.md and screenshots.
+Decomposition reviewed; kept cohesive because: only existing sheet composition
+changed, with no independent workflow or infrastructure added.
+
+Next: B — prepare GPX list/one-or-multiple-track visibility PNG+MD, obtain
+approval before implementation; persist visibility and reuse layers/Registry.
+Import/storage stay independent of map display. After B, C defines minimal
+My points model: name/coordinates, create/view/edit/delete, show/hide,
+persistence and Territory/layer integration, no bee-observation semantics or
+extra attributes/media/classifiers without OWNER. Later unified extensible
+local Backup/Restore for all permanent user data; no separate GPX/point backup,
+Android Auto Backup untouched. Stage1/H05 OPEN. One local scoped commit; no push.
+Prior uncommitted qualification/handoff text below is preserved independently.
+Do not begin B implementation, C or Backup automatically.
+
 ## Current status — GPX import UI implemented from OWNER-approved mockup v1 (2026-10-17)
 
 OWNER approved the reviewed `gpx-import-v1` PNG+MD (commit `a69eaf3`) and authorized this UI

@@ -299,15 +299,16 @@ private fun MapDataPanelContent(
             ) { Text("Готово") }
         }
 
-        HorizontalDivider(modifier = Modifier.testTag("map-data-gpx-divider"))
+        HorizontalDivider(modifier = Modifier.testTag("map-data-user-data-divider"))
 
         Text(
-            text = "GPX",
-            modifier = Modifier.testTag("gpx-section"),
+            text = "ПОЛЬЗОВАТЕЛЬСКИЕ ДАННЫЕ",
+            modifier = Modifier.testTag("user-data-section"),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         GpxEntryRow(onClick = onOpenGpx)
+        UserPointsEntryRow()
     }
 }
 

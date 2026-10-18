@@ -39,7 +39,7 @@ import org.beesearch.app.ui.points.CompactScreenHeader
 
 private val GpxInset = 16.dp
 
-private enum class GpxGlyphKind { Upload, Map, Route }
+private enum class GpxGlyphKind { Upload, Map, Route, Pin }
 
 /**
  * Nested page of the approved «Данные на карте» panel.
@@ -91,13 +91,28 @@ internal fun GpxTracksPage(
 internal fun GpxEntryRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
     GpxNavRow(
         kind = GpxGlyphKind.Route,
-        title = "Треки GPX",
-        subtitle = "Импорт и показ сохранённых треков",
+        title = "Треки",
+        subtitle = null,
         enabled = true,
         onClick = onClick,
         testTag = "gpx-tracks-row",
         modifier = modifier,
-        description = "Треки GPX. Импорт и показ сохранённых треков.",
+        description = "Треки",
+    )
+}
+
+/** Reserved user map points entry; the future feature has no page or callback yet. */
+@Composable
+internal fun UserPointsEntryRow(modifier: Modifier = Modifier) {
+    GpxNavRow(
+        kind = GpxGlyphKind.Pin,
+        title = "Мои точки",
+        subtitle = null,
+        enabled = false,
+        onClick = {},
+        testTag = "user-points-row",
+        modifier = modifier,
+        description = "Мои точки. Недоступно.",
     )
 }
 
@@ -105,7 +120,7 @@ internal fun GpxEntryRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
 private fun GpxNavRow(
     kind: GpxGlyphKind,
     title: String,
-    subtitle: String,
+    subtitle: String?,
     enabled: Boolean,
     onClick: () -> Unit,
     testTag: String,
@@ -172,12 +187,14 @@ private fun GpxNavRow(
                     }
                 }
             }
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp),
-            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
         Text(
             text = "›",
@@ -230,6 +247,17 @@ private fun GpxGlyph(kind: GpxGlyphKind, tint: Color, modifier: Modifier = Modif
                 )
                 drawCircle(tint, radius = 1.8.dp.toPx(), center = Offset(w * 0.12f, h * 0.76f))
                 drawCircle(tint, radius = 1.8.dp.toPx(), center = Offset(w * 0.88f, h * 0.18f))
+            }
+            GpxGlyphKind.Pin -> {
+                val pin = Path().apply {
+                    moveTo(w * 0.5f, h * 0.9f)
+                    cubicTo(w * 0.43f, h * 0.77f, w * 0.2f, h * 0.59f, w * 0.2f, h * 0.4f)
+                    cubicTo(w * 0.2f, h * 0.17f, w * 0.8f, h * 0.17f, w * 0.8f, h * 0.4f)
+                    cubicTo(w * 0.8f, h * 0.59f, w * 0.57f, h * 0.77f, w * 0.5f, h * 0.9f)
+                    close()
+                }
+                drawPath(pin, tint, style = Stroke(width = stroke, join = StrokeJoin.Round))
+                drawCircle(tint, radius = 1.4.dp.toPx(), center = Offset(w * 0.5f, h * 0.4f))
             }
         }
     }

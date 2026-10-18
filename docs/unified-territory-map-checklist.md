@@ -363,3 +363,33 @@ results remain blocked, and broader visual/performance/field obligations remain 
   Verification on the final tree: full JVM1061/1061 (126 classes, 0 failures/errors/skips); all7 build/lint gates PASS; API29 focused 58/58 PASS (35 existing MapDataPanel + 8 new GPX panel + 10 new ViewModel + 5 wiring) on the final APK. API37 new ViewModel 10/10 PASS; API37 Compose UI NOT RUN because Espresso 3.5.1 calls removed `InputManager.getInstance` on the installed Android 17 API37 image (test-harness/toolchain incompatibility reproduced before these tests). Physical Samsung S25 Ultra manual scenario NOT RUN. Frozen inputs: `build/evidence/d106-stage1-gpx-ui/attempt-1/frozen-inputs.json` (see `freeze.json`). Stage1/H05 remain OPEN; one local implementation commit authorized, no push.
 
 - [x] OWNER panel-order correction (2026-10-18): research rows -> existing `Сбросить фильтры` / `Готово` -> divider -> GPX heading/entry. Existing scroll, callbacks and nested page preserved; v1 PNG+MD synchronized, only the main-panel frame fragment changed. DEV/androidTest assemblies and lint PASS; JVM12/12 PASS; API29 targeted59 unique cases PASS (56 initial +3 Back retries after dismissing an observed System UI ANR dialog; unchanged APKs). Actual emulator system fontScale1.7 and reduced-window vertical scrolling/open/back checked. Evidence: `build/evidence/d106-panel-order-20261018/report.md`. New APK on Samsung NOT RUN pending explicit installation permission. Prior qualification evidence and9b limitation preserved; Stage1/H05 OPEN. No GPX pipeline requalification or harness changes.
+
+
+## OWNER roadmap — user cartography, 2026-10-18
+
+Current main-panel contract supersedes the historical GPX-labelled entry above:
+[accepted D106 decision](decisions.md#d106-user-data-navigation--owner-decision-2026-10-18).
+
+- [x] **A — finish user-data structure (implementation):** research rows -> their Reset/Done ->
+  divider -> `ПОЛЬЗОВАТЕЛЬСКИЕ ДАННЫЕ` -> `Треки` -> disabled `Мои точки`.
+  No row subtitles/Soon; distinct icons/chevrons; existing GPX import retained.
+  UI checks/build/lint and physical Samsung fontScale1.7 status recorded below.
+- [ ] **B — imported GPX display:** first prepare OWNER-approved PNG+MD for the
+  saved-GPX list and one/multiple track visibility controls. Then implement
+  list/selection/show-hide, persist visibility between launches and integrate
+  existing layers/Registry. Import never automatically shows a track.
+- [ ] **C — My points, after B:** minimal independent point model, create on map,
+  name/coordinates, view/edit/delete, show/hide, persistence and Territory/layer
+  integration. Not bee observations/GPX samples. No extra attributes/media or
+  classifiers without OWNER decision.
+- [ ] **Later unified local Backup/Restore:** extensible support for all permanent
+  user data, no separate backup after each type. Android Auto Backup unchanged.
+  Stage1/H05 OPEN; no automatic implementation of B/C/backup.
+
+A verification: DEV/androidTest assemblies and lint PASS; JVM12/12, API29 UI/
+ViewModel/wiring61/61 PASS. Actual emulator system fontScale1.7 and reduced
+1080x1600 scroll/navigation/disabled-row checks PASS; screenshots in local
+`build/evidence/d106-user-data-20261018/report.md`. Physical Samsung new UI
+NOT INSTALLED/NOT VERIFIED pending separate OWNER permission; earlier Samsung
+qualification applies to4cdb640. Prior handoff preserved; one local scoped
+commit, no push. Stage1/H05 remain OPEN; next task is B mockup only.

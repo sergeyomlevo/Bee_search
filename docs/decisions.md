@@ -4097,3 +4097,40 @@ Superseded in part (explicitly, not silently):
 
 H05, the unified local Backup/Restore and full GPX protection are not verified by
 this decision; no codec, restore, UI or runtime behavior is changed here.
+
+
+## D106 user data navigation — OWNER decision, 2026-10-18
+
+**ACCEPTED — explicit OWNER instruction.** Refines the main-panel composition in
+GPX Import UI v1; nested GPX operations and all pipeline contracts remain intact.
+
+After research rows, their Reset/Done actions and a divider, the main panel has
+`ПОЛЬЗОВАТЕЛЬСКИЕ ДАННЫЕ` with exactly `Треки` and `Мои точки`. Both are compact
+icon/label/chevron rows without subtitles. Main-panel `GPX`, `Треки GPX` and
+`Импорт и показ сохранённых треков` are replaced, not retained as extra copy.
+`Треки` opens the existing nested GPX page. `Мои точки` is disabled, has correct
+accessibility semantics and a distinct pin icon; no visible Soon text or empty
+page. No new entity/table or persistence is introduced for this placeholder.
+Research filters/actions and the existing single panel scroll remain unchanged.
+Real system fontScale1.7 must preserve complete text, >=48dp targets and access
+to both rows; do not shrink fonts to force a fit.
+
+Implementation sequence:
+- **A — user-data structure:** this panel change, retain existing GPX import.
+- **B — imported GPX display:** saved-GPX list, selection of one or multiple
+  tracks, visibility on/off, persistence of that selection between launches,
+  map rendering through existing layers/Registry. Import/storage remain
+  independent of display; import must not automatically enable visibility.
+  Next task is the B UI mockup PNG+MD under mockup-first, before implementation.
+- **C — My points, after B:** define minimal independent point model; create on
+  map, name/coordinates, view/edit/delete, show/hide, persistence, Territory and
+  existing layer integration. Never reuse bee ObservationPoints or GPX samples.
+  No extra attributes/media/classifiers without an OWNER decision. Earlier D106
+  optional FieldPoint attributes do not authorize expanding this minimal C
+  slice; its concrete model is agreed at C, not implemented for the UI row.
+- **Backup/Restore:** later unified extensible local Backup/Restore for all
+  persistent user data. Do not add a separate backup per GPX/My points feature;
+  Android Auto Backup unchanged. Stage1 and H05 remain OPEN.
+
+[UI contract](ui/mockups/gpx-import-v1.md),
+[implementation checklist](unified-territory-map-checklist.md).
