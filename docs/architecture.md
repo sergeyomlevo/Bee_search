@@ -1924,8 +1924,8 @@ database metadata
 ## 65.1. Каталог обмена Bee Search
 
 Пользовательский обмен файлами отделён от хранилища приложения отдельным контрактом
-`BeeSearchExchangeStorage`. Контракт определяет корень варианта и три каталога:
-`Areas`, `OfflineMaps`, `Data`. UI, импорт и экспорт не собирают пути самостоятельно —
+`BeeSearchExchangeStorage`. Контракт определяет корень варианта и каталоги:
+`Areas`, `OfflineMaps`, `Data`, `GPX`. UI, импорт и экспорт не собирают пути самостоятельно —
 они получают каталог и начальное расположение для picker из этого контракта.
 
 Физический корень — общедоступный `Download`, поэтому фактический путь варианта:
@@ -2633,3 +2633,10 @@ Native attach acknowledgement does not claim that every GPU frame has been measu
 
 Build/device evidence and remaining physical acceptance:
 [implementation report](d106-gpx-display-implementation-report.md).
+
+### GPX picker initial folder — OWNER amendment2026-10-19
+
+GPX uses existing OpenExchangeDocument and ExchangeFolder.GPX. Directory preparation
+is best-effort through the existing storage component; platform refusal does not
+block OpenDocument. EXTRA_INITIAL_URI is a document-URI hint, not a permission or
+a guaranteed initial location. [Verification/limits](d106-gpx-picker-folder-report.md).

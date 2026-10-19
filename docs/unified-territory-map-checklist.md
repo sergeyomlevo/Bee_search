@@ -419,3 +419,16 @@ commit, no push. Stage1/H05 remain OPEN; next task is B mockup only.
   and lint PASS (0 errors,35 warnings,6 hints). Samsung deployment separately
   authorized by OWNER; actual device results are recorded in the report.
   Stage1/H05 remain OPEN. No push or automatic continuation to My points.
+
+- [x] GPX1.0 profile, OWNER2026-10-19: commit2412661, existing pipeline, exact
+  control SHA256/271 points verified on API29 and37; no schema/speed/rte/wpt change.
+  [A report](d106-gpx10-report.md). Historical1.1 qualification retained.
+- [ ] READY deletion: interaction approved; [PNG+MD DRAFT](ui/mockups/gpx-display-delete-v1.md)
+  and [minimal durable-state plan](d106-gpx-deletion-plan.md) await review. No production
+  deletion/UI/schema or destructive phone tests. B documentation commit eb0859e.
+- [x] GPX picker reuses Exchange/OpenExchangeDocument, per-variant GPX folder;
+  best-effort mkdir and normal SAF fallback. Samsung API36/font1.7 automatic GPX
+  folder creation and initial breadcrumb PASS after separate OWNER update permission.
+  DEV1.3.0(8),4078 private files exactly preserved across update; Stable/Beta untouched.
+  [C report and screenshot](d106-gpx-picker-folder-report.md). Stage1/H05 OPEN.
+  No push or automatic continuation.

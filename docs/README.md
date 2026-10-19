@@ -62,3 +62,5 @@
 порядку приоритетов из [AGENTS.md](../AGENTS.md), а не краткому описанию здесь.
 
 GPX follow-up2026-10-19: [GPX1.0 qualification](d106-gpx10-report.md); [deletion audit/plan](d106-gpx-deletion-plan.md), [deletion PNG+MD draft](ui/mockups/gpx-display-delete-v1.md).
+
+[GPX Exchange folder and Samsung deployment](d106-gpx-picker-folder-report.md) — OWNER follow-up2026-10-19.

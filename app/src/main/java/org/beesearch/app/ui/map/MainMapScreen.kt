@@ -2,7 +2,6 @@ package org.beesearch.app.ui.map
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -134,7 +133,11 @@ internal fun CurrentTerritoryScreen(
     }
     val pickerRequest by gpxImportViewModel.pickerRequest.collectAsStateWithLifecycle()
     val contentResolver = LocalContext.current.contentResolver
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    val picker = rememberLauncherForActivityResult(
+        org.beesearch.app.data.exchange.OpenExchangeDocument(
+            application.container.exchangeStorage.initialDocumentUri(org.beesearch.app.data.exchange.ExchangeFolder.GPX),
+        ),
+    ) { uri ->
         if (uri == null) {
             gpxImportViewModel.onPickerCancelled()
         } else {
@@ -146,6 +149,10 @@ internal fun CurrentTerritoryScreen(
     }
     LaunchedEffect(pickerRequest) {
         pickerRequest?.let { request ->
+            // Same best-effort Exchange preparation as offline maps; refusal never blocks SAF.
+            try { application.container.exchangeStorage.ensure() }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { /* The normal document picker remains available. */ }
             picker.launch(arrayOf("*/*"))
             gpxImportViewModel.onPickerLaunched(request.token)
         }

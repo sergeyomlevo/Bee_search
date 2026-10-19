@@ -951,8 +951,8 @@ attachment metadata и photo bytes, а также минимальный Territo
 не является новой версией полного backup; selective import пока не реализован.
 
 Пользовательский обмен файлами имеет одно предсказуемое место — каталог обмена
-`Download/BeeSearch/<вариант>/Exchange/` с подкаталогами `Areas`, `OfflineMaps` и
-`Data`. Вариант приложения (Stable, Beta, Dev) выбирается автоматически, поэтому
+`Download/BeeSearch/<вариант>/Exchange/` с подкаталогами `Areas`, `OfflineMaps`,
+`Data` и `GPX`. Вариант приложения (Stable, Beta, Dev) выбирается автоматически, поэтому
 сборки не смешивают файлы. Экспорт данных и импорт офлайн-карт предлагают
 соответствующий подкаталог как начальное расположение, но выбор файла и имени
 всегда подтверждает пользователь. Каталог обмена не является внутренним
@@ -1254,3 +1254,8 @@ offload remain later layers; private originals are never cleanup targets.
 
 Порядок дальнейшей разработки и границы: [решение D106](decisions.md#d106-user-data-navigation--owner-decision-2026-10-18),
 [макет v1](ui/mockups/gpx-import-v1.md).
+
+GPX import exchange amendment2026-10-19: prepared external GPX belong in
+`Download/BeeSearch/<variant>/Exchange/GPX`; picker starts there when supported.
+Missing/unavailable folder or ignored hint never prevents manual file selection.
+This folder is not internal canonical/original storage; external files stay untouched.

@@ -31,6 +31,9 @@ internal enum class ExchangeFolder(val directoryName: String) {
 
     /** Exported Bee Search data and the files used to import it back. */
     DATA("Data"),
+
+    /** External GPX files prepared for import; never internal original storage. */
+    GPX("GPX"),
 }
 
 internal data class ExchangeDirectory(

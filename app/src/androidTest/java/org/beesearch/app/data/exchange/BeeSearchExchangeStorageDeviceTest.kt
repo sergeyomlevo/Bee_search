@@ -95,4 +95,14 @@ class BeeSearchExchangeStorageDeviceTest {
         )
         assertNotEquals(offlineMaps, data)
     }
+    @Test
+    fun gpxUsesExistingOpenDocumentContractAndVariantDocumentHint() {
+        val uri = storage.initialDocumentUri(ExchangeFolder.GPX)
+        assertEquals("primary:Download/BeeSearch/${storage.variantName}/Exchange/GPX", DocumentsContract.getDocumentId(uri))
+        val intent = OpenExchangeDocument(uri).createIntent(InstrumentationRegistry.getInstrumentation().targetContext, arrayOf("*/*"))
+        assertEquals(android.content.Intent.ACTION_OPEN_DOCUMENT, intent.action)
+        @Suppress("DEPRECATION")
+        val initial = intent.getParcelableExtra<android.net.Uri>(DocumentsContract.EXTRA_INITIAL_URI)
+        assertEquals(uri, initial)
+    }
 }

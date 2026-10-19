@@ -76,6 +76,7 @@ class BeeSearchExchangeStorageTest {
             ExchangeFolder.AREAS to "BeeSearch/Beta/Exchange/Areas",
             ExchangeFolder.OFFLINE_MAPS to "BeeSearch/Beta/Exchange/OfflineMaps",
             ExchangeFolder.DATA to "BeeSearch/Beta/Exchange/Data",
+            ExchangeFolder.GPX to "BeeSearch/Beta/Exchange/GPX",
         )
 
         assertEquals(expected.keys, ExchangeFolder.entries.toSet())
@@ -147,26 +148,26 @@ class BeeSearchExchangeStorageTest {
 
         val state = storage.ensure()
 
-        // `mkdirs()` already created the parents, so only the two missing siblings are new.
-        assertEquals(ExchangeStorageState.Ready(listOf("OfflineMaps", "Data")), state)
+        // `mkdirs()` already created the parents, so only the missing siblings are new.
+        assertEquals(ExchangeStorageState.Ready(listOf("OfflineMaps", "Data", "GPX")), state)
         assertTrue(existing.isFile)
         assertEquals(areas, existing.parentFile)
     }
 
     @Test
-    fun `exchange addresses only its three folders and never app storage`() {
+    fun `exchange addresses only its exchange folders and never app storage`() {
         val storage = storageFor("Stable")
         val exchangeRoot = storage.exchangeDirectory
 
-        // The tree is closed: nothing outside Exchange/{Areas,OfflineMaps,Data} is addressable, so
+        // The tree is closed: nothing outside Exchange/{Areas,OfflineMaps,Data,GPX} is addressable, so
         // the Room database, DataStore, cache or the installed PMTiles copy cannot land here.
         val addressed = ExchangeFolder.entries.map { storage.directoryOf(it).directory }
-        assertEquals(3, addressed.size)
+        assertEquals(4, addressed.size)
         addressed.forEach { directory ->
             assertEquals(exchangeRoot, directory.parentFile)
         }
         assertEquals(
-            setOf("Areas", "OfflineMaps", "Data"),
+            setOf("Areas", "OfflineMaps", "Data", "GPX"),
             addressed.map { it.name }.toSet(),
         )
         assertFalse(addressed.any { it.name in setOf("databases", "datastore", "cache", "files") })

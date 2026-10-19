@@ -43,7 +43,9 @@ class4/4 PASS including owner original (53 unique Android tests across those run
 DEV/test APK assemblies PASS. Final A lint PASS:0 errors,35 warnings,6 hints;
 no disabled rules. Logs: qualification.log and owner-qualification.log. Initial
 52-test run had2 old D06 expectations; corrected as described above, rerun passed.
-Raw evidence is local, ignored: build/evidence/d106-gpx10-20261019/. No Samsung install or destructive test.
+Raw evidence is local, ignored: build/evidence/d106-gpx10-20261019/. No Samsung install during A qualification.
+Later API37 GPX1.0 tests and combined DEV deployment are recorded in the
+[folder/deployment report](d106-gpx-picker-folder-report.md); no destructive phone test.
 
 Decomposition reviewed; kept cohesive because: the361-line Android XML reader
 receives only a root-namespace acceptance change; XML security/provider ownership

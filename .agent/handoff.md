@@ -1,5 +1,30 @@
 # Bee Search handoff
 
+## Latest task - GPX1.0, deletion draft and Exchange picker (2026-10-19)
+
+A implemented:2412661. Existing pipeline supports exact1.0/1.1 profiles; original
+Topokarty33339-byte SHA256dc390810...9e175d8 found read-only on Samsung. All271
+coordinates/elevations/times and original bytes verified on API29 and37. No schema
+or1.1 CM1/UUID/original changes. docs/d106-gpx10-report.md.
+B STOP:eb0859e is documentation only. PNG+MD deletion addendum DRAFT and durable
+delete-journal/tombstone migration plan await OWNER review. No delete production
+UI/backend/schema and no destructive Samsung tests. Stage1/H05 OPEN.
+Folder slice: existing Exchange/OpenExchangeDocument, per-variant GPX directory;
+best-effort preparation, normal SAF fallback. JVM1062 PASS; API29 A53 unique and
+folder/import target19 PASS; API37 GPX/Exchange10 PASS. Final lint0 errors,35
+warnings,6 hints. API29 public-directory write limitation documented, no broad
+permission added. Independent Luna unavailable; SELF_REVIEW, reduced independence.
+After separate OWNER permission, installed only org.beesearch.app.dev1.3.0(8) on
+Samsung SM-S938B/API36/font1.7. APK SHA256
+66ba1e813a6278feff7e8c1c26b3feae009d2c319d6ce756e68b640ad59f8eb1.
+All4078 private files exactly match before update/first launch; Stable/Beta unchanged.
+Missing Exchange/GPX folder created by app; fresh picker automatically opened
+BeeSearch/Dev/Exchange/GPX. Screenshot and results:
+docs/d106-gpx-picker-folder-report.md. Cancel returned to Tracks, no file selected.
+Old handoff diff preserved byte-for-byte outside task commits. No push. Stop;
+no automatic deletion implementation, My points or next stage.
+
+
 ## Latest task - saved GPX display implementation and DEV smoke (2026-10-19)
 
 Base574f099; OWNER-approved gpx-display-v1 implemented. READY Territory catalog,
