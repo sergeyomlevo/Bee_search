@@ -4163,3 +4163,12 @@ ACCEPTED: add GPX1.0 track profile beside1.1 in the existing chain; exact
 version/namespace pairing, root1.0 metadata, unsupported speed preserved only in
 original, existing canonical/security/identity semantics unchanged. No rte/wpt
 promotion or speed schema field. Historical1.1 qualification is not rewritten.
+
+## D106 saved GPX deletion — OWNER interaction, 2026-10-19
+
+ACCEPTED interaction: long press a saved GPX name → Удалить → named confirmation;
+ordinary tap still toggles visibility; accessibility gets a deliberate equivalent
+action. Delete only the selected UUID and owned resources, never external source.
+New visual states await [PNG+MD approval](ui/mockups/gpx-display-delete-v1.md);
+[safe-delete audit/plan](d106-gpx-deletion-plan.md) records the durable-state blocker.
+No deletion implementation approved by the draft artifacts. Stage1/H05 OPEN.

@@ -63,7 +63,6 @@ ACCEPTED:
 | Input | Stage 1 result |
 |---|---|
 | GPX 1.0 / 1.1 | Supported track profiles (OWNER amendment 2026-10-19) |
-| GPX 1.0 | Explicitly rejected |
 | trk | Canonicalized |
 | rte / wpt | Not canonicalized; never converted into tracks |
 | Mixed document | Import supported tracks with explicit unsupported-content warning |
