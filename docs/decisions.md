@@ -4171,4 +4171,32 @@ ordinary tap still toggles visibility; accessibility gets a deliberate equivalen
 action. Delete only the selected UUID and owned resources, never external source.
 New visual states await [PNG+MD approval](ui/mockups/gpx-display-delete-v1.md);
 [safe-delete audit/plan](d106-gpx-deletion-plan.md) records the durable-state blocker.
-No deletion implementation approved by the draft artifacts. Stage1/H05 OPEN.
+The approved UI and deletion plan were accepted by OWNER on 2026-10-19. The
+implementation uses the existing GPX pipeline, Registry and Settings DataStore.
+Stage1/H05 OPEN.
+
+## D106 saved GPX deletion lifecycle — OWNER approval, 2026-10-19
+
+**ACCEPTED / IMPLEMENTED.** Deletion is keyed by the exact Territory UUID and
+import UUID. Room migration 15→16 adds the feature-local `gpx_deletions` journal
+as a permanent tombstone with no foreign key to the removed import. A Room
+transaction records the tombstone and removes samples, segments, tracks and the
+READY import in RESTRICT-safe order only after import reconciliation settles
+staging. A residual READY job is rejected; it is never deleted as a shortcut.
+
+The managed original store persists ownership proof including the expected
+original identity and directory/payload device and inode values. Cleanup unlinks
+only that proven app-private copy. Missing copies can complete idempotently;
+ownership mismatch fails closed. External picker files, including the per-variant
+Exchange/GPX directory, are never deleted. File cleanup and visibility-settings
+cleanup have independent durable completion flags and retry without blocking
+other GPX imports.
+
+After the Room commit, a durable deletion event removes the catalog row and
+existing Registry overlay. Territory epochs and UUID filtering reject stale
+geometry or presentation callbacks. The permanent tombstone rejects replay of
+the old request/import while a fresh explicitly requested import with new
+identity may proceed. Pending cleanup never reports that all original bytes have
+been removed and never restores the deleted READY import. The approved UI is
+[gpx-display-delete-v1](ui/mockups/gpx-display-delete-v1.md); Stage1/H05 remain
+OPEN and unified Backup/Restore remains a later task.

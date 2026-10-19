@@ -2634,6 +2634,27 @@ Native attach acknowledgement does not claim that every GPU frame has been measu
 Build/device evidence and remaining physical acceptance:
 [implementation report](d106-gpx-display-implementation-report.md).
 
+### D106 saved GPX deletion lifecycle — 2026-10-19
+
+The approved deletion flow is implemented in the existing GPX feature boundary:
+long press or the equivalent accessibility action opens the named confirmation;
+ordinary tap continues to change visibility. `GpxDeletionStore` uses Room
+migration 15→16 and a permanent `gpx_deletions` tombstone with exact Territory,
+import, request and original-object identity. The Room transaction records durable
+intent and removes canonical samples→segments→tracks→READY import only after
+reconciliation has settled the import workflow. A residual READY job fails closed;
+the deletion path does not remove a staging job itself.
+
+`GpxOriginalStore` verifies its persisted app-private directory/device/inode proof
+before deleting the managed original copy. File cleanup and visibility-settings
+cleanup have independent journal flags and can be retried after restart. A
+cleanup debt is isolated to that import, while the durable tombstone keeps the
+import out of READY and prevents old request or callback replay. After the Room
+commit, `GpxRuntime` emits the deletion through the existing Registry/session
+lifecycle so the selected row and overlay disappear without affecting other GPX
+or research layers. External picker files and the Exchange/GPX directory are
+outside this ownership boundary. Stage1/H05 remain OPEN.
+
 ### GPX picker initial folder — OWNER amendment2026-10-19
 
 GPX uses existing OpenExchangeDocument and ExchangeFolder.GPX. Directory preparation

@@ -281,5 +281,8 @@ internal class GpxImportCoordinator(
         requireNotNull(job.originalByteLength), requireNotNull(job.originalSha256))
     private class RequestUnavailable : Exception()
     private class ParseRejected(val result: GpxParseResult.Rejected) : Exception()
-    companion object { private val lock = Mutex() }
+    companion object {
+        private val lock = Mutex()
+        internal suspend fun <T> serializedWriter(block: suspend () -> T): T = lock.withLock { block() }
+    }
 }

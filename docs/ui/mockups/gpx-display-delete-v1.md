@@ -1,9 +1,9 @@
 # Удаление сохранённого GPX — дополнение к display v1
 
-**DRAFT — требуется утверждение PNG+MD OWNER до production UI.**
+**APPROVED BY OWNER, 2026-10-19.**
 Общий сценарий long press → Удалить → подтверждение уже утверждён OWNER.
 [Базовый утверждённый макет](gpx-display-v1.md) и его композиция сохраняются.
-[PNG](gpx-display-delete-v1.png); HTML — воспроизводимый источник статического
+[PNG](gpx-display-delete-v1.png); [HTML](gpx-display-delete-v1.html) — воспроизводимый источник статического
 макета с увеличенным в1.7 раза текстом, не runtime/device evidence.
 
 - Обычный tap строки по-прежнему меняет видимость.
@@ -31,6 +31,7 @@
 - Смена Territory закрывает меню/диалог; устаревший callback не удаляет иной UUID.
   Подтверждённая операция сохраняет исходную Territory и завершается безопасно.
 
-Production UI/backend удаления не реализованы. Gate — mockup-first и отсутствие
-существующего durable delete lifecycle. [Аудит и минимальный план](../../d106-gpx-deletion-plan.md).
-Stage1/H05 OPEN. Backup/Restore и My points не входят.
+Production UI/backend deletion is implemented against this contract. The durable
+result is keyed by exact Territory UUID + import UUID. A feature-local Room
+deletion journal/tombstone survives cleanup and blocks old request/import replay.
+Stage1/H05 OPEN. Backup/Restore and My points are outside this slice.

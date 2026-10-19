@@ -146,4 +146,21 @@ internal abstract class GpxDao {
 
     @Query("DELETE FROM gpx_imports WHERE id = :importId AND publication_state = 'PENDING'")
     abstract suspend fun deletePendingImport(importId: UUID): Int
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertDeletion(row: GpxDeletionEntity)
+    @Query("SELECT * FROM gpx_deletions WHERE import_id=:id")
+    abstract suspend fun deletion(id: UUID): GpxDeletionEntity?
+    @Query("SELECT * FROM gpx_deletions WHERE files_cleaned=0 OR settings_cleaned=0 ORDER BY import_id")
+    abstract suspend fun pendingDeletions(): List<GpxDeletionEntity>
+    @Query("UPDATE gpx_deletions SET files_cleaned=1 WHERE import_id=:id")
+    abstract suspend fun markDeletionFiles(id: UUID): Int
+    @Query("UPDATE gpx_deletions SET settings_cleaned=1 WHERE import_id=:id")
+    abstract suspend fun markDeletionSettings(id: UUID): Int
+    @Query("SELECT COUNT(*) FROM gpx_imports WHERE original_object_id=:original")
+    abstract suspend fun originalReferences(original: UUID): Int
+    @Query("SELECT COUNT(*) FROM gpx_import_jobs WHERE original_object_id=:original")
+    abstract suspend fun originalJobReferences(original: UUID): Int
+    @Query("DELETE FROM gpx_imports WHERE id=:id AND territory_id=:territory AND publication_state='READY'")
+    abstract suspend fun deleteReadyImport(id: UUID, territory: UUID): Int
 }

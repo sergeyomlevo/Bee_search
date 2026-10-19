@@ -423,9 +423,15 @@ commit, no push. Stage1/H05 remain OPEN; next task is B mockup only.
 - [x] GPX1.0 profile, OWNER2026-10-19: commit2412661, existing pipeline, exact
   control SHA256/271 points verified on API29 and37; no schema/speed/rte/wpt change.
   [A report](d106-gpx10-report.md). Historical1.1 qualification retained.
-- [ ] READY deletion: interaction approved; [PNG+MD DRAFT](ui/mockups/gpx-display-delete-v1.md)
-  and [minimal durable-state plan](d106-gpx-deletion-plan.md) await review. No production
-  deletion/UI/schema or destructive phone tests. B documentation commit eb0859e.
+- [x] READY deletion implemented, OWNER approved 2026-10-19: [PNG+MD](ui/mockups/gpx-display-delete-v1.md)
+  and [durable-state plan](d106-gpx-deletion-plan.md). Room 15→16 feature-local permanent
+  tombstone, exact UUID binding, RESTRICT-safe canonical deletion after reconciliation,
+  owned original inode proof, independent file/settings cleanup debt retries, stale
+  callback/overlay invalidation, and accessible long-press confirmation are implemented.
+  JVM1062 PASS; API29 targeted95 unique tests (27 deletion/UI +64 regressions +4 native)
+  and API37 backend13 PASS. Screenshots/fontScale1.7 and limitations:
+  [deletion report](d106-gpx-deletion-report.md). Dedicated Samsung test-GPX run
+  awaits separate deployment permission. Stage1/H05 OPEN.
 - [x] GPX picker reuses Exchange/OpenExchangeDocument, per-variant GPX folder;
   best-effort mkdir and normal SAF fallback. Samsung API36/font1.7 automatic GPX
   folder creation and initial breadcrumb PASS after separate OWNER update permission.

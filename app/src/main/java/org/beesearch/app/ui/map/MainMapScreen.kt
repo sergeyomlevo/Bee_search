@@ -118,6 +118,8 @@ internal fun CurrentTerritoryScreen(
             prepareGpxOverlay(territoryId, graph, revision)
         },
         store = application.container.gpxVisibilityStore,
+        delete = { territory, id -> application.container.gpxRuntime.deleteReady(territory, id); Unit },
+        deletions = application.container.gpxRuntime.deletions,
     ))
     val gpxDisplayState by gpxDisplayViewModel.state.collectAsStateWithLifecycle()
     val preparedGpx by gpxDisplayViewModel.overlays.collectAsStateWithLifecycle()
@@ -238,6 +240,7 @@ internal fun CurrentTerritoryScreen(
                     gpxImportState = gpxImportState,
                     gpxDisplayState = currentGpxDisplayState,
                     onGpxVisibilityChange = gpxDisplayViewModel::setVisible,
+                    onDeleteGpx = gpxDisplayViewModel::deleteImport,
                     onRetryGpxDisplay = gpxDisplayViewModel::retry,
                     onStartGpxImport = {
                         gpxImportViewModel.beginImport(territory?.name.orEmpty())
@@ -286,6 +289,7 @@ internal fun MapDataSurface(
     gpxImportState: GpxImportUiState = GpxImportUiState.Idle,
     gpxDisplayState: GpxDisplayUiState = GpxDisplayUiState(),
     onGpxVisibilityChange: (UUID, Boolean) -> Unit = { _, _ -> },
+    onDeleteGpx: (UUID) -> Unit = {},
     onRetryGpxDisplay: (UUID?) -> Unit = {},
     onStartGpxImport: () -> Unit = {},
     onCancelGpxImport: () -> Unit = {},
@@ -310,6 +314,7 @@ internal fun MapDataSurface(
         gpxImportState = gpxImportState,
         gpxDisplayState = gpxDisplayState,
         onGpxVisibilityChange = onGpxVisibilityChange,
+        onDeleteGpx = onDeleteGpx,
         onRetryGpxDisplay = onRetryGpxDisplay,
         onStartGpxImport = onStartGpxImport,
         onCancelGpxImport = onCancelGpxImport,

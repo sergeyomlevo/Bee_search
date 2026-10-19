@@ -1,6 +1,8 @@
 package org.beesearch.app.data.gpx
 
 import java.util.UUID
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -32,8 +34,15 @@ internal class GpxRuntimeUnavailableException(val reconciliation: GpxReconciliat
 internal class GpxRuntime(
     private val persistence: GpxPersistenceStore,
     createCoordinator: () -> GpxImportCoordinator,
+    createDeletion: (() -> GpxDeletion)?,
 ) {
     private val coordinator by lazy(createCoordinator)
+    private val deletion by lazy { createDeletion?.invoke() }
+    constructor(persistence: GpxPersistenceStore, createCoordinator: () -> GpxImportCoordinator) :
+        this(persistence, createCoordinator, null)
+    // Available synchronously: a ViewModel subscribes before starting any catalog load/action.
+    private val deletedEvents = MutableSharedFlow<UUID>()
+    val deletions = deletedEvents.asSharedFlow()
     constructor(coordinator: GpxImportCoordinator, persistence: GpxPersistenceStore) :
         this(persistence, { coordinator })
 
@@ -75,7 +84,16 @@ internal class GpxRuntime(
         }
     }
 
+    suspend fun deleteReady(territoryId: UUID, importId: UUID): GpxDeleteResult = withContext(Dispatchers.IO) {
+        gate.withLock {
+            val result = reconcileLocked()
+            if (!result.completed) throw GpxRuntimeUnavailableException(result)
+            requireNotNull(deletion).delete(territoryId, importId) { deletedEvents.emit(it) }
+        }
+    }
+
     private suspend fun reconcileLocked(): GpxReconciliationResult {
+        deletion?.reconcile()
         settled?.let { return it }
         val result = try {
             GpxReconciliationResult(coordinator.recover())

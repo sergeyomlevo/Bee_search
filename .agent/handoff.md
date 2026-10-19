@@ -1,5 +1,20 @@
 # Bee Search handoff
 
+## Latest task — safe saved GPX deletion (2026-10-19)
+
+OWNER approved deletion PNG+MD and durable journal plan. Base97d4d67; Room15→16,
+permanent exact-ID tombstone, RESTRICT-safe logical deletion, owned-original
+inode proof and independent file/settings debt retries are implemented. Existing
+Registry/session invalidates deleted overlays and rejects stale geometry/catalog.
+Accessible name long press → Delete → confirmation; Cancel/Back preserve data.
+Report: docs/d106-gpx-deletion-report.md. JVM1062 PASS; API29 95 unique targeted
+checks (27 deletion/UI +64 regressions +4 native), final UI recheck1 and API37
+backend13 PASS. Final lint/diff status is recorded in the report.
+Prior handoff bytes/diff preserved outside this task commit. No push. Samsung
+was NOT updated or used for deletion; new DEV update needs separate OWNER
+permission, followed only by a specially created test-GPX qualification.
+Stage1/H05 OPEN. Stop; no My points/backup/export or next task implementation.
+
 ## Latest task - GPX1.0, deletion draft and Exchange picker (2026-10-19)
 
 A implemented:2412661. Existing pipeline supports exact1.0/1.1 profiles; original

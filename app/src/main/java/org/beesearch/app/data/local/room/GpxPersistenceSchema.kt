@@ -101,10 +101,11 @@ internal object GpxPersistenceSchema {
                 if (name.startsWith(PREFIX)) actual[name] = cursor.getString(1)
             }
         }
+        if (db.version >= 16) GpxDeletionSchema.verify(db)
         if (actual != triggers) throw GpxPersistenceIntegrityException("STRUCTURAL_TRIGGERS")
     }
     val callback = object : RoomDatabase.Callback() {
-        override fun onCreate(db: SupportSQLiteDatabase) { installTriggers(db) }
+        override fun onCreate(db: SupportSQLiteDatabase) { installTriggers(db); GpxDeletionSchema.install(db) }
     }
 }
 

@@ -102,9 +102,13 @@ internal class AppContainer(private val context: Context) {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gpxPersistence = GpxPersistenceStore(database)
     // The runtime defers private-path resolution until its suspend IO boundary.
-    val gpxRuntime = GpxRuntime(gpxPersistence) {
-        GpxImportCoordinator(gpxPersistence, GpxOriginalStore(context.filesDir))
-    }
+    val gpxRuntime = GpxRuntime(gpxPersistence,
+        createCoordinator = { GpxImportCoordinator(gpxPersistence, GpxOriginalStore(context.filesDir)) },
+        createDeletion = { org.beesearch.app.data.gpx.GpxDeletion(
+            org.beesearch.app.data.local.room.GpxDeletionStore(database), GpxOriginalStore(context.filesDir),
+            hide = { territory, id -> gpxVisibilityStore.setVisible(territory, id, false) },
+        ) },
+    )
 
     fun startGpxReconciliation() = applicationScope.launch {
         try {

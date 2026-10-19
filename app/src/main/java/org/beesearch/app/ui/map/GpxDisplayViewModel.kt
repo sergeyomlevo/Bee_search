@@ -19,6 +19,7 @@ import org.beesearch.app.data.local.room.GpxReadyMetadata
 internal data class GpxDisplayRow(
     val id: UUID, val name: String, val selected: Boolean = false,
     val saving: Boolean = false, val preparing: Boolean = false, val error: String? = null,
+    val deleting: Boolean = false, val deleteError: String? = null,
 )
 internal data class GpxDisplayUiState(
     val territoryId: UUID? = null, val loading: Boolean = true,
@@ -34,6 +35,8 @@ internal class GpxDisplayViewModel(
     private val catalog: suspend (UUID) -> List<GpxReadyMetadata>,
     private val prepare: suspend (UUID, UUID, Long) -> GpxPreparedOverlay,
     private val store: GpxVisibilityStore,
+    private val delete: suspend (UUID, UUID) -> Unit = { _, _ -> error("Deletion unavailable") },
+    deletions: kotlinx.coroutines.flow.Flow<UUID> = kotlinx.coroutines.flow.emptyFlow(),
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(GpxDisplayUiState())
     val state = mutableState.asStateFlow()
@@ -46,6 +49,45 @@ internal class GpxDisplayViewModel(
     private var geometryJob: Job? = null
     private val writes = Mutex()
     private val failedWrites = mutableMapOf<UUID, Boolean>()
+    private val pendingDeletes = mutableSetOf<UUID>()
+    private val deletedIds = mutableSetOf<UUID>()
+
+    init {
+        viewModelScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            deletions.collect { onDeleted(it) }
+        }
+    }
+    fun deleteImport(importId: UUID) {
+        val initial = mutableState.value
+        val territory = initial.territoryId ?: return
+        val row = initial.rows.find { it.id == importId } ?: return
+        if (row.deleting || row.saving || !pendingDeletes.add(importId)) return
+        updateRow(importId) { it.copy(deleting = true, deleteError = null) }
+        viewModelScope.launch {
+            writes.withLock {
+                try {
+                    delete(territory, importId)
+                    onDeleted(importId)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) {
+                    if (mutableState.value.territoryId == territory) updateRow(importId) {
+                        it.copy(deleting = false, deleteError = "Не удалось удалить трек")
+                    }
+                } finally {
+                    pendingDeletes.remove(importId)
+                }
+            }
+        }
+    }
+    private fun onDeleted(id: UUID) {
+        deletedIds.add(id)
+        if (mutableState.value.rows.none { it.id == id } && mutableOverlays.value.none { it.id == id }) return
+        epoch++; preparationGeneration++
+        loadJob?.cancel(); geometryJob?.cancel(); failedWrites.remove(id)
+        mutableOverlays.value = mutableOverlays.value.filterNot { it.id == id }
+        mutableState.value = mutableState.value.copy(rows = mutableState.value.rows.filterNot { it.id == id })
+        mutableState.value.territoryId?.let { prepareSelected(it, epoch) }
+    }
 
     fun setTerritory(id: UUID?) {
         if (mutableState.value.territoryId == id && epoch != 0L) return
@@ -70,7 +112,7 @@ internal class GpxDisplayViewModel(
                 val selected = store.load(id)
                 if (!current(id, token)) return@launch
                 mutableState.value = GpxDisplayUiState(id, loading = false,
-                    rows = names(metadata).map { (row, name) -> GpxDisplayRow(row.id, name, row.id in selected) })
+                    rows = names(metadata.filterNot { it.id in deletedIds }).map { (row, name) -> GpxDisplayRow(row.id, name, row.id in selected, deleting = row.id in pendingDeletes) })
                 prepareSelected(id, token)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) {
@@ -84,7 +126,7 @@ internal class GpxDisplayViewModel(
         val id = initial.territoryId ?: return
         val token = epoch
         val row = initial.rows.find { it.id == importId } ?: return
-        if (row.saving || initial.loading || row.selected == visible) return
+        if (row.deleting || row.saving || initial.loading || row.selected == visible) return
         failedWrites.remove(importId)
         updateRow(importId) { it.copy(saving = true, error = null) }
         viewModelScope.launch {
@@ -172,10 +214,12 @@ internal class GpxDisplayViewModel(
 
     companion object {
         fun factory(catalog: suspend (UUID) -> List<GpxReadyMetadata>,
-            prepare: suspend (UUID, UUID, Long) -> GpxPreparedOverlay, store: GpxVisibilityStore
+            prepare: suspend (UUID, UUID, Long) -> GpxPreparedOverlay, store: GpxVisibilityStore,
+            delete: suspend (UUID, UUID) -> Unit = { _, _ -> error("Deletion unavailable") },
+            deletions: kotlinx.coroutines.flow.Flow<UUID> = kotlinx.coroutines.flow.emptyFlow()
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T = GpxDisplayViewModel(catalog, prepare, store) as T
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = GpxDisplayViewModel(catalog, prepare, store, delete, deletions) as T
         }
 
         internal fun names(metadata: List<GpxReadyMetadata>): List<Pair<GpxReadyMetadata, String>> {

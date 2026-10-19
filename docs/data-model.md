@@ -2246,3 +2246,20 @@ Missing key is an empty selected set; future imports are OFF. This is presentati
 state, independent of READY publication/canonical data and research filters. Updates
 are atomic and acknowledged before presentation changes. No Room schema/entity,
 original ownership or Backup/Snapshot/Android Auto Backup change is introduced.
+
+### D106 GPX deletion journal (2026-10-19)
+
+Room schema version 16 adds the feature-local `gpx_deletions` table. Its permanent
+tombstone is keyed by `import_id` and records the exact `territory_id`, completed
+request UUID, managed original-object UUID, expected original SHA/length and
+ownership proof. It has no foreign key to the removed import, so the tombstone
+survives parent deletion and blocks replay of the old request/import identity.
+
+Deletion records durable intent and removes canonical samples, segments, tracks
+and the READY import in that order after reconciliation has settled any staging
+job. A residual READY job is rejected rather than deleted by the deletion path.
+`files_cleaned` and `settings_cleaned` are independent durable cleanup flags;
+pending cleanup is retried and does not restore the import or block other GPX.
+The journal does not store or delete external picker files. A new explicit import
+of the same bytes may create a new logical import with new identity. Stage1/H05
+and unified Backup/Restore remain outside this change.

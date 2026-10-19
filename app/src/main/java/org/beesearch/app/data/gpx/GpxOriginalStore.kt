@@ -23,10 +23,22 @@ internal data class GpxOperationFiles(val owned: Boolean, val stagingBytes: Long
  */
 internal class GpxOriginalStore(
     filesDir: File,
-    private val checkpoint: (GpxOriginalStage) -> Unit = {},
+    private val checkpoint: (GpxOriginalStage) -> Unit,
+    deletionCheckpoint: (String) -> Unit,
 ) {
+    constructor(filesDir: File, checkpoint: (GpxOriginalStage) -> Unit = {}) : this(filesDir, checkpoint, {})
+
     private val files = GpxOriginalFiles(filesDir.canonicalFile)
     private val publication = GpxOriginalPublication(files, checkpoint)
+    private val deletion = GpxOriginalDeletion(files, deletionCheckpoint)
+
+    fun deletionProof(request: UUID, original: UUID, identity: GpxOriginalIdentity): String? =
+        operation(GpxOriginalStage.CLEANUP) { deletion.capture(request, original, identity) }
+
+    fun cleanupDeletedOriginal(request: UUID, original: UUID, identity: GpxOriginalIdentity, proof: String?, authorize: () -> Boolean) =
+        operation(GpxOriginalStage.CLEANUP) {
+            require(authorize()); deletion.cleanup(request, original, identity, proof)
+        }
 
     fun copyToStaging(
         request: UUID, original: UUID, open: () -> InputStream,

@@ -92,6 +92,7 @@ internal fun MapDataPanel(
     gpxDisplayState: GpxDisplayUiState = GpxDisplayUiState(),
     onGpxVisibilityChange: (java.util.UUID, Boolean) -> Unit = { _, _ -> },
     onRetryGpxDisplay: (java.util.UUID?) -> Unit = {},
+    onDeleteGpx: (java.util.UUID) -> Unit = {},
     gpxImportState: GpxImportUiState = GpxImportUiState.Idle,
     onStartGpxImport: () -> Unit = {},
     onCancelGpxImport: () -> Unit = {},
@@ -157,6 +158,7 @@ internal fun MapDataPanel(
             onCloseGpxDisplay = { gpxDisplayOpen = false },
             gpxDisplayState = gpxDisplayState,
             onGpxVisibilityChange = onGpxVisibilityChange,
+            onDeleteGpx = onDeleteGpx,
             onRetryGpxDisplay = onRetryGpxDisplay,
             gpxImportState = gpxImportState,
             onStartGpxImport = onStartGpxImport,
@@ -195,6 +197,7 @@ internal fun MapDataPanelBody(
     gpxDisplayState: GpxDisplayUiState = GpxDisplayUiState(),
     onGpxVisibilityChange: (java.util.UUID, Boolean) -> Unit = { _, _ -> },
     onRetryGpxDisplay: (java.util.UUID?) -> Unit = {},
+    onDeleteGpx: (java.util.UUID) -> Unit = {},
     gpxImportState: GpxImportUiState = GpxImportUiState.Idle,
     onStartGpxImport: () -> Unit = {},
     onCancelGpxImport: () -> Unit = {},
@@ -219,6 +222,8 @@ internal fun MapDataPanelBody(
             onBack = onCloseGpxDisplay,
             onToggle = onGpxVisibilityChange,
             onRetry = onRetryGpxDisplay,
+            onDeleteConfirmed = onDeleteGpx,
+            onRetryDelete = onDeleteGpx,
             modifier = modifier,
         )
         state.gpxOpen -> GpxTracksPage(

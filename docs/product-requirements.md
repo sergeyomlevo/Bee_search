@@ -1259,3 +1259,16 @@ GPX import exchange amendment2026-10-19: prepared external GPX belong in
 `Download/BeeSearch/<variant>/Exchange/GPX`; picker starts there when supported.
 Missing/unavailable folder or ignored hint never prevents manual file selection.
 This folder is not internal canonical/original storage; external files stay untouched.
+
+
+### Удаление пользовательского GPX — OWNER 2026-10-19
+
+В списке сохранённых GPX удаляется только явно подтверждённый импорт:
+длительное нажатие на имя → `Удалить` → именованное подтверждение;
+accessibility предоставляет эквивалентное действие. Обычный tap меняет видимость.
+Удаляются выбранная canonical geometry и принадлежащая импорту внутренняя копия;
+внешний исходный файл, другие импорты и исследовательские данные сохраняются.
+Durable deletion переживает сбой/перезапуск и исключает повторное появление
+удалённого импорта; новый явный импорт тех же байтов разрешён.
+[Утверждённый контракт](ui/mockups/gpx-display-delete-v1.md),
+[реализованный lifecycle](d106-gpx-deletion-plan.md). Stage1/H05 OPEN.

@@ -9,6 +9,7 @@ import androidx.room.TypeConverters
 @Database(
     entities = [
         GpxImportEntity::class,
+        GpxDeletionEntity::class,
         GpxSourceTrackEntity::class,
         GpxTrackSegmentEntity::class,
         GpxTrackSampleEntity::class,
@@ -27,7 +28,7 @@ import androidx.room.TypeConverters
         ObservationPointAttachmentEntity::class,
         ObservationPointWeatherEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -67,6 +68,7 @@ internal abstract class BeeSearchDatabase : RoomDatabase() {
                 MIGRATION_12_13,
                 MIGRATION_13_14,
                 MIGRATION_14_15,
+                MIGRATION_15_16,
             )
             .addCallback(GpxPersistenceSchema.callback)
             .build()

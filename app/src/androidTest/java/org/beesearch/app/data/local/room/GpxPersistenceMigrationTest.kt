@@ -35,7 +35,7 @@ class GpxPersistenceMigrationTest {
         val name = "gpx_migration_parity"
         context.deleteDatabase(name)
         seedLegacy14(name)
-        val migrated = helper.runMigrationsAndValidate(name, 15, true, MIGRATION_14_15)
+        val migrated = helper.runMigrationsAndValidate(name, 16, true, MIGRATION_14_15, MIGRATION_15_16)
         val fresh = Room.inMemoryDatabaseBuilder(context, BeeSearchDatabase::class.java).addCallback(GpxPersistenceSchema.callback).build()
         val migratedSnapshot = schemaSnapshot(migrated)
         val freshSnapshot = schemaSnapshot(fresh.openHelper.writableDatabase)

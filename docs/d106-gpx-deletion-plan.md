@@ -1,11 +1,11 @@
 # D106 — READY deletion audit and minimal plan, 2026-10-19
 
-**STOP B implementation; proposal only.** OWNER approved the interaction sequence,
-but the new [PNG+MD](ui/mockups/gpx-display-delete-v1.md) still needs explicit visual
-approval under [mockup-first](ui/Создание%20интерфейсов.md). No production deletion
-API/UI or schema changes were made. A remains independent.
+**APPROVED BY OWNER, 2026-10-19; implementation completed.** The approved
+[PNG+MD](ui/mockups/gpx-display-delete-v1.md) and this plan define the deletion
+contract. Production deletion uses the existing GPX boundaries and a feature-local
+Room journal/tombstone; it does not introduce a generic deletion framework.
 
-## Observed existing boundaries
+## Observed existing boundaries before this slice
 
 - `GpxEntities`: RESTRICT parent→track→segment→sample and job→import links;
   unique original_object_id. Identical-byte logical imports have distinct UUIDs
@@ -32,7 +32,7 @@ that work after deleting its RESTRICT-linked import and cannot record deletion
 intent. A stale captured request/callback also needs a durable deleted-result
 boundary so it cannot republish the removed import.
 
-## Smallest proposed coherent extension (requires separate implementation approval)
+## Approved coherent extension and implementation contract
 
 1. Add a feature-local durable deletion journal/tombstone to Room with explicit
    migration and integrity checks; no universal deletion framework. Key by exact
@@ -43,8 +43,10 @@ boundary so it cannot republish the removed import.
    explicitly requested reimport of identical bytes.
 2. Under existing runtime/coordinator serialization, revalidate Territory + UUID,
    READY status, current job and original ownership. One Room transaction records
-   durable intent, resolves/removes only its READY job, removes samples→segments→
-   tracks→import. Respect RESTRICT; no broad delete and no hash-based deletion.
+   durable intent and removes samples→segments→tracks→import only after import
+   reconciliation has settled any staging job. A residual READY job is a safety
+   failure; deletion never removes the staging job as a substitute for recovery.
+   Respect RESTRICT; no broad delete and no hash-based deletion.
 3. Once durable deletion is committed, remove that exact ID from selection and
    invalidate its prepared/native overlay with current epoch/revision guards.
    Ignore later preparation results for that tombstone. Other scopes unaffected.
@@ -53,22 +55,36 @@ boundary so it cannot republish the removed import.
    owned payload/sidecars with directory durability, idempotently. Missing original
    is already clean; ownership mismatch fails closed. Never external source files.
 5. Retry settings/files cleanup from the durable journal before normal runtime
-   access and after restart. Report durable removal vs pending cleanup distinctly;
-   never resurrect a deleted READY row or report a precommit failure as success.
+   access and after restart. Files and settings have independent completion flags;
+   one cleanup debt does not block other GPX. Report durable removal vs pending
+   cleanup distinctly; never resurrect a deleted READY row or report a precommit
+   failure as success.
 6. Fault-inject before/after transaction, each unlink/fsync, settings save and
    callback; use isolated Room/original roots. Cover hidden/visible, identical bytes,
    other research/GPX, A→B, repeated confirmation/replay and restart. No destructive
    qualification on Samsung owner records.
 
-Exact DDL/phases and migration are deliberately not implemented here; this is the
-minimal plan requested when safe deletion requires new durable state/schema.
-A filesystem tombstone alternative would need equivalent durable writer/recovery
-and ownership semantics; it is not a safe shortcut around this review.
+The implementation uses the Room migration and lifecycle described below. A
+filesystem-only tombstone is not used; it would need equivalent durable writer,
+recovery and ownership semantics.
+
+## Implemented lifecycle
+
+Room migration 15→16 creates `gpx_deletions`, a permanent feature-local
+tombstone without a foreign key to the removed import. The transaction is bound
+to exact Territory/import/request/original UUIDs and deletes dependent canonical
+rows in RESTRICT-safe order. The managed original store persists and verifies
+directory/device/inode ownership proof before unlinking; external picker files,
+including `Downloads/BeeSearch/Dev/Exchange/GPX`, are never touched. A durable
+deletion event invalidates the existing Registry overlay and catalog row. Settings
+and managed-file cleanup retry independently after restart. A pending file cleanup
+never claims that all bytes are gone, while the removed READY import remains
+hidden and cannot be restored by reconciliation.
 
 ## Mockup check
 
 Three static frames: context action, explicit named confirmation, precommit error.
 HTML/PNG uses 412×892 logical frames and text enlarged1.7, readable stacked actions.
-This is a layout study, not actual Samsung fontScale/Compose/accessibility proof.
-Long-message scrolling, custom accessibility action and Back require qualification
-when the approved production UI exists. Stage1/H05 OPEN; no GPX-specific backup gate.
+The approved production UI retains the composition, accessibility action, Back and
+fontScale semantics. Runtime qualification remains recorded by the implementation
+checklist and test report. Stage1/H05 OPEN; no GPX-specific backup gate.
