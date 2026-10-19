@@ -4,6 +4,7 @@ package org.beesearch.app.domain.gpx
 internal class GpxProfileDraftBuilder {
     var creator = ""
     var sourceName: String? = null
+    var version = "1.1"
     var sourceDesc: String? = null
     var authorName: String? = null
     val tracks = ArrayList<GpxTrack>()
@@ -38,7 +39,7 @@ internal class GpxProfileDraftBuilder {
         tracks.add(GpxTrack(t.ordinal, t.segments, t.name, t.description))
         track = null
     }
-    fun freeze() = GpxCanonicalDraft(GpxMetadata(creator, sourceName, sourceDesc, authorName), tracks)
+    fun freeze() = GpxCanonicalDraft(GpxMetadata(creator, sourceName, sourceDesc, authorName), tracks, version)
     fun clear() {
         tracks.clear(); track = null; segment = null; sample = null
         creator = ""; sourceName = null; sourceDesc = null; authorName = null

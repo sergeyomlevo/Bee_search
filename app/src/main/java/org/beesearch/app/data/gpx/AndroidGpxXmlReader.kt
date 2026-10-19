@@ -253,7 +253,7 @@ internal object AndroidGpxXmlReader {
         val qualifiedElementName = qualifiedName(parser.prefix.orEmpty(), parser.name)
         if (qualifiedElementName != facts.name) gpxFail("SECURITY_CONFIGURATION_UNAVAILABLE", "element-name-reconciliation")
         validateQualifiedName(facts.name)
-        if (isRoot && (parser.name != "gpx" || parser.namespaceOrEmpty() != GPX_NAMESPACE)) {
+        if (isRoot && (parser.name != "gpx" || parser.namespaceOrEmpty() !in setOf(GPX_NAMESPACE, "http://www.topografix.com/GPX/1/0"))) {
             gpxFail("UNSUPPORTED_PROFILE", "root")
         }
         validateNamespaceBinding(parser.prefix.orEmpty(), parser.namespaceOrEmpty())

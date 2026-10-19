@@ -8,7 +8,7 @@
 |---|---|
 | [GpxInput.kt](GpxInput.kt), [GpxRawInput.kt](GpxRawInput.kt) | Повторяемое чтение, исходный digest/length и закрытие источника. |
 | [AndroidGpxXmlReader.kt](AndroidGpxXmlReader.kt), [GpxXmlBoundary.kt](GpxXmlBoundary.kt), [GpxXmlGuard.kt](GpxXmlGuard.kt), [GpxXmlLexical.kt](GpxXmlLexical.kt), [GpxXmlSemantics.kt](GpxXmlSemantics.kt) | Закрытая XML/security boundary и Android XML adapter. |
-| [AndroidGpxProfileReader.kt](AndroidGpxProfileReader.kt) | Закрытый GPX 1.1 profile reader и canonical draft handoff. |
+| [AndroidGpxProfileReader.kt](AndroidGpxProfileReader.kt) | Закрытый GPX 1.0/1.1 profile reader и canonical draft handoff. |
 | [GpxProcessor.kt](GpxProcessor.kt), [GpxParseResult.kt](GpxParseResult.kt) | Закрытый двухпроходный processor и типизированный accepted/rejected результат. |
 | [GpxImportWorkflow.kt](GpxImportWorkflow.kt) | Внутренние capture/execute/lookup, captured context и consumed request; пользовательский вход не активирован. |
 | [GpxRuntime.kt](GpxRuntime.kt) | Application startup/first-access reconciliation, лёгкий READY-каталог и canonical read по Territory. |

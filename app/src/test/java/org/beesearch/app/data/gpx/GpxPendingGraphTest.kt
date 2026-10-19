@@ -50,4 +50,16 @@ class GpxPendingGraphTest {
         assertTrue(first.tracks.map { it.id }.toSet().intersect(second.tracks.map { it.id }.toSet()).isEmpty())
         assertTrue(first.segments.map { it.id }.toSet().intersect(second.segments.map { it.id }.toSet()).isEmpty())
     }
+    @Test fun version10RoundTripsExistingVersionFieldsWithoutIdentityReuse() {
+        val v10 = draft.copy(declaredGpxVersion = "1.0")
+        var next = 200L
+        val graph = pendingGpxGraph(accepted.copy(draft = v10), job, "v10.gpx", 12345) { UUID(0, next++) }
+        graph.validate()
+        assertEquals("1.0", graph.importRow.gpxVersion)
+        assertEquals("GPX_1_0_STAGE_1", graph.importRow.parserProfileVersion)
+        assertEquals(v10, graph.canonical())
+        assertThrows(org.beesearch.app.data.local.room.GpxPersistenceIntegrityException::class.java) {
+            graph.copy(importRow = graph.importRow.copy(parserProfileVersion = "GPX_1_1_STAGE_1")).validate()
+        }
+    }
 }

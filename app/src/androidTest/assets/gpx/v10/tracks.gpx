@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/0" version="1.0" creator="independent regression fixture">
+<name>Source</name><desc>Description</desc><author>Observer</author><time>2026-10-14T16:40:11Z</time>
+<wpt lat="1" lon="2"/><rte><rtept lat="3" lon="4"/></rte>
+<trk><name>Forest</name><trkseg><trkpt lat="55.100" lon="37.200"><ele>123.40</ele><time>2026-10-14T16:40:11Z</time><speed>1.25</speed></trkpt><trkpt lat="55.101" lon="37.201"/></trkseg><trkseg><trkpt lat="56" lon="38"/></trkseg></trk>
+<trk><name>Second</name><trkseg><trkpt lat="57" lon="39"/></trkseg></trk></gpx>

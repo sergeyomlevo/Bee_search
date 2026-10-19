@@ -4156,3 +4156,10 @@ instead causes a clear display error for that specific file. Do not conflate the
 Both PNG examples use `Лесная дорога.gpx` ON without a warning/icon. No production,
 Room, import, MapLibre, Registry or Backup/Restore change is authorized by this
 artifact correction. Stage1 and H05 remain OPEN.
+
+## D106 GPX1.0 profile — OWNER instruction, 2026-10-19
+
+ACCEPTED: add GPX1.0 track profile beside1.1 in the existing chain; exact
+version/namespace pairing, root1.0 metadata, unsupported speed preserved only in
+original, existing canonical/security/identity semantics unchanged. No rte/wpt
+promotion or speed schema field. Historical1.1 qualification is not rewritten.

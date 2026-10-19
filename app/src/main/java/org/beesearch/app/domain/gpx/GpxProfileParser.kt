@@ -18,6 +18,7 @@ internal class GpxProfileParser(private val checkCancellation: () -> Unit = {}) 
     private val draft = GpxProfileDraftBuilder()
     private val warnings = EnumMap<GpxWarningCategory, Warning>(GpxWarningCategory::class.java)
     private var ignoredDepth = 0
+    private var namespace = GpxProfileSchema.NAMESPACE
     private var rootSeen = false
     private var rootClosed = false
     private var terminated = false
@@ -65,10 +66,12 @@ internal class GpxProfileParser(private val checkCancellation: () -> Unit = {}) 
         if (ignoredDepth > 0) { ignoredDepth++; return }
         if (rootClosed) fail("INVALID_STRUCTURE", "ELEMENT_AFTER_ROOT")
         if (frames.isEmpty()) {
-            if (rootSeen || event.namespace != GpxProfileSchema.NAMESPACE || event.name != "gpx")
+            if (rootSeen || event.name != "gpx")
                 fail("UNSUPPORTED_PROFILE", "ROOT_PROFILE")
             val version = attribute(event, "version") ?: fail("INVALID_STRUCTURE", "MISSING_VERSION")
-            if (version != "1.1") fail("UNSUPPORTED_PROFILE", "GPX_VERSION")
+            namespace = GpxProfileSchema.namespace(version) ?: fail("UNSUPPORTED_PROFILE", "GPX_VERSION")
+            if (event.namespace != namespace) fail("UNSUPPORTED_PROFILE", "ROOT_PROFILE")
+            draft.version = version
             draft.creator = attribute(event, "creator") ?: fail("INVALID_STRUCTURE", "MISSING_CREATOR")
             GpxValueText.check(draft.creator, 1024, "G08")
             rootSeen = true
@@ -78,9 +81,12 @@ internal class GpxProfileParser(private val checkCancellation: () -> Unit = {}) 
         }
         val parent = frames.last
         if (parent.node.scalar) fail("INVALID_STRUCTURE", "MARKUP_IN_SCALAR")
-        val rule = if (event.namespace == GpxProfileSchema.NAMESPACE) GpxProfileSchema.rule(parent.node, event.name) else null
+        val rule = if (event.namespace == namespace) {
+            if (draft.version == "1.0") GpxProfileSchema.rule10(parent.node, event.name)
+            else GpxProfileSchema.rule(parent.node, event.name)
+        } else null
         if (rule == null) {
-            if (event.namespace == GpxProfileSchema.NAMESPACE && GpxProfileSchema.misplaced(parent.node, event.name))
+            if (event.namespace == namespace && !(draft.version == "1.0" && parent.node == Node.ROOT && event.name == "time") && GpxProfileSchema.misplaced(parent.node, event.name))
                 fail("INVALID_STRUCTURE", "MISPLACED_SUPPORTED_NODE")
             warn(GpxWarningCategory.UNSUPPORTED_CONTENT)
             ignoredDepth = 1
@@ -116,7 +122,7 @@ internal class GpxProfileParser(private val checkCancellation: () -> Unit = {}) 
     private fun end(event: GpxProfileEvent.End) {
         if (ignoredDepth > 0) { ignoredDepth--; return }
         val frame = frames.peekLast() ?: fail("INVALID_STRUCTURE", "UNEXPECTED_END")
-        if (event.namespace != GpxProfileSchema.NAMESPACE || event.name != frame.node.xmlName)
+        if (event.namespace != namespace || event.name != frame.node.xmlName)
             fail("INVALID_STRUCTURE", "NORMALIZED_END_MISMATCH")
         if (frame.highSurrogate) fail("MALFORMED_XML", "INVALID_UNICODE_SCALAR")
         when (frame.node) {
@@ -134,12 +140,13 @@ internal class GpxProfileParser(private val checkCancellation: () -> Unit = {}) 
         val parent = frames.elementAt(frames.size - 2).node
         when (frame.node) {
             Node.NAME -> when (parent) {
-                Node.METADATA -> draft.sourceName = value
+                Node.METADATA, Node.ROOT -> draft.sourceName = value
                 Node.AUTHOR -> draft.authorName = value
                 Node.TRACK -> checkNotNull(draft.track).name = value
                 else -> fail("INVALID_STRUCTURE", "SCALAR_PARENT")
             }
-            Node.DESC -> if (parent == Node.METADATA) draft.sourceDesc = value else checkNotNull(draft.track).description = value
+            Node.DESC -> if (parent == Node.METADATA || parent == Node.ROOT) draft.sourceDesc = value else checkNotNull(draft.track).description = value
+            Node.AUTHOR_TEXT -> draft.authorName = value
             Node.ELE -> checkNotNull(draft.sample).elevation = GpxCanonicalValues.elevation(value)
             Node.TIME -> {
                 val time = GpxCanonicalValues.time(value)

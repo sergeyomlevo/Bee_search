@@ -59,10 +59,12 @@ internal data class GpxTrack(
 internal data class GpxCanonicalDraft(
     val metadata: GpxMetadata,
     val tracks: GpxFrozenList<GpxTrack>,
+    val declaredGpxVersion: String = "1.1",
 ) {
-    constructor(metadata: GpxMetadata, tracks: List<GpxTrack>) : this(metadata, GpxFrozenList(tracks))
-    val declaredGpxVersion: String get() = "1.1"
-    val parserProfileVersion: String get() = "GPX_1_1_STAGE_1"
+    constructor(metadata: GpxMetadata, tracks: List<GpxTrack>, declaredGpxVersion: String = "1.1") :
+        this(metadata, GpxFrozenList(tracks), declaredGpxVersion)
+    val parserProfileVersion: String get() = if (declaredGpxVersion == "1.0") "GPX_1_0_STAGE_1" else "GPX_1_1_STAGE_1"
+    init { require(declaredGpxVersion in setOf("1.0", "1.1")) }
     init { tracks.forEachIndexed { index, track -> require(track.ordinal == index) } }
 }
 

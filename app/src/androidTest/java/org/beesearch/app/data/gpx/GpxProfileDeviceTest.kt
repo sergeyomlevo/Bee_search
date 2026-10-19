@@ -47,7 +47,8 @@ class GpxProfileDeviceTest {
                 Log.i("D106_GPX_PROFILE", "family=${row.family} result=ACCEPTED api=${read.verification.apiLevel} provider=${read.verification.provider} configuration=${read.verification.configuration}")
             } else {
                 val failure = result.exceptionOrNull() ?: throw AssertionError("${row.family} should fail")
-                assertEquals(row.expect, failureCategory(failure))
+                // Frozen D06 is a valid1.0 empty track: new profile reaches the no-samples gate.
+                assertEquals(if (row.family == "D06") "NO_IMPORTABLE_TRACK" else row.expect, failureCategory(failure))
             }
         }
     }
@@ -133,7 +134,8 @@ class GpxProfileDeviceTest {
         assertFailure("D05-wrong-root.xml", "UNSUPPORTED_PROFILE")
         assertFailure("D05-second-root.xml", "MALFORMED_XML")
         assertFailure("D06-missing-namespace.xml", "UNSUPPORTED_PROFILE")
-        assertFailure("D06-version10.xml", "UNSUPPORTED_PROFILE")
+        // OWNER1.0 amendment; frozen bytes remain unchanged.
+        assertFailure("D06-version10.xml", "NO_IMPORTABLE_TRACK")
         assertFailure("D07-missing-version.xml", "INVALID_STRUCTURE")
         assertFailure("D07-missing-creator.xml", "INVALID_STRUCTURE")
         assertFailure("D07-duplicate-creator.xml", "INVALID_STRUCTURE")

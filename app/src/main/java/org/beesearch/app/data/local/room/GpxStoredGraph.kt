@@ -11,7 +11,8 @@ internal data class GpxStoredGraph(
     val samples: List<GpxTrackSampleEntity>,
 ) {
     fun canonical(): GpxCanonicalDraft = integrity {
-        require(importRow.gpxVersion == "1.1" && importRow.parserProfileVersion == "GPX_1_1_STAGE_1")
+        require((importRow.gpxVersion == "1.1" && importRow.parserProfileVersion == "GPX_1_1_STAGE_1") ||
+            (importRow.gpxVersion == "1.0" && importRow.parserProfileVersion == "GPX_1_0_STAGE_1"))
         require(tracks.map { it.id }.toSet().size == tracks.size)
         require(segments.map { it.id }.toSet().size == segments.size)
         require(samples.map { it.segmentId to it.ordinal }.toSet().size == samples.size)
@@ -30,7 +31,7 @@ internal data class GpxStoredGraph(
                             GpxSampleTime(row.timeRaw, GpxTimeStatus.valueOf(row.timeStatus), row.timeEpochSeconds, row.timeNanos))
                     })
                 }, track.name, track.description)
-            })
+            }, importRow.gpxVersion)
     }
     fun warnings(): List<GpxProfileWarning> = integrity {
         listOfNotNull(

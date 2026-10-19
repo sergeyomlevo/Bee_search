@@ -35,7 +35,7 @@ decisions.md hunk remain separate from this task.
 
 | OWNER decision | Stage 1B consequence |
 |---|---|
-| GPX1.1 only; tracks; mixed warning; no samples rejected | No GPX1.0/rte/wpt promotion or element recovery |
+| GPX1.0/1.1 tracks (OWNER amendment2026-10-19); mixed warning; no samples rejected | No rte/wpt promotion or element recovery |
 | Preserve empty tracks/segments and singleton | Canonical structure includes them; singleton need not be a line |
 | Reimport same bytes after confirmation; fresh UUIDs | No hash/content uniqueness or silent logical dedup |
 | Visibility local/Territory/default visible; excluded from protection | Outside canonical identity; restore defaults visible |
@@ -58,7 +58,9 @@ I = ACCEPT + IGNORE for canonical fields, with bounded unsupported-content diagn
 R = REJECT DOCUMENT. P/I do not normalize original bytes.
 There is **no REJECT ELEMENT/SEGMENT recovery** for an invalid supported track.
 
-GPX QName means exact URI http://www.topografix.com/GPX/1/1 plus local name.
+This original table describes the unchanged1.1 profile; the OWNER1.0 amendment
+below adds its version-specific projection. GPX1.1 QName means exact URI
+http://www.topografix.com/GPX/1/1 plus local name.
 Required root attributes version/creator and point lat/lon are unqualified.
 Namespace prefixes and attribute order do not identify data.
 
@@ -701,3 +703,14 @@ authorization. Do not implement automatically or reopen accepted Stage0 verifica
 OWNER-ACCEPTED on2026-10-13, DESIGN CONTRACT ONLY. It does not redefine this accepted
 Stage 1B contract or authorize implementation. Slice1 and security capability proof
 require separate explicit OWNER authorization; runtime qualification remains pending.
+
+## OWNER amendment — GPX1.0, 2026-10-19
+
+[Stage1A version profile amendment](d106-stage1-gpx-spec.md#gpx-10-profile-amendment--owner-2026-10-19)
+supersedes the earlier1.1-only boundary. Pair root version1.0 with namespace
+http://www.topografix.com/GPX/1/0. Root scalar name/desc/author are metadata;
+there is no1.1 metadata/author container projection in1.0. Shared track structure
+and numeric/time/security limits remain unchanged. Unsupported speed/rte/wpt are
+preserved only in original and summarized, not promoted. New parser profile
+GPX_1_0_STAGE_1 uses existing version columns. CM1 field encoding is unchanged;
+its declared-version field distinguishes1.0. Historical frozen1.1 fixtures stay intact.

@@ -1,0 +1,2 @@
+# Preserve the OWNER control GPX byte identity across Windows checkouts.
+app/src/androidTest/assets/gpx/v10/topokarty-original.gpx -text

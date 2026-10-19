@@ -62,7 +62,7 @@ OBSERVED integration:
 ACCEPTED:
 | Input | Stage 1 result |
 |---|---|
-| GPX 1.1 | Supported |
+| GPX 1.0 / 1.1 | Supported track profiles (OWNER amendment 2026-10-19) |
 | GPX 1.0 | Explicitly rejected |
 | trk | Canonicalized |
 | rte / wpt | Not canonicalized; never converted into tracks |
@@ -74,8 +74,8 @@ ACCEPTED:
 | Missing elevation/time | Nullable |
 | Invalid/missing coordinates or malformed XML | Reject entire import |
 
-Namespace URI must be http://www.topografix.com/GPX/1/1; prefix is irrelevant.
-Root version must be 1.1. Only supported GPX elements in their proper structural
+Namespace URI/version must match exactly: http://www.topografix.com/GPX/1/0 + 1.0
+or http://www.topografix.com/GPX/1/1 + 1.1; prefix is irrelevant. Only supported GPX elements in their proper structural
 context count; vendor elements with the same local name are not GPX nodes.
 Validate required profile fields, including root creator. Supported scalar duplicates
 and malformed critical structure fail explicitly.
@@ -419,3 +419,16 @@ approved visual artifacts. Accepted product choices are no longer open questions
 [Parser/profile/security fixtures and canonical identity contract](d106-stage1b-gpx-parser-identity-contract.md)
 is the DERIVED technical contract, ACCEPTED WITH AMENDMENTS by OWNER on2026-10-13.
 Stage 1A remains the parent product truth; acceptance is not implementation authorization.
+
+## GPX 1.0 profile amendment — OWNER, 2026-10-19
+
+Both versions use the existing security, canonical, identity, managed-original,
+READY/recovery and display chain. In1.0 root name/desc/scalar author map to source
+metadata; track name/desc, segments, lat/lon/ele/time keep source order. Root time
+and speed/other unsupported data are preserved in exact original only, with the
+existing bounded UNSUPPORTED_CONTENT summary. Mixed rte/wpt do not become track
+samples; zero supported track samples still rejects. No schema/speed field added.
+GPX1.1 interpretation and CM1 encoding remain unchanged. Declared1.0 and profile
+GPX_1_0_STAGE_1 use the existing persisted version fields and CM1 version field;
+no existing IDs/originals are rewritten. Earlier1.1 qualification remains historical.
+Primary source: [TopoGrafix1.0 manual](https://www.topografix.com/gpx_manual.asp).
