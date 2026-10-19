@@ -81,6 +81,7 @@ internal class GpxImportViewModel(
     private var capturedTerritoryId: UUID? = null
     private var capturedObserverId: UUID? = null
     private var capturedTerritoryName: String = ""
+    private var selectedDisplayName: String? = null
     private var fileName: String = ""
     private var openSource: (() -> InputStream?)? = null
     private var requestUuid: UUID? = null
@@ -129,7 +130,8 @@ internal class GpxImportViewModel(
 
     fun onFilePicked(displayName: String?, open: () -> InputStream?) {
         val intent = captured ?: return
-        fileName = displayName?.trim()?.takeIf { it.isNotEmpty() } ?: "GPX-файл"
+        selectedDisplayName = displayName?.takeIf(String::isNotBlank)
+        fileName = selectedDisplayName ?: "GPX-файл"
         openSource = open
         requestUuid = intent.request.requestUuid
         _state.value = GpxImportUiState.Importing(fileName, capturedTerritoryName)
@@ -155,7 +157,7 @@ internal class GpxImportViewModel(
         _state.value = GpxImportUiState.Importing(fileName, capturedTerritoryName)
         importJob = viewModelScope.launch {
             try {
-                val fresh = workflow.capture()
+                val fresh = workflow.capture(selectedDisplayName)
                 if (fresh.request.territoryId != capturedTerritoryId ||
                     fresh.request.observerId != capturedObserverId
                 ) {
@@ -222,6 +224,7 @@ internal class GpxImportViewModel(
                 captured = intent,
                 open = { open() ?: throw IOException("GPX_SOURCE_UNAVAILABLE") },
                 confirmRepeatedOriginal = confirmRepeatedOriginal,
+                displayName = selectedDisplayName,
             )
             handleResult(result)
         } catch (cancelled: CancellationException) {
@@ -351,6 +354,7 @@ internal class GpxImportViewModel(
         capturedObserverId = null
         capturedTerritoryName = ""
         fileName = ""
+        selectedDisplayName = null
         openSource = null
         requestUuid = null
         _pickerRequest.value = null

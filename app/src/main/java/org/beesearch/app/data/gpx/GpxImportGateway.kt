@@ -16,6 +16,7 @@ internal interface GpxImportGateway {
         captured: GpxCapturedRequest,
         open: () -> InputStream,
         confirmRepeatedOriginal: Boolean = false,
+        displayName: String? = null,
     ): GpxPreparationResult
 
     suspend fun lookup(requestUuid: UUID): GpxPreparationResult.Ready?

@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.unit.Density
@@ -197,6 +198,36 @@ class GpxDisplayPageTest {
         rule.onNodeWithText("Удалить трек?").assertDoesNotExist()
         rule.onNodeWithTag("gpx-display-row-$firstId").assertIsDisplayed()
         assertEquals(null, deleted)
+    }
+
+    @Test
+    fun longProviderNameIsIdenticalInListAndScrollableDialogAtFontScale17() {
+        val name = "Полевой маршрут с пробелами — " +
+            "северная поляна и лесная дорога ".repeat(7) + ".gpx"
+        setPage(
+            GpxDisplayUiState(loading = false, rows = listOf(GpxDisplayRow(firstId, name))),
+            fontScale = 1.7f,
+        )
+        rule.onNodeWithText(name).assertTextContains(name)
+        screenshot("filename-list-font17.png")
+        val action = rule.onNodeWithTag("gpx-display-row-$firstId").fetchSemanticsNode()
+            .config[SemanticsActions.CustomActions].first { it.label == "Удалить трек" }
+        rule.runOnIdle { action.action() }
+        val message = "«$name» будет удалён из Bee Search вместе с сохранёнными координатами. " +
+            "Исходный файл в другой папке телефона не затрагивается."
+        val text = rule.onNodeWithText(message)
+        text.assertIsDisplayed()
+        screenshot("filename-dialog-top-font17.png")
+        val before = text.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange]
+            .value()
+        text.performTouchInput { swipeUp() }
+        rule.waitForIdle()
+        val after = text.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange]
+            .value()
+        org.junit.Assert.assertTrue("Long dialog must actually scroll", after > before)
+        screenshot("filename-dialog-scrolled-font17.png")
+        rule.onNodeWithText("Отмена").assertIsDisplayed().performClick()
+        rule.onNodeWithText("Удалить трек?").assertDoesNotExist()
     }
 
     @Test

@@ -57,9 +57,10 @@ class GpxImportWorkflowCrashDeviceTest {
             })
             val runtime = GpxRuntime(coordinator, persistence)
             val workflow = workflow(runtime)
-            val captured = workflow.capture("workflow-crash.gpx")
+            val captured = workflow.capture()
             val bytes = "<gpx xmlns=\"http://www.topografix.com/GPX/1/1\" version=\"1.1\" creator=\"crash\"><trk><trkseg><trkpt lat=\"1\" lon=\"2\"/></trkseg></trk></gpx>".toByteArray()
-            assertTrue(workflow.execute(captured, { bytes.inputStream() }) is GpxPreparationResult.Ready)
+            assertTrue(workflow.execute(captured, { bytes.inputStream() },
+                displayName = "Полевой маршрут после перезапуска.gpx") is GpxPreparationResult.Ready)
         } finally { db.close() }
     }
 
@@ -80,6 +81,9 @@ class GpxImportWorkflowCrashDeviceTest {
             assertEquals(expected[3], graph.segments.single().id)
             assertEquals(0, graph.samples.single().ordinal)
             assertEquals(request.requestUuid, graph.importRow.requestUuid)
+            assertEquals("Полевой маршрут после перезапуска.gpx", graph.importRow.displayName)
+            assertEquals("Полевой маршрут после перезапуска.gpx",
+                runtime.listReady(request.territoryId).single().displayName)
             assertEquals(1L, persistence.counts(request.territoryId, "READY").imports)
             assertEquals(0L, persistence.counts(request.territoryId, "PENDING").imports)
             assertNull(persistence.journal(request.requestUuid))

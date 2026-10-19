@@ -52,8 +52,11 @@ internal class GpxImportWorkflow(
         runtime.withImportCoordinator { it.lookup(requestUuid) }
 
     override suspend fun execute(captured: GpxCapturedRequest, open: () -> InputStream,
-                                 confirmRepeatedOriginal: Boolean): GpxPreparationResult {
-        val request = captured.request
+                                 confirmRepeatedOriginal: Boolean, displayName: String?): GpxPreparationResult {
+        // SAF metadata arrives after capture. Bind only the name; keep the same one-shot capability.
+        val request = captured.request.copy(
+            displayName = displayName?.takeIf(String::isNotBlank) ?: captured.request.displayName,
+        )
         if (captured.issuer !== issuer) return GpxPreparationResult.Failed(request.requestUuid,
             GpxPreparationResult.Kind.REQUEST)
         return runtime.withImportCoordinator { coordinator ->

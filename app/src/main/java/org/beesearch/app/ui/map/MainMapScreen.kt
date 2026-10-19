@@ -144,7 +144,7 @@ internal fun CurrentTerritoryScreen(
             gpxImportViewModel.onPickerCancelled()
         } else {
             gpxImportViewModel.onFilePicked(
-                displayName = contentResolver.displayName(uri),
+                displayName = contentResolver.gpxDisplayName(uri),
                 open = { contentResolver.openInputStream(uri) },
             )
         }
@@ -526,12 +526,12 @@ private fun AddPointGlyph() {
 private fun Double.formatMeters(): String = "%.1f".format(this)
 
 /** Display name for the picked document; never used as import identity. */
-private fun ContentResolver.displayName(uri: Uri): String? {
+internal fun ContentResolver.gpxDisplayName(uri: Uri): String? {
     val fromProvider = runCatching {
         query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
         }
     }.getOrNull()
-    return fromProvider?.takeIf { it.isNotBlank() }
-        ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+    return fromProvider?.takeIf(String::isNotBlank)
 }

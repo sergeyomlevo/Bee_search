@@ -1,5 +1,20 @@
 # Bee Search handoff
 
+## Latest fix — GPX provider filename (2026-10-19)
+
+Base b29af07; targeted fix: SAF name arrived after capture() and previously
+remained only in UI. execute now binds the provider name to the same request;
+Room/READY persist it. No schema/parser/geometry/deletion/UI composition changes.
+Old four Samsung imports have no reliable saved filename; no backfill performed.
+JVM1062 PASS; DEV/test assemblies PASS; lint0 errors/36 warnings/6 hints;
+API29 fontScale1.7 final69/69 plus2 process-restart checks PASS. Long Cyrillic
+name/list/dialog/actual scroll checked. First failed test-harness run recorded.
+Report: docs/d106-gpx-filename-report.md. Samsung NOT updated; physical SAF/UI
+qualification and TalkBack pending separate OWNER scope. Stage1/H05 OPEN.
+Prior dirty handoff and Samsung report bytes preserved outside this commit.
+One local fix commit only; no push. Stop; no next-stage implementation.
+
+
 ## Latest task — safe saved GPX deletion (2026-10-19)
 
 OWNER approved deletion PNG+MD and durable journal plan. Base97d4d67; Room15→16,

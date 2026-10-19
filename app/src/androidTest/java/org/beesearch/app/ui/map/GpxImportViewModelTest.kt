@@ -51,14 +51,32 @@ class GpxImportViewModelTest {
         val vm = viewModel(gateway)
         startImport(vm)
 
-        vm.onFilePicked("поход.gpx") { ByteArrayInputStream(byteArrayOf(1)) }
+        val longName = "Полевой маршрут — северная поляна 2026.gpx"
+        vm.onFilePicked(longName) { ByteArrayInputStream(byteArrayOf(1)) }
 
         val success = withTimeout(5_000) {
             vm.state.first { it is GpxImportUiState.Success }
         } as GpxImportUiState.Success
-        assertEquals("поход.gpx", success.fileName)
+        assertEquals(longName, success.fileName)
         assertEquals("Лесная поляна", success.territoryName)
         assertEquals(listOf(false), gateway.confirmations)
+        assertEquals(listOf(longName), gateway.executeDisplayNames)
+        vm.reset()
+    }
+
+    @Test
+    fun missingProviderNameUsesUiFallbackWithoutPersistingGenericLabel() = runBlocking {
+        val gateway = FakeGateway()
+        val vm = viewModel(gateway)
+        startImport(vm)
+
+        vm.onFilePicked(null) { ByteArrayInputStream(byteArrayOf(1)) }
+
+        val success = withTimeout(5_000) {
+            vm.state.first { it is GpxImportUiState.Success }
+        } as GpxImportUiState.Success
+        assertEquals("GPX-файл", success.fileName)
+        assertEquals(listOf(null), gateway.executeDisplayNames)
         vm.reset()
     }
 
@@ -79,6 +97,8 @@ class GpxImportViewModelTest {
         withTimeout(5_000) { vm.state.first { it is GpxImportUiState.Success } }
         assertEquals(listOf(false, true), gateway.confirmations)
         assertEquals(2, gateway.captureCount)
+        assertEquals(listOf(null, "поход.gpx"), gateway.captureNames)
+        assertEquals(listOf("поход.gpx", "поход.gpx"), gateway.executeDisplayNames)
         vm.reset()
     }
 
@@ -253,13 +273,16 @@ class GpxImportViewModelTest {
         var captureTerritory: UUID = territory
         var captureObserver: UUID = observer
         var captureCount = 0
+        val captureNames = mutableListOf<String?>()
         val confirmations = mutableListOf<Boolean>()
+        val executeDisplayNames = mutableListOf<String?>()
         var executeBlock: suspend (GpxCapturedRequest, Boolean) -> GpxPreparationResult =
             { captured, _ -> ready(captured) }
         var lookupBlock: suspend (UUID) -> GpxPreparationResult.Ready? = { null }
 
         override suspend fun capture(displayName: String?): GpxCapturedRequest {
             captureCount++
+            captureNames += displayName
             return GpxCapturedRequest(
                 GpxImportRequest(
                     UUID.randomUUID(), captureTerritory, captureObserver, displayName, 0L,
@@ -273,8 +296,10 @@ class GpxImportViewModelTest {
             captured: GpxCapturedRequest,
             open: () -> InputStream,
             confirmRepeatedOriginal: Boolean,
+            displayName: String?,
         ): GpxPreparationResult {
             confirmations += confirmRepeatedOriginal
+            executeDisplayNames += displayName
             return executeBlock(captured, confirmRepeatedOriginal)
         }
 

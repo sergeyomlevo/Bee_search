@@ -77,8 +77,112 @@ class GpxImportWorkflowDeviceTest {
         val result = workflow.execute(captured, source()) as GpxPreparationResult.Ready
 
         assertEquals(territory, result.territoryId(db))
-        assertNotNull(GpxPersistenceStore(db).readReady(result.importId))
+        val ready = requireNotNull(GpxPersistenceStore(db).readReady(result.importId))
+        assertEquals("workflow.gpx", ready.importRow.displayName)
+        assertEquals("workflow.gpx", db.gpxDao().importById(result.importId)?.displayName)
         assertEquals(captured.request.requestUuid, result.requestUuid)
+    }
+
+    @Test
+    fun providerFilenameIsStoredForGpx10And11AndSurvivesReadyAndCatalogReads(): Unit = runBlocking {
+        val workflow = workflow()
+        val providerFilename = "Трек пасеки — южный склон, контрольный маршрут 2026.gpx"
+
+        val gpx10 = workflow.execute(
+            workflow.capture(), source(version = "1.0"), displayName = providerFilename,
+        ) as GpxPreparationResult.Ready
+        val gpx11 = workflow.execute(
+            workflow.capture(), source(version = "1.1", creator = "fixture- второй файл"),
+            displayName = providerFilename,
+        ) as GpxPreparationResult.Ready
+
+        assertFalse(gpx10.importId == gpx11.importId)
+        assertFalse(gpx10.originalId == gpx11.originalId)
+        for (result in listOf(gpx10, gpx11)) {
+            assertEquals(providerFilename, db.gpxDao().importById(result.importId)?.displayName)
+            assertEquals(
+                providerFilename,
+                requireNotNull(GpxPersistenceStore(db).readReady(result.importId)).importRow.displayName,
+            )
+        }
+        val catalog = GpxPersistenceStore(db).listReady(territory).associateBy { it.id }
+        assertEquals(providerFilename, catalog[gpx10.importId]?.displayName)
+        assertEquals(providerFilename, catalog[gpx11.importId]?.displayName)
+    }
+
+    @Test
+    fun nullProviderFilenameFallsBackToNameCapturedBeforeSourceOpen(): Unit = runBlocking {
+        val workflow = workflow()
+        val capturedName = "capture-before-provider.gpx"
+        val result = workflow.execute(workflow.capture(capturedName), source(), displayName = null)
+            as GpxPreparationResult.Ready
+
+        assertEquals(capturedName, db.gpxDao().importById(result.importId)?.displayName)
+        assertEquals(
+            capturedName,
+            requireNotNull(GpxPersistenceStore(db).readReady(result.importId)).importRow.displayName,
+        )
+        assertEquals(capturedName, GpxPersistenceStore(db).listReady(territory).single().displayName)
+    }
+
+    @Test
+    fun providerFilenameSurvivesDatabaseCloseAndReopen(): Unit = runBlocking {
+        val databaseName = "gpx-workflow-filename-${UUID.randomUUID()}.db"
+        val persistedRoot = File(context.filesDir, "gpx-workflow-filename-${UUID.randomUUID()}").apply { mkdirs() }
+        val providerFilename = "Длинный маршрут пасеки с пробелами — повторная проверка.gpx"
+        var persistedDb: BeeSearchDatabase? = null
+        var reopenedDb: BeeSearchDatabase? = null
+        try {
+            val firstDb = Room.databaseBuilder(context, BeeSearchDatabase::class.java, databaseName)
+                .addCallback(GpxPersistenceSchema.callback).build()
+            persistedDb = firstDb
+            firstDb.territoryDao().insert(
+                TerritoryEntity(territory, "WORKFLOW-FILE", "Workflow file", "R", "D", instant, instant),
+            )
+            firstDb.observerDao().insert(
+                ObserverEntity(observer, "WORKFLOW-FILE", "Observer", "Test", null, null, instant, instant),
+            )
+            val persistedSettings = FakeSettings(AppSettings(territory, observer))
+            val persistedSelection = persistedSettings.selection
+            val persistedStore = GpxPersistenceStore(firstDb)
+            val persistedRuntime = GpxRuntime(
+                GpxImportCoordinator(persistedStore, GpxOriginalStore(persistedRoot)), persistedStore,
+            )
+            val persistedWorkflow = GpxImportWorkflow(
+                persistedRuntime, persistedSettings, persistedSelection, Clock.fixed(instant, ZoneOffset.UTC),
+            )
+            val result = persistedWorkflow.execute(
+                persistedWorkflow.capture(), source(version = "1.1"), displayName = providerFilename,
+            ) as GpxPreparationResult.Ready
+            firstDb.close()
+            persistedDb = null
+
+            val secondDb = Room.databaseBuilder(context, BeeSearchDatabase::class.java, databaseName)
+                .addCallback(GpxPersistenceSchema.callback).build()
+            reopenedDb = secondDb
+            val reopenedStore = GpxPersistenceStore(secondDb)
+            assertEquals(
+                providerFilename,
+                requireNotNull(reopenedStore.readReady(result.importId)).importRow.displayName,
+            )
+            assertEquals(providerFilename, reopenedStore.listReady(territory).single().displayName)
+        } finally {
+            reopenedDb?.close()
+            persistedDb?.close()
+            context.deleteDatabase(databaseName)
+            persistedRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun missingCaptureAndProviderFilenameRemainsNullInCatalog(): Unit = runBlocking {
+        val workflow = workflow()
+        val result = workflow.execute(workflow.capture(), source(), displayName = null)
+            as GpxPreparationResult.Ready
+
+        assertNull(db.gpxDao().importById(result.importId)?.displayName)
+        assertNull(requireNotNull(GpxPersistenceStore(db).readReady(result.importId)).importRow.displayName)
+        assertNull(GpxPersistenceStore(db).listReady(territory).single().displayName)
     }
 
     @Test
@@ -328,9 +432,11 @@ class GpxImportWorkflowDeviceTest {
         )
     }
 
-    private fun source(): () -> ByteArrayInputStream = { ByteArrayInputStream(validGpx()) }
+    private fun source(version: String = "1.1", creator: String = "fixture"): () -> ByteArrayInputStream =
+        { ByteArrayInputStream(validGpx(version, creator)) }
 
-    private fun validGpx() = "<?xml version=\"1.0\"?><gpx version=\"1.1\" creator=\"fixture\" xmlns=\"http://www.topografix.com/GPX/1/1\"><trk><trkseg><trkpt lat=\"0\" lon=\"0\"/></trkseg></trk></gpx>".toByteArray()
+    private fun validGpx(version: String = "1.1", creator: String = "fixture") =
+        "<?xml version=\"1.0\"?><gpx version=\"$version\" creator=\"$creator\" xmlns=\"http://www.topografix.com/GPX/${version.replace('.', '/')}\"><trk><trkseg><trkpt lat=\"0\" lon=\"0\"/></trkseg></trk></gpx>".toByteArray()
 
     private suspend fun GpxPreparationResult.Ready.territoryId(db: BeeSearchDatabase): UUID =
         requireNotNull(db.gpxDao().importById(importId)).territoryId
