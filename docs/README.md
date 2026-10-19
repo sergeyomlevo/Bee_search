@@ -29,6 +29,7 @@
 | [Overlay lifecycle evidence](map-overlay-lifecycle-evidence.md) | История проверок map overlays. |
 | [Map display spec](ui/unified-territory-map-display-spec.md) | Семантика отображения единой карты. |
 | [GPX display mockup v1 — APPROVED](ui/mockups/gpx-display-v1.md) | Список READY GPX, выбор отображения и targeted Registry integration check; APPROVED BY OWNER, 2026-10-19. |
+| [GPX display implementation](d106-gpx-display-implementation-report.md) | Реализация списка READY, сохранения выбора и отображения через существующий Registry; проверки и ограничения. |
 | [Test vectors](test-vectors) | Контрактные тестовые материалы. |
 
 ## Backup / Snapshot / экспорт

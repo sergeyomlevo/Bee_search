@@ -35,6 +35,7 @@ internal enum class OverlayResult {
     APPLIED, NO_CHANGE, DEFERRED, STALE, INVALID_DECLARATION, DUPLICATE_KEY,
     ID_COLLISION, FACTORY_FAILED, MUTATION_FAILED, SESSION_UNSAFE, RELEASED,
 }
+internal data class OverlayPresentation(val revision: Long, val result: OverlayResult)
 internal data class OverlayStyleRequest(val generation: Long, val identity: Any)
 internal class OverlayWorkToken internal constructor(
     internal val host: Any,
@@ -72,6 +73,23 @@ internal class MapOverlayRegistry<S : Any, L : Any> {
     }
 
     fun registeredRevision(key: String): Long? = desired[key]?.overlay?.revision
+
+    /** Acknowledges full declaration attachment, never equates desired visibility with success. */
+    fun presentation(): Map<String, OverlayPresentation> {
+        checkOwner()
+        val current = attachment
+        return desired.mapValues { (key, entry) ->
+            val result = when {
+                !active -> OverlayResult.RELEASED
+                current?.unsafe == true -> OverlayResult.SESSION_UNSAFE
+                failureState[key] != null -> failureState.getValue(key)
+                current == null || confirmed != request || !current.target.isCurrentAndReady() -> OverlayResult.DEFERRED
+                current.owned[key]?.revision == entry.overlay.revision -> OverlayResult.APPLIED
+                else -> OverlayResult.DEFERRED
+            }
+            OverlayPresentation(entry.overlay.revision, result)
+        }
+    }
 
     fun styleRequestFailed(failed: OverlayStyleRequest): OverlayResult {
         checkOwner()
@@ -268,7 +286,8 @@ internal class MapOverlayRegistry<S : Any, L : Any> {
             layers = overlay.layers.mapIndexed { i, factory ->
                 factory.create(layerIds[i], sourceId(overlay.key, factory.sourceKey))
             }
-        } catch (_: Exception) { return OverlayResult.FACTORY_FAILED }
+        } catch (_: OutOfMemoryError) { return OverlayResult.FACTORY_FAILED }
+        catch (_: Exception) { return OverlayResult.FACTORY_FAILED }
         val owned = Owned<S, L>(overlay.revision, overlay.visible, scopeEpoch)
         current.owned[overlay.key] = owned
         try {

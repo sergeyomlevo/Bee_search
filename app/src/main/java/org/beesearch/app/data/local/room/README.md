@@ -8,6 +8,7 @@ version — DB15; миграция `14 → 15` добавляет GPX persistenc
 |---|---|
 | [GpxEntities.kt](GpxEntities.kt) | Пять GPX entity-моделей: imports, source tracks, segments, samples и import jobs. |
 | [GpxDao.kt](GpxDao.kt) | GPX queries, graph rows, READY/PENDING visibility и derived counts. |
+| [GpxReadyMetadata.kt](GpxReadyMetadata.kt) | Лёгкая READY-проекция каталога Territory, без загрузки геометрии; не новая entity/schema. |
 | [GpxPersistenceSchema.kt](GpxPersistenceSchema.kt) | Таблицы, индексы, structural triggers и schema verification. |
 | [GpxPersistenceStore.kt](GpxPersistenceStore.kt) | Ограниченный Room store для graph persistence/read/count/PENDING cleanup. |
 | [GpxStoredGraph.kt](GpxStoredGraph.kt) | Stored graph mapping и integrity checks канонического графа. |

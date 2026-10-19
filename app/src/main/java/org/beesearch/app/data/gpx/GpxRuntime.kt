@@ -8,6 +8,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.beesearch.app.data.local.room.GpxPersistenceStore
 import org.beesearch.app.data.local.room.GpxStoredGraph
+import org.beesearch.app.data.local.room.GpxReadyMetadata
 
 internal data class GpxReconciliationResult(
     val operations: List<GpxPreparationResult> = emptyList(),
@@ -63,6 +64,14 @@ internal class GpxRuntime(
             val result = reconcileLocked()
             if (!result.completed) throw GpxRuntimeUnavailableException(result)
             persistence.readReady(importId)?.takeIf { it.importRow.territoryId == territoryId }
+        }
+    }
+
+    suspend fun listReady(territoryId: UUID): List<GpxReadyMetadata> = withContext(Dispatchers.IO) {
+        gate.withLock {
+            val result = reconcileLocked()
+            if (!result.completed) throw GpxRuntimeUnavailableException(result)
+            persistence.listReady(territoryId)
         }
     }
 

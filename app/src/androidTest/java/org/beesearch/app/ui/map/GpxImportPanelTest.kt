@@ -4,7 +4,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -14,17 +13,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/** Approved GPX import surfaces: exact copy and the import/future-show separation. */
+/** Approved GPX import surfaces and the active display-list entry point. */
 class GpxImportPanelTest {
     @get:Rule
     val rule = createComposeRule()
 
     @Test
-    fun tracksPageSeparatesActiveImportFromFutureShow() {
+    fun tracksPageKeepsImportAndDisplayNavigationIndependent() {
         var imports = 0
         var backs = 0
+        var displays = 0
         rule.setContent {
-            GpxTracksPage(onBack = { backs++ }, onImport = { imports++ })
+            GpxTracksPage(onBack = { backs++ }, onImport = { imports++ }, onShowTracks = { displays++ })
         }
 
         rule.onNodeWithText("Треки GPX").assertIsDisplayed()
@@ -32,11 +32,10 @@ class GpxImportPanelTest {
         rule.onNodeWithText("Добавить GPX-файл из памяти телефона").assertIsDisplayed()
         rule.onNodeWithText("Показать трек").assertIsDisplayed()
         rule.onNodeWithText("Выбрать сохранённый трек для карты").assertIsDisplayed()
-        rule.onNodeWithText("Скоро").assertIsDisplayed()
         rule.onNodeWithTag("gpx-import-action").assertIsEnabled().performClick()
         assertEquals(1, imports)
-        rule.onNodeWithTag("gpx-show-track-action").assertIsNotEnabled()
-        // The disabled future row must not be an empty working click target.
+        rule.onNodeWithTag("gpx-show-track-action").assertIsEnabled().performClick()
+        assertEquals(1, displays)
         assertEquals(0, backs)
     }
 

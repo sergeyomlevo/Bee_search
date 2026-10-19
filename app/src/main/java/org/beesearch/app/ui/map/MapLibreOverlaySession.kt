@@ -15,6 +15,8 @@ import org.maplibre.android.style.sources.Source
 /** One MapView host. No SDK reference is retained in a ViewModel or application owner. */
 internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
     val registry = MapOverlayRegistry<Source, Layer>()
+    var onPresentationChanged: (Any?, Map<String, OverlayPresentation>) -> Unit = { _, _ -> }
+    private fun notifyPresentation() = onPresentationChanged(contentScope, registry.presentation())
     private var hostView: MapView? = view
     private var hostMap: MapLibreMap? = map
     private val correlation = OverlayStyleCorrelation()
@@ -33,6 +35,7 @@ internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
             // SDK failure event has no request identity. Keep the ownership journal and pending
             // request; do not falsely fail a newer request on an old event. No automatic retry.
             Log.w(TAG, "Style unavailable; restore deferred: $error")
+            notifyPresentation()
         }
     }
 
@@ -50,6 +53,7 @@ internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
         check(!requestingStyle) { "Nested style request" }
         // Equality includes the actual JSON and package-derived profile fields, not a hash.
         val request = registry.beginStyleRequest(profile)
+        notifyPresentation()
         val marker = correlation.begin(request)
         requestingStyle = true
         try {
@@ -90,6 +94,7 @@ internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
             ?: return OverlayResult.STALE
         val result = registry.restoreIfCurrent(request, MapLibreTarget(map, style))
         report(result)
+        notifyPresentation()
         return result
     }
 
@@ -123,6 +128,7 @@ internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
         }
         supplied = (supplied + next.filterValues { registry.registeredRevision(it.key) == it.revision })
             .filterKeys { it in next }
+        notifyPresentation()
     }
 
     fun release() {
@@ -134,6 +140,7 @@ internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
         correlation.clear()
         supplied = emptyMap()
         contentScope = null
+        onPresentationChanged = { _, _ -> }
         hostMap = null
         hostView = null
     }

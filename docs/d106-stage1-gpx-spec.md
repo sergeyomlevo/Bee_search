@@ -214,7 +214,8 @@ Reconcile before exposing READY data at startup/first access. In-flight imports 
 not completed protection records.
 
 ACCEPTED missing-original policy: retain canonical geometry and viewing with explicit
-degraded/unavailable-original state. FULL backup/snapshot fails/declines while required
+internal degraded/unavailable-original diagnostic state (no original-status warning
+in the approved display list). FULL backup/snapshot fails/declines while required
 bytes are unavailable; no omission or identity-regenerating reparse. Verify originals
 for protection/restore; do not hash on recomposition.
 
@@ -244,8 +245,8 @@ acceptable memory cost; no Registry semantic change.
 
 Feature owner knows Territory; Registry sees opaque scope/revisions. PROPOSED one
 overlay/import, gpx-<importUUID>, local keys geometry/lines/singletons; Registry builds
-full IDs. Separate LineString per segment with ≥2 samples, optional singleton Point/
-CircleLayer, no empty geometry. No bridges, smoothing or canonical decimation.
+full IDs. Separate LineString per segment with ≥2 samples, singleton Point/
+CircleLayer (OWNER-approved 2026-10-19), no empty geometry. No bridges, smoothing or canonical decimation.
 
 Immutable latest snapshots; captured Territory/epoch/revision gates stale work.
 A cannot republish into B. Fresh SDK objects on reload/re-registration, no stored
@@ -257,17 +258,22 @@ ceiling failure/defer, never silent partial-track omission or canonical data los
 
 ## 10. Visibility and UI
 
-ACCEPTED: device-local per-Territory visibility, default visible, not canonical
-provenance, excluded from Complete Backup and Snapshot. Restored imports default
-visible. Persist hidden IDs separately from research types/date filters. Clean stale/
-restored preferences through safe post-commit settings/retry semantics; preference
-failure does not destroy restored canonical data.
+ACCEPTED — OWNER amendments 2026-10-18/19: device-local per-Territory explicit
+selected import IDs in the existing Settings DataStore. New imports default OFF;
+import/storage and display are independent. Persistence must succeed before applying
+selection to presentation. Visibility is not canonical provenance and is excluded
+from Complete Backup/Snapshot. The former default-visible/hidden-IDs rule is superseded
+for ordinary new imports. The existing restored-default-visible policy is unchanged and remains future work
+with unified Backup/Restore; this implementation does not implement restore.
 
-Entry: Визуализация → Данные на карте. Minimal GPX section: Import GPX, current-Territory
-list/names and track/segment/sample summaries, hide/show, warnings and original-
-unavailable state. Capture ownership before picker; progress, Cancel, invalid/
-unsupported reason and explicit unsupported-content warning; success only at READY.
-Restart preserves imports and local visibility.
+Entry: Визуализация → Данные на карте → Треки → Показать трек. One file-level
+switch selects its entire supported canonical graph; multiple files may be visible.
+Singleton segments are points. No summaries or original-status warning in this list:
+a missing/corrupt original with valid canonical geometry keeps displaying; canonical
+failure produces a clear per-file error. Original status may be internal diagnostics.
+Import picker/progress/cancel/duplicate behavior is unchanged, success only at READY.
+Restart preserves imports and local visibility. Approved visual/behavior contract:
+[GPX display v1 PNG+MD](ui/mockups/gpx-display-v1.md).
 
 No fifth action, AREA_VIEW controls, removal UI or research-filter redesign.
 Behavioral/textual specification is not an approved visual artifact. New production

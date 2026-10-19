@@ -38,6 +38,16 @@ internal abstract class GpxDao {
     @Query("SELECT * FROM gpx_imports WHERE id = :id AND publication_state = 'READY'")
     abstract suspend fun readyImportById(id: UUID): GpxImportEntity?
 
+    @Query(
+        """
+        SELECT id, display_name, imported_at_epoch_ms
+        FROM gpx_imports
+        WHERE territory_id = :territoryId AND publication_state = 'READY'
+        ORDER BY imported_at_epoch_ms DESC, id ASC
+        """,
+    )
+    abstract suspend fun readyMetadataByTerritory(territoryId: UUID): List<GpxReadyMetadata>
+
     @Query("SELECT * FROM gpx_imports WHERE request_uuid = :requestUuid AND publication_state = 'READY'")
     abstract suspend fun completedByRequest(requestUuid: UUID): GpxImportEntity?
 

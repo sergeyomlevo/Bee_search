@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -88,6 +89,9 @@ internal fun MapDataPanel(
     onDismiss: () -> Unit,
     onOpenGpx: () -> Unit = {},
     onCloseGpx: () -> Unit = {},
+    gpxDisplayState: GpxDisplayUiState = GpxDisplayUiState(),
+    onGpxVisibilityChange: (java.util.UUID, Boolean) -> Unit = { _, _ -> },
+    onRetryGpxDisplay: (java.util.UUID?) -> Unit = {},
     gpxImportState: GpxImportUiState = GpxImportUiState.Idle,
     onStartGpxImport: () -> Unit = {},
     onCancelGpxImport: () -> Unit = {},
@@ -98,6 +102,10 @@ internal fun MapDataPanel(
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var gpxDisplayOpen by rememberSaveable(gpxDisplayState.territoryId) { mutableStateOf(false) }
+    LaunchedEffect(state.gpxOpen, gpxDisplayState.territoryId) {
+        if (!state.gpxOpen) gpxDisplayOpen = false
+    }
 
     ModalBottomSheet(
         onDismissRequest = {
@@ -119,13 +127,14 @@ internal fun MapDataPanel(
         // import it starts the durable-result check instead of pretending the import was cancelled.
         BackHandler(
             enabled = state.openedType != null || state.gpxOpen ||
-                gpxImportState !is GpxImportUiState.Idle,
+                gpxDisplayOpen || gpxImportState !is GpxImportUiState.Idle,
         ) {
             when {
                 gpxImportState is GpxImportUiState.Importing -> onCancelGpxImport()
                 gpxImportState is GpxImportUiState.Duplicate -> onDeclineGpxDuplicate()
                 gpxImportState is GpxImportUiState.Checking -> Unit
                 gpxImportState !is GpxImportUiState.Idle -> onGpxResultClose()
+                gpxDisplayOpen -> gpxDisplayOpen = false
                 state.gpxOpen -> onCloseGpx()
                 else -> onCloseType()
             }
@@ -143,6 +152,12 @@ internal fun MapDataPanel(
             onDismiss = onDismiss,
             onOpenGpx = onOpenGpx,
             onCloseGpx = onCloseGpx,
+            gpxDisplayOpen = gpxDisplayOpen,
+            onOpenGpxDisplay = { gpxDisplayOpen = true },
+            onCloseGpxDisplay = { gpxDisplayOpen = false },
+            gpxDisplayState = gpxDisplayState,
+            onGpxVisibilityChange = onGpxVisibilityChange,
+            onRetryGpxDisplay = onRetryGpxDisplay,
             gpxImportState = gpxImportState,
             onStartGpxImport = onStartGpxImport,
             onCancelGpxImport = onCancelGpxImport,
@@ -174,6 +189,12 @@ internal fun MapDataPanelBody(
     onDismiss: () -> Unit,
     onOpenGpx: () -> Unit = {},
     onCloseGpx: () -> Unit = {},
+    gpxDisplayOpen: Boolean = false,
+    onOpenGpxDisplay: () -> Unit = {},
+    onCloseGpxDisplay: () -> Unit = {},
+    gpxDisplayState: GpxDisplayUiState = GpxDisplayUiState(),
+    onGpxVisibilityChange: (java.util.UUID, Boolean) -> Unit = { _, _ -> },
+    onRetryGpxDisplay: (java.util.UUID?) -> Unit = {},
     gpxImportState: GpxImportUiState = GpxImportUiState.Idle,
     onStartGpxImport: () -> Unit = {},
     onCancelGpxImport: () -> Unit = {},
@@ -193,9 +214,17 @@ internal fun MapDataPanelBody(
             onDone = onGpxResultClose,
             modifier = modifier,
         )
+        gpxDisplayOpen && state.gpxOpen -> GpxDisplayPage(
+            state = gpxDisplayState,
+            onBack = onCloseGpxDisplay,
+            onToggle = onGpxVisibilityChange,
+            onRetry = onRetryGpxDisplay,
+            modifier = modifier,
+        )
         state.gpxOpen -> GpxTracksPage(
             onBack = onCloseGpx,
             onImport = onStartGpxImport,
+            onShowTracks = onOpenGpxDisplay,
             modifier = modifier,
         )
         openedType == null -> MapDataPanelContent(

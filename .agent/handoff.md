@@ -1,5 +1,26 @@
 # Bee Search handoff
 
+## Latest task - saved GPX display implementation and DEV smoke (2026-10-19)
+
+Base574f099; OWNER-approved gpx-display-v1 implemented. READY Territory catalog,
+per-Territory persistent multi-file selection (new imports OFF), canonical lines
+and singleton points through existing Registry/session. No import/schema/backup
+changes. Stage1A default-visible wording aligned with OWNER decision.
+Report: docs/d106-gpx-display-implementation-report.md.
+JVM1061/1061, API29 targeted103/103 at actual fontScale1.7, DEV/test assemblies
+and final lint PASS (0 errors,35 warnings,6 hints).
+After separate OWNER permission, Samsung SM-S938B/RFCY90MBYVZ updated only DEV
+org.beesearch.app.dev1.3.0(8), APK SHA256
+15d6476fe2744437b39d82f7a05cb9aea2795cc3e33cb97e25d2a7adc16b96a6.
+All4075 private files exactly match pre-update SHA256 before first launch;
+Stable/Beta untouched. Phone font1.7 list/two switches/restart persistence/
+scroll/arrow/system Back/picker cancel smoke PASS; selections restored OFF.
+Phone native line placement, Territory/style/fault matrix, TalkBack and capacity
+not claimed; emulator native lifecycle/geometry tests cover their defined scope.
+Prior uncommitted handoff bytes preserved; only this entry belongs to task commit.
+No push. Stage1/H05 OPEN. Stop; no automatic continuation to My points.
+
+
 ## Latest task — GPX display mockup APPROVED (2026-10-19)
 
 OWNER approved gpx-display-v1 PNG+MD; mandatory correction completed in both PNGs:

@@ -129,6 +129,7 @@ internal class AppContainer(private val context: Context) {
     )
     // Internal application workflow only; no user picker/import action is registered.
     val gpxImportWorkflow = GpxImportWorkflow(gpxRuntime, settingsRepository, selectionGuard, clock)
+    val gpxVisibilityStore = org.beesearch.app.data.local.settings.DataStoreGpxVisibilityStore(context.settingsDataStore)
 
     /**
      * The Ареал of the current Territory.

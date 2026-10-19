@@ -33,6 +33,9 @@ internal class GpxPersistenceStore(private val database: BeeSearchDatabase) {
         }
     }
     suspend fun readReady(id: UUID): GpxStoredGraph? = checked { dao.readyImportById(id)?.let { read(it) } }
+    suspend fun listReady(territoryId: UUID): List<GpxReadyMetadata> = checked {
+        dao.readyMetadataByTerritory(territoryId)
+    }
     /** Durable result lookup is separate from accepting/consuming a new request. */
     suspend fun completed(request: UUID): GpxImportEntity? = checked {
         dao.completedByRequest(request)?.also { row ->

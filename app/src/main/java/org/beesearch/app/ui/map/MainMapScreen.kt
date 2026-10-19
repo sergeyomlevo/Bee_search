@@ -112,6 +112,26 @@ internal fun CurrentTerritoryScreen(
         factory = GpxImportViewModel.factory(application.container.gpxImportWorkflow),
     )
     val gpxImportState by gpxImportViewModel.state.collectAsStateWithLifecycle()
+    val gpxDisplayViewModel: GpxDisplayViewModel = viewModel(factory = GpxDisplayViewModel.factory(
+        catalog = application.container.gpxRuntime::listReady,
+        prepare = { territoryId, importId, revision ->
+            val graph = checkNotNull(application.container.gpxRuntime.readReady(territoryId, importId))
+            prepareGpxOverlay(territoryId, graph, revision)
+        },
+        store = application.container.gpxVisibilityStore,
+    ))
+    val gpxDisplayState by gpxDisplayViewModel.state.collectAsStateWithLifecycle()
+    val preparedGpx by gpxDisplayViewModel.overlays.collectAsStateWithLifecycle()
+    val currentGpxDisplayState = if (gpxDisplayState.territoryId == territory?.id) gpxDisplayState
+        else GpxDisplayUiState(territoryId = territory?.id)
+    val gpxOverlays = androidx.compose.runtime.remember(preparedGpx, territory?.id, gpxDisplayState.territoryId) {
+        if (gpxDisplayState.territoryId == territory?.id) preparedGpx.map { it.declaration() } else emptyList()
+    }
+    LaunchedEffect(territory?.id) { gpxDisplayViewModel.setTerritory(territory?.id) }
+
+    LaunchedEffect(gpxImportState) {
+        if (gpxImportState is GpxImportUiState.Success) gpxDisplayViewModel.refresh()
+    }
     val pickerRequest by gpxImportViewModel.pickerRequest.collectAsStateWithLifecycle()
     val contentResolver = LocalContext.current.contentResolver
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -139,7 +159,10 @@ internal fun CurrentTerritoryScreen(
     // Opening the panel is also a fresh look at the same records, and it is the moment a user checks
     // whether a newly created object is on the map.
     LaunchedEffect(mapDataState.panelOpen) {
-        if (mapDataState.panelOpen) mapDataViewModel.refresh()
+        if (mapDataState.panelOpen) {
+            mapDataViewModel.refresh()
+            gpxDisplayViewModel.refresh()
+        }
     }
 
     MapFirstScaffold(
@@ -169,6 +192,8 @@ internal fun CurrentTerritoryScreen(
                     areaEditorRequest = areaEditorRequest,
                     onAreaEditorRequestHandled = onAreaEditorRequestHandled,
                     onCoverageSessionEnded = onCoverageEditFinished,
+                    runtimeOverlays = gpxOverlays,
+                    onOverlayPresentation = gpxDisplayViewModel::onPresentation,
                     researchObjectMarkers = mapDataState.markers,
                     selectedResearchObjectId = mapDataState.selectedObjectId,
                     onSelectResearchObject = { marker -> mapDataViewModel.toggleSelection(marker.id) },
@@ -204,6 +229,9 @@ internal fun CurrentTerritoryScreen(
                     state = mapDataState,
                     viewModel = mapDataViewModel,
                     gpxImportState = gpxImportState,
+                    gpxDisplayState = currentGpxDisplayState,
+                    onGpxVisibilityChange = gpxDisplayViewModel::setVisible,
+                    onRetryGpxDisplay = gpxDisplayViewModel::retry,
                     onStartGpxImport = {
                         gpxImportViewModel.beginImport(territory?.name.orEmpty())
                     },
@@ -249,6 +277,9 @@ internal fun MapDataSurface(
     state: MapDataUiState,
     viewModel: MapDataViewModel,
     gpxImportState: GpxImportUiState = GpxImportUiState.Idle,
+    gpxDisplayState: GpxDisplayUiState = GpxDisplayUiState(),
+    onGpxVisibilityChange: (UUID, Boolean) -> Unit = { _, _ -> },
+    onRetryGpxDisplay: (UUID?) -> Unit = {},
     onStartGpxImport: () -> Unit = {},
     onCancelGpxImport: () -> Unit = {},
     onConfirmGpxDuplicate: () -> Unit = {},
@@ -270,6 +301,9 @@ internal fun MapDataSurface(
         onOpenGpx = viewModel::openGpxTracks,
         onCloseGpx = viewModel::closeGpxTracks,
         gpxImportState = gpxImportState,
+        gpxDisplayState = gpxDisplayState,
+        onGpxVisibilityChange = onGpxVisibilityChange,
+        onRetryGpxDisplay = onRetryGpxDisplay,
         onStartGpxImport = onStartGpxImport,
         onCancelGpxImport = onCancelGpxImport,
         onConfirmGpxDuplicate = onConfirmGpxDuplicate,

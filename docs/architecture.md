@@ -2605,3 +2605,31 @@ cleanup failure is suppressed, durable READY is preserved. Provider stream is on
 needed for initial copy; parser consumes managed staging. User import availability
 remains false with no override/picker/UI route; READY does not set map visibility.
 Evidence: ignored build/evidence/d106-workflow/attempt-2/. Stage1/H05 OPEN.
+
+
+## D106 saved GPX display — 2026-10-19
+
+Approved contract: [GPX display v1](ui/mockups/gpx-display-v1.md).
+The existing `GpxRuntime.listReady(Territory)` gate exposes only metadata projected
+by the existing DAO/transaction; hidden graphs are not read for the catalog.
+`GpxDisplayViewModel` owns persisted selection/error/preparation state and one
+sequential cancellable producer. Existing Settings DataStore stores explicit selected
+import UUIDs per Territory; missing key/new import means OFF. Apply after `edit`
+returns successfully. Research settings, import and Room schema are unchanged.
+
+Selected IDs use `GpxRuntime.readReady` and validated canonical geometry, never raw
+original parsing. A direct JSON writer emits separate LineStrings and singleton
+Points without bridging. It checks exact JSON size against available JVM heap before
+allocating builder/final String; this resource guard is not a fixed sample limit or
+an established native-renderer capacity. Only selected prepared snapshots are retained.
+
+Declarations enter existing `BeeMap.runtimeOverlays` / `MapLibreOverlaySession.sync`
+and `MapOverlayRegistry`: one overlay/import, fresh Sources/Layers per attach/reload.
+Hiding unregisters declarations. Territory epoch and preparation revision reject old
+reads/attach statuses. Native session acknowledgements report deferred/full attach/
+failure independently of persisted selection; per-file errors remain visible.
+No second Registry, automatic camera movement or original-availability warning.
+Native attach acknowledgement does not claim that every GPU frame has been measured.
+
+Build/device evidence and remaining physical acceptance:
+[implementation report](d106-gpx-display-implementation-report.md).

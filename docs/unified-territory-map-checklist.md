@@ -403,8 +403,19 @@ commit, no push. Stage1/H05 remain OPEN; next task is B mockup only.
   display error. Original status may remain internal diagnostics.
   File-level multi-select, new imports OFF, persistent per-Territory selection,
   independent storage/display, singleton segments as points, existing Registry.
-  READY catalog/visibility/renderer remain unimplemented. Old Stage1A default-visible
-  wording must be aligned with the later OWNER no-auto-show rule before implementation.
+  At approval time READY catalog/visibility/renderer were unimplemented;
+  the implementation result below supersedes that historical boundary.
   Prior static Samsung Gallery review was of the draft; corrected PNGs checked
   locally, not runtime Compose/fontScale/touch/scroll proof. No production changes
   or APK install. Stage1/H05 OPEN; implementation starts as a separate task.
+
+- [x] **B saved GPX display implemented, 2026-10-19:**
+  [Implementation and verification report](d106-gpx-display-implementation-report.md).
+  READY-only Territory catalog, persistent multi-file visibility in existing Settings
+  DataStore, new imports OFF, existing Registry/session rendering of canonical
+  segments and singletons, per-file failure/retry. Import pipeline unchanged.
+  Stage1A default-visible wording aligned with later OWNER decision.
+  JVM1061/1061, API29 targeted103/103 at actual fontScale1.7, DEV/test assemblies
+  and lint PASS (0 errors,35 warnings,6 hints). Samsung deployment separately
+  authorized by OWNER; actual device results are recorded in the report.
+  Stage1/H05 remain OPEN. No push or automatic continuation to My points.

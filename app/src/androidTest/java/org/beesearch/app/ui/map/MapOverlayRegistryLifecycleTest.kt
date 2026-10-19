@@ -50,6 +50,61 @@ class MapOverlayRegistryLifecycleTest {
     }
 
     @Test
+    fun gpxLinesSingletonsHideAndStyleReloadUseTheSameSession() {
+        val session = createSession()
+        val id = java.util.UUID.randomUUID()
+        val prepared = GpxPreparedOverlay(id, 1, """{"type":"FeatureCollection","features":[
+          {"type":"Feature","properties":{},"geometry":{"type":"LineString","coordinates":[[39,57],[39.01,57.01]]}},
+          {"type":"Feature","properties":{},"geometry":{"type":"Point","coordinates":[39.02,57.02]}}
+        ]}""")
+        val overlay = prepared.declaration()
+        val research = overlayRegistryFixture()
+        val a = java.util.UUID.randomUUID()
+        val b = java.util.UUID.randomUUID()
+        val statuses = mutableListOf<Map<String, OverlayPresentation>>()
+        onMain {
+            session.onPresentationChanged = { _, status -> statuses.add(status) }
+            session.sync(a, listOf(research, overlay))
+            session.requestStyle(testProfile(OVERLAY_REGISTRY_FIXTURE_STYLE_A))
+        }
+        awaitStyle(session)
+        onMain {
+            assertEquals(OverlayResult.APPLIED,session.registry.presentation()[overlay.key]?.result)
+            assertEquals(1,countLayers(session,research))
+            assertEquals(true,session.currentStyle!!.getLayer(MapOverlayRegistry.layerId(overlay.key,"lines")) != null)
+            assertEquals(true,session.currentStyle!!.getLayer(MapOverlayRegistry.layerId(overlay.key,"singletons")) != null)
+            session.sync(a,listOf(research))
+            assertEquals(null,session.currentStyle!!.getSource(MapOverlayRegistry.sourceId(overlay.key,"geometry")))
+            assertEquals(1,countLayers(session,research))
+            session.sync(a,listOf(research,prepared.copy(revision=2).declaration()))
+        }
+        val old = onMainValue { session.currentStyle }
+        onMain { session.requestStyle(testProfile(OVERLAY_REGISTRY_FIXTURE_STYLE_B)) }
+        awaitStyle(session, old)
+        onMain {
+            assertEquals(OverlayResult.APPLIED,session.registry.presentation()[overlay.key]?.result)
+            assertEquals(2L,session.registry.presentation()[overlay.key]?.revision)
+            session.sync(b,listOf(research))
+            assertEquals(null,session.currentStyle!!.getSource(MapOverlayRegistry.sourceId(overlay.key,"geometry")))
+            session.sync(a,listOf(research,prepared.copy(revision=3).declaration()))
+            assertEquals(OverlayResult.APPLIED,session.registry.presentation()[overlay.key]?.result)
+            assertEquals(true,statuses.any { it[overlay.key]?.result == OverlayResult.DEFERRED })
+            val good=prepared.copy(revision=4).declaration()
+            val broken=good.copy(layers=good.layers.mapIndexed { index, factory ->
+                if(index==1) factory.copy(create={_,_->error("test-owned factory failure")}) else factory
+            })
+            session.sync(a,listOf(research,broken))
+            assertEquals(OverlayResult.FACTORY_FAILED,session.registry.presentation()[overlay.key]?.result)
+            assertEquals(null,session.currentStyle!!.getSource(MapOverlayRegistry.sourceId(overlay.key,"geometry")))
+            assertEquals(null,session.currentStyle!!.getLayer(MapOverlayRegistry.layerId(overlay.key,"lines")))
+            assertEquals(1,countLayers(session,research))
+            session.sync(a,listOf(research,prepared.copy(revision=5).declaration()))
+            assertEquals(OverlayResult.APPLIED,session.registry.presentation()[overlay.key]?.result)
+            session.release()
+        }
+    }
+
+    @Test
     fun sdkSessionRestoresFixtureAcrossReloadAndScopeChange() {
         val session = createSession()
         val overlay = overlayRegistryFixture(visible = false)

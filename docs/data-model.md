@@ -2236,3 +2236,13 @@ Slice 2A adds install-local repository binding outside Room: expected UUID and S
 namespaced by build variant, in `install-state/repository_binding.preferences_pb` (Preferences DataStore).
 Absent keys default to UNBOUND; malformed/partial state fails closed. Explicit adoption/rebind only;
 no migration from path or repository presence. This state is excluded from portable/Android backup.
+
+
+### D106 GPX visibility setting (2026-10-19)
+
+The existing device-local Settings Preferences DataStore stores
+`gpx_visible_imports_<TerritoryUUID>` as a set of selected import UUID strings.
+Missing key is an empty selected set; future imports are OFF. This is presentation
+state, independent of READY publication/canonical data and research filters. Updates
+are atomic and acknowledged before presentation changes. No Room schema/entity,
+original ownership or Backup/Snapshot/Android Auto Backup change is introduced.

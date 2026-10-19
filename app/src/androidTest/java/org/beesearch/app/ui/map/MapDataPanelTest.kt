@@ -89,6 +89,11 @@ class MapDataPanelTest {
         rule.nodeText("Импорт GPX").assertIsDisplayed()
         rule.nodeText("Показать трек").assertIsDisplayed()
 
+        rule.node("gpx-show-track-action").performClick()
+        rule.node("gpx-display-page").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Назад").performClick()
+        rule.node("gpx-tracks-page").assertIsDisplayed()
+
         rule.onNodeWithContentDescription("Назад").performClick()
         rule.node(MAP_DATA_CONTENT_TAG).assertIsDisplayed()
     }
@@ -555,7 +560,7 @@ class MapDataPanelTest {
     fun theTypeScreenKeepsTheApprovedBottomActions() {
         setSheet(initial = DEFAULT_MAP_DATA_DISPLAY.withPeriod(MapDataType.HOLLOW, augustSeptember2026))
         rule.node("map-data-type-HOLLOW").performClick()
-        rule.node("period-reset-HOLLOW").assertIsDisplayed()
+        rule.node("period-reset-HOLLOW").performScrollTo().assertIsDisplayed()
         rule.node(MAP_DATA_FILTER_FOOTER_TAG).assertIsDisplayed()
         rule.node("filter-done-HOLLOW").assertIsDisplayed()
         rule.onAllNodesWithTag("filter-done-HOLLOW", useUnmergedTree = true).assertCountEquals(1)

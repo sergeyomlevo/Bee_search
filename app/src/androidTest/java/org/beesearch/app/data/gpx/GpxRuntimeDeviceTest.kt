@@ -76,6 +76,19 @@ class GpxRuntimeDeviceTest {
     }
 
     @Test
+    fun missingOriginalDoesNotBlockCanonicalDisplay(): Unit = runBlocking {
+        val request = request(42)
+        coordinator().prepare(request, source(), { true }, { true })
+        val ready = coordinator().complete(request, isCapturedRequestCurrent = { true }) as GpxPreparationResult.Ready
+        // Only this test-owned temporary OriginalStore, never DEV user imports.
+        root.walkTopDown().filter { it.isFile }.forEach { check(it.delete()) }
+        val graph = requireNotNull(runtime().readReady(territory, ready.importId))
+        val overlay = org.beesearch.app.ui.map.prepareGpxOverlay(territory, graph, 1)
+        assertTrue(overlay.json.contains("FeatureCollection"))
+        assertTrue(graph.samples.isNotEmpty())
+    }
+
+    @Test
     fun committedReadyRemainsReadableAndIsNotRemovedByReconciliation(): Unit = runBlocking {
         val request = request(2)
         val prepared = coordinator().prepare(request, source(), { true }, { true }) as GpxPreparationResult.Prepared

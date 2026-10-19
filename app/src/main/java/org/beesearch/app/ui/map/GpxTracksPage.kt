@@ -51,6 +51,7 @@ private enum class GpxGlyphKind { Upload, Map, Route, Pin }
 internal fun GpxTracksPage(
     onBack: () -> Unit,
     onImport: () -> Unit,
+    onShowTracks: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -76,11 +77,10 @@ internal fun GpxTracksPage(
                 kind = GpxGlyphKind.Map,
                 title = "Показать трек",
                 subtitle = "Выбрать сохранённый трек для карты",
-                enabled = false,
-                onClick = {},
+                enabled = true,
+                onClick = onShowTracks,
                 testTag = "gpx-show-track-action",
-                badge = "Скоро",
-                description = "Показать трек. Недоступно. Скоро.",
+                description = "Показать трек. Выбрать сохранённый трек для карты.",
             )
         }
     }

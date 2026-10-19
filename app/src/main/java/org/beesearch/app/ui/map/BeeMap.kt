@@ -138,6 +138,7 @@ internal fun BeeMap(
     runtimeOverlays: List<MapOverlay<org.maplibre.android.style.sources.Source, org.maplibre.android.style.layers.Layer>> = emptyList(),
     overlayScope: Any? = territoryId,
     onOverlaySessionReady: (MapLibreOverlaySession) -> Unit = {},
+    onOverlayPresentation: (Any?, Map<String, OverlayPresentation>) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -145,6 +146,7 @@ internal fun BeeMap(
     val latestOverlays by rememberUpdatedState(runtimeOverlays)
     val latestOverlayScope by rememberUpdatedState(overlayScope)
     val latestSessionReady by rememberUpdatedState(onOverlaySessionReady)
+    val latestPresentation by rememberUpdatedState(onOverlayPresentation)
     val mapViewLifecycle = remember {
         MapViewLifecycleController { view ->
             overlaySession?.takeIf { it.owns(view) }?.release()
@@ -152,7 +154,10 @@ internal fun BeeMap(
         }
     }
     LaunchedEffect(overlaySession, overlayScope, runtimeOverlays) {
-        overlaySession?.sync(overlayScope, runtimeOverlays)
+        overlaySession?.let { session ->
+            session.onPresentationChanged = { scope, status -> latestPresentation(scope, status) }
+            session.sync(overlayScope, runtimeOverlays)
+        }
     }
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
