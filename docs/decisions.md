@@ -4134,3 +4134,25 @@ Implementation sequence:
 
 [UI contract](ui/mockups/gpx-import-v1.md),
 [implementation checklist](unified-territory-map-checklist.md).
+
+
+## D106 GPX display mockup approval — OWNER decision, 2026-10-19
+
+**ACCEPTED — explicit OWNER approval; mandatory example correction completed.**
+[GPX display v1 PNG+MD](ui/mockups/gpx-display-v1.md) is APPROVED BY OWNER,
+2026-10-19; no repeat approval is needed. Implementation is a separate task.
+
+One switch selects the whole supported canonical graph of an imported GPX;
+multiple files may be visible. New imports default OFF, visibility persists per
+Territory, and import/storage remain independent of display. Singleton segments
+are shown as separate points. Reuse the existing Registry; no new Registry.
+
+A missing/corrupt original does not stop display of valid saved canonical geometry
+and causes no original-status warning in the user-facing display list. Original
+status may be internal diagnostics; prior degraded/unavailable-original contract
+wording does not require a warning in this list. Missing/corrupt canonical geometry
+instead causes a clear display error for that specific file. Do not conflate them.
+
+Both PNG examples use `Лесная дорога.gpx` ON without a warning/icon. No production,
+Room, import, MapLibre, Registry or Backup/Restore change is authorized by this
+artifact correction. Stage1 and H05 remain OPEN.

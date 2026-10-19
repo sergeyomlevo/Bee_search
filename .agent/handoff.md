@@ -1,5 +1,21 @@
 # Bee Search handoff
 
+## Latest task — GPX display mockup APPROVED (2026-10-19)
+
+OWNER approved gpx-display-v1 PNG+MD; mandatory correction completed in both PNGs:
+Лесная дорога.gpx, switch ON, no original-status warning/icon. No repeat review.
+Valid canonical geometry keeps displaying without an original-status warning;
+canonical failure instead produces a per-track display error. Original diagnostics
+remain internal. Singleton segments as points and existing Registry are approved.
+README, checklist and decisions synchronize this approval. No production/test code,
+schema, import, APK install or push. Stage1/H05 OPEN. Next separate task: implement
+saved GPX list and map display; do not start automatically or begin My points.
+PNG visual/pixel preservation and MD/link/diff checks completed; corrected font17
+PNG checked locally, not a new physical-device runtime qualification.
+Only this new handoff entry belongs to the approval commit; all prior uncommitted
+handoff changes are retained outside it. Earlier DRAFT notes below are historical.
+
+
 ## Current task — universal user-data panel implemented (2026-10-18)
 
 OWNER approved the targeted UI revision. Main panel order is research rows ->

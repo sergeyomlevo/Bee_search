@@ -393,3 +393,18 @@ ViewModel/wiring61/61 PASS. Actual emulator system fontScale1.7 and reduced
 NOT INSTALLED/NOT VERIFIED pending separate OWNER permission; earlier Samsung
 qualification applies to4cdb640. Prior handoff preserved; one local scoped
 commit, no push. Stage1/H05 remain OPEN; next task is B mockup only.
+
+
+- [x] **B UI mockup APPROVED BY OWNER, 2026-10-19:**
+  [gpx-display-v1 PNG+MD](ui/mockups/gpx-display-v1.md) and font17 companion.
+  Mandatory example correction completed: `Лесная дорога.gpx`, switch ON,
+  no original-status warning/icon. Valid canonical geometry remains visible
+  when the original is missing/corrupt; only canonical failure causes a per-file
+  display error. Original status may remain internal diagnostics.
+  File-level multi-select, new imports OFF, persistent per-Territory selection,
+  independent storage/display, singleton segments as points, existing Registry.
+  READY catalog/visibility/renderer remain unimplemented. Old Stage1A default-visible
+  wording must be aligned with the later OWNER no-auto-show rule before implementation.
+  Prior static Samsung Gallery review was of the draft; corrected PNGs checked
+  locally, not runtime Compose/fontScale/touch/scroll proof. No production changes
+  or APK install. Stage1/H05 OPEN; implementation starts as a separate task.
