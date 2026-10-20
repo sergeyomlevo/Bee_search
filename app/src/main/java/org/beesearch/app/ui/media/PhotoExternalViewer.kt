@@ -25,9 +25,18 @@ internal fun openObservationPointPhoto(
         return
     }
 
+    openManagedPhoto(context, file, attachment.mimeType)
+}
+
+/** Shared FileProvider viewer for an already ownership-validated managed image. */
+internal fun openManagedPhoto(context: Context, file: java.io.File?, imageMimeType: String?) {
+    if (file == null || !file.isFile) {
+        Toast.makeText(context, "Фотография недоступна", Toast.LENGTH_LONG).show()
+        return
+    }
     try {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val mimeType = attachment.mimeType
+        val mimeType = imageMimeType
             ?.takeIf { it.startsWith("image/", ignoreCase = true) }
             ?: "image/*"
         val intent = Intent(Intent.ACTION_VIEW)

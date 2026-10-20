@@ -67,6 +67,7 @@ internal fun CurrentTerritoryScreen(
     onCreateObservationPoint: () -> Unit,
     onCreateHollow: () -> Unit,
     onCreateLogHive: () -> Unit,
+    onCreateUserPoint: () -> Unit = {},
     observationRepository: ObservationRepository,
     physicalObjectRepository: PhysicalObjectRepository,
     mapDataDisplayStore: MapDataDisplayStore,
@@ -231,6 +232,7 @@ internal fun CurrentTerritoryScreen(
                     onCreateObservationPoint = onCreateObservationPoint,
                     onCreateHollow = onCreateHollow,
                     onCreateLogHive = onCreateLogHive,
+                    onCreateUserPoint = onCreateUserPoint,
                 )
             }
             if (mapDataState.panelOpen) {

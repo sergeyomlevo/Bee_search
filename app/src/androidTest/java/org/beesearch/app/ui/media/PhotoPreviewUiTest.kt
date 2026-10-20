@@ -107,6 +107,12 @@ class PhotoPreviewUiTest {
             }.getOrDefault(false)
         }
         val image = node.captureToImage().asAndroidBitmap()
+        // Preserve the exact verified runtime preview as qualification evidence.
+        val folder = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            .targetContext.getExternalFilesDir(null)!!.resolve("my-points-stage-b").apply { mkdirs() }
+        folder.resolve("$tag.png").outputStream().use {
+            image.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
         val points = listOf(
             image.width / 4 to image.height / 4,
             image.width * 3 / 4 to image.height / 4,

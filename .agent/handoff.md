@@ -1,5 +1,25 @@
 # Bee Search handoff
 
+## Latest qualification — My points Stage B PASS on emulator (2026-10-20)
+
+Targeted fixes complete on task/d106-stage0-overlay-registry, baseline8ebcf06.
+Draft FileProvider now permits exactly files/user-point-media-staging; existing
+content URI/read-only temporary grants, ownership cleanup and managed lifecycle
+remain intact. Local approved-composition fixes: title/subtitle, six-decimal
+coordinates, photo divider, card hero1.8. No approved PNG was changed.
+JVM1067/1067 and final API29 Android16/16 PASS at actual fontScale1.7; debug app
+and test APK builds and lintDebug PASS (0 errors,33 warnings,6 hints); diff-check
+PASS. Installed emulator APK SHA c66bd654...937febe8 equals local build.
+Manual draft/saved external viewing, multiple gallery photos, save/card, rotation,
+Back/cancel and owned cleanup evidence retained. Camera fake success/cancel PASS;
+real camera, TalkBack and owner Samsung NOT RUN. Process-death recovery not claimed.
+Report: ../docs/d106-my-points-stage-b-qualification.md; final logs/screenshots:
+../docs/ui/evidence/my-points-stage-b-fix-20261020/.
+Local B commit only; prior handoff diff/research/GPX reports/recovery evidence
+preserved outside its scope. No push, Samsung operation or C/D implementation.
+STOP after B. Stage1/H05 OPEN. Further C/D or owner qualification needs a new task.
+
+
 ## Latest fix — GPX provider filename (2026-10-19)
 
 Base b29af07; targeted fix: SAF name arrived after capture() and previously

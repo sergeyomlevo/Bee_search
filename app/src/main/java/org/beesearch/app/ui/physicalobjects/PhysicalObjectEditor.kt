@@ -4,6 +4,7 @@ package org.beesearch.app.ui.physicalobjects
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -293,12 +294,13 @@ private fun HeadingField(
 private fun azimuthSector(deg: Int): String = listOf("С", "СВ", "В", "ЮВ", "Ю", "ЮЗ", "З", "СЗ")[(deg + 22) / 45 % 8]
 
 @Composable
-private fun PhysicalObjectMediaSection(
+internal fun PhysicalObjectMediaSection(
     media: List<PhysicalObjectMediaDraft>, onPick: () -> Unit, onCamera: () -> Unit,
     onRemove: (UUID) -> Unit, enabled: Boolean, showActions: Boolean,
+    title: String = "Медиа", onOpen: ((UUID) -> Unit)? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.testTag("physical-object-media")) {
-        Text("Медиа", style = MaterialTheme.typography.titleMedium)
+        Text(title, style = MaterialTheme.typography.titleMedium)
         if (showActions) {
             AdaptiveActions(
                 cancel = { OutlinedButton(onClick = onCamera, enabled = enabled, modifier = Modifier.fillMaxWidth()) { Text("Сделать фото") } },
@@ -308,7 +310,7 @@ private fun PhysicalObjectMediaSection(
         if (media.isNotEmpty()) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("physical-object-media-thumbnails")) {
                 items(media, key = { it.id }) { item ->
-                    PhysicalObjectMediaThumbnail(item, enabled, showActions, onRemove)
+                    PhysicalObjectMediaThumbnail(item, enabled, showActions, onRemove, onOpen)
                 }
             }
         }
@@ -321,8 +323,11 @@ private fun PhysicalObjectMediaThumbnail(
     enabled: Boolean,
     showRemove: Boolean,
     onRemove: (UUID) -> Unit,
+    onOpen: ((UUID) -> Unit)? = null,
 ) {
-    Box(Modifier.size(112.dp).testTag("physical-object-media-${item.id}")) {
+    Box(Modifier.size(112.dp).testTag("physical-object-media-${item.id}").then(
+        if (onOpen == null || !enabled) Modifier else Modifier.clickable { onOpen(item.id) }
+    )) {
         PhysicalObjectMediaPreview(
             file = item.previewFile,
             isVideo = item.isVideo,

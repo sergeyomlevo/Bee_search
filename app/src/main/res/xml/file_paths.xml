@@ -6,9 +6,18 @@
     <cache-path
         name="physical_object_media_capture"
         path="physical-object-media-staging/" />
+    <cache-path
+        name="user_point_media_capture"
+        path="user-point-media-staging/" />
     <files-path
         name="physical_object_media"
         path="physical-object-media/" />
+    <files-path
+        name="user_point_media_draft"
+        path="user-point-media-staging/" />
+    <files-path
+        name="user_point_media"
+        path="user-point-media/" />
     <files-path
         name="observation_attachments"
         path="observation-attachments/" />

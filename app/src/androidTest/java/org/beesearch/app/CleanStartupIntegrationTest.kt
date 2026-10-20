@@ -459,6 +459,32 @@ class CleanStartupIntegrationTest {
     }
 
     @Test
+    fun userPointCoordinateRequestKeepsSessionAndDoesNotReplayAfterCancelOrSave() = runBlocking {
+        val viewModel = newViewModel()
+        val target = org.beesearch.app.ui.userpoints.UserPointEditorTarget(
+            UUID.randomUUID(), UUID.randomUUID(), latitude = 56.8, longitude = 60.6,
+        )
+        viewModel.changeUserPointDraftLocation(target, target.latitude, target.longitude)
+        awaitRoute(viewModel, AppRoute.CurrentTerritory())
+        viewModel.confirmPhysicalObjectLocation(57.0, 61.0)
+        val selected = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+            viewModel.route.first { it is AppRoute.UserPointEditor }
+        } as AppRoute.UserPointEditor
+        assertEquals(target.requestId, selected.target.requestId)
+        assertEquals(57.0, selected.target.latitude, 0.0)
+        assertTrue(target.coordinateRevision != selected.target.coordinateRevision)
+        assertNull(viewModel.physicalObjectLocationSelection.value)
+        viewModel.changeUserPointDraftLocation(selected.target, 57.0, 61.0)
+        viewModel.cancelPhysicalObjectLocationSelection()
+        awaitRoute(viewModel, AppRoute.UserPointEditor(selected.target))
+        viewModel.openUserPoint(target.territoryId, UUID.randomUUID())
+        viewModel.openSettings()
+        viewModel.openCurrentTerritory()
+        awaitRoute(viewModel, AppRoute.CurrentTerritory())
+        assertNull(viewModel.physicalObjectLocationSelection.value)
+    }
+
+    @Test
     fun mapPhysicalCardShowOnMapAndCoordinateEditPreserveMapOrigin() = runBlocking {
         val viewModel = newViewModel()
         val objectId = UUID.randomUUID()

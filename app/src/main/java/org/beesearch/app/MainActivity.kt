@@ -261,6 +261,22 @@ private fun BeeSearchApp(
                         onBack = viewModel::closePhysicalObjectList,
                         onResetSequence = viewModel::resetPhysicalObjectSequence,
                     )
+                    is AppRoute.UserPointEditor -> org.beesearch.app.ui.userpoints.UserPointEditorRoute(
+                        target = currentRoute.target,
+                        repository = application.container.userPointRepository,
+                        mediaStore = application.container.userPointMediaStore,
+                        onCancel = { viewModel.closeUserPointEditor(currentRoute.target) },
+                        onSaved = { saved -> viewModel.openUserPoint(saved.territoryId, saved.id) },
+                        onChangeLocation = { viewModel.changeUserPointDraftLocation(currentRoute.target,
+                            currentRoute.target.latitude, currentRoute.target.longitude) },
+                    )
+                    is AppRoute.UserPointDetail -> org.beesearch.app.ui.userpoints.UserPointDetailRoute(
+                        territoryId = currentRoute.territoryId,
+                        pointId = currentRoute.pointId,
+                        repository = application.container.userPointRepository,
+                        mediaStore = application.container.userPointMediaStore,
+                        onBack = viewModel::openCurrentTerritory,
+                    )
                     is AppRoute.CreatePhysicalObject -> PhysicalObjectCreationRoute(
                         target = currentRoute.target,
                         repository = application.container.physicalObjectRepository,
@@ -356,6 +372,7 @@ private fun BeeSearchApp(
                         onCreateObservationPoint = viewModel::createObservationPointFromChooser,
                         onCreateHollow = viewModel::createHollowFromChooser,
                         onCreateLogHive = viewModel::createLogHiveFromChooser,
+                        onCreateUserPoint = viewModel::createUserPointFromChooser,
                         observationRepository = application.container.observationRepository,
                         physicalObjectRepository = application.container.physicalObjectRepository,
                         mapDataDisplayStore = application.container.mapDataDisplayStore,

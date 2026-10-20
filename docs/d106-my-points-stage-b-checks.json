@@ -1,0 +1,335 @@
+{
+  "stageACommit": "fdb2bfb",
+  "approvalCommit": "8329291",
+  "overviewLabelCommit": "8ebcf06",
+  "stageB": "PASS_EMULATOR_QUALIFICATION",
+  "android": [
+    {
+      "errors": 0,
+      "tests": 2,
+      "failures": 0,
+      "name": "org.beesearch.app.ui.media.PhotoPreviewUiTest"
+    },
+    {
+      "errors": 0,
+      "tests": 6,
+      "failures": 0,
+      "name": "org.beesearch.app.ui.physicalobjects.PhysicalObjectEditorTest"
+    },
+    {
+      "errors": 0,
+      "tests": 3,
+      "failures": 0,
+      "name": "org.beesearch.app.ui.userpoints.UserPointCreationUiTest"
+    },
+    {
+      "errors": 0,
+      "tests": 2,
+      "failures": 0,
+      "name": "org.beesearch.app.ui.userpoints.UserPointSaveLifecycleTest"
+    },
+    {
+      "errors": 0,
+      "tests": 3,
+      "failures": 0,
+      "name": "org.beesearch.app.ui.userpoints.UserPointMediaProviderQualificationTest"
+    }
+  ],
+  "jvm": [
+    {
+      "name": "org.beesearch.app.data.media.PhysicalObjectMediaFileStoreTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "org.beesearch.app.data.media.UserPointMediaStoreTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "org.beesearch.app.domain.model.UserPointValidationTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0"
+    }
+  ],
+  "currentStageBFiles": [
+    "app/src/androidTest/java/org/beesearch/app/CleanStartupIntegrationTest.kt",
+    "app/src/androidTest/java/org/beesearch/app/ui/media/PhotoPreviewUiTest.kt",
+    "app/src/main/java/org/beesearch/app/AppContainer.kt",
+    "app/src/main/java/org/beesearch/app/MainActivity.kt",
+    "app/src/main/java/org/beesearch/app/MainViewModel.kt",
+    "app/src/main/java/org/beesearch/app/data/media/PhysicalObjectMediaFileStore.kt",
+    "app/src/main/java/org/beesearch/app/ui/map/CreateRecordTypeChooserDialog.kt",
+    "app/src/main/java/org/beesearch/app/ui/map/MainMapScreen.kt",
+    "app/src/main/java/org/beesearch/app/ui/media/PhotoExternalViewer.kt",
+    "app/src/main/java/org/beesearch/app/ui/physicalobjects/PhysicalObjectEditor.kt",
+    "app/src/main/res/xml/file_paths.xml",
+    "app/src/androidTest/java/org/beesearch/app/ui/userpoints/UserPointCreationUiTest.kt",
+    "app/src/androidTest/java/org/beesearch/app/ui/userpoints/UserPointMediaProviderQualificationTest.kt",
+    "app/src/androidTest/java/org/beesearch/app/ui/userpoints/UserPointSaveLifecycleTest.kt",
+    "app/src/main/java/org/beesearch/app/data/media/UserPointMediaStore.kt",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointDetailRoute.kt",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointEditor.kt",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointEditorRoute.kt",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointEditorViewModel.kt",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointNavigation.kt",
+    "app/src/test/java/org/beesearch/app/data/media/UserPointMediaStoreTest.kt"
+  ],
+  "preservedReports": {
+    "docs\\d106-gpx-deletion-samsung-report.md": "abfe0c7dc7f64deb75e3e58fd6fd6a3cc46f50009dff6c7009eec5355c0e8abb",
+    "docs\\d106-gpx-filename-samsung-report.md": "88d7a8298bb640b9c805740a35e81f827b48799d6bfa80c9e7998dc9bad7821a"
+  },
+  "build": {
+    "assembleDebug": "PASS",
+    "lintDebug": "PASS",
+    "lintSummary": "0 errors, 33 warnings, 6 hints",
+    "gitDiffCheck": "PASS"
+  },
+  "committedFiles": {
+    "8329291": [
+      "docs/architecture.md",
+      "docs/data-model.md",
+      "docs/decisions.md",
+      "docs/domain-model.md",
+      "docs/glossary.md",
+      "docs/product-requirements.md",
+      "docs/ui/mockups/my-points-v1-a-chooser-bottom.png",
+      "docs/ui/mockups/my-points-v1-a-chooser-top.png",
+      "docs/ui/mockups/my-points-v1-assets/native-list.png",
+      "docs/ui/mockups/my-points-v1-assets/native-map.png",
+      "docs/ui/mockups/my-points-v1-assets/preservation-baseline.json",
+      "docs/ui/mockups/my-points-v1-assets/synchronization-20261020.json",
+      "docs/ui/mockups/my-points-v1-b-location.png",
+      "docs/ui/mockups/my-points-v1-c-create-empty-bottom.png",
+      "docs/ui/mockups/my-points-v1-c-create-empty.png",
+      "docs/ui/mockups/my-points-v1-c-create-photos-bottom.png",
+      "docs/ui/mockups/my-points-v1-c-create-photos-top.png",
+      "docs/ui/mockups/my-points-v1-d-empty.png",
+      "docs/ui/mockups/my-points-v1-d-list-bottom.png",
+      "docs/ui/mockups/my-points-v1-d-list.png",
+      "docs/ui/mockups/my-points-v1-e-card-bottom.png",
+      "docs/ui/mockups/my-points-v1-e-card-top.png",
+      "docs/ui/mockups/my-points-v1-f-delete-error.png",
+      "docs/ui/mockups/my-points-v1-f-delete-scrolled.png",
+      "docs/ui/mockups/my-points-v1-f-delete.png",
+      "docs/ui/mockups/my-points-v1-f-edit-bottom.png",
+      "docs/ui/mockups/my-points-v1-f-edit-top.png",
+      "docs/ui/mockups/my-points-v1-overview.png",
+      "docs/ui/mockups/my-points-v1-qa.json",
+      "docs/ui/mockups/my-points-v1-review.html",
+      "docs/ui/mockups/my-points-v1-save-error.png",
+      "docs/ui/mockups/my-points-v1-validation-error.png",
+      "docs/ui/mockups/my-points-v1-visibility-error.png",
+      "docs/ui/mockups/my-points-v1.html",
+      "docs/ui/mockups/my-points-v1.md",
+      "docs/user-workflows.md"
+    ],
+    "fdb2bfb": [
+      "app/schemas/org.beesearch.app.data.local.room.BeeSearchDatabase/17.json",
+      "app/src/androidTest/java/org/beesearch/app/data/local/room/UserPointMigrationTest.kt",
+      "app/src/androidTest/java/org/beesearch/app/data/repository/UserPointRepositoryTest.kt",
+      "app/src/main/java/org/beesearch/app/data/local/room/BeeSearchDatabase.kt",
+      "app/src/main/java/org/beesearch/app/data/local/room/UserPointDao.kt",
+      "app/src/main/java/org/beesearch/app/data/local/room/UserPointEntities.kt",
+      "app/src/main/java/org/beesearch/app/data/local/room/UserPointMigration.kt",
+      "app/src/main/java/org/beesearch/app/data/repository/RoomTerritoryRepository.kt",
+      "app/src/main/java/org/beesearch/app/data/repository/RoomUserPointRepository.kt",
+      "app/src/main/java/org/beesearch/app/domain/model/UserPoint.kt",
+      "app/src/main/java/org/beesearch/app/domain/repository/UserPointRepository.kt",
+      "app/src/test/java/org/beesearch/app/domain/model/UserPointValidationTest.kt",
+      "docs/d106-my-points-implementation-report.md"
+    ],
+    "8ebcf06": [
+      "docs/ui/mockups/my-points-v1-overview.png"
+    ]
+  },
+  "gitStatusShort": " M .agent/handoff.md\n M app/src/androidTest/java/org/beesearch/app/CleanStartupIntegrationTest.kt\n M app/src/main/java/org/beesearch/app/AppContainer.kt\n M app/src/main/java/org/beesearch/app/MainActivity.kt\n M app/src/main/java/org/beesearch/app/MainViewModel.kt\n M app/src/main/java/org/beesearch/app/data/media/PhysicalObjectMediaFileStore.kt\n M app/src/main/java/org/beesearch/app/ui/map/CreateRecordTypeChooserDialog.kt\n M app/src/main/java/org/beesearch/app/ui/map/MainMapScreen.kt\n M app/src/main/java/org/beesearch/app/ui/media/PhotoExternalViewer.kt\n M app/src/main/java/org/beesearch/app/ui/physicalobjects/PhysicalObjectEditor.kt\n M app/src/main/res/xml/file_paths.xml\n M docs/d106-my-points-implementation-report.md\n?? app/src/androidTest/java/org/beesearch/app/ui/userpoints/\n?? app/src/main/java/org/beesearch/app/data/media/UserPointMediaStore.kt\n?? app/src/main/java/org/beesearch/app/ui/userpoints/\n?? app/src/test/java/org/beesearch/app/data/media/UserPointMediaStoreTest.kt\n?? docs/d106-gpx-deletion-samsung-report.md\n?? docs/d106-gpx-filename-samsung-report.md\n?? docs/d106-my-points-research.md\n?? docs/d106-my-points-stage-b-checks.json\n",
+  "stagedFiles": [],
+  "priorApi37AndroidResults": [
+    {
+      "name": "org.beesearch.app.ui.media.PhotoPreviewUiTest",
+      "tests": "2",
+      "failures": "2",
+      "errors": "0"
+    },
+    {
+      "name": "org.beesearch.app.ui.userpoints.UserPointSaveLifecycleTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "org.beesearch.app.CleanStartupIntegrationTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "org.beesearch.app.ui.userpoints.UserPointCreationUiTest",
+      "tests": "3",
+      "failures": "3",
+      "errors": "0"
+    }
+  ],
+  "infrastructure": "RECOVERED_API29",
+  "androidEvidenceScope": "Final API29 run: 16 executed, zero failures/errors/skips. recovery/priorApi37 fields are historical.",
+  "recovery": {
+    "date": "2026-10-20",
+    "branch": "task/d106-stage0-overlay-registry",
+    "head": "8ebcf06bd550c9642db8cb5cbc189900b1c83ef3",
+    "stageB": "QUALIFICATION_BLOCKED_PRODUCT_DEFECT",
+    "infrastructure": "RECOVERED",
+    "target": {
+      "serial": "emulator-5556",
+      "avd": "BeeSearch_ZIP64_API29",
+      "api": 29,
+      "fontScale": 1.7,
+      "physicalSize": "1080x2280",
+      "physicalDensity": 440,
+      "overrideDensity": 480,
+      "emulatorPid": 16728,
+      "qemuPid": 48472,
+      "bootCompleted": true
+    },
+    "otherAvd": {
+      "serial": "emulator-5558",
+      "avd": "BeeSearch_XML_API37",
+      "api": 37,
+      "emulatorPid": 57512,
+      "qemuPid": 24640,
+      "usedForRecoveryUiTests": false
+    },
+    "installedDevApkSha256": "1519e7a782ab250fd6a9b2fc11e9ede3a7a28f810e4546efc803eefde011d351",
+    "installedMatchesLocalDebugApk": true,
+    "installedLastUpdateTime": "2026-10-20 15:20:20",
+    "latestUiExif": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml": "api29-five-results.xml"
+    },
+    "productionAndPriorMaterialsBaselineComparison": {
+      "app/src/androidTest/java/org/beesearch/app/ui/userpoints/UserPointCreationUiTest.kt": false,
+      "app/src/androidTest/java/org/beesearch/app/ui/userpoints/UserPointSaveLifecycleTest.kt": true,
+      "app/src/main/java/org/beesearch/app/data/media/UserPointMediaStore.kt": true,
+      "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointDetailRoute.kt": true,
+      "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointEditor.kt": true,
+      "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointEditorRoute.kt": true,
+      "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointEditorViewModel.kt": true,
+      "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointNavigation.kt": true,
+      "app/src/test/java/org/beesearch/app/data/media/UserPointMediaStoreTest.kt": true,
+      "docs/d106-gpx-deletion-samsung-report.md": true,
+      "docs/d106-gpx-filename-samsung-report.md": true,
+      "docs/d106-my-points-research.md": true,
+      ".agent/handoff.md": true,
+      "app/src/androidTest/java/org/beesearch/app/CleanStartupIntegrationTest.kt": true,
+      "app/src/main/java/org/beesearch/app/AppContainer.kt": true,
+      "app/src/main/java/org/beesearch/app/MainActivity.kt": true,
+      "app/src/main/java/org/beesearch/app/MainViewModel.kt": true,
+      "app/src/main/java/org/beesearch/app/data/media/PhysicalObjectMediaFileStore.kt": true,
+      "app/src/main/java/org/beesearch/app/ui/map/CreateRecordTypeChooserDialog.kt": true,
+      "app/src/main/java/org/beesearch/app/ui/map/MainMapScreen.kt": true,
+      "app/src/main/java/org/beesearch/app/ui/media/PhotoExternalViewer.kt": true,
+      "app/src/main/java/org/beesearch/app/ui/physicalobjects/PhysicalObjectEditor.kt": true,
+      "app/src/main/res/xml/file_paths.xml": true
+    },
+    "manual": {
+      "createChooserLocationForm": "PASS",
+      "pickerCancelReturnsToDraft": "PASS",
+      "twoImagesAddedViaDocumentsUi": "PASS",
+      "draftPhotoActionView": "FAIL",
+      "systemBackReturnsToMap": "PASS",
+      "draftPhotoFilesRemovedOnBack": "PASS (2 -> 0)",
+      "bottomActionsAtFontScale17": "PASS after vertical scroll",
+      "approvedComposition": "FAIL (see report)",
+      "productionSaveToCard": "NOT RUN",
+      "cameraCapture": "NOT RUN",
+      "talkBack": "NOT RUN",
+      "samsung": "NOT RUN"
+    },
+    "remainingEmulatorFixtures": [
+      "Download/B20-landscape.png",
+      "Download/B20-portrait.png",
+      "QB20 observer Qualification Recovery in test Territory QB20"
+    ],
+    "commitB": null,
+    "push": false,
+    "stageC": "NOT STARTED",
+    "stageD": "NOT STARTED",
+    "stage1": "OPEN",
+    "H05": "OPEN"
+  },
+  "gitStatusShortScope": "gitStatusShort and recovery are retained historical snapshots. Current scope is qualification/currentStageBFiles; local B commit leaves prior handoff/research/GPX/recovery evidence outside commit.",
+  "historicalAndroidBeforeTargetedFix": [
+    {
+      "name": "org.beesearch.app.ui.media.PhotoPreviewUiTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "environment": "API29 emulator-5556",
+      "evidence": "ui/evidence/my-points-stage-b-20261020/api29-five-results.xml"
+    },
+    {
+      "name": "org.beesearch.app.ui.userpoints.UserPointSaveLifecycleTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "environment": "Prior API37 safety/navigation run (preserved XML)"
+    },
+    {
+      "name": "org.beesearch.app.CleanStartupIntegrationTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "environment": "Prior API37 safety/navigation run (preserved XML)"
+    },
+    {
+      "name": "org.beesearch.app.ui.userpoints.UserPointCreationUiTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "environment": "API29 emulator-5556",
+      "evidence": "ui/evidence/my-points-stage-b-20261020/api29-five-results.xml"
+    }
+  ],
+  "qualification": {
+    "skipped": 0,
+    "installedDevApkSha256": "c66bd654dfadf3b3052e6d36e3d178f860c462a29416b66ee9e5f2a4937febe8",
+    "stageC": "NOT STARTED",
+    "rawBuild": "ui/evidence/my-points-stage-b-fix-20261020/final-build-jvm-lint.log",
+    "fontScale": 1.7,
+    "H05": "OPEN",
+    "stage1": "OPEN",
+    "backCancel": "PASS",
+    "baselineHead": "8ebcf06bd550c9642db8cb5cbc189900b1c83ef3",
+    "draftAndSavedViewer": "PASS",
+    "samsung": "NOT RUN",
+    "commitB": "Containing commit; resolve with git log for this file",
+    "rawAndroid": "ui/evidence/my-points-stage-b-fix-20261020/api29-final-16-tests.txt",
+    "galleryMultipleExif": "PASS",
+    "jvmTests": 1067,
+    "androidTests": 16,
+    "privateSiblingTraversalRejection": "PASS",
+    "failures": 0,
+    "errors": 0,
+    "cameraFakeCancel": "PASS",
+    "configurationRecreation": "PASS",
+    "date": "2026-10-20",
+    "push": false,
+    "draftCleanupOwnership": "PASS",
+    "realCamera": "NOT RUN",
+    "target": "API29 emulator-5556",
+    "scrollAndComposition": "PASS with documented platform adaptations",
+    "cameraFakeSuccess": "PASS",
+    "stageD": "NOT STARTED",
+    "processDeathRecovery": "NOT IMPLEMENTED / NOT CLAIMED",
+    "installedLastUpdateTime": "2026-10-20 18:39:49",
+    "talkBack": "NOT RUN",
+    "saveToCard": "PASS",
+    "physicalObjectRegression": "PASS"
+  }
+}

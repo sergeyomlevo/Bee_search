@@ -269,6 +269,10 @@ internal class AppContainer(private val context: Context) {
         contentResolver = context.contentResolver,
         cacheDirectory = context.cacheDir,
     )
+    val userPointRepository: org.beesearch.app.domain.repository.UserPointRepository =
+        org.beesearch.app.data.repository.RoomUserPointRepository(database, clock)
+    val userPointMediaStore = org.beesearch.app.data.media.UserPointMediaStore(context.filesDir, context.cacheDir)
+
     val physicalObjectRepository: PhysicalObjectRepository = RoomPhysicalObjectRepository(
         database = database,
         objectDao = database.physicalObjectDao(),

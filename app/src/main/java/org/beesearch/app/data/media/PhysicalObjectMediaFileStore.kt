@@ -26,10 +26,12 @@ internal data class StagedPhysicalObjectMedia(
 internal class PhysicalObjectMediaFileStore(
     filesDirectory: File,
     cacheDirectory: File,
+    private val mediaDirectory: String = MEDIA_DIRECTORY,
+    private val stagingDirectory: String = MEDIA_STAGING_DIRECTORY,
 ) {
-    internal val mediaRoot = File(filesDirectory, MEDIA_DIRECTORY)
-    internal val stagingRoot = File(cacheDirectory, MEDIA_STAGING_DIRECTORY)
-    private val draftRoot = File(filesDirectory, MEDIA_STAGING_DIRECTORY)
+    internal val mediaRoot = File(filesDirectory, mediaDirectory)
+    internal val stagingRoot = File(cacheDirectory, stagingDirectory)
+    private val draftRoot = File(filesDirectory, stagingDirectory)
 
     suspend fun stageDraftMedia(
         draftSessionId: UUID,
@@ -40,7 +42,7 @@ internal class PhysicalObjectMediaFileStore(
         createdAt: Instant,
         source: () -> InputStream,
     ): StagedPhysicalObjectMedia {
-        val relativePath = draftRelativePath(draftSessionId, mediaId)
+        val relativePath = draftRelativePathForNamespace(draftSessionId, mediaId)
         val destination = withContext(Dispatchers.IO) { requireDraftFile(relativePath) }
         val partial = File(destination.parentFile, "${destination.name}.part")
         val stored = writeAndPublishMediaFile(partial, destination, source, "Не удалось подготовить медиа")
@@ -86,7 +88,7 @@ internal class PhysicalObjectMediaFileStore(
                 if (source.length() != item.byteSize || sha256(source) != item.sha256) {
                     throw AttachmentStorageException("Временное медиа повреждено")
                 }
-                val finalPath = relativePath(physicalObjectId, item.id)
+                val finalPath = relativePathForNamespace(physicalObjectId, item.id)
                 val destination = requireManagedFile(finalPath)
                 destination.parentFile?.mkdirs()
                 if (destination.exists() || !source.renameTo(destination)) {
@@ -120,7 +122,7 @@ internal class PhysicalObjectMediaFileStore(
         mediaId: UUID,
         source: () -> InputStream,
     ): StoredAttachmentFile {
-        val finalPath = relativePath(physicalObjectId, mediaId)
+        val finalPath = relativePathForNamespace(physicalObjectId, mediaId)
         val destination = withContext(Dispatchers.IO) { requireManagedFile(finalPath) }
         val partial = File(stagingRoot, "import-$mediaId.part")
         val stored = writeAndPublishMediaFile(
@@ -172,12 +174,14 @@ internal class PhysicalObjectMediaFileStore(
     )
 
     private fun draftDirectory(draftSessionId: UUID): File = requireNotNull(
-        requireDraftFile("$MEDIA_STAGING_DIRECTORY/$draftSessionId/session").parentFile,
+        requireDraftFile("$stagingDirectory/$draftSessionId/session").parentFile,
     )
 
     internal companion object {
         const val MEDIA_DIRECTORY = "physical-object-media"
         const val MEDIA_STAGING_DIRECTORY = "physical-object-media-staging"
+        const val USER_POINT_MEDIA_DIRECTORY = "user-point-media"
+        const val USER_POINT_MEDIA_STAGING_DIRECTORY = "user-point-media-staging"
 
         fun relativePath(physicalObjectId: UUID, mediaId: UUID): String =
             "$MEDIA_DIRECTORY/$physicalObjectId/$mediaId"
@@ -185,6 +189,12 @@ internal class PhysicalObjectMediaFileStore(
         fun draftRelativePath(draftSessionId: UUID, mediaId: UUID): String =
             "$MEDIA_STAGING_DIRECTORY/$draftSessionId/$mediaId"
     }
+
+    private fun relativePathForNamespace(ownerId: UUID, mediaId: UUID): String =
+        "$mediaDirectory/$ownerId/$mediaId"
+
+    private fun draftRelativePathForNamespace(draftSessionId: UUID, mediaId: UUID): String =
+        "$stagingDirectory/$draftSessionId/$mediaId"
 }
 
 internal class PhysicalObjectMediaActivation(

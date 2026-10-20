@@ -1,0 +1,898 @@
+[
+  {
+    "name": "org.beesearch.app.BeeMapProfileTest",
+    "tests": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.BeeObservationUiTest",
+    "tests": 12,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backup.CompleteBackupStreamingMediaTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backup.CompleteBackupTemporalDateTest",
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backup.CompleteBackupZipCharacterizationTest",
+    "tests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backup.MapCoverageValidatorTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupoperation.CreateBackupOperationTest",
+    "tests": 12,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.BackupAccessCoordinatorTest",
+    "tests": 18,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.BackupDirectoryBootstrapTest",
+    "tests": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.BackupLocationTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.BackupOperationCoordinatorTest",
+    "tests": 20,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.DataStoreRepositoryBindingStoreTest",
+    "tests": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.MediaProtectionTest",
+    "tests": 21,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.PublishedBackupSummaryTest",
+    "tests": 15,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.RepositoryBindingTest",
+    "tests": 12,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.RepositoryFoundationTest",
+    "tests": 29,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.RepositoryFullSnapshotTest",
+    "tests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.RepositoryHeaderTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.RepositoryMediaEvidenceTest",
+    "tests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.RepositoryPolicyTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.RepositorySnapshotsTest",
+    "tests": 14,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backuprepository.RequiredMediaSetTest",
+    "tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.PhysicalObjectLegacyDateGuardTest",
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotAllCollectionsDeterminismTest",
+    "tests": 2,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotArchiveTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotCoverageAlignmentTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotDomainCodecTest",
+    "tests": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotEvidenceProfileTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotExactLimitsTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotIndependentFixtureTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotJsonTest",
+    "tests": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotLegacyDateGuardTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotMimeParityTest",
+    "tests": 2,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotReaderAlignmentTest",
+    "tests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotSafetyTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotV2DateConformanceTest",
+    "tests": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.backupsnapshot.SnapshotWeatherMatrixTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.exchange.AndroidAreaMapDiscoveryTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.exchange.AreaExchangeCodecTest",
+    "tests": 17,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.exchange.AreaExchangeFileNameTest",
+    "tests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.exchange.AreaExchangeMirrorTest",
+    "tests": 14,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.exchange.AreaExternalStemTest",
+    "tests": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.exchange.AreaMapPackageDiscoveryTest",
+    "tests": 20,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.exchange.BeeSearchExchangeStorageTest",
+    "tests": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.exchange.MapPackageFileNameTest",
+    "tests": 15,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxCancellationCloseTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxCm1EncoderTest",
+    "tests": 15,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxImportWorkflowTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxInputTest",
+    "tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxOriginalCopyTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxPendingGraphTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxProcessorTest",
+    "tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxReadyAdmissionTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxReconciliationResultTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxXmlBoundaryTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxXmlGuardTest",
+    "tests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.gpx.GpxXmlSemanticsTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.local.room.GpxStoredGraphTest",
+    "tests": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.local.room.RoomConvertersTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.local.settings.InstallStateBackupRulesTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.location.LocationTrackingSessionTest",
+    "tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.media.LargeMediaIngestTest",
+    "tests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.media.ObservationAttachmentDraftFileStoreTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.media.ObservationAttachmentFileStoreTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.media.PhysicalObjectMediaFileStoreTest",
+    "tests": 2,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.media.UserPointMediaStoreTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.objectexport.PhysicalObjectCollectionExportCodecTest",
+    "tests": 17,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.objectexport.PhysicalObjectExportCodecTest",
+    "tests": 25,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.objectexport.PhysicalObjectExportFileNameTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.objectexport.PhysicalObjectExportServiceTest",
+    "tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.pointexport.ObservationPointExportCodecTest",
+    "tests": 20,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.pointexport.ObservationPointExportServiceTest",
+    "tests": 2,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.weather.OpenMeteoWeatherProviderTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.zip.ArchivePayloadTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.zip.AuthorizedArchiveTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.zip.PortableZipSafetyCharacterizationTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.data.zip.ZipSafetyTest",
+    "tests": 19,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.gpx.GpxCanonicalModelTest",
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.gpx.GpxCanonicalValuesTest",
+    "tests": 14,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.gpx.GpxProfileBoundaryTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.gpx.GpxProfileParserTest",
+    "tests": 19,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.heading.TrueHeadingTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.location.LocationUiStateTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.model.BeeMarkCatalogTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.model.FlightCycleAnalysisRulesTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.model.MarkPositionCompatibilityTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.model.ResearchDateIntervalTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.model.UserPointValidationTest",
+    "tests": 2,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.usecase.CreateObservationPointTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.usecase.StartupRouterTest",
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.domain.weather.WeatherBackfillRunnerTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.DomainErrorMessagesTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ExampleUnitTest",
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.HeadingUiTest",
+    "tests": 2,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.InitialSetupLoadingRuleTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.InitialSetupStateTest",
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.MapCameraTest",
+    "tests": 2,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.MapCoverageSelectionTest",
+    "tests": 14,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.MapMarkersGeometryTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.MapMeasurementTest",
+    "tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ObservationPointCreationDraftTest",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.TerritoryCoverageDeletionTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.area.AreaMapLoadDecisionTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.backup.BackupUiStateTest",
+    "tests": 19,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.help.HelpContentGenerationTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.help.HelpContentTest",
+    "tests": 19,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.AreaEditorSessionTest",
+    "tests": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.AreaMapValidationInvariantTest",
+    "tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapAreaCodecTest",
+    "tests": 22,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapAreaCommitPlanTest",
+    "tests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapAreaGeometryTest",
+    "tests": 12,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapAreaMigrationTest",
+    "tests": 10,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapAreaPresentationTest",
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapDataDisplayCodecTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapDataDisplayTest",
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapFilterSetTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapOverlayRegistryTest",
+    "tests": 30,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapPackageContractTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapPeriodGridTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapPeriodSelectionTest",
+    "tests": 12,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.MapResearchObjectsTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.ResearchObjectMarkerTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.map.SavedObjectMarkerPresentationTest",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.observation.BeeMarkIconTest",
+    "tests": 13,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.physicalobjects.PhysicalObjectFormStateTest",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.points.BeeFlightMatrixTest",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.points.PointsPresentationTest",
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "name": "org.beesearch.app.ui.properties.PointPropertiesPresentationTest",
+    "tests": 2,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+]

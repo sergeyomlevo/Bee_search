@@ -1,0 +1,23 @@
+ACTIVITY MANAGER URI PERMISSIONS (dumpsys activity permissions)
+  Granted Uri Permissions:
+  * UID 10144 holds:
+    UriPermission{76f0a73 content://org.beesearch.app.dev.fileprovider/user_point_media/ab5254c2-85c0-4050-b9cb-29185e6a2ad8/679ff1d3-7a5f-4e45-8da4-8544887a9eb0 [user 0]}
+      targetUserId=0 sourcePkg=org.beesearch.app.dev targetPkg=com.google.android.apps.photos
+      mode=0x1 owned=0x1 global=0x0 persistable=0x0 persisted=0x0
+      readOwners:
+        * ActivityRecord{768ad30 u0 com.google.android.apps.photos/.pager.HostPhotoPagerActivity t3278}
+  * UID 10148 holds:
+    UriPermission{f8a61ae content://com.android.providers.downloads.documents/document/raw%3A%2Fstorage%2Femulated%2F0%2FDownload%2FB20-landscape.png [user 0]}
+      targetUserId=0 sourcePkg=com.android.providers.downloads targetPkg=org.beesearch.app.dev
+      mode=0x3 owned=0x3 global=0x0 persistable=0x3 persisted=0x0
+      readOwners:
+        * ActivityRecord{22a6021 u0 org.beesearch.app.dev/org.beesearch.app.MainActivity t3278}
+      writeOwners:
+        * ActivityRecord{22a6021 u0 org.beesearch.app.dev/org.beesearch.app.MainActivity t3278}
+    UriPermission{242cb4f content://com.android.providers.downloads.documents/document/raw%3A%2Fstorage%2Femulated%2F0%2FDownload%2FB20-portrait.png [user 0]}
+      targetUserId=0 sourcePkg=com.android.providers.downloads targetPkg=org.beesearch.app.dev
+      mode=0x3 owned=0x3 global=0x0 persistable=0x3 persisted=0x0
+      readOwners:
+        * ActivityRecord{22a6021 u0 org.beesearch.app.dev/org.beesearch.app.MainActivity t3278}
+      writeOwners:
+        * ActivityRecord{22a6021 u0 org.beesearch.app.dev/org.beesearch.app.MainActivity t3278}

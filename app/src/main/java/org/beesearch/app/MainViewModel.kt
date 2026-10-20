@@ -82,6 +82,8 @@ import org.beesearch.app.data.objectexport.UnsupportedPhysicalObjectExportType
 import org.beesearch.app.domain.repository.PhysicalObjectRepository
 
 sealed interface AppRoute {
+    data class UserPointEditor(val target: org.beesearch.app.ui.userpoints.UserPointEditorTarget) : AppRoute
+    data class UserPointDetail(val territoryId: UUID, val pointId: UUID) : AppRoute
     data object Loading : AppRoute
     data object Settings : AppRoute
     data object InitialSetup : AppRoute
@@ -132,6 +134,13 @@ sealed interface AppRoute {
 
 internal sealed interface PhysicalObjectLocationSelection {
     val label: String
+
+    data class UserPointCreate(val territoryId: UUID) : PhysicalObjectLocationSelection {
+        override val label = "Моя точка"
+    }
+    data class UserPointDraft(val target: org.beesearch.app.ui.userpoints.UserPointEditorTarget) : PhysicalObjectLocationSelection {
+        override val label = "Моя точка"
+    }
 
     data class Create(
         val type: PhysicalObjectType,
@@ -802,6 +811,33 @@ internal class MainViewModel(
         clearFeedback()
     }
 
+    fun createUserPointFromChooser() {
+        val draft = _observationPointDraft.value ?: return
+        _observationPointDraft.value = null
+        _physicalObjectLocationSelection.value = PhysicalObjectLocationSelection.UserPointCreate(draft.territoryId)
+        clearFeedback()
+    }
+
+    fun changeUserPointDraftLocation(target: org.beesearch.app.ui.userpoints.UserPointEditorTarget, latitude: Double, longitude: Double) {
+        _physicalObjectLocationSelection.value = PhysicalObjectLocationSelection.UserPointDraft(target)
+        _mapCenterRequest.value = MapCenterRequest(UUID.randomUUID(), MapTarget(latitude, longitude))
+        manualRoute.value = AppRoute.CurrentTerritory()
+        clearFeedback()
+    }
+
+    fun openUserPoint(territoryId: UUID, pointId: UUID) {
+        _physicalObjectLocationSelection.value = null
+        manualRoute.value = AppRoute.UserPointDetail(territoryId, pointId)
+        clearFeedback()
+    }
+
+    fun closeUserPointEditor(target: org.beesearch.app.ui.userpoints.UserPointEditorTarget) {
+        _physicalObjectLocationSelection.value = null
+        manualRoute.value = target.pointId?.let { AppRoute.UserPointDetail(target.territoryId, it) }
+            ?: AppRoute.CurrentTerritory()
+        clearFeedback()
+    }
+
     fun createHollowFromChooser() = startPhysicalObjectLocationSelection(PhysicalObjectType.HOLLOW)
 
     fun createLogHiveFromChooser() = startPhysicalObjectLocationSelection(PhysicalObjectType.LOG_HIVE)
@@ -823,6 +859,13 @@ internal class MainViewModel(
         if (!longitude.isFinite() || longitude !in -180.0..180.0) return
         _physicalObjectLocationSelection.value = null
         manualRoute.value = when (selection) {
+            is PhysicalObjectLocationSelection.UserPointCreate -> AppRoute.UserPointEditor(
+                org.beesearch.app.ui.userpoints.UserPointEditorTarget(UUID.randomUUID(), selection.territoryId,
+                    latitude = latitude, longitude = longitude),
+            )
+            is PhysicalObjectLocationSelection.UserPointDraft -> AppRoute.UserPointEditor(
+                selection.target.copy(latitude = latitude, longitude = longitude, coordinateRevision = UUID.randomUUID()),
+            )
             is PhysicalObjectLocationSelection.Create -> AppRoute.CreatePhysicalObject(
                 PhysicalObjectCreationTarget(
                     requestId = UUID.randomUUID(),
@@ -851,6 +894,9 @@ internal class MainViewModel(
         val selection = _physicalObjectLocationSelection.value
         _physicalObjectLocationSelection.value = null
         _mapCenterRequest.value = null
+        if (selection is PhysicalObjectLocationSelection.UserPointDraft) {
+            manualRoute.value = AppRoute.UserPointEditor(selection.target)
+        }
         if (selection is PhysicalObjectLocationSelection.Edit) {
             manualRoute.value = AppRoute.PhysicalObjectDetail(selection.objectId, selection.listType,
                 returnToMap = selection.returnToMap)

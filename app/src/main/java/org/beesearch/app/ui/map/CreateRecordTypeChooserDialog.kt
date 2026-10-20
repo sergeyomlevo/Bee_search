@@ -1,5 +1,9 @@
 package org.beesearch.app.ui.map
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,12 +22,14 @@ internal fun CreateRecordTypeChooserDialog(
     onCreateObservationPoint: () -> Unit,
     onCreateHollow: () -> Unit,
     onCreateLogHive: () -> Unit,
+    onCreateUserPoint: () -> Unit = {},
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Что создать?") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("ИССЛЕДОВАТЕЛЬСКИЕ ОБЪЕКТЫ", style = MaterialTheme.typography.labelLarge)
                 CreateTypeButton(
                     label = "Точка наблюдения",
                     enabled = true,
@@ -44,6 +50,9 @@ internal fun CreateRecordTypeChooserDialog(
                 )
                 FutureCreateTypeButton("Ловушка")
                 FutureCreateTypeButton("Пасека")
+                HorizontalDivider()
+                Text("ПОЛЬЗОВАТЕЛЬСКИЕ ОБЪЕКТЫ", style = MaterialTheme.typography.labelLarge)
+                CreateTypeButton("Моя точка", true, onCreateUserPoint, "create-user-point-type")
             }
         },
         confirmButton = {},
