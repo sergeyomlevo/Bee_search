@@ -1,0 +1,1944 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 17,
+    "identityHash": "d3822398c6e2fac5456b018a95367a2d",
+    "entities": [
+      {
+        "tableName": "user_points",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `territory_id` TEXT NOT NULL, `title` TEXT NOT NULL, `note` TEXT, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `is_visible` INTEGER NOT NULL DEFAULT 1, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`territory_id`) REFERENCES `territories`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "territoryId",
+            "columnName": "territory_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isVisible",
+            "columnName": "is_visible",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_user_points_territory_id",
+            "unique": false,
+            "columnNames": [
+              "territory_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_user_points_territory_id` ON `${TABLE_NAME}` (`territory_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "territories",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "territory_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "user_point_photos",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `user_point_id` TEXT NOT NULL, `relative_path` TEXT NOT NULL, `original_file_name` TEXT, `mime_type` TEXT, `byte_size` INTEGER NOT NULL, `sha256` TEXT NOT NULL, `created_at` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`user_point_id`) REFERENCES `user_points`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userPointId",
+            "columnName": "user_point_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relativePath",
+            "columnName": "relative_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalFileName",
+            "columnName": "original_file_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "byteSize",
+            "columnName": "byte_size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sha256",
+            "columnName": "sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_user_point_photos_user_point_id",
+            "unique": false,
+            "columnNames": [
+              "user_point_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_user_point_photos_user_point_id` ON `${TABLE_NAME}` (`user_point_id`)"
+          },
+          {
+            "name": "index_user_point_photos_relative_path",
+            "unique": true,
+            "columnNames": [
+              "relative_path"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_user_point_photos_relative_path` ON `${TABLE_NAME}` (`relative_path`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "user_points",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "user_point_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "gpx_imports",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `territory_id` TEXT NOT NULL, `importing_observer_id` TEXT, `original_object_id` TEXT NOT NULL, `original_sha256` TEXT NOT NULL, `original_byte_length` INTEGER NOT NULL, `display_name` TEXT, `gpx_version` TEXT NOT NULL, `parser_profile_version` TEXT NOT NULL, `imported_at_epoch_ms` INTEGER NOT NULL, `creator` TEXT NOT NULL, `source_name` TEXT, `source_description` TEXT, `author_name` TEXT, `publication_state` TEXT NOT NULL, `request_uuid` TEXT, `unsupported_content_count` INTEGER NOT NULL, `unsupported_content_first_scope` TEXT, `unsupported_content_first_track_ordinal` INTEGER, `unsupported_content_first_segment_ordinal` INTEGER, `unsupported_content_first_sample_ordinal` INTEGER, `unsupported_time_count` INTEGER NOT NULL, `unsupported_time_first_scope` TEXT, `unsupported_time_first_track_ordinal` INTEGER, `unsupported_time_first_segment_ordinal` INTEGER, `unsupported_time_first_sample_ordinal` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`territory_id`) REFERENCES `territories`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`importing_observer_id`) REFERENCES `observers`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "territoryId",
+            "columnName": "territory_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importingObserverId",
+            "columnName": "importing_observer_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originalObjectId",
+            "columnName": "original_object_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalSha256",
+            "columnName": "original_sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalByteLength",
+            "columnName": "original_byte_length",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "gpxVersion",
+            "columnName": "gpx_version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parserProfileVersion",
+            "columnName": "parser_profile_version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importedAtEpochMs",
+            "columnName": "imported_at_epoch_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creator",
+            "columnName": "creator",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceName",
+            "columnName": "source_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceDescription",
+            "columnName": "source_description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "authorName",
+            "columnName": "author_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "publicationState",
+            "columnName": "publication_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requestUuid",
+            "columnName": "request_uuid",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "unsupportedContentCount",
+            "columnName": "unsupported_content_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unsupportedContentFirstScope",
+            "columnName": "unsupported_content_first_scope",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "unsupportedContentFirstTrackOrdinal",
+            "columnName": "unsupported_content_first_track_ordinal",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "unsupportedContentFirstSegmentOrdinal",
+            "columnName": "unsupported_content_first_segment_ordinal",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "unsupportedContentFirstSampleOrdinal",
+            "columnName": "unsupported_content_first_sample_ordinal",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "unsupportedTimeCount",
+            "columnName": "unsupported_time_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unsupportedTimeFirstScope",
+            "columnName": "unsupported_time_first_scope",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "unsupportedTimeFirstTrackOrdinal",
+            "columnName": "unsupported_time_first_track_ordinal",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "unsupportedTimeFirstSegmentOrdinal",
+            "columnName": "unsupported_time_first_segment_ordinal",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "unsupportedTimeFirstSampleOrdinal",
+            "columnName": "unsupported_time_first_sample_ordinal",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_gpx_imports_original_object_id",
+            "unique": true,
+            "columnNames": [
+              "original_object_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_gpx_imports_original_object_id` ON `${TABLE_NAME}` (`original_object_id`)"
+          },
+          {
+            "name": "index_gpx_imports_request_uuid",
+            "unique": true,
+            "columnNames": [
+              "request_uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_gpx_imports_request_uuid` ON `${TABLE_NAME}` (`request_uuid`)"
+          },
+          {
+            "name": "index_gpx_imports_territory_id_publication_state",
+            "unique": false,
+            "columnNames": [
+              "territory_id",
+              "publication_state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_gpx_imports_territory_id_publication_state` ON `${TABLE_NAME}` (`territory_id`, `publication_state`)"
+          },
+          {
+            "name": "index_gpx_imports_importing_observer_id",
+            "unique": false,
+            "columnNames": [
+              "importing_observer_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_gpx_imports_importing_observer_id` ON `${TABLE_NAME}` (`importing_observer_id`)"
+          },
+          {
+            "name": "index_gpx_imports_original_sha256",
+            "unique": false,
+            "columnNames": [
+              "original_sha256"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_gpx_imports_original_sha256` ON `${TABLE_NAME}` (`original_sha256`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "territories",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "territory_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "observers",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "importing_observer_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "gpx_deletions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`import_id` TEXT NOT NULL, `territory_id` TEXT NOT NULL, `request_uuid` TEXT NOT NULL, `original_object_id` TEXT NOT NULL, `original_sha256` TEXT NOT NULL, `original_byte_length` INTEGER NOT NULL, `proof` TEXT, `files_cleaned` INTEGER NOT NULL, `settings_cleaned` INTEGER NOT NULL, PRIMARY KEY(`import_id`))",
+        "fields": [
+          {
+            "fieldPath": "importId",
+            "columnName": "import_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "territoryId",
+            "columnName": "territory_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requestUuid",
+            "columnName": "request_uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalObjectId",
+            "columnName": "original_object_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalSha256",
+            "columnName": "original_sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalByteLength",
+            "columnName": "original_byte_length",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "proof",
+            "columnName": "proof",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "filesCleaned",
+            "columnName": "files_cleaned",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "settingsCleaned",
+            "columnName": "settings_cleaned",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "import_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_gpx_deletions_request_uuid",
+            "unique": true,
+            "columnNames": [
+              "request_uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_gpx_deletions_request_uuid` ON `${TABLE_NAME}` (`request_uuid`)"
+          }
+        ]
+      },
+      {
+        "tableName": "gpx_source_tracks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `import_id` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `name` TEXT, `description` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`import_id`) REFERENCES `gpx_imports`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importId",
+            "columnName": "import_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_gpx_source_tracks_import_id_ordinal",
+            "unique": true,
+            "columnNames": [
+              "import_id",
+              "ordinal"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_gpx_source_tracks_import_id_ordinal` ON `${TABLE_NAME}` (`import_id`, `ordinal`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "gpx_imports",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "import_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "gpx_track_segments",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `track_id` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`track_id`) REFERENCES `gpx_source_tracks`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trackId",
+            "columnName": "track_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_gpx_track_segments_track_id_ordinal",
+            "unique": true,
+            "columnNames": [
+              "track_id",
+              "ordinal"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_gpx_track_segments_track_id_ordinal` ON `${TABLE_NAME}` (`track_id`, `ordinal`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "gpx_source_tracks",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "track_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "gpx_track_samples",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`segment_id` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `latitude` TEXT NOT NULL, `longitude` TEXT NOT NULL, `elevation` TEXT, `time_raw` TEXT, `time_status` TEXT NOT NULL, `time_epoch_seconds` INTEGER, `time_nanos` INTEGER, PRIMARY KEY(`segment_id`, `ordinal`), FOREIGN KEY(`segment_id`) REFERENCES `gpx_track_segments`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segment_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "elevation",
+            "columnName": "elevation",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "timeRaw",
+            "columnName": "time_raw",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "timeStatus",
+            "columnName": "time_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timeEpochSeconds",
+            "columnName": "time_epoch_seconds",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "timeNanos",
+            "columnName": "time_nanos",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "segment_id",
+            "ordinal"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "gpx_track_segments",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segment_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "gpx_import_jobs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`request_uuid` TEXT NOT NULL, `territory_id` TEXT NOT NULL, `importing_observer_id` TEXT, `phase` TEXT NOT NULL, `intent` TEXT NOT NULL, `original_object_id` TEXT, `original_sha256` TEXT, `original_byte_length` INTEGER, `import_id` TEXT, PRIMARY KEY(`request_uuid`), FOREIGN KEY(`territory_id`) REFERENCES `territories`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`importing_observer_id`) REFERENCES `observers`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`import_id`) REFERENCES `gpx_imports`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "requestUuid",
+            "columnName": "request_uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "territoryId",
+            "columnName": "territory_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importingObserverId",
+            "columnName": "importing_observer_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "phase",
+            "columnName": "phase",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intent",
+            "columnName": "intent",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalObjectId",
+            "columnName": "original_object_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originalSha256",
+            "columnName": "original_sha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originalByteLength",
+            "columnName": "original_byte_length",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "importId",
+            "columnName": "import_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "request_uuid"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_gpx_import_jobs_territory_id",
+            "unique": false,
+            "columnNames": [
+              "territory_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_gpx_import_jobs_territory_id` ON `${TABLE_NAME}` (`territory_id`)"
+          },
+          {
+            "name": "index_gpx_import_jobs_importing_observer_id",
+            "unique": false,
+            "columnNames": [
+              "importing_observer_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_gpx_import_jobs_importing_observer_id` ON `${TABLE_NAME}` (`importing_observer_id`)"
+          },
+          {
+            "name": "index_gpx_import_jobs_original_object_id",
+            "unique": true,
+            "columnNames": [
+              "original_object_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_gpx_import_jobs_original_object_id` ON `${TABLE_NAME}` (`original_object_id`)"
+          },
+          {
+            "name": "index_gpx_import_jobs_import_id",
+            "unique": true,
+            "columnNames": [
+              "import_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_gpx_import_jobs_import_id` ON `${TABLE_NAME}` (`import_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "territories",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "territory_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "observers",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "importing_observer_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "gpx_imports",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "import_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "territories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `code` TEXT NOT NULL, `name` TEXT NOT NULL, `region` TEXT NOT NULL, `district` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "code",
+            "columnName": "code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "region",
+            "columnName": "region",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "district",
+            "columnName": "district",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_territories_code",
+            "unique": true,
+            "columnNames": [
+              "code"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_territories_code` ON `${TABLE_NAME}` (`code`)"
+          }
+        ]
+      },
+      {
+        "tableName": "observers",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `code` TEXT NOT NULL, `last_name` TEXT NOT NULL, `first_name` TEXT NOT NULL, `middle_name` TEXT, `contact` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "code",
+            "columnName": "code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastName",
+            "columnName": "last_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstName",
+            "columnName": "first_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "middleName",
+            "columnName": "middle_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "contact",
+            "columnName": "contact",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_observers_code",
+            "unique": true,
+            "columnNames": [
+              "code"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_observers_code` ON `${TABLE_NAME}` (`code`)"
+          }
+        ]
+      },
+      {
+        "tableName": "observation_points",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`observation_date` TEXT NOT NULL, `id` TEXT NOT NULL, `territory_id` TEXT NOT NULL, `observer_id` TEXT NOT NULL, `observation_year` INTEGER NOT NULL DEFAULT 0, `point_number` INTEGER NOT NULL DEFAULT 0, `bee_presence_result` TEXT, `code` TEXT, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `gps_latitude` REAL, `gps_longitude` REAL, `gps_accuracy_m` REAL, `created_at` INTEGER NOT NULL, `initial_group_release_at` INTEGER, `completed_at` INTEGER, `description` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`territory_id`) REFERENCES `territories`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`observer_id`) REFERENCES `observers`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "observationDate",
+            "columnName": "observation_date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "territoryId",
+            "columnName": "territory_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observerId",
+            "columnName": "observer_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observationYear",
+            "columnName": "observation_year",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "pointNumber",
+            "columnName": "point_number",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "beePresenceResult",
+            "columnName": "bee_presence_result",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "code",
+            "columnName": "code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gpsLatitude",
+            "columnName": "gps_latitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "gpsLongitude",
+            "columnName": "gps_longitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "gpsAccuracyM",
+            "columnName": "gps_accuracy_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "initialGroupReleaseAt",
+            "columnName": "initial_group_release_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "completedAt",
+            "columnName": "completed_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_observation_points_territory_id",
+            "unique": false,
+            "columnNames": [
+              "territory_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_observation_points_territory_id` ON `${TABLE_NAME}` (`territory_id`)"
+          },
+          {
+            "name": "index_observation_points_observer_id",
+            "unique": false,
+            "columnNames": [
+              "observer_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_observation_points_observer_id` ON `${TABLE_NAME}` (`observer_id`)"
+          },
+          {
+            "name": "index_observation_points_territory_id_observation_year_observer_id_point_number",
+            "unique": true,
+            "columnNames": [
+              "territory_id",
+              "observation_year",
+              "observer_id",
+              "point_number"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_observation_points_territory_id_observation_year_observer_id_point_number` ON `${TABLE_NAME}` (`territory_id`, `observation_year`, `observer_id`, `point_number`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "territories",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "territory_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "observers",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "observer_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "physical_objects",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `territory_id` TEXT NOT NULL, `object_type` TEXT NOT NULL, `sequence_number` INTEGER NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `created_at` INTEGER NOT NULL, `creator_observer_id` TEXT, `fixation_date` TEXT, `fixation_at` INTEGER, `updated_at` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`territory_id`) REFERENCES `territories`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`creator_observer_id`) REFERENCES `observers`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "territoryId",
+            "columnName": "territory_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "objectType",
+            "columnName": "object_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sequenceNumber",
+            "columnName": "sequence_number",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creatorObserverId",
+            "columnName": "creator_observer_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fixationDate",
+            "columnName": "fixation_date",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fixationAt",
+            "columnName": "fixation_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_physical_objects_territory_id",
+            "unique": false,
+            "columnNames": [
+              "territory_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_physical_objects_territory_id` ON `${TABLE_NAME}` (`territory_id`)"
+          },
+          {
+            "name": "index_physical_objects_creator_observer_id",
+            "unique": false,
+            "columnNames": [
+              "creator_observer_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_physical_objects_creator_observer_id` ON `${TABLE_NAME}` (`creator_observer_id`)"
+          },
+          {
+            "name": "index_physical_objects_territory_id_object_type_sequence_number",
+            "unique": true,
+            "columnNames": [
+              "territory_id",
+              "object_type",
+              "sequence_number"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_physical_objects_territory_id_object_type_sequence_number` ON `${TABLE_NAME}` (`territory_id`, `object_type`, `sequence_number`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "territories",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "territory_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "observers",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "creator_observer_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "hollows",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`physical_object_id` TEXT NOT NULL, `tree` TEXT, `entrance_height_cm` REAL, `entrance_azimuth_deg` INTEGER, `outer_diameter_cm` REAL, `internal_diameter_cm` REAL, `notes` TEXT, `name` TEXT, PRIMARY KEY(`physical_object_id`), FOREIGN KEY(`physical_object_id`) REFERENCES `physical_objects`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "physicalObjectId",
+            "columnName": "physical_object_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tree",
+            "columnName": "tree",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "entranceHeightCm",
+            "columnName": "entrance_height_cm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "entranceAzimuthDeg",
+            "columnName": "entrance_azimuth_deg",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "outerDiameterCm",
+            "columnName": "outer_diameter_cm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "internalDiameterCm",
+            "columnName": "internal_diameter_cm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "physical_object_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "physical_objects",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "physical_object_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "log_hives",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`physical_object_id` TEXT NOT NULL, `tree` TEXT, `entrance_height_cm` REAL, `entrance_azimuth_deg` INTEGER, `outer_diameter_cm` REAL, `material` TEXT, `internal_diameter_cm` REAL, `internal_height_cm` REAL, `notes` TEXT, `name` TEXT, PRIMARY KEY(`physical_object_id`), FOREIGN KEY(`physical_object_id`) REFERENCES `physical_objects`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "physicalObjectId",
+            "columnName": "physical_object_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tree",
+            "columnName": "tree",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "entranceHeightCm",
+            "columnName": "entrance_height_cm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "entranceAzimuthDeg",
+            "columnName": "entrance_azimuth_deg",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "outerDiameterCm",
+            "columnName": "outer_diameter_cm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "material",
+            "columnName": "material",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "internalDiameterCm",
+            "columnName": "internal_diameter_cm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "internalHeightCm",
+            "columnName": "internal_height_cm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "physical_object_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "physical_objects",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "physical_object_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "physical_object_media",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `physical_object_id` TEXT NOT NULL, `media_type` TEXT NOT NULL, `relative_path` TEXT NOT NULL, `original_file_name` TEXT, `mime_type` TEXT, `byte_size` INTEGER NOT NULL, `sha256` TEXT NOT NULL, `created_at` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`physical_object_id`) REFERENCES `physical_objects`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "physicalObjectId",
+            "columnName": "physical_object_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "media_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relativePath",
+            "columnName": "relative_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalFileName",
+            "columnName": "original_file_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "byteSize",
+            "columnName": "byte_size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sha256",
+            "columnName": "sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_physical_object_media_physical_object_id",
+            "unique": false,
+            "columnNames": [
+              "physical_object_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_physical_object_media_physical_object_id` ON `${TABLE_NAME}` (`physical_object_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "physical_objects",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "physical_object_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "physical_object_sequences",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`territory_id` TEXT NOT NULL, `object_type` TEXT NOT NULL, `last_issued` INTEGER NOT NULL, PRIMARY KEY(`territory_id`, `object_type`), FOREIGN KEY(`territory_id`) REFERENCES `territories`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "territoryId",
+            "columnName": "territory_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "objectType",
+            "columnName": "object_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastIssued",
+            "columnName": "last_issued",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "territory_id",
+            "object_type"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_physical_object_sequences_territory_id",
+            "unique": false,
+            "columnNames": [
+              "territory_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_physical_object_sequences_territory_id` ON `${TABLE_NAME}` (`territory_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "territories",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "territory_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "apiaries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`physical_object_id` TEXT NOT NULL, `name` TEXT, PRIMARY KEY(`physical_object_id`), FOREIGN KEY(`physical_object_id`) REFERENCES `physical_objects`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "physicalObjectId",
+            "columnName": "physical_object_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "physical_object_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "physical_objects",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "physical_object_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "bees",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `observation_point_id` TEXT NOT NULL, `mark_color` TEXT NOT NULL, `mark_position` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `source_object_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`observation_point_id`) REFERENCES `observation_points`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`source_object_id`) REFERENCES `physical_objects`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observationPointId",
+            "columnName": "observation_point_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "markColor",
+            "columnName": "mark_color",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "markPosition",
+            "columnName": "mark_position",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceObjectId",
+            "columnName": "source_object_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_bees_observation_point_id",
+            "unique": false,
+            "columnNames": [
+              "observation_point_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_bees_observation_point_id` ON `${TABLE_NAME}` (`observation_point_id`)"
+          },
+          {
+            "name": "index_bees_source_object_id",
+            "unique": false,
+            "columnNames": [
+              "source_object_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_bees_source_object_id` ON `${TABLE_NAME}` (`source_object_id`)"
+          },
+          {
+            "name": "index_bees_observation_point_id_mark_color_mark_position",
+            "unique": true,
+            "columnNames": [
+              "observation_point_id",
+              "mark_color",
+              "mark_position"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_bees_observation_point_id_mark_color_mark_position` ON `${TABLE_NAME}` (`observation_point_id`, `mark_color`, `mark_position`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "observation_points",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "observation_point_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "physical_objects",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "source_object_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "flight_cycles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `bee_id` TEXT NOT NULL, `sequence_number` INTEGER NOT NULL, `departure_time` INTEGER NOT NULL, `return_time` INTEGER, `azimuth_deg` REAL, `azimuth_capture_consumed` INTEGER NOT NULL DEFAULT 0, `initial_group_launch` INTEGER NOT NULL DEFAULT 0, `initial_group_launch_correction_eligible` INTEGER NOT NULL DEFAULT 0, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`bee_id`) REFERENCES `bees`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "beeId",
+            "columnName": "bee_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sequenceNumber",
+            "columnName": "sequence_number",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "departureTime",
+            "columnName": "departure_time",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "returnTime",
+            "columnName": "return_time",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "azimuthDeg",
+            "columnName": "azimuth_deg",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "azimuthCaptureConsumed",
+            "columnName": "azimuth_capture_consumed",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "isInitialGroupLaunch",
+            "columnName": "initial_group_launch",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "isFirstDepartureCancellationEligible",
+            "columnName": "initial_group_launch_correction_eligible",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_flight_cycles_bee_id",
+            "unique": false,
+            "columnNames": [
+              "bee_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_flight_cycles_bee_id` ON `${TABLE_NAME}` (`bee_id`)"
+          },
+          {
+            "name": "index_flight_cycles_bee_id_sequence_number",
+            "unique": true,
+            "columnNames": [
+              "bee_id",
+              "sequence_number"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_flight_cycles_bee_id_sequence_number` ON `${TABLE_NAME}` (`bee_id`, `sequence_number`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "bees",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "bee_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "observation_point_attachments",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `observation_point_id` TEXT NOT NULL, `attachment_type` TEXT NOT NULL, `relative_path` TEXT NOT NULL, `original_file_name` TEXT, `mime_type` TEXT, `byte_size` INTEGER NOT NULL, `sha256` TEXT NOT NULL, `created_at` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`observation_point_id`) REFERENCES `observation_points`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observationPointId",
+            "columnName": "observation_point_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "attachment_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relativePath",
+            "columnName": "relative_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalFileName",
+            "columnName": "original_file_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "byteSize",
+            "columnName": "byte_size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sha256",
+            "columnName": "sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_observation_point_attachments_observation_point_id",
+            "unique": false,
+            "columnNames": [
+              "observation_point_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_observation_point_attachments_observation_point_id` ON `${TABLE_NAME}` (`observation_point_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "observation_points",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "observation_point_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "observation_point_weather",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`observation_point_id` TEXT NOT NULL, `status` TEXT NOT NULL, `temperature_c` REAL, `wind_speed_mps` REAL, `wind_direction_deg` REAL, `sample_at` INTEGER, `fetched_at` INTEGER, `source` TEXT, PRIMARY KEY(`observation_point_id`), FOREIGN KEY(`observation_point_id`) REFERENCES `observation_points`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "observationPointId",
+            "columnName": "observation_point_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "temperatureC",
+            "columnName": "temperature_c",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "windSpeedMps",
+            "columnName": "wind_speed_mps",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "windDirectionDeg",
+            "columnName": "wind_direction_deg",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "sampleAt",
+            "columnName": "sample_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetched_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "observation_point_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "observation_points",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "observation_point_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd3822398c6e2fac5456b018a95367a2d')"
+    ]
+  }
+}
