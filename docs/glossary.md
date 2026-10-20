@@ -1171,6 +1171,15 @@ media. `PhysicalObjectMedia` — отдельный image/video item, прина
 
 ---
 
+# 64.1. MyPoint / Моя точка
+
+Самостоятельная пользовательская точка текущей `Territory` с собственным UUID,
+обязательным названием, подтверждёнными координатами, optional заметкой и
+optional несколькими фотографиями. `MyPoint` не является `ObservationPoint`,
+`PhysicalObject` или GPX sample. Visibility — device-local persisted
+presentation attribute; новая MyPoint после успешного локального save получает
+`ON`, тогда как GPX сохраняет отдельное default `OFF`.
+
 # 65. Ловушка
 
 **Русский:** ловушка

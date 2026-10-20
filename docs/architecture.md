@@ -2661,3 +2661,21 @@ GPX uses existing OpenExchangeDocument and ExchangeFolder.GPX. Directory prepara
 is best-effort through the existing storage component; platform refusal does not
 block OpenDocument. EXTRA_INITIAL_URI is a document-URI hint, not a permission or
 a guaranteed initial location. [Verification/limits](d106-gpx-picker-folder-report.md).
+
+### D106 MyPoint implementation boundary (OWNER 2026-10-20)
+
+MyPoint reuses the existing chooser, map selection, Room, managed-media and
+Territory-scoped overlay boundaries. The flow is chooser → existing map selection
+→ form → one local Room transaction → presentation. The transaction writes the
+point row, `is_visible = true` for a new point, and photo metadata before the
+marker/card is published. This avoids a DataStore/Room double commit for initial
+visibility; later visibility changes remain acknowledged persisted presentation
+state and do not alter GPX settings.
+
+The runtime uses the single existing map overlay Registry and routes a MyPoint
+marker to the same card as its list title. It does not create an ObservationPoint,
+PhysicalObject type, GPX record, second Registry or separate map lifecycle.
+Photo add/remove/edit uses the existing managed-copy and owner-aware cleanup
+patterns. Delete is scoped by Territory and point UUID and cannot delete external
+picker files. Unified Backup/Restore is later; Android Auto Backup is unchanged.
+Stage1/H05 remain OPEN.

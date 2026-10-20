@@ -2263,3 +2263,23 @@ pending cleanup is retried and does not restore the import or block other GPX.
 The journal does not store or delete external picker files. A new explicit import
 of the same bytes may create a new logical import with new identity. Stage1/H05
 and unified Backup/Restore remain outside this change.
+
+### D106 MyPoint persistence (OWNER 2026-10-20)
+
+MyPoint uses two feature-local Room tables in the existing database:
+
+- `user_points`: UUID primary key, `territory_id` UUID foreign key,
+  required trimmed `title`, optional `note`, confirmed coordinates, persisted
+  `is_visible` Boolean, and created/updated timestamps;
+- `user_point_photos`: UUID primary key, `user_point_id` foreign key, managed
+  media metadata and ownership fields, with one-to-many cardinality and no
+  feature-specific photo-count limit.
+
+Creation/update of a point and its photo metadata is a local transaction. Initial
+creation commits `is_visible = true` in the same persisted point row before map
+presentation; a second DataStore visibility commit is not used. Visibility is
+device-local presentation state and is excluded from research status semantics.
+Delete removes only the point and its owned photo rows transactionally; managed
+file cleanup follows the existing owner-aware lifecycle and external source files
+remain untouched. Unified Backup/Restore remains later and Android Auto Backup is
+unchanged. Stage1/H05 remain OPEN.

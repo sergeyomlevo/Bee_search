@@ -4200,3 +4200,33 @@ identity may proceed. Pending cleanup never reports that all original bytes have
 been removed and never restores the deleted READY import. The approved UI is
 [gpx-display-delete-v1](ui/mockups/gpx-display-delete-v1.md); Stage1/H05 remain
 OPEN and unified Backup/Restore remains a later task.
+
+## D106 MyPoint UI and persistence — OWNER amendment, 2026-10-20
+
+**ACCEPTED — explicit OWNER decision;** [My points v1 PNG+MD](ui/mockups/my-points-v1.md)
+is APPROVED BY OWNER, 2026-10-20. This amendment replaces the earlier disabled
+`Мои точки` placeholder from the 2026-10-18 navigation decision while preserving
+that historical record. The separate overview HTML is a status companion only;
+the production UI contract is the approved PNG+MD package.
+
+MyPoint is a standalone Territory-owned UUID entity with required title,
+confirmed coordinates, optional note and optional multiple photos without a new
+count limit. It has no video, category or color fields and is not an
+ObservationPoint, PhysicalObject or GPX sample. The existing Observer prerequisite
+is unchanged.
+
+The flow is existing `+` → chooser research/user headings → `Моя точка` → map
+selection `OK` → form → local Room save. Save atomically creates the point and
+photo metadata; after successful commit the point persists visibility `ON`, its
+marker is published and its saved card opens immediately. GPX keeps default
+visibility `OFF`. The minimum persistence model is `user_points` plus
+`user_point_photos`; initial `is_visible` is persisted in `user_points`, not a
+DataStore double commit. Visibility is device-local presentation state, not
+research domain status.
+
+List switch and title are independent actions. Title and marker open the same
+card. Hidden points are persisted `ON` before focus/highlight. Edit supports
+shared create/edit/remove photo operations; Cancel leaves saved data unchanged.
+Delete confirmation removes only owned point/media and leaves external files
+untouched. One shared Registry serves markers; unified Backup/Restore remains
+later and Android Auto Backup is unchanged. Stage1/H05 remain OPEN.

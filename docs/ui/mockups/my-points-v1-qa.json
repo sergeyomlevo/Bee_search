@@ -1,0 +1,353 @@
+{
+  "status": "STATIC DESIGN ONLY",
+  "viewportPx": [
+    1080,
+    2340
+  ],
+  "layoutDp": [
+    360,
+    780
+  ],
+  "scale": 3,
+  "fontStudy": 1.7,
+  "states": [
+    {
+      "state": "a-chooser-top",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 412,
+        "total": 511,
+        "top": 0
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "a-chooser-bottom",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 412,
+        "total": 511,
+        "top": 99
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "b-location",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": null,
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "c-create-empty",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 615,
+        "total": 740,
+        "top": 0
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "c-create-empty-bottom",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 615,
+        "total": 740,
+        "top": 125
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "c-create-photos-top",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 615,
+        "total": 894,
+        "top": 0
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "c-create-photos-bottom",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 615,
+        "total": 894,
+        "top": 279
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "d-list",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 580,
+        "total": 646,
+        "top": 0
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "d-list-bottom",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 580,
+        "total": 646,
+        "top": 66
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "d-empty",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 580,
+        "total": 580,
+        "top": 0
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "e-card-top",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 636,
+        "total": 849,
+        "top": 0
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "e-card-bottom",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 636,
+        "total": 849,
+        "top": 213
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "f-edit-top",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 636,
+        "total": 894,
+        "top": 0
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "f-edit-bottom",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 636,
+        "total": 894,
+        "top": 258
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "f-delete",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 636,
+        "total": 849,
+        "top": 0
+      },
+      "dialogText": {
+        "client": 280,
+        "total": 306,
+        "top": 0
+      },
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "f-delete-scrolled",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 636,
+        "total": 849,
+        "top": 0
+      },
+      "dialogText": {
+        "client": 280,
+        "total": 306,
+        "top": 26
+      },
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "f-delete-error",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 636,
+        "total": 977,
+        "top": 341
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "save-error",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 636,
+        "total": 1020,
+        "top": 384
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "validation-error",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 615,
+        "total": 772,
+        "top": 0
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    },
+    {
+      "state": "visibility-error",
+      "viewport": [
+        1080,
+        2340
+      ],
+      "scroll": {
+        "client": 580,
+        "total": 588,
+        "top": 0
+      },
+      "dialogText": null,
+      "horizontalOverflow": [],
+      "targetsUnder48dp": []
+    }
+  ],
+  "wheelGestures": [
+    {
+      "state": "a-chooser-top",
+      "before": 0,
+      "after": 99
+    },
+    {
+      "state": "c-create-photos-top",
+      "before": 0,
+      "after": 279
+    },
+    {
+      "state": "d-list",
+      "before": 0,
+      "after": 66
+    },
+    {
+      "state": "e-card-top",
+      "before": 0,
+      "after": 213
+    },
+    {
+      "state": "f-edit-top",
+      "before": 0,
+      "after": 258
+    }
+  ],
+  "dialogWheelScroll": 26,
+  "horizontalPhotoStrip": {
+    "client": 328,
+    "total": 352,
+    "atEnd": 24
+  },
+  "androidRuntimeVerified": false
+}

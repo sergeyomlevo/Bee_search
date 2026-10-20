@@ -1,0 +1,783 @@
+{
+  "status": "DRAFT - OWNER REVIEW PENDING",
+  "completed": "2026-10-20T11:47:47.830884+03:00",
+  "baseline": {
+    "started": "2026-10-20T11:42:43.411649+03:00",
+    "root": "C:\\App\\Bee_search_stage0_overlay_registry",
+    "files": {
+      "docs/ui/mockups/my-points-v1.html": {
+        "sha256": "be74821ab5ca223245984f530d820b2aa6e5712d760cf85e02c3566f5a00a7a7",
+        "mtimeNs": 1792482607447838400,
+        "size": 15952
+      },
+      "docs/ui/mockups/my-points-v1.md": {
+        "sha256": "afa968153a63206bc8ee18a8aa9beee81fa48f8118b7a007de42af2b87544ebb",
+        "mtimeNs": 1792484451966672300,
+        "size": 41846
+      },
+      "docs/ui/mockups/my-points-v1-qa.json": {
+        "sha256": "4f52c762161f9eaa2077399a891bebef206c4624e88561a0f9b94442a5ad3f93",
+        "mtimeNs": 1792483509475519100,
+        "size": 6379
+      },
+      "docs/ui/mockups/my-points-v1-review.html": {
+        "sha256": "c3f3d3974ac4d2585b0b2c4ad153f979c11f52d035525e27fd7efc517654bbfb",
+        "mtimeNs": 1792483664864634400,
+        "size": 1785
+      },
+      "docs/ui/mockups/objects-ui-approved-v1.png": {
+        "sha256": "9bd9f37d05a18feec5c96f6c57b6e4fc8fc438470798312a4d167cab22b0e63f",
+        "mtimeNs": 1791811818536060000,
+        "size": 2069204
+      },
+      "docs/ui/mockups/my-points-v1-assets/native-list.png": {
+        "sha256": "d5b664342769c32808910181618c28a923a47be89fd2edc4b5f5b71f1a6dd8a4",
+        "mtimeNs": 1792481471244853100,
+        "size": 195269
+      },
+      "docs/ui/mockups/my-points-v1-assets/native-map.png": {
+        "sha256": "ca11e5e8ec864a1831fafab747758a532deb93b87512bdf9f8df7d59eed5ccb3",
+        "mtimeNs": 1792481471243854600,
+        "size": 575066
+      },
+      "docs/ui/mockups/my-points-v1-assets/preservation-baseline.json": {
+        "sha256": "3e93a6bf2c82664a785d80d6a9e22183d755529a53335b812adfbe057911d465",
+        "mtimeNs": 1792481471247854100,
+        "size": 431
+      },
+      ".agent/handoff.md": {
+        "sha256": "52e7f00ba6bbd726e0b3be4ff2cdb9ebbf08cbf28a626d4e10d1421b634a923a",
+        "mtimeNs": 1792436411270348700,
+        "size": 203606
+      },
+      "docs/d106-my-points-research.md": {
+        "sha256": "1229c980323af364f660bd89a815d6b04988c7b0953729fade1fbd4a37d5e4db",
+        "mtimeNs": 1792479231279036100,
+        "size": 29447
+      },
+      "docs/d106-gpx-deletion-samsung-report.md": {
+        "sha256": "abfe0c7dc7f64deb75e3e58fd6fd6a3cc46f50009dff6c7009eec5355c0e8abb",
+        "mtimeNs": 1792422416977190700,
+        "size": 10395
+      },
+      "docs/d106-gpx-filename-samsung-report.md": {
+        "sha256": "88d7a8298bb640b9c805740a35e81f827b48799d6bfa80c9e7998dc9bad7821a",
+        "mtimeNs": 1792436528872799500,
+        "size": 10449
+      }
+    },
+    "states": [
+      "a-chooser-top",
+      "a-chooser-bottom",
+      "b-location",
+      "c-create-empty",
+      "c-create-empty-bottom",
+      "c-create-photos-top",
+      "c-create-photos-bottom",
+      "d-list",
+      "d-list-bottom",
+      "d-empty",
+      "e-card-top",
+      "e-card-bottom",
+      "f-edit-top",
+      "f-edit-bottom",
+      "f-delete",
+      "f-delete-scrolled",
+      "f-delete-error",
+      "save-error",
+      "validation-error",
+      "visibility-error"
+    ]
+  },
+  "sourceFilesUnchanged": true,
+  "sourcesLockedAgainstWriteDuringPublication": true,
+  "renderer": "Installed Chrome headless; 1080x2340; device scale 1; static CSS fontScale 1.7 study",
+  "pngs": [
+    {
+      "file": "my-points-v1-a-chooser-top.png",
+      "sha256": "6765820b1dd1c65e42f72ae32a5b0f6b1e0b3673d3778831e41ff75ca5f1f23b",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-a-chooser-bottom.png",
+      "sha256": "b8dbfdfb16e5693b84c4ea3d6ed782906284d2aa49ce2948240ec60448b8f2d3",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-b-location.png",
+      "sha256": "421a745c688ad638c1f9f09b775020c48cfe137e18dc3c36585b2c81be4f39c0",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-c-create-empty.png",
+      "sha256": "d7ede8b846bc5584fe7c846b4da8766aa37d342bafd217fa96afc0261d96a0f3",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-c-create-empty-bottom.png",
+      "sha256": "acd85c320ab0ebf4985a12429ba289cf1a9060a84983719a7eb61060625501f4",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-c-create-photos-top.png",
+      "sha256": "4a503293c6834edded25e16e99ff482d981477ceeaf062bc680b2772da392894",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-c-create-photos-bottom.png",
+      "sha256": "f6c784c56db21e892696ea8581001dcae1889f0a6af3b094a53fb552e02d2c41",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-d-list.png",
+      "sha256": "4ea9f42bec99f74558b6bd765695643b2e9bd88d5262c92019cb5eab3059cba6",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-d-list-bottom.png",
+      "sha256": "90cb7782ac7e1007880ed0fb21cc20cc8d7a1df703a793122621014de362dabd",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-d-empty.png",
+      "sha256": "5e0b4827069f9a7f56df9df8bf0aa9d43ec3b73120ab3b8aaa8138b1bda98a51",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-e-card-top.png",
+      "sha256": "c89dc5e8b98a78952043bc38ddbc4af407309cb3e0d1821117e2aeee1e5a2a40",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-e-card-bottom.png",
+      "sha256": "4a928f156a38c36fb4f26665aace15f6267e0870787c506e721d6ca37c64b7cd",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-f-edit-top.png",
+      "sha256": "c38bcf66a9e7b3ef5ede4258912c4bafae67b5def3d613dcbaab13a742df74cb",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-f-edit-bottom.png",
+      "sha256": "d39faae1def55fbc06b6e171a496db3d18a471edb02b552f6040e262281bfff9",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-f-delete.png",
+      "sha256": "0363f3f64a1d39e81058f1849fffbca0a908825fe413f361be378844da74b825",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-f-delete-scrolled.png",
+      "sha256": "6d3449873b3731d9f4d83573c44ec3cc6f9716526d2545ace66b9458f2febf4f",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-f-delete-error.png",
+      "sha256": "1635c99de333784c2a272bcb71e0242650c2ea9539e0e36d928452354f203a95",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-save-error.png",
+      "sha256": "366b7ceedb710a90c9cab5199790d2c55811df70c0dfa126079a2399f01eb84e",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-validation-error.png",
+      "sha256": "868562e9634fdbd2644d6d322932fe9198e466b9df90fc698126c3cc745f0e88",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-visibility-error.png",
+      "sha256": "4fe4afbd99ccd6b0a70079882d9dbc083085a3ab0added74280c109c85d9ad8d",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    },
+    {
+      "file": "my-points-v1-overview.png",
+      "sha256": "49e09fcf80daadc5e555de60b374a2aad3979ba1464487a143209e7c6869b655",
+      "matchesStagedRender": true,
+      "changedFromPrevious": true
+    }
+  ],
+  "repeatedQA": {
+    "results": [
+      {
+        "state": "a-chooser-top",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 412,
+          "total": 511,
+          "top": 0
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Моя точка",
+            "visible": true
+          },
+          {
+            "text": "Отмена",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": true
+      },
+      {
+        "state": "a-chooser-bottom",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 412,
+          "total": 511,
+          "top": 99
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Моя точка",
+            "visible": true
+          },
+          {
+            "text": "Отмена",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": true
+      },
+      {
+        "state": "b-location",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": null,
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "OK",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "c-create-empty",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 615,
+          "total": 740,
+          "top": 0
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Отмена",
+            "visible": false
+          },
+          {
+            "text": "Сохранить",
+            "visible": false
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "c-create-empty-bottom",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 615,
+          "total": 740,
+          "top": 125
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Отмена",
+            "visible": true
+          },
+          {
+            "text": "Сохранить",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "c-create-photos-top",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 615,
+          "total": 894,
+          "top": 0
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Отмена",
+            "visible": false
+          },
+          {
+            "text": "Сохранить",
+            "visible": false
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "c-create-photos-bottom",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 615,
+          "total": 894,
+          "top": 279
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Отмена",
+            "visible": true
+          },
+          {
+            "text": "Сохранить",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "d-list",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 580,
+          "total": 646,
+          "top": 0
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "",
+            "visible": false
+          },
+          {
+            "text": "Развилка троп",
+            "visible": false
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "d-list-bottom",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 580,
+          "total": 646,
+          "top": 66
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "",
+            "visible": true
+          },
+          {
+            "text": "Развилка троп",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "d-empty",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 580,
+          "total": 580,
+          "top": 0
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "←",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "e-card-top",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 636,
+          "total": 849,
+          "top": 0
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Редактировать",
+            "visible": false
+          },
+          {
+            "text": "Удалить точку",
+            "visible": false
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "e-card-bottom",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 636,
+          "total": 849,
+          "top": 213
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Редактировать",
+            "visible": true
+          },
+          {
+            "text": "Удалить точку",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "f-edit-top",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 636,
+          "total": 894,
+          "top": 0
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Отмена",
+            "visible": false
+          },
+          {
+            "text": "Сохранить",
+            "visible": false
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "f-edit-bottom",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 636,
+          "total": 894,
+          "top": 258
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Отмена",
+            "visible": true
+          },
+          {
+            "text": "Сохранить",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "f-delete",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 636,
+          "total": 849,
+          "top": 0
+        },
+        "dialogText": {
+          "client": 280,
+          "total": 306,
+          "top": 0
+        },
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Отмена",
+            "visible": true
+          },
+          {
+            "text": "Удалить",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "f-delete-scrolled",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 636,
+          "total": 849,
+          "top": 0
+        },
+        "dialogText": {
+          "client": 280,
+          "total": 306,
+          "top": 26
+        },
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Отмена",
+            "visible": true
+          },
+          {
+            "text": "Удалить",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "f-delete-error",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 636,
+          "total": 977,
+          "top": 341
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Редактировать",
+            "visible": true
+          },
+          {
+            "text": "Удалить точку",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "save-error",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 636,
+          "total": 1020,
+          "top": 384
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Отмена",
+            "visible": true
+          },
+          {
+            "text": "Сохранить",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "validation-error",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 615,
+          "total": 772,
+          "top": 0
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "Отмена",
+            "visible": false
+          },
+          {
+            "text": "Сохранить",
+            "visible": false
+          }
+        ],
+        "cancelOutsideScroll": null
+      },
+      {
+        "state": "visibility-error",
+        "viewport": [
+          1080,
+          2340
+        ],
+        "scroll": {
+          "client": 580,
+          "total": 588,
+          "top": 0
+        },
+        "dialogText": null,
+        "horizontalOverflow": [],
+        "targetsUnder48dp": [],
+        "bottomActions": [
+          {
+            "text": "",
+            "visible": true
+          },
+          {
+            "text": "Мост через ручей",
+            "visible": true
+          }
+        ],
+        "cancelOutsideScroll": null
+      }
+    ],
+    "wheel": [
+      {
+        "state": "a-chooser-top",
+        "top": 99
+      },
+      {
+        "state": "c-create-photos-top",
+        "top": 279
+      },
+      {
+        "state": "d-list",
+        "top": 66
+      },
+      {
+        "state": "e-card-top",
+        "top": 213
+      },
+      {
+        "state": "f-edit-top",
+        "top": 258
+      }
+    ],
+    "dialogWheelScroll": 26,
+    "horizontalPhotoStrip": {
+      "client": 328,
+      "total": 352,
+      "atEnd": 24
+    }
+  },
+  "checks": {
+    "states": 20,
+    "previousQAMetricsMatch": true,
+    "allMDLocalLinksExist": true,
+    "allStatePNGsLinkedFromMD": true,
+    "wheelGesturesMatch": 5,
+    "dialogScrollMatch": true,
+    "photoStripScrollMatch": true,
+    "lowerActionsReachable": true,
+    "noProductionCodeChanges": true,
+    "noAndroidRuntimeVerification": true
+  }
+}

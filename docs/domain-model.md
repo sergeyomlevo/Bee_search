@@ -65,6 +65,26 @@ VLAD-02 — Владимирский участок
 
 ---
 
+### 3.1.1. Самостоятельная пользовательская точка (MyPoint)
+
+`MyPoint` — самостоятельная Territory-owned пользовательская сущность для
+карты. Она не является `ObservationPoint`, `PhysicalObject` или GPX sample и не
+входит в исследовательскую иерархию наблюдений.
+
+MyPoint имеет собственный UUID и обязательную связь с `Territory` UUID,
+обязательное непустое `title`, optional `note`, подтверждённые координаты и
+optional несколько принадлежащих фотографий без отдельного лимита. Video,
+category и colors в этой модели отсутствуют. Вход в поток по-прежнему требует
+текущий Observer prerequisite; это не добавляет Observer domain link и не
+меняет правила `ObservationPoint`.
+
+Visibility — device-local persisted presentation attribute MyPoint, а не
+исследовательский статус. Новая MyPoint после успешного локального save получает
+visibility `ON`; GPX сохраняет отдельное default `OFF`. Marker и сохранённая
+карточка становятся доступны только после успешной записи.
+
+---
+
 ## 3.2. Основные свойства территории
 
 Территория должна иметь:
