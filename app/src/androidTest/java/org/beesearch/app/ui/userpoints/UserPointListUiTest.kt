@@ -103,6 +103,7 @@ class UserPointListUiTest {
 
         rule.onNodeWithTag("user-point-title-${item.id}").performClick()
         rule.onNodeWithTag("user-point-visibility-${item.id}").performClick()
+        rule.onNodeWithText("Создана:", substring = true).assertDoesNotExist()
 
         rule.runOnIdle {
             assertEquals(listOf(item.id), opened)

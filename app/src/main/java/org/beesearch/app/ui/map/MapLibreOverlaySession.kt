@@ -13,7 +13,11 @@ import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.Source
 
 /** One MapView host. No SDK reference is retained in a ViewModel or application owner. */
-internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
+internal class MapLibreOverlaySession(
+    view: MapView,
+    map: MapLibreMap,
+    private val styleImages: List<MapStyleImage> = emptyList(),
+) {
     val registry = MapOverlayRegistry<Source, Layer>()
     var onPresentationChanged: (Any?, Map<String, OverlayPresentation>) -> Unit = { _, _ -> }
     private fun notifyPresentation() = onPresentationChanged(contentScope, registry.presentation())
@@ -23,6 +27,8 @@ internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
     private var requestingStyle = false
     private var supplied = emptyMap<String, MapOverlay<Source, Layer>>()
     private var contentScope: Any? = null
+    private var imagesStyle: Style? = null
+    private val addedImageIds = mutableSetOf<String>()
     val isReleased: Boolean get() = hostMap == null
     val currentStyle: Style? get() = hostMap?.style
     val currentGeneration: Long get() = registry.currentGeneration
@@ -92,6 +98,7 @@ internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
         } catch (_: Exception) { null }
         val request = correlation.correlate(marker, style, map.style, style.isFullyLoaded, callbackRequest)
             ?: return OverlayResult.STALE
+        ensureStyleImages(style)
         val result = registry.restoreIfCurrent(request, MapLibreTarget(map, style))
         report(result)
         notifyPresentation()
@@ -131,6 +138,24 @@ internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
         notifyPresentation()
     }
 
+    /**
+     * Installs shared style images on the actual loaded Style before any overlay layer references
+     * them. Images are not Registry-owned: the Registry intentionally journals only sources/layers.
+     */
+    private fun ensureStyleImages(style: Style) {
+        if (imagesStyle !== style) {
+            imagesStyle = style
+            addedImageIds.clear()
+        }
+        for (image in styleImages) {
+            if (!addedImageIds.add(image.id)) continue
+            if (style.getImage(image.id) == null) {
+                runCatching { style.addImage(image.id, image.create()) }
+                    .onFailure { Log.w(TAG, "Style image ${image.id} unavailable", it) }
+            }
+        }
+    }
+
     fun release() {
         checkMainThread()
         if (isReleased) return
@@ -140,6 +165,8 @@ internal class MapLibreOverlaySession(view: MapView, map: MapLibreMap) {
         correlation.clear()
         supplied = emptyMap()
         contentScope = null
+        imagesStyle = null
+        addedImageIds.clear()
         onPresentationChanged = { _, _ -> }
         hostMap = null
         hostView = null

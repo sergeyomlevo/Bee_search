@@ -438,3 +438,15 @@ commit, no push. Stage1/H05 remain OPEN; next task is B mockup only.
   DEV1.3.0(8),4078 private files exactly preserved across update; Stable/Beta untouched.
   [C report and screenshot](d106-gpx-picker-folder-report.md). Stage1/H05 OPEN.
   No push or automatic continuation.
+
+- [x] **My points Samsung review UI corrections, 2026-10-21:** chooser headings use
+  existing secondary section style (`labelMedium`/`onSurfaceVariant`); user-point
+  markers are upright graphite triangles with light outline and an amber selected
+  halo through native MapLibre SymbolLayers, fixed style images and the existing
+  48 dp Compose hit target; the card shows `Создана: dd.MM.yyyy` from the existing
+  `UserPoint.createdAt`. No Room schema/migration, no user-selectable marker
+  options, no GPX/research/GPS changes. Full JVM1072/1072; all7 build/lint PASS;
+  API29 targeted28/28 PASS; runtime screenshots at fontScale1.7 are linked from
+  [the correction report](d106-my-points-samsung-review-corrections.md). New APK
+  on Samsung NOT INSTALLED; TEST-S25-02 untouched; full basemap matrix/TalkBack/
+  fault paths NOT RUN. Stage1/H05 remain OPEN; no push.

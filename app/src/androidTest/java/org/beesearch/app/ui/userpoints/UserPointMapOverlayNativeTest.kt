@@ -31,6 +31,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.Layer
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.android.style.sources.Source
 
@@ -61,8 +62,11 @@ class UserPointMapOverlayNativeTest {
         assertEquals(setOf(first.toString(), second.toString()), features.map { it.getStringProperty("id") }.toSet())
         assertEquals(setOf(true, false), features.map { it.getBooleanProperty("selected") }.toSet())
         onMain {
-            assertTrue(session.currentStyle!!.getLayer(MapOverlayRegistry.layerId(overlay.key, "selection")) != null)
-            assertTrue(session.currentStyle!!.getLayer(MapOverlayRegistry.layerId(overlay.key, "markers")) != null)
+            val style = session.currentStyle!!
+            assertTrue(style.getLayer(MapOverlayRegistry.layerId(overlay.key, "selection")) is SymbolLayer)
+            assertTrue(style.getLayer(MapOverlayRegistry.layerId(overlay.key, "markers")) is SymbolLayer)
+            assertTrue(style.getImage(USER_POINT_TRIANGLE_IMAGE) != null)
+            assertTrue(style.getImage(USER_POINT_TRIANGLE_SELECTED_IMAGE) != null)
             session.release()
         }
     }
@@ -107,8 +111,11 @@ class UserPointMapOverlayNativeTest {
         assertNotSame(oldSource, newSource)
         assertEquals(first.toString(), onMainValue { source(session, overlay).querySourceFeatures(Expression.all()).single().getStringProperty("id") })
         onMain {
-            assertTrue(session.currentStyle!!.getLayer(MapOverlayRegistry.layerId(overlay.key, "selection")) != null)
-            assertTrue(session.currentStyle!!.getLayer(MapOverlayRegistry.layerId(overlay.key, "markers")) != null)
+            val style = session.currentStyle!!
+            assertTrue(style.getLayer(MapOverlayRegistry.layerId(overlay.key, "selection")) is SymbolLayer)
+            assertTrue(style.getLayer(MapOverlayRegistry.layerId(overlay.key, "markers")) is SymbolLayer)
+            assertTrue(style.getImage(USER_POINT_TRIANGLE_IMAGE) != null)
+            assertTrue(style.getImage(USER_POINT_TRIANGLE_SELECTED_IMAGE) != null)
             session.release()
         }
     }
@@ -163,7 +170,10 @@ class UserPointMapOverlayNativeTest {
                         if (fully) renderedStyle = session?.currentStyle
                     }
                     view.onCreate(null); view.onStart(); view.onResume()
-                    view.getMapAsync { map -> session = MapLibreOverlaySession(view, map); ready.countDown() }
+                    view.getMapAsync { map -> session = MapLibreOverlaySession(
+                        view, map,
+                        userPointMarkerStyleImages(view.resources.displayMetrics.density),
+                    ); ready.countDown() }
                 }
             }, onRelease = { view ->
                 session?.release(); view.onPause(); view.onStop(); view.onDestroy()

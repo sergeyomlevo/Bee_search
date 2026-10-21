@@ -55,6 +55,7 @@ import kotlinx.coroutines.launch
 import org.beesearch.app.MapCenterTarget
 import org.beesearch.app.MapGpsMarker
 import org.beesearch.app.MapGpsToTargetGuide
+import org.beesearch.app.ui.userpoints.userPointMarkerStyleImages
 import org.beesearch.app.MapTarget
 import org.beesearch.app.MapCenterRequest
 import org.beesearch.app.beeSearchFieldMapProfile
@@ -461,7 +462,10 @@ internal fun BeeMap(
                     view.onCreate(null)
                     view.getMapAsync { mapInstance ->
                         if (!mapViewLifecycle.owns(view)) return@getMapAsync
-                        val session = MapLibreOverlaySession(view, mapInstance)
+                        val session = MapLibreOverlaySession(
+                            view, mapInstance,
+                            userPointMarkerStyleImages(view.resources.displayMetrics.density),
+                        )
                         overlaySession = session
                         session.sync(latestOverlayScope, latestOverlays)
                         latestSessionReady(session)

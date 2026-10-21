@@ -87,4 +87,20 @@ class UserPointCardMapActionTest {
         assertTrue(closed)
         assertEquals(1, requests)
     }
+
+    @Test fun cardShowsCreationDateFromTheStoredTimestamp() {
+        val createdAt = Instant.parse("2026-10-21T10:15:00Z")
+        val original = runBlocking {
+            actual.create(UserPoint(UUID.randomUUID(), territory, "Тропа к лесной поляне", null,
+                56.8, 60.6, createdAt = createdAt, updatedAt = createdAt))
+        }
+        rule.setContent { Bee_searchTheme {
+            UserPointDetailRoute(territory, original.id, repository, media, onBack = {}, onShowOnMap = {})
+        } }
+        rule.waitUntil(10_000) {
+            rule.onAllNodesWithTag("user-point-created-at").fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithTag("user-point-created-at")
+            .assertTextEquals(userPointCreatedDateText(createdAt))
+    }
 }

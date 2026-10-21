@@ -29,7 +29,12 @@ internal fun CreateRecordTypeChooserDialog(
         title = { Text("Что создать?") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("ИССЛЕДОВАТЕЛЬСКИЕ ОБЪЕКТЫ", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    "ИССЛЕДОВАТЕЛЬСКИЕ ОБЪЕКТЫ",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("create-type-section-research"),
+                )
                 CreateTypeButton(
                     label = "Точка наблюдения",
                     enabled = true,
@@ -51,7 +56,12 @@ internal fun CreateRecordTypeChooserDialog(
                 FutureCreateTypeButton("Ловушка")
                 FutureCreateTypeButton("Пасека")
                 HorizontalDivider()
-                Text("ПОЛЬЗОВАТЕЛЬСКИЕ ОБЪЕКТЫ", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    "ПОЛЬЗОВАТЕЛЬСКИЕ ОБЪЕКТЫ",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("create-type-section-user"),
+                )
                 CreateTypeButton("Моя точка", true, onCreateUserPoint, "create-user-point-type")
             }
         },

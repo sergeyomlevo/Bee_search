@@ -4230,3 +4230,30 @@ shared create/edit/remove photo operations; Cancel leaves saved data unchanged.
 Delete confirmation removes only owned point/media and leaves external files
 untouched. One shared Registry serves markers; unified Backup/Restore remains
 later and Android Auto Backup is unchanged. Stage1/H05 remain OPEN.
+
+## D106 MyPoint Samsung review UI corrections — OWNER decision, 2026-10-21
+
+**ACCEPTED — explicit OWNER decision after Samsung S25 Ultra review.** This is a
+subsequent UI correction to the approved 2026-10-20 [My points v1 PNG+MD](ui/mockups/my-points-v1.md);
+the original PNG history is not redrawn or rewritten.
+
+1. In the existing `Что создать?` dialog the two group headings use the existing
+   secondary section-label style (`labelMedium`, `onSurfaceVariant`), not a new
+   colour token; object buttons, separators, texts and actions stay unchanged.
+2. The user-point map marker is a fixed dark graphite upward triangle with a
+   thin light outline and a distinguishable selected halo; neither normal nor
+   selected state uses the former blue circle. The existing MapLibre lifecycle,
+   GeoJSON source, 48 dp Compose hit target, visibility, multiple-marker,
+   selection and card-opening behaviour are preserved. No user-selectable
+   marker shape/colour/icon is introduced. GPX, research markers and the GPS
+   indicator are unchanged.
+3. The user-point card shows `Создана: dd.MM.yyyy` from the **existing**
+   `user_points.created_at` / `UserPoint.createdAt`, using the device's local
+   calendar date and no time of day. No Room field or migration is added. The
+   date is not shown in create/edit forms or in the list, and editing cannot
+   overwrite the creation timestamp.
+
+Targeted implementation and runtime evidence are recorded in the
+[review correction report](d106-my-points-samsung-review-corrections.md).
+Stage1/H05 remain OPEN; no Samsung installation or TEST-S25-02 change is
+authorized by this decision.

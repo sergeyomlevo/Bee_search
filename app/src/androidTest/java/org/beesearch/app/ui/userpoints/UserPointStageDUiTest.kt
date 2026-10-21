@@ -68,6 +68,7 @@ class UserPointStageDUiTest {
             }
         }
         composeRule.onNodeWithText("Редактирование").assertIsDisplayed()
+        composeRule.onNodeWithText("Создана:", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Изменить место").performScrollTo().performClick()
         composeRule.runOnIdle { assertEquals(56.1 to 42.7, location) }
         composeRule.onNodeWithTag("user-point-title").performTextInput(

@@ -140,6 +140,12 @@ private fun UserPointCardBody(
     val context = LocalContext.current
     Text(point.title, style = MaterialTheme.typography.headlineSmall)
     point.note?.let { Text(it) }
+    Text(
+        text = userPointCreatedDateText(point.createdAt),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.testTag("user-point-created-at"),
+    )
     if (point.photos.isNotEmpty()) {
         var selectedId by remember(point.id) { mutableStateOf(point.photos.first().id) }
         val selected = point.photos.firstOrNull { it.id == selectedId } ?: point.photos.first()

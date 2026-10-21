@@ -5,6 +5,8 @@ import androidx.compose.runtime.*
 import androidx.compose.material3.*
 import androidx.compose.ui.test.*
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import org.beesearch.app.ui.theme.Bee_searchTheme
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.room.Room
@@ -63,6 +65,26 @@ class UserPointCreationUiTest {
         rule.runOnIdle { assertEquals(listOf("observation", "hollow", "log", "user", "cancel"), actions) }
     }
 
+    @Test fun chooserSectionLabelsRemainSecondaryAtFontScale17() {
+        rule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.7f)) {
+                Bee_searchTheme { CreateRecordTypeChooserDialog(
+                    onDismiss = {},
+                    onCreateObservationPoint = {},
+                    onCreateHollow = {},
+                    onCreateLogHive = {},
+                    onCreateUserPoint = {},
+                ) }
+            }
+        }
+        rule.onNodeWithTag("create-type-section-research").assertIsDisplayed()
+        rule.onNodeWithTag("create-type-section-user").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("create-user-point-type").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("dismiss-create-type-chooser").assertIsDisplayed()
+        capture("chooser-font17", rule.onNodeWithTag("create-type-chooser"))
+    }
+
     @Test fun saveValidatesAndCreatesVisiblePointOnlyAfterCommit() {
         var saved: UserPoint? = null
         val initial = UserPointEditorTarget(UUID.randomUUID(), territory, latitude = 56.8, longitude = 60.6)
@@ -75,6 +97,7 @@ class UserPointCreationUiTest {
         rule.runOnIdle { assertNull(saved) }
         rule.onNodeWithTag("user-point-title").performTextInput("Тропа к лесной поляне с длинным названием")
         rule.onNodeWithTag("user-point-note").performTextInput("Заметка")
+        rule.onNodeWithText("Создана:", substring = true).assertDoesNotExist()
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         rule.onNodeWithTag("user-point-title").performScrollTo()
         capture("create-title-note")
