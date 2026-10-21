@@ -2703,3 +2703,30 @@ provides the same 48dp interaction boundary used by research markers, enabled
 only for an applied current revision. Research-object targets retain priority
 where targets overlap. This adds no map host, lifecycle, visibility store,
 schema change or media pipeline. Edit/delete remain separate Stage D work.
+
+
+### D106 My points: Stage D edit/delete integration (2026-10-21)
+
+The existing editor loads a UserPoint snapshot into its Activity-owned draft.
+Saved-photo removal changes only the draft; new photos use the existing staging
+and activation/rollback pipeline. Retained bytes are checked against owner,
+length and SHA-256 before Room update. The metadata transaction preserves UUID,
+Territory, creation time and the current visibility. Removed originals are
+cleaned only after that transaction commits.
+
+Deletion is scoped by Territory/UserPoint UUID and commits Room first (photo FK
+CASCADE and visibility in the same point row). UserPointMediaStore accepts only
+exact owner/photo paths and canonical owner locations. The shared
+UserPointDeletionViewModel keeps session-only cleanup receipts across navigation;
+Retry cleans only unreferenced managed bytes and never repeats SQL deletion.
+Partial cleanup is reported over the source list/map without resurrecting the
+card. There is no durable cleanup journal, sweeper or process-death recovery;
+a failed cleanup may leave an unreferenced internal file after process death.
+No Room schema, GPX, research-card, Backup/Restore or Android Auto Backup changes.
+Stage1/H05 remain OPEN.
+
+The UserPoint card/editor target carries an explicit LIST/MAP origin through
+coordinate selection. The Activity uses the same MapDataViewModel owner to
+restore My points on Back/Delete from a list-origin card; a map-origin card
+returns to the map. This is an explicitly handled return action, not a durable
+reopen flag. Research-card routes and coordinate-selection behavior are unchanged.

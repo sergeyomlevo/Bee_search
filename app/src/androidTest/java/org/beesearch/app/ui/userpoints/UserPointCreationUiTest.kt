@@ -68,7 +68,7 @@ class UserPointCreationUiTest {
         val initial = UserPointEditorTarget(UUID.randomUUID(), territory, latitude = 56.8, longitude = 60.6)
         rule.setContent { Bee_searchTheme { UserPointEditorRoute(
             target = initial,
-            repository = repository, mediaStore = media, onCancel = {}, onSaved = { saved = it }, onChangeLocation = {},
+            repository = repository, mediaStore = media, onCancel = {}, onSaved = { saved = it }, onChangeLocation = { _, _ -> },
         ) } }
         rule.onNodeWithTag("user-point-save").performScrollTo().performClick()
         rule.onNodeWithTag("user-point-title").performScrollTo().assertIsDisplayed()
@@ -98,7 +98,7 @@ class UserPointCreationUiTest {
                 target = target.copy(latitude = 57.1, longitude = 61.2, coordinateRevision = UUID.randomUUID())
                 selecting = false
             }) { Text("OK") }
-            else UserPointEditorRoute(target, repository, media, onCancel = { cancelled = true }, onSaved = {}, onChangeLocation = { selecting = true })
+            else UserPointEditorRoute(target, repository, media, onCancel = { cancelled = true }, onSaved = {}, onChangeLocation = { _, _ -> selecting = true })
         } }
         rule.onNodeWithTag("user-point-title").performTextInput("Черновик")
         rule.onNodeWithTag("user-point-note").performTextInput("Не потерять")

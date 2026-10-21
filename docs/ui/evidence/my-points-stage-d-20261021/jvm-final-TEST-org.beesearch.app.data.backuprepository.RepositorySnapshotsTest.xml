@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-10-21T07:24:31.225Z" hostname="DESKTOP-9016QR7" time="5.984">
+  <properties/>
+  <testcase name="finalCorruptionIsNotCommittedAndPreviousSnapshotRemains" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.379"/>
+  <testcase name="mixedV1AndV2DiscoveryKeepsBothValidAndSelectsLatest" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.467"/>
+  <testcase name="cancellationAndInvalidCandidateNeverPublish" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.042"/>
+  <testcase name="allStorageFailuresPreservePriorHistory" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="1.192"/>
+  <testcase name="stagedMutationAndCancellationAfterWritePreservePriorHistory" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.651"/>
+  <testcase name="failedMoveResponseRequiresFinalFullReadback" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.219"/>
+  <testcase name="publicationReopensAndDiscoverySurvivesNewFoundation" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.533"/>
+  <testcase name="unknownAndLowCapacityRejectBeforeCaptureOrStaging" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.008"/>
+  <testcase name="captureSerializationAndCandidateFailuresPreservePriorHistory" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="1.026"/>
+  <testcase name="stagingUnknownAndDuplicateSnapshotIdentityRemainVisible" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.279"/>
+  <testcase name="stagedAndFinalReopenFailuresNeverReturnCommit" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.732"/>
+  <testcase name="capacityDropAfterStagingNeverPublishes" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.153"/>
+  <testcase name="replacementImmediatelyBeforePublicationFailsClosed" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.147"/>
+  <testcase name="rootChangedAfterStagingCannotPublishOrDeleteAgainstReplacement" classname="org.beesearch.app.data.backuprepository.RepositorySnapshotsTest" time="0.153"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

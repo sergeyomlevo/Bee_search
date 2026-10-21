@@ -1,0 +1,16 @@
+{
+  "serial": "emulator-5556",
+  "artifacts": [
+    {
+      "artifact": "app\\build\\outputs\\apk\\debug\\app-debug.apk",
+      "applicationId": "org.beesearch.app.dev",
+      "sha256": "2a13350151d244a29891ac17afa4e13da8b6c03e4fdde4eb0ac2d65a689642f9"
+    },
+    {
+      "artifact": "app\\build\\outputs\\apk\\androidTest\\debug\\app-debug-androidTest.apk",
+      "applicationId": "org.beesearch.app.dev.test",
+      "sha256": "87ae48de40009c0bb7ff53e9bd712a9910cbb361d56ec9d6a85dfd1488a905b0"
+    }
+  ],
+  "installedSha256": "2a13350151d244a29891ac17afa4e13da8b6c03e4fdde4eb0ac2d65a689642f9"
+}

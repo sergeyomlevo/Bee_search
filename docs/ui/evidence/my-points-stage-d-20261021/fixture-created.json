@@ -1,0 +1,39 @@
+{
+  "point": {
+    "id": "3ca0bff8-f37b-40a6-82be-7388da900680",
+    "territory_id": "4f852a34-69e0-4f64-8de5-a88d1ee6f1f7",
+    "title": "D21-safety-fixture",
+    "note": "D21 original note",
+    "latitude": 56.83411833332964,
+    "longitude": 60.61479236893269,
+    "is_visible": 1,
+    "created_at": 1792567525246,
+    "updated_at": 1792567525246
+  },
+  "photos": [
+    {
+      "id": "06be814c-0fb4-4e44-b62e-82ecb9fed31b",
+      "user_point_id": "3ca0bff8-f37b-40a6-82be-7388da900680",
+      "relative_path": "user-point-media/3ca0bff8-f37b-40a6-82be-7388da900680/06be814c-0fb4-4e44-b62e-82ecb9fed31b",
+      "original_file_name": "B20-landscape.png",
+      "mime_type": "image/png",
+      "byte_size": 9231,
+      "sha256": "1a4be9aa7d4dada67f74d23e21e3db6b084e4f5d7db869ee99c30b3c28bf7848",
+      "created_at": 1792567500447
+    },
+    {
+      "id": "d95b912a-022b-4b7c-9834-2723272abf1e",
+      "user_point_id": "3ca0bff8-f37b-40a6-82be-7388da900680",
+      "relative_path": "user-point-media/3ca0bff8-f37b-40a6-82be-7388da900680/d95b912a-022b-4b7c-9834-2723272abf1e",
+      "original_file_name": "B20-portrait.png",
+      "mime_type": "image/png",
+      "byte_size": 11257,
+      "sha256": "03bccea9581710fcc3258abf4f643fc786f16405fe868fbc6b91fe2032809a80",
+      "created_at": 1792567501181
+    }
+  ],
+  "sourceSha256": {
+    "B20-landscape.png": "1a4be9aa7d4dada67f74d23e21e3db6b084e4f5d7db869ee99c30b3c28bf7848",
+    "B20-portrait.png": "03bccea9581710fcc3258abf4f643fc786f16405fe868fbc6b91fe2032809a80"
+  }
+}

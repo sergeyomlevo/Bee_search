@@ -1,0 +1,14 @@
+{
+  "serial": "emulator-5556",
+  "artifacts": [
+    {
+      "applicationId": "org.beesearch.app.dev",
+      "sha256": "2eb40ca81353ef48e16c714be9b15b0f8fa0d0a0d7677bac1083d2584b6b0e17"
+    },
+    {
+      "applicationId": "org.beesearch.app.dev.test",
+      "sha256": "447c7ccdcc50411a45ff5fbec8358ab86d01bad4a975983d351ca7544f42fd22"
+    }
+  ],
+  "installedSha256": "2eb40ca81353ef48e16c714be9b15b0f8fa0d0a0d7677bac1083d2584b6b0e17"
+}

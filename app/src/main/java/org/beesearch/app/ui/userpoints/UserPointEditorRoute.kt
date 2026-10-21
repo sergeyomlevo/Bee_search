@@ -32,11 +32,15 @@ internal fun UserPointEditorRoute(
     mediaStore: UserPointMediaStore,
     onCancel: () -> Unit,
     onSaved: (UserPoint) -> Unit,
-    onChangeLocation: () -> Unit,
+    onChangeLocation: (Double, Double) -> Unit,
 ) {
     val model: UserPointEditorViewModel = viewModel(
         key = "user-point-editor-${target.requestId}",
         factory = UserPointEditorViewModel.factory(target, repository, mediaStore),
+    )
+    val deletionModel: UserPointDeletionViewModel = viewModel(
+        key = "user-point-deletion",
+        factory = UserPointDeletionViewModel.factory(repository, mediaStore),
     )
     val state by model.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -45,8 +49,14 @@ internal fun UserPointEditorRoute(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(target.coordinateRevision) { model.setCoordinates(target.latitude, target.longitude) }
-    LaunchedEffect(state.photos) {
-        if (state.photos.any { photo -> runCatching { mediaStore.resolveDraft(photo.relativePath).isFile }.getOrDefault(false).not() }) {
+    LaunchedEffect(state.photos, state.existingPhotos) {
+        val stagedMissing = state.photos.any { photo ->
+            runCatching { mediaStore.resolveDraft(photo.relativePath).isFile }.getOrDefault(false).not()
+        }
+        val existingMissing = state.existingPhotos.any { photo ->
+            runCatching { mediaStore.resolve(photo.relativePath).isFile }.getOrDefault(false).not()
+        }
+        if (stagedMissing || existingMissing) {
             model.reportError("Фото недоступно")
         }
     }
@@ -78,7 +88,17 @@ internal fun UserPointEditorRoute(
     }
     val cancel = { model.cancel(onCancel) }
     BackHandler(onBack = cancel)
-    val media = state.photos.mapNotNull { photo ->
+    val existingMedia = state.existingPhotos.mapNotNull { photo ->
+        runCatching {
+            PhysicalObjectMediaDraft(
+                id = photo.id,
+                label = photo.originalFileName ?: "Фото",
+                isVideo = false,
+                previewFile = mediaStore.resolve(photo.relativePath),
+            )
+        }.getOrNull()
+    }
+    val stagedMedia = state.photos.mapNotNull { photo ->
         runCatching {
             PhysicalObjectMediaDraft(
                 id = photo.id,
@@ -90,11 +110,11 @@ internal fun UserPointEditorRoute(
     }
     UserPointEditor(
         state = state,
-        media = media,
+        media = existingMedia + stagedMedia,
         titleFocusRequester = focusRequester,
         onTitleChanged = model::setTitle,
         onNoteChanged = model::setNote,
-        onChangeLocation = onChangeLocation,
+        onChangeLocation = { onChangeLocation(state.latitude, state.longitude) },
         onPickPhoto = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
         onTakePhoto = {
             val file = mediaStore.cameraCaptureFile(UUID.randomUUID())
@@ -109,12 +129,29 @@ internal fun UserPointEditorRoute(
         },
         onRemovePhoto = model::removePhoto,
         onOpenPhoto = { id ->
-            state.photos.firstOrNull { it.id == id }?.let { photo ->
-                openManagedPhoto(context, mediaStore.resolveDraft(photo.relativePath), photo.mimeType)
+            val staged = state.photos.firstOrNull { it.id == id }
+            if (staged != null) {
+                staged.let { photo ->
+                runCatching { mediaStore.resolveDraft(photo.relativePath) }.getOrNull()?.let { file ->
+                    openManagedPhoto(context, file, photo.mimeType)
+                }
+                }
+            } else {
+                state.existingPhotos.firstOrNull { it.id == id }?.let { photo ->
+                    runCatching { mediaStore.resolve(photo.relativePath) }.getOrNull()?.let { file ->
+                        openManagedPhoto(context, file, photo.mimeType)
+                    }
+                }
             }
         },
-        onSave = { model.save(onSaved) },
+        onSave = {
+            model.save { saved ->
+                model.state.value.cleanupPending?.let(deletionModel::retainCleanup)
+                onSaved(saved)
+            }
+        },
         onCancel = cancel,
+        onRetryLoad = model::retryLoad,
     )
 }
 

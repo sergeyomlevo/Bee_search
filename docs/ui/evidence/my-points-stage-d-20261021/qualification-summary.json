@@ -1,0 +1,22 @@
+{
+  "jvm": {
+    "tests": 1070,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "api29Combined": 115,
+  "api29LifecycleAfterPopulatedTestAdded": 8,
+  "uniqueAndroidTestsAcrossFinalRuns": 116,
+  "fontScale": 1.7,
+  "lint": {
+    "errors": 0,
+    "warnings": 33,
+    "hints": 6
+  },
+  "separatePreviouslyFlakyBackupTest": "PASS",
+  "assemblies": "PASS",
+  "baselinePreservation": "PASS",
+  "samsungInstall": "NOT RUN",
+  "push": "NOT RUN"
+}

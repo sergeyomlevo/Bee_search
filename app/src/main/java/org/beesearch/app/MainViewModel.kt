@@ -83,7 +83,8 @@ import org.beesearch.app.domain.repository.PhysicalObjectRepository
 
 sealed interface AppRoute {
     data class UserPointEditor(val target: org.beesearch.app.ui.userpoints.UserPointEditorTarget) : AppRoute
-    data class UserPointDetail(val territoryId: UUID, val pointId: UUID) : AppRoute
+    data class UserPointDetail(val territoryId: UUID, val pointId: UUID,
+        val origin: org.beesearch.app.ui.userpoints.UserPointCardOrigin = org.beesearch.app.ui.userpoints.UserPointCardOrigin.MAP) : AppRoute
     data object Loading : AppRoute
     data object Settings : AppRoute
     data object InitialSetup : AppRoute
@@ -819,15 +820,28 @@ internal class MainViewModel(
     }
 
     fun changeUserPointDraftLocation(target: org.beesearch.app.ui.userpoints.UserPointEditorTarget, latitude: Double, longitude: Double) {
-        _physicalObjectLocationSelection.value = PhysicalObjectLocationSelection.UserPointDraft(target)
+        _physicalObjectLocationSelection.value = PhysicalObjectLocationSelection.UserPointDraft(target.copy(latitude = latitude, longitude = longitude))
         _mapCenterRequest.value = MapCenterRequest(UUID.randomUUID(), MapTarget(latitude, longitude))
         manualRoute.value = AppRoute.CurrentTerritory()
         clearFeedback()
     }
 
-    fun openUserPoint(territoryId: UUID, pointId: UUID) {
+    fun openUserPoint(territoryId: UUID, pointId: UUID,
+        origin: org.beesearch.app.ui.userpoints.UserPointCardOrigin = org.beesearch.app.ui.userpoints.UserPointCardOrigin.MAP) {
         _physicalObjectLocationSelection.value = null
-        manualRoute.value = AppRoute.UserPointDetail(territoryId, pointId)
+        manualRoute.value = AppRoute.UserPointDetail(territoryId, pointId, origin)
+        clearFeedback()
+    }
+
+    fun editUserPoint(point: org.beesearch.app.domain.model.UserPoint) {
+        if (settings.value.currentTerritoryId != point.territoryId) return
+        _physicalObjectLocationSelection.value = null
+        manualRoute.value = AppRoute.UserPointEditor(
+            org.beesearch.app.ui.userpoints.UserPointEditorTarget(UUID.randomUUID(), point.territoryId,
+                pointId = point.id, latitude = point.latitude, longitude = point.longitude,
+                origin = (manualRoute.value as? AppRoute.UserPointDetail)?.origin
+                    ?: org.beesearch.app.ui.userpoints.UserPointCardOrigin.MAP),
+        )
         clearFeedback()
     }
 
@@ -840,7 +854,7 @@ internal class MainViewModel(
 
     fun closeUserPointEditor(target: org.beesearch.app.ui.userpoints.UserPointEditorTarget) {
         _physicalObjectLocationSelection.value = null
-        manualRoute.value = target.pointId?.let { AppRoute.UserPointDetail(target.territoryId, it) }
+        manualRoute.value = target.pointId?.let { AppRoute.UserPointDetail(target.territoryId, it, target.origin) }
             ?: AppRoute.CurrentTerritory()
         clearFeedback()
     }

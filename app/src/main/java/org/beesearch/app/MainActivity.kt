@@ -114,6 +114,19 @@ private fun BeeSearchApp(
         mutableStateOf(lifecycleOwner.lifecycle.currentState)
     }
     val viewModel: MainViewModel = viewModel(factory = MainViewModel.factory(application))
+    // Same Activity-scoped owner as CurrentTerritoryScreen. Return commands execute once here,
+    // rather than using a durable reopen flag observed by the map.
+    val mapDataModel: org.beesearch.app.ui.map.MapDataViewModel = viewModel(
+        factory = org.beesearch.app.ui.map.MapDataViewModel.factory(
+            application.container.observationRepository, application.container.physicalObjectRepository,
+            application.container.mapDataDisplayStore,
+        ),
+    )
+    val closeUserPoint: (AppRoute.UserPointDetail) -> Unit = { detail ->
+        if (detail.origin == org.beesearch.app.ui.userpoints.UserPointCardOrigin.LIST) mapDataModel.openUserPoints()
+        else { mapDataModel.closePanel(); mapDataModel.closePreview() }
+        viewModel.openCurrentTerritory()
+    }
     val route by viewModel.route.collectAsStateWithLifecycle()
     val initialSetup by viewModel.visibleInitialSetup.collectAsStateWithLifecycle()
     val setupSettingsSection by viewModel.setupSettingsSection.collectAsStateWithLifecycle()
@@ -186,6 +199,9 @@ private fun BeeSearchApp(
     }
 
     Bee_searchTheme {
+        org.beesearch.app.ui.userpoints.UserPointCleanupNotice(
+            application.container.userPointRepository, application.container.userPointMediaStore,
+        )
         Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (val currentRoute = route) {
@@ -266,17 +282,19 @@ private fun BeeSearchApp(
                         repository = application.container.userPointRepository,
                         mediaStore = application.container.userPointMediaStore,
                         onCancel = { viewModel.closeUserPointEditor(currentRoute.target) },
-                        onSaved = { saved -> viewModel.openUserPoint(saved.territoryId, saved.id) },
-                        onChangeLocation = { viewModel.changeUserPointDraftLocation(currentRoute.target,
-                            currentRoute.target.latitude, currentRoute.target.longitude) },
+                        onSaved = { saved -> viewModel.openUserPoint(saved.territoryId, saved.id, currentRoute.target.origin) },
+                        onChangeLocation = { latitude, longitude -> viewModel.changeUserPointDraftLocation(
+                            currentRoute.target, latitude, longitude) },
                     )
                     is AppRoute.UserPointDetail -> org.beesearch.app.ui.userpoints.UserPointDetailRoute(
                         territoryId = currentRoute.territoryId,
                         pointId = currentRoute.pointId,
                         repository = application.container.userPointRepository,
                         mediaStore = application.container.userPointMediaStore,
-                        onBack = viewModel::openCurrentTerritory,
+                        onBack = { closeUserPoint(currentRoute) },
                         onShowOnMap = viewModel::showUserPointOnMap,
+                        onEdit = viewModel::editUserPoint,
+                        onDeleted = { closeUserPoint(currentRoute) },
                     )
                     is AppRoute.CreatePhysicalObject -> PhysicalObjectCreationRoute(
                         target = currentRoute.target,

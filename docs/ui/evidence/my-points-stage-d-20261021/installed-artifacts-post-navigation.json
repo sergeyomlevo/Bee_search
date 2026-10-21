@@ -1,0 +1,31 @@
+{
+  "serial": "emulator-5556",
+  "artifacts": [
+    {
+      "applicationId": "org.beesearch.app.dev",
+      "sha256": "af3f27cdb4ef30a4207b2f9d9f101503409d41be3128ae15d0ea83c99b3283a2"
+    },
+    {
+      "applicationId": "org.beesearch.app.dev.test",
+      "sha256": "8f0ae21d75eb78313f7fdf991738f850047dbccc5838dff9822b076766f5338e"
+    }
+  ],
+  "installedSha256": "af3f27cdb4ef30a4207b2f9d9f101503409d41be3128ae15d0ea83c99b3283a2",
+  "sourceSha256": {
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointCleanupNotice.kt": "041c1f111b393c2e61d1b8471c3ebac33e689b6c32f9fb647c2128ea5a3baa21",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointDeletionViewModel.kt": "baf3778eca37bd6c20f98c6a25ac846c455954847c1d3d19ed26732dfce9ad34",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointDetailRoute.kt": "fa6e3d17d6ec2adca067e26ee92c4e2465522d40935eca813b25a4ea7f5b4d64",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointDisplayViewModel.kt": "f20fb6fa5006931ef3fa85a55319df14b9ec3acc51647cca0531f020283b23ec",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointEditor.kt": "f9b86dbe53b44e32669f785e9b8d9d3ed9d1cf66651bcffc0701299c416a1c11",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointEditorRoute.kt": "13055147ee7d5f50c19a51540ab35bef7cc770b38d105878c73c2626d3cf5fac",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointEditorViewModel.kt": "7c6d979f29419a819fe3d04893b899fb1a2d29b14a11577729a1c046a534423f",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointListPage.kt": "9ff4af2cf787b1277bd0a3bc2871893122cf90383c7893166149d2d136e36457",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointMapOverlay.kt": "79a643f696e5609a4b3c970dc8f32685a4f0e66cd4f6158b5660012b41d23a1b",
+    "app/src/main/java/org/beesearch/app/ui/userpoints/UserPointNavigation.kt": "c4d010297e690031ebf5798631a1fde60ab3cbf5109f201c6a35ad87a7d90969",
+    "app/src/main/java/org/beesearch/app/MainActivity.kt": "95afe25418be53263a02c881eebcf5ce71a7d8bfd206924b647c2f8cb0ea753b",
+    "app/src/main/java/org/beesearch/app/MainViewModel.kt": "634867a67284491bd3d940adc4913f18d7169d9e385adb687ac251ba10adc20b",
+    "app/src/main/java/org/beesearch/app/data/media/UserPointMediaStore.kt": "55c4458692c5e46cf15dc2a90c64dfe9c0cde3d41d876bd6e0c7a35e940811e3",
+    "app/src/main/java/org/beesearch/app/ui/map/MainMapScreen.kt": "618300da62fcd1a28db4e8d73ac6937b80e3c277ba65f38ba0dba3e477e450d3",
+    "app/src/main/java/org/beesearch/app/ui/map/MapDataViewModel.kt": "57b666d5e1b796f96b5f088d7a2b2e54b3f7530691eec58b5c905513c7c1c5ac"
+  }
+}

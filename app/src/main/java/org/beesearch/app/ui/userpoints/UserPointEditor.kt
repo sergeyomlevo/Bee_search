@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -45,6 +46,7 @@ internal fun UserPointEditor(
     onOpenPhoto: (java.util.UUID) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
+    onRetryLoad: () -> Unit,
 ) {
     val bringIntoViewRequester = androidx.compose.runtime.remember { BringIntoViewRequester() }
     LaunchedEffect(state.error) {
@@ -64,9 +66,26 @@ internal fun UserPointEditor(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
             ) { Text("←", style = MaterialTheme.typography.headlineSmall) }
             Column(Modifier.weight(1f)) {
-                Text("Новая точка", style = MaterialTheme.typography.headlineSmall)
-                Text("Создание объекта", style = MaterialTheme.typography.bodyMedium)
+                Text(if (state.isEditing) "Редактирование" else "Новая точка", style = MaterialTheme.typography.headlineSmall)
+                if (!state.isEditing) Text("Создание объекта", style = MaterialTheme.typography.bodyMedium)
             }
+        }
+        if (state.isEditing && !state.isLoaded) {
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (state.error == null) {
+                    CircularProgressIndicator()
+                } else {
+                    Text(state.error, color = MaterialTheme.colorScheme.error)
+                    Button(onClick = onRetryLoad, enabled = !state.isWorking,
+                        modifier = Modifier.fillMaxWidth().testTag("user-point-edit-retry")) {
+                        Text("Повторить")
+                    }
+                }
+            }
+            return@Column
         }
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())

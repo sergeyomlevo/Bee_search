@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.beesearch.app.domain.model.UserPointValidationTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-21T07:25:33.596Z" hostname="DESKTOP-9016QR7" time="0.006">
+  <properties/>
+  <testcase name="rejectsPhotoOutsideOwnerNamespaceOrNonPhotoMetadata" classname="org.beesearch.app.domain.model.UserPointValidationTest" time="0.004"/>
+  <testcase name="rejectsBlankTitleAndOutOfRangeOrNonFiniteCoordinates" classname="org.beesearch.app.domain.model.UserPointValidationTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

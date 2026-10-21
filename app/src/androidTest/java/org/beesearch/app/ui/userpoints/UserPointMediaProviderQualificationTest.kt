@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -148,7 +149,7 @@ class UserPointMediaProviderQualificationTest {
         composeRule.setContent {
             TestRegistryContent(owner) {
                 if (saved == null) {
-                    UserPointEditorRoute(target, repository, media, onCancel = {}, onSaved = { saved = it }, onChangeLocation = {})
+                    UserPointEditorRoute(target, repository, media, onCancel = {}, onSaved = { saved = it }, onChangeLocation = { _, _ -> })
                 } else {
                     UserPointDetailRoute(territory, saved!!.id, repository, media, onBack = {})
                 }
@@ -168,6 +169,10 @@ class UserPointMediaProviderQualificationTest {
         assertArrayEquals(validJpegBytes(), managedFile.readBytes())
         composeRule.waitUntil(10_000) { composeRule.onAllNodesWithTag("user-point-card").fetchSemanticsNodes().isNotEmpty() }
         composeRule.onNodeWithTag("user-point-card").assertIsDisplayed()
+        // The card container exists during its asynchronous read; wait for loaded content.
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("Сохранённая точка").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("Сохранённая точка").assertIsDisplayed()
         owner.destroy()
     }
@@ -180,7 +185,7 @@ class UserPointMediaProviderQualificationTest {
         val target = UserPointEditorTarget(UUID.randomUUID(), territory, latitude = 56.8, longitude = 60.6)
         composeRule.setContent {
             TestRegistryContent(owner) {
-                UserPointEditorRoute(target, repository, media, onCancel = { cancelled = true }, onSaved = {}, onChangeLocation = {})
+                UserPointEditorRoute(target, repository, media, onCancel = { cancelled = true }, onSaved = {}, onChangeLocation = { _, _ -> })
             }
         }
         composeRule.onNodeWithText("Сделать фото").performScrollTo().performClick()

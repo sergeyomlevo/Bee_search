@@ -1,10 +1,12 @@
 package org.beesearch.app.data.media
 
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.time.Instant
 import java.util.UUID
 import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.runBlocking
+import org.beesearch.app.domain.model.UserPointPhoto
 import org.beesearch.app.domain.model.PhysicalObjectMediaType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -77,6 +79,79 @@ class UserPointMediaStoreTest {
             assertThrows(AttachmentStorageException::class.java) {
                 runBlocking { store.prepareDraftActivation(session, UUID.randomUUID(), listOf(staged)) }
             }
+        }
+    }
+
+    @Test
+    fun `requireAvailable rejects a foreign owner tuple and malformed path`() = runBlocking {
+        withStore { _, store ->
+            val point = UUID.randomUUID()
+            val photoId = UUID.randomUUID()
+            val photo = UserPointPhoto(
+                photoId, UUID.randomUUID(), "user-point-media/$point/$photoId", "x.jpg", "image/jpeg",
+                BYTES_A.size.toLong(), "a".repeat(64), Instant.EPOCH,
+            )
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { store.requireAvailable(point, listOf(photo)) }
+            }
+            val malformed = photo.copy(userPointId = point, relativePath = "user-point-media/$point/other")
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { store.requireAvailable(point, listOf(malformed)) }
+            }
+        }
+    }
+
+    @Test
+    fun `cleanup is idempotent and a nonempty owner directory fails closed then recovers`() = runBlocking {
+        withStore { root, store ->
+            val point = UUID.randomUUID()
+            val session = UUID.randomUUID()
+            val staged = store.stageDraftMedia(session, UUID.randomUUID(), "a.jpg", "image/jpeg", Instant.EPOCH) {
+                ByteArrayInputStream(BYTES_A)
+            }
+            val activation = store.prepareDraftActivation(session, point, listOf(staged))
+            activation.commit()
+            val photo = activation.photos.single()
+            val managed = store.resolve(photo.relativePath)
+            assertTrue(managed.isFile)
+            assertTrue(store.cleanupOwned(point, listOf(photo)))
+            assertTrue(store.cleanupOwned(point, listOf(photo)))
+
+            val session2 = UUID.randomUUID()
+            val staged2 = store.stageDraftMedia(session2, UUID.randomUUID(), "b.jpg", "image/jpeg", Instant.EPOCH) {
+                ByteArrayInputStream(BYTES_B)
+            }
+            val activation2 = store.prepareDraftActivation(session2, point, listOf(staged2))
+            activation2.commit()
+            val photo2 = activation2.photos.single()
+            val blockingDirectory = store.resolve(photo2.relativePath)
+            assertTrue(blockingDirectory.delete())
+            assertTrue(blockingDirectory.mkdirs())
+            val child = File(blockingDirectory, "child").apply { writeBytes(BYTES_A) }
+            assertFalse(store.cleanupOwned(point, listOf(photo2)))
+            assertTrue(child.delete())
+            assertTrue(blockingDirectory.delete())
+            assertTrue(store.cleanupOwned(point, listOf(photo2)))
+        }
+    }
+
+    @Test
+    fun `cleanup refuses another point photo even with forged owner metadata`() = runBlocking {
+        withStore { _, store ->
+            val owner = UUID.randomUUID()
+            val other = UUID.randomUUID()
+            val session = UUID.randomUUID()
+            val staged = store.stageDraftMedia(session, UUID.randomUUID(), "keep.jpg", "image/jpeg", Instant.EPOCH) {
+                ByteArrayInputStream(BYTES_A)
+            }
+            val activation = store.prepareDraftActivation(session, owner, listOf(staged))
+            activation.commit()
+            val photo = activation.photos.single()
+            assertFalse(store.cleanupOwned(other, listOf(photo)))
+            assertFalse(store.cleanupOwned(other, listOf(photo.copy(userPointId = other))))
+            assertEquals(BYTES_A.toList(), store.resolve(photo.relativePath).readBytes().toList())
+            assertTrue(store.cleanupOwned(owner, listOf(photo), removeDirectory = true))
+            assertFalse(store.resolve(photo.relativePath).exists())
         }
     }
 

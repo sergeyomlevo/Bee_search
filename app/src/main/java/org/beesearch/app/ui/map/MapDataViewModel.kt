@@ -295,6 +295,7 @@ internal class MapDataViewModel(
     }
 
     fun openUserPoints() {
+        panelOpen.value = true
         openedType.value = null
         gpxOpen.value = false
         userPointsOpen.value = true

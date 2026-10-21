@@ -1,0 +1,275 @@
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\AndroidManifest.xml:22: Warning: Redundant label can be removed [RedundantLabel]
+            android:label="@string/app_name"
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "RedundantLabel":
+   When an activity does not have a label attribute, it will use the one from
+   the application tag. Since the application has already specified the same
+   label, the label on this activity can be omitted.
+
+C:\App\Bee_search_stage0_overlay_registry\gradle\libs.versions.toml:3: Warning: A newer version of androidx.core:core-ktx than 1.10.1 is available: 1.16.0 [GradleDependency]
+coreKtx = "1.10.1"
+          ~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\gradle\libs.versions.toml:8: Warning: A newer version of androidx.activity:activity-compose than 1.8.0 is available: 1.8.2 [GradleDependency]
+activityCompose = "1.8.0"
+                  ~~~~~~~
+
+   Explanation for issues of type "GradleDependency":
+   This detector looks for usages of libraries where the version you are using
+   is not the current stable release. Using older versions is fine, and there
+   are cases where you deliberately want to stick with an older version.
+   However, you may simply not be aware that a more recent version is
+   available, and that is what this lint check helps find.
+
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\BeeMap.kt:145: Warning: Modifier parameter should be the first optional parameter [ModifierParameter from androidx.compose.ui]
+    modifier: Modifier = Modifier,
+    ~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\GpxDisplayPage.kt:54: Warning: Modifier parameter should be the first optional parameter [ModifierParameter from androidx.compose.ui]
+    modifier: Modifier = Modifier,
+    ~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\GpxTracksPage.kt:55: Warning: Modifier parameter should be the first optional parameter [ModifierParameter from androidx.compose.ui]
+    modifier: Modifier = Modifier,
+    ~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MainMapScreen.kt:340: Warning: Modifier parameter should be the first optional parameter [ModifierParameter from androidx.compose.ui]
+    modifier: Modifier = Modifier,
+    ~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MainMapScreen.kt:414: Warning: Modifier parameter should be the first optional parameter [ModifierParameter from androidx.compose.ui]
+    modifier: Modifier = Modifier,
+    ~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapCoverageSelectionUi.kt:186: Warning: Modifier parameter should be the first optional parameter [ModifierParameter from androidx.compose.ui]
+    modifier: Modifier = Modifier,
+    ~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapDataPanel.kt:110: Warning: Modifier parameter should be the first optional parameter [ModifierParameter from androidx.compose.ui]
+    modifier: Modifier = Modifier,
+    ~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapDataPanel.kt:230: Warning: Modifier parameter should be the first optional parameter [ModifierParameter from androidx.compose.ui]
+    modifier: Modifier = Modifier,
+    ~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapNumericRangeEditor.kt:35: Warning: Modifier parameter should be the first optional parameter [ModifierParameter from androidx.compose.ui]
+    modifier: Modifier = Modifier,
+    ~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapNumericRangeEditor.kt:57: Warning: Modifier parameter should be the first optional parameter [ModifierParameter from androidx.compose.ui]
+    modifier: Modifier = Modifier,
+    ~~~~~~~~
+
+   Explanation for issues of type "ModifierParameter":
+   The first (or only) Modifier parameter in a Composable function should
+   follow the following rules:
+   - Be named modifier
+   - Have a type of Modifier
+   - Either have no default value, or have a default value of Modifier
+   - If optional, be the first optional parameter in the parameter list
+
+   Vendor: Jetpack Compose
+   Identifier: androidx.compose.ui
+   Feedback: https://issuetracker.google.com/issues/new?component=612128
+
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\AppContainer.kt:116: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+            if (!result.completed) android.util.Log.w("GpxRuntime", "Reconciliation incomplete; GPX access remains gated", result.failure)
+                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\AppContainer.kt:121: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+            android.util.Log.w("GpxRuntime", "Initialization failed; GPX access remains gated", failure)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\BeeMap.kt:921: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+        Log.d("BeeMap", "style request mode=$developerBasemap profile=${profile.profileId} path=${profile.datasetVersion} hash=${profile.styleJson.hashCode()}")
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapLibreOverlaySession.kt:37: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+            Log.w(TAG, "Style unavailable; restore deferred: $error")
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapLibreOverlaySession.kt:71: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+            Log.w(TAG, "Style request failed generation=${request.generation}", failure)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapLibreOverlaySession.kt:150: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+            Log.w(TAG, "Overlay operation: $result; failures=${registry.failures}")
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "LogNotTimber":
+   Since Timber is included in the project, it is likely that calls to Log
+   should instead be going to Timber.
+
+   Vendor: JakeWharton/timber
+   Identifier: com.jakewharton.timber:timber:{version}
+   Feedback: https://github.com/JakeWharton/timber/issues
+
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\BeeMap.kt:190: Hint: Prefer mutableIntStateOf instead of mutableStateOf [AutoboxingStateCreation from androidx.compose.runtime]
+    var mapCameraRevision by remember { mutableStateOf(0) }
+                                        ~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\BeeMap.kt:191: Hint: Prefer mutableIntStateOf instead of mutableStateOf [AutoboxingStateCreation from androidx.compose.runtime]
+    var coverageControlsHeightPx by remember { mutableStateOf(0) }
+                                               ~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapDataPanel.kt:466: Hint: Prefer mutableIntStateOf instead of mutableStateOf [AutoboxingStateCreation from androidx.compose.runtime]
+    var beeResetToken by rememberSaveable(type.name + "-bee-reset") { mutableStateOf(0) }
+                                                                      ~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapDataPanel.kt:467: Hint: Prefer mutableIntStateOf instead of mutableStateOf [AutoboxingStateCreation from androidx.compose.runtime]
+    var cycleResetToken by rememberSaveable(type.name + "-cycle-reset") { mutableStateOf(0) }
+                                                                          ~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapDataPanel.kt:468: Hint: Prefer mutableIntStateOf instead of mutableStateOf [AutoboxingStateCreation from androidx.compose.runtime]
+    var entranceResetToken by rememberSaveable(type.name + "-entrance-reset") { mutableStateOf(0) }
+                                                                                ~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\ui\map\MapDataPanel.kt:469: Hint: Prefer mutableIntStateOf instead of mutableStateOf [AutoboxingStateCreation from androidx.compose.runtime]
+    var diameterResetToken by rememberSaveable(type.name + "-diameter-reset") { mutableStateOf(0) }
+                                                                                ~~~~~~~~~~~~~~
+
+   Explanation for issues of type "AutoboxingStateCreation":
+   Calling mutableStateOf<T>() when T is either backed by a primitive type on
+   the JVM or is a value class results in a state implementation that requires
+   all state values to be boxed. This usually causes an additional allocation
+   for each state write, and adds some additional work to auto-unbox values
+   when reading the value of the state. Instead, prefer to use a specialized
+   primitive state implementation for Int, Long, Float, and Double when the
+   state does not need to track null values and does not override the default
+   SnapshotMutationPolicy. See mutableIntStateOf(), mutableLongStateOf(),
+   mutableFloatStateOf(), and mutableDoubleStateOf() for more information.
+
+   Vendor: Jetpack Compose
+   Identifier: androidx.compose.runtime
+   Feedback: https://issuetracker.google.com/issues/new?component=612128
+
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\values\colors.xml:3: Warning: The resource R.color.purple_200 appears to be unused [UnusedResources]
+    <color name="purple_200">#FFBB86FC</color>
+           ~~~~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\values\colors.xml:4: Warning: The resource R.color.purple_500 appears to be unused [UnusedResources]
+    <color name="purple_500">#FF6200EE</color>
+           ~~~~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\values\colors.xml:5: Warning: The resource R.color.purple_700 appears to be unused [UnusedResources]
+    <color name="purple_700">#FF3700B3</color>
+           ~~~~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\values\colors.xml:6: Warning: The resource R.color.teal_200 appears to be unused [UnusedResources]
+    <color name="teal_200">#FF03DAC5</color>
+           ~~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\values\colors.xml:7: Warning: The resource R.color.teal_700 appears to be unused [UnusedResources]
+    <color name="teal_700">#FF018786</color>
+           ~~~~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\values\colors.xml:8: Warning: The resource R.color.black appears to be unused [UnusedResources]
+    <color name="black">#FF000000</color>
+           ~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\values\colors.xml:9: Warning: The resource R.color.white appears to be unused [UnusedResources]
+    <color name="white">#FFFFFFFF</color>
+           ~~~~~~~~~~~~
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\drawable-nodpi\help_map_controls.png: Warning: The resource R.drawable.help_map_controls appears to be unused [UnusedResources]
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\drawable-nodpi\help_map_info.png: Warning: The resource R.drawable.help_map_info appears to be unused [UnusedResources]
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\drawable-nodpi\help_observation_screen.png: Warning: The resource R.drawable.help_observation_screen appears to be unused [UnusedResources]
+
+   Explanation for issues of type "UnusedResources":
+   Unused resources make applications larger and slow down builds.
+
+
+   The unused resource check can ignore tests. If you want to include
+   resources that are only referenced from tests, consider packaging them in a
+   test source set instead.
+
+   You can include test sources in the unused resource check by setting the
+   system property lint.unused-resources.include-tests=true, and to exclude
+   them (usually for performance reasons), use
+   lint.unused-resources.exclude-tests=true.
+
+   Available options:
+
+   **skip-libraries** (default is true):
+   Whether the unused resource check should skip reporting unused resources in libraries.
+
+   Many libraries will declare resources that are part of the library surface; other modules depending on the library will also reference the resources. To avoid reporting all these resources as unused (in the context of a library), the unused resource check normally skips reporting unused resources in libraries. Instead, run the unused resource check on the consuming app module (along with `checkDependencies=true`).
+
+   However, there are cases where you want to check that all the resources declared in a library are used; in that case, you can disable the skip option.
+
+   To configure this option, use a `lint.xml` file with an <option> like this:
+
+   ```xml
+   <lint>
+       <issue id="UnusedResources">
+           <option name="skip-libraries" value="true" />
+       </issue>
+   </lint>
+   ```
+
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\data\zip\AuthorizedArchive.kt:42: Warning: Consider also using StorageManager#getAllocatableBytes and allocateBytes which will consider clearable cached data [UsableSpace]
+    val available = directory.usableSpace
+                              ~~~~~~~~~~~
+
+   Explanation for issues of type "UsableSpace":
+   When you need to allocate disk space for large files, consider using the
+   new allocateBytes(FileDescriptor, long) API, which will automatically clear
+   cached files belonging to other apps (as needed) to meet your request.
+
+   When deciding if the device has enough disk space to hold your new data,
+   call getAllocatableBytes(UUID) instead of using getUsableSpace(), since the
+   former will consider any cached data that the system is willing to clear on
+   your behalf.
+
+   Note that these methods require API level 26. If your app is running on
+   older devices, you will probably need to use both APIs, conditionally
+   switching on Build.VERSION.SDK_INT. Lint only looks in the same compilation
+   unit to see if you are already using both APIs, so if it warns even though
+   you are already using the new API, consider moving the calls to the same
+   file or suppressing the warning.
+
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\mipmap-xxxhdpi\ic_launcher.webp: Warning: The following images appear both as density independent .xml files and as bitmap files: srcmainresmipmap-anydpiic_launcher.xml, srcmainresmipmap-hdpiic_launcher.webp [IconXmlAndPng]
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\res\mipmap-xxxhdpi\ic_launcher_round.webp: Warning: The following images appear both as density independent .xml files and as bitmap files: srcmainresmipmap-anydpiic_launcher_round.xml, srcmainresmipmap-hdpiic_launcher_round.webp [IconXmlAndPng]
+
+   Explanation for issues of type "IconXmlAndPng":
+   If a drawable resource appears as an .xml file in the drawable/ folder,
+   it's usually not intentional for it to also appear as a bitmap using the
+   same name; generally you expect the drawable XML file to define states and
+   each state has a corresponding drawable bitmap.
+
+C:\App\Bee_search_stage0_overlay_registry\app\src\main\java\org\beesearch\app\data\backuprepository\AndroidRepositoryBinding.kt:25: Warning: Use the KTX extension function String.toUri instead? [UseKtx]
+            val uri = Uri.parse(locator)
+                      ~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "UseKtx":
+   The Android KTX libraries decorates the Android platform SDK as well as
+   various libraries with more convenient extension functions available from
+   Kotlin, allowing you to use default parameters, named parameters, and
+   more.
+
+   Available options:
+
+   **remove-defaults** (default is true):
+   Whether to skip arguments that match the defaults provided by the extension.
+
+   Extensions often provide default values for some of the parameters. For example:
+   ```kotlin
+   fun Path.readLines(charset: Charset = Charsets.UTF_8): List<String> { return Files.readAllLines(this, charset) }
+   ```
+   This lint check will by default automatically omit parameters that match the default, so if your code was calling
+
+   ```kotlin
+   Files.readAllLines(file, Charset.UTF_8)
+   ```
+   lint would replace this with
+   ```kotlin
+   file.readLines()
+   ```
+   rather than
+
+   ```kotlin
+   file.readLines(Charset.UTF_8
+   ```
+   You can turn this behavior off using this option.
+
+   To configure this option, use a `lint.xml` file with an <option> like this:
+
+   ```xml
+   <lint>
+       <issue id="UseKtx">
+           <option name="remove-defaults" value="true" />
+       </issue>
+   </lint>
+   ```
+
+   **require-present** (default is true):
+   Whether to only offer extensions already available.
+
+   This option lets you only have lint suggest extension replacements if those extensions are already available on the class path (in other words, you're already depending on the library containing the extension method.)
+
+   To configure this option, use a `lint.xml` file with an <option> like this:
+
+   ```xml
+   <lint>
+       <issue id="UseKtx">
+           <option name="require-present" value="true" />
+       </issue>
+   </lint>
+   ```
+
+0 errors, 33 warnings, 6 hints

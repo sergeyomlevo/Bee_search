@@ -1,5 +1,27 @@
 # D106 My points implementation evidence
 
+## Stage D — current implementation, 2026-10-21
+
+**Stage D emulator qualification PASS; local commit, ready for OWNER review.**
+The existing card/form now support edit and confirmed delete. Saved photos stay
+untouched until successful Save; Cancel removes only draft-owned resources.
+Room-first delete and exact owner-scoped cleanup distinguish a committed deletion
+from partial file cleanup and permit cleanup-only retry within the current process.
+The production map round trip exposed lost list origin; explicit LIST/MAP origin
+now travels through card/editor targets, with source restoration through the
+existing Activity-owned MapDataViewModel. Post-fix JVM1070/1070, Android115/115
+plus the8/8 lifecycle run (116 unique tests), assemblies and lint passed. The
+previously unstable backup test passed separately and in repeated full suites.
+Native API29 screenshots at fontScale1.7, both source origins, cold restart and
+baseline Room/media preservation are recorded in the Stage D report. Lint has
+0 errors,33 warnings,6 hints. Samsung/TalkBack/hardware camera/GPS NOT RUN;
+cleanup retry is session-only, with possible orphan bytes after process death.
+
+[Stage D report and evidence](d106-my-points-stage-d-qualification.md).
+The earlier sections below are historical stage-specific records;
+[C qualification](d106-my-points-stage-c-qualification.md) completed after B.
+No push or Samsung installation. Stage1/H05 remain OPEN.
+
 2026-10-20. Staged implementation in task/d106-stage0-overlay-registry.
 OWNER approval commit: 8329291. No push or Samsung deployment authorized.
 Stage1/H05 OPEN; unified Backup/Restore and Android Auto Backup untouched.

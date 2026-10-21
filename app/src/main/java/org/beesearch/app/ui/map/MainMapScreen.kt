@@ -69,7 +69,7 @@ internal fun CurrentTerritoryScreen(
     onCreateHollow: () -> Unit,
     onCreateLogHive: () -> Unit,
     onCreateUserPoint: () -> Unit = {},
-    onOpenUserPoint: (UUID, UUID) -> Unit = { _, _ -> },
+    onOpenUserPoint: (UUID, UUID, org.beesearch.app.ui.userpoints.UserPointCardOrigin) -> Unit = { _, _, _ -> },
     observationRepository: ObservationRepository,
     physicalObjectRepository: PhysicalObjectRepository,
     mapDataDisplayStore: MapDataDisplayStore,
@@ -230,7 +230,7 @@ internal fun CurrentTerritoryScreen(
                     selectedUserPointId = currentUserPoints.selectedId,
                     onOpenUserPoint = { point ->
                         mapDataViewModel.closePanel(); mapDataViewModel.closePreview()
-                        onOpenUserPoint(point.territoryId, point.id)
+                        onOpenUserPoint(point.territoryId, point.id, org.beesearch.app.ui.userpoints.UserPointCardOrigin.MAP)
                     },
                     researchObjectMarkers = mapDataState.markers,
                     selectedResearchObjectId = mapDataState.selectedObjectId,
@@ -268,7 +268,7 @@ internal fun CurrentTerritoryScreen(
                     state = mapDataState,
                     viewModel = mapDataViewModel,
                     userPointsState = currentUserPoints,
-                    onOpenUserPoint = { id -> territory?.id?.let { onOpenUserPoint(it, id) } },
+                    onOpenUserPoint = { id -> territory?.id?.let { onOpenUserPoint(it, id, org.beesearch.app.ui.userpoints.UserPointCardOrigin.LIST) } },
                     onUserPointVisibility = userPointsModel::setVisible,
                     onRetryUserPoints = userPointsModel::retryRead,
                     onRetryUserPointVisibility = userPointsModel::retryVisibility,

@@ -1,0 +1,113 @@
+{
+  "tableFingerprints": {
+    "android_metadata": {
+      "rows": 1,
+      "sha256": "63bbdf70270819ece78b0f40edb29ebe8399b96ab13d18db6568d7328ae7c924"
+    },
+    "territories": {
+      "rows": 1,
+      "sha256": "1312a56ad117848972d4ddb2effd7e305827c502e64b8e87a1b206efc69eca52"
+    },
+    "observers": {
+      "rows": 1,
+      "sha256": "426fc3d37c783bf5fd58c2c20f28f92f6537f678b60a5a6ec25f45c9d50cf821"
+    },
+    "observation_points": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "physical_objects": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "hollows": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "log_hives": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "physical_object_media": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "physical_object_sequences": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "apiaries": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "bees": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "flight_cycles": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "observation_point_attachments": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "observation_point_weather": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "room_master_table": {
+      "rows": 1,
+      "sha256": "392ed0f1885f96317bee62c1a33be33fa4434c60c289632057289871b9b55344"
+    },
+    "gpx_imports": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "gpx_source_tracks": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "gpx_track_segments": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "gpx_track_samples": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "gpx_import_jobs": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "gpx_deletions": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "user_points": {
+      "rows": 3,
+      "sha256": "3e9cb624d2912ee81bebb1e26cb53c75d8f17ae4d78acebebe9c36e8b9a9e302"
+    },
+    "user_point_photos": {
+      "rows": 4,
+      "sha256": "3ea1a41380c9fa072eb8353e003e38c9f86ebb1ef4763509522971a553bfac54"
+    }
+  },
+  "all23TableFingerprintsUnchanged": true,
+  "original3Points4PhotosUnchanged": true,
+  "managedSha256": {
+    "user-point-media/e50653af-1bb2-448a-bd6a-c454a3eefb64/2ce6559c-f0ed-43d7-b348-9e477a85e837": "1a4be9aa7d4dada67f74d23e21e3db6b084e4f5d7db869ee99c30b3c28bf7848",
+    "user-point-media/e50653af-1bb2-448a-bd6a-c454a3eefb64/4352d031-c0e3-416d-975b-e641c127b2b7": "03bccea9581710fcc3258abf4f643fc786f16405fe868fbc6b91fe2032809a80",
+    "user-point-media/ab5254c2-85c0-4050-b9cb-29185e6a2ad8/679ff1d3-7a5f-4e45-8da4-8544887a9eb0": "1a4be9aa7d4dada67f74d23e21e3db6b084e4f5d7db869ee99c30b3c28bf7848",
+    "user-point-media/ab5254c2-85c0-4050-b9cb-29185e6a2ad8/b93a7493-3673-420a-8d2c-400e4b5e972d": "03bccea9581710fcc3258abf4f643fc786f16405fe868fbc6b91fe2032809a80"
+  },
+  "noDisposableManagedFilesRemain": true,
+  "draftStagingEmpty": true,
+  "externalSourceSha256": {
+    "B20-landscape.png": "1a4be9aa7d4dada67f74d23e21e3db6b084e4f5d7db869ee99c30b3c28bf7848",
+    "B20-portrait.png": "03bccea9581710fcc3258abf4f643fc786f16405fe868fbc6b91fe2032809a80"
+  },
+  "installedSha256": "af3f27cdb4ef30a4207b2f9d9f101503409d41be3128ae15d0ea83c99b3283a2",
+  "productionSourceMatchesQualifiedApk": true,
+  "fontScale": "1.7"
+}

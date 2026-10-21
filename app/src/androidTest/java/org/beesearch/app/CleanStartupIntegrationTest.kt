@@ -210,6 +210,49 @@ class CleanStartupIntegrationTest {
     }
 
     @Test
+    fun userPointDraftMapBackAndConfirmKeepEditorSessionAndDoNotReplayAfterClosing() = runBlocking {
+        val model = newViewModel()
+        val target = org.beesearch.app.ui.userpoints.UserPointEditorTarget(
+            requestId = UUID.randomUUID(), territoryId = UUID.randomUUID(), pointId = UUID.randomUUID(),
+            latitude = 56.1, longitude = 42.7,
+            origin = org.beesearch.app.ui.userpoints.UserPointCardOrigin.LIST,
+        )
+        // A previous coordinate edit can make the current draft differ from the original route.
+        model.changeUserPointDraftLocation(target, 57.1, 43.7)
+        val selection = model.physicalObjectLocationSelection.value as PhysicalObjectLocationSelection.UserPointDraft
+        assertEquals(target.requestId, selection.target.requestId)
+        assertEquals(MapTarget(57.1, 43.7), model.mapCenterRequest.value?.target)
+        model.cancelPhysicalObjectLocationSelection()
+        val returned = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+            model.route.first { it is AppRoute.UserPointEditor }
+        } as AppRoute.UserPointEditor
+        assertEquals(target.requestId, returned.target.requestId)
+        assertEquals(57.1, returned.target.latitude, 0.0)
+        assertEquals(43.7, returned.target.longitude, 0.0)
+        assertNull(model.physicalObjectLocationSelection.value)
+        assertNull(model.mapCenterRequest.value)
+
+        model.changeUserPointDraftLocation(returned.target, 57.1, 43.7)
+        model.confirmPhysicalObjectLocation(58.2, 44.8)
+        val confirmed = withTimeout(ROUTE_TIMEOUT_MILLIS) {
+            model.route.first { it is AppRoute.UserPointEditor && it.target.latitude == 58.2 }
+        } as AppRoute.UserPointEditor
+        assertEquals(target.requestId, confirmed.target.requestId)
+        assertEquals(target.pointId, confirmed.target.pointId)
+        assertEquals(target.origin, confirmed.target.origin)
+        assertTrue(returned.target.coordinateRevision != confirmed.target.coordinateRevision)
+        assertEquals(44.8, confirmed.target.longitude, 0.0)
+        model.closeUserPointEditor(confirmed.target)
+        awaitRoute(model, AppRoute.UserPointDetail(target.territoryId, requireNotNull(target.pointId), target.origin))
+        model.openCurrentTerritory()
+        awaitRoute(model, AppRoute.CurrentTerritory())
+        assertNull(model.physicalObjectLocationSelection.value)
+        model.openSettings()
+        model.openCurrentTerritory()
+        awaitRoute(model, AppRoute.CurrentTerritory())
+    }
+
+    @Test
     fun physicalObjectCoordinateEditUsesMapCenterAndReturnsOneShotUpdateForSameIdentity() = runBlocking {
         val viewModel = newViewModel()
         val objectId = UUID.randomUUID()

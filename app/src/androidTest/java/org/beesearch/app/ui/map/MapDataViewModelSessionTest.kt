@@ -99,6 +99,25 @@ class MapDataViewModelSessionTest {
         withTimeout(TIMEOUT_MILLIS) { viewModel.uiState.first(predicate) }
 
     @Test
+    fun explicitUserPointListReturnRestoresItsPanelAfterCoordinateSelectionAndDoesNotReplay() = runBlocking {
+        viewModel.openPanel()
+        viewModel.openUserPoints()
+        awaitState { it.panelOpen && it.userPointsOpen }
+        // A coordinate camera request closes the old map sheet.
+        viewModel.closePanel()
+        awaitState { !it.panelOpen }
+        viewModel.openUserPoints()
+        val restored = awaitState { it.panelOpen && it.userPointsOpen }
+        assertFalse(restored.gpxOpen)
+        assertNull(restored.openedType)
+        viewModel.closePanel()
+        awaitState { !it.panelOpen && !it.userPointsOpen }
+        viewModel.openPanel()
+        val ordinary = awaitState { it.panelOpen }
+        assertFalse(ordinary.userPointsOpen)
+    }
+
+    @Test
     fun theSessionStartsClosedAndOpensAtTheTypeList() = runBlocking {
         assertFalse(awaitState { !it.panelOpen }.panelOpen)
 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.beesearch.app.data.media.UserPointMediaStoreTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-21T08:00:37.972Z" hostname="DESKTOP-9016QR7" time="0.43">
+  <properties/>
+  <testcase name="cleanup is idempotent and a nonempty owner directory fails closed then recovers" classname="org.beesearch.app.data.media.UserPointMediaStoreTest" time="0.124"/>
+  <testcase name="user point namespace is isolated and activation commits multiple photos" classname="org.beesearch.app.data.media.UserPointMediaStoreTest" time="0.112"/>
+  <testcase name="rollback restores staged bytes and external source remains untouched" classname="org.beesearch.app.data.media.UserPointMediaStoreTest" time="0.05"/>
+  <testcase name="cleanup refuses another point photo even with forged owner metadata" classname="org.beesearch.app.data.media.UserPointMediaStoreTest" time="0.075"/>
+  <testcase name="requireAvailable rejects a foreign owner tuple and malformed path" classname="org.beesearch.app.data.media.UserPointMediaStoreTest" time="0.02"/>
+  <testcase name="corrupt staged bytes fail closed" classname="org.beesearch.app.data.media.UserPointMediaStoreTest" time="0.049"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
