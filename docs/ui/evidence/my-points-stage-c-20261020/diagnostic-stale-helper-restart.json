@@ -1,0 +1,19 @@
+{
+  "pid_before": "17963",
+  "stopped_pid": "",
+  "pid_after": "18157",
+  "switches": [
+    [
+      "Показывать на карте: B20 field photon-Final qualificatio",
+      false
+    ],
+    [
+      "Показывать на карте: B20-final-qualification",
+      false
+    ],
+    [
+      "Показывать на карте: C map marker",
+      false
+    ]
+  ]
+}

@@ -80,6 +80,7 @@ internal data class MapDataUiState(
     val openedType: MapDataType? = null,
     /** Whether the open sheet shows the nested «Треки GPX» page. */
     val gpxOpen: Boolean = false,
+    val userPointsOpen: Boolean = false,
 ) {
     /** Only a currently visible, filtered real record can supply a preview or detail action. */
     val selectedMarker: MapObjectMarker?
@@ -115,6 +116,7 @@ internal class MapDataViewModel(
     private val panelOpen = MutableStateFlow(false)
     private val openedType = MutableStateFlow<MapDataType?>(null)
     private val gpxOpen = MutableStateFlow(false)
+    private val userPointsOpen = MutableStateFlow(false)
     private val refreshTrigger = MutableStateFlow(0)
     private val pendingSave = MutableStateFlow<SaveRequest?>(null)
 
@@ -135,8 +137,9 @@ internal class MapDataViewModel(
     }
 
     /** The sheet session as one value, so the UI state stays a five-flow combination. */
-    private val panelSession = combine(panelOpen, openedType, gpxOpen) { open, type, gpx ->
-        Triple(open, type, gpx)
+    private data class PanelSession(val open: Boolean, val type: MapDataType?, val gpx: Boolean, val userPoints: Boolean)
+    private val panelSession = combine(panelOpen, openedType, gpxOpen, userPointsOpen) { open, type, gpx, userPoints ->
+        PanelSession(open, type, gpx, userPoints)
     }
 
     val uiState: StateFlow<MapDataUiState> =
@@ -153,9 +156,10 @@ internal class MapDataViewModel(
                 markers = researchObjectMarkers(state, sets.points, sets.hollows, sets.logHives),
                 availability = available,
                 selectedObjectId = selected,
-                panelOpen = session.first,
-                openedType = session.second,
-                gpxOpen = session.third,
+                panelOpen = session.open,
+                openedType = session.type,
+                gpxOpen = session.gpx,
+                userPointsOpen = session.userPoints,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -211,6 +215,7 @@ internal class MapDataViewModel(
         objects.value = MapObjectSets.EMPTY
         selectedObjectId.value = null
         gpxOpen.value = false
+        userPointsOpen.value = false
         if (id == null) {
             // Without a Territory there is no research data to configure, so the panel that configures
             // it has nothing to show and is closed rather than left open over an empty map.
@@ -264,6 +269,7 @@ internal class MapDataViewModel(
     fun openPanel() {
         openedType.value = null
         gpxOpen.value = false
+        userPointsOpen.value = false
         panelOpen.value = true
     }
 
@@ -271,11 +277,13 @@ internal class MapDataViewModel(
     fun closePanel() {
         openedType.value = null
         gpxOpen.value = false
+        userPointsOpen.value = false
         panelOpen.value = false
     }
 
     /** Opens the nested «Треки GPX» page inside the open panel. */
     fun openGpxTracks() {
+        userPointsOpen.value = false
         openedType.value = null
         gpxOpen.value = true
     }
@@ -283,11 +291,21 @@ internal class MapDataViewModel(
     /** Returns from «Треки GPX» to the main panel, keeping the sheet open. */
     fun closeGpxTracks() {
         gpxOpen.value = false
+        userPointsOpen.value = false
     }
+
+    fun openUserPoints() {
+        openedType.value = null
+        gpxOpen.value = false
+        userPointsOpen.value = true
+    }
+
+    fun closeUserPoints() { userPointsOpen.value = false }
 
     /** Shows the filter screen of one type inside the open panel. */
     fun openTypeFilters(type: MapDataType) {
         gpxOpen.value = false
+        userPointsOpen.value = false
         openedType.value = type
     }
 

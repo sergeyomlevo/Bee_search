@@ -70,7 +70,7 @@ class MapDataPanelTest {
     private val year2024 = ResearchDateInterval(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31))
 
     @Test
-    fun userDataSectionKeepsTracksAndDisabledMyPointsInOrder() {
+    fun userDataSectionKeepsTracksAndEnabledMyPointsInOrder() {
         setSheet()
 
         rule.node("user-data-section").performScrollTo().assertIsDisplayed()
@@ -78,8 +78,8 @@ class MapDataPanelTest {
         rule.nodeText("Мои точки").assertIsDisplayed()
         rule.onAllNodesWithText("Треки", useUnmergedTree = true).assertCountEquals(1)
         rule.onAllNodesWithText("Мои точки", useUnmergedTree = true).assertCountEquals(1)
-        rule.node("user-points-row").assertIsNotEnabled()
-        rule.node("user-points-row").assertContentDescriptionEquals("Мои точки. Недоступно.")
+        rule.node("user-points-row").assertIsEnabled()
+        rule.node("user-points-row").assertContentDescriptionEquals("Мои точки")
         rule.nodeText("GPX").assertDoesNotExist()
         rule.nodeText("Треки GPX").assertDoesNotExist()
         rule.nodeText("Импорт и показ сохранённых треков").assertDoesNotExist()
@@ -99,7 +99,7 @@ class MapDataPanelTest {
     }
 
     @Test
-    fun disabledMyPointsDoesNotOpenAnything() {
+    fun userPointsOpensItsOwnRouteWithoutOpeningGpxOrResearchFilters() {
         setPanel()
 
         rule.node("user-points-row").performTouchInput { click() }
@@ -107,6 +107,7 @@ class MapDataPanelTest {
         rule.node("gpx-tracks-page").assertDoesNotExist()
         assertNull(state.openedType)
         assertTrue(!state.gpxOpen)
+        assertTrue(userPointsOpen)
     }
 
     @Test
@@ -856,6 +857,7 @@ class MapDataPanelTest {
 
     private var state by mutableStateOf(MapDataUiState(today = LocalDate.of(2026, 10, 9)))
     private var closed = false
+    private var userPointsOpen = false
 
     private fun setPanel(
         initial: MapDataDisplayState = DEFAULT_MAP_DATA_DISPLAY,
@@ -865,6 +867,7 @@ class MapDataPanelTest {
     ) {
         state = MapDataUiState(today = today, display = initial, availability = availability)
         closed = false
+        userPointsOpen = false
         rule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
@@ -887,6 +890,7 @@ class MapDataPanelTest {
             availability = availability,
             panelOpen = true,
         )
+        userPointsOpen = false
         rule.setContent { SheetHarness() }
     }
 
@@ -914,6 +918,7 @@ class MapDataPanelTest {
             onCloseType = { state = state.copy(openedType = null) },
             onOpenGpx = { state = state.copy(gpxOpen = true) },
             onCloseGpx = { state = state.copy(gpxOpen = false) },
+            onOpenUserPoints = { userPointsOpen = true },
             // Closing the panel is what the ViewModel does too: the session ends with the sheet.
             onDismiss = { state = state.copy(panelOpen = false, openedType = null, gpxOpen = false) },
         )
@@ -953,6 +958,7 @@ class MapDataPanelTest {
             onDismiss = { closed = true },
             onOpenGpx = { state = state.copy(gpxOpen = true) },
             onCloseGpx = { state = state.copy(gpxOpen = false) },
+            onOpenUserPoints = { userPointsOpen = true },
             modifier = if (viewportHeight == null) Modifier.fillMaxSize()
             else Modifier.fillMaxWidth().height(viewportHeight),
         )

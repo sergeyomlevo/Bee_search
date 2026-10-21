@@ -1,0 +1,128 @@
+INSTRUMENTATION_STATUS: class=org.beesearch.app.MapMarkersTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stream=
+org.beesearch.app.MapMarkersTest:
+INSTRUMENTATION_STATUS: test=initializationError
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.MapMarkersTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stack=java.lang.RuntimeException: Failed loading specified test class 'org.beesearch.app.MapMarkersTest'
+	at androidx.test.internal.runner.DirectTestLoader.doCreateRunner(DirectTestLoader.java:50)
+	at androidx.test.internal.runner.TestLoader.getRunnersFor(TestLoader.java:64)
+	at androidx.test.internal.runner.TestRequestBuilder.build(TestRequestBuilder.java:835)
+	at androidx.test.runner.AndroidJUnitRunner.buildRequest(AndroidJUnitRunner.java:650)
+	at androidx.test.runner.AndroidJUnitRunner.onStart(AndroidJUnitRunner.java:418)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2189)
+Caused by: java.lang.ClassNotFoundException: org.beesearch.app.MapMarkersTest
+	at java.lang.Class.classForName(Native Method)
+	at java.lang.Class.forName(Class.java:454)
+	at androidx.test.internal.runner.DirectTestLoader.doCreateRunner(DirectTestLoader.java:44)
+	... 5 more
+Caused by: java.lang.ClassNotFoundException: Didn't find class "org.beesearch.app.MapMarkersTest" on path: DexPathList[[zip file "/data/app/org.beesearch.app.dev.test-GuWQkQ0uBAPV1QJnVSGSqA==/base.apk", zip file "/data/app/org.beesearch.app.dev-1A0869MT9mUiSfqpxa_xSg==/base.apk"],nativeLibraryDirectories=[/data/app/org.beesearch.app.dev.test-GuWQkQ0uBAPV1QJnVSGSqA==/lib/x86_64, /data/app/org.beesearch.app.dev-1A0869MT9mUiSfqpxa_xSg==/lib/x86_64, /data/app/org.beesearch.app.dev.test-GuWQkQ0uBAPV1QJnVSGSqA==/base.apk!/lib/x86_64, /data/app/org.beesearch.app.dev-1A0869MT9mUiSfqpxa_xSg==/base.apk!/lib/x86_64, /system/lib64, /system/product/lib64]]
+	at dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:196)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:379)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:312)
+	... 8 more
+
+INSTRUMENTATION_STATUS: stream=
+Error in initializationError(org.beesearch.app.MapMarkersTest):
+java.lang.RuntimeException: Failed loading specified test class 'org.beesearch.app.MapMarkersTest'
+	at androidx.test.internal.runner.DirectTestLoader.doCreateRunner(DirectTestLoader.java:50)
+	at androidx.test.internal.runner.TestLoader.getRunnersFor(TestLoader.java:64)
+	at androidx.test.internal.runner.TestRequestBuilder.build(TestRequestBuilder.java:835)
+	at androidx.test.runner.AndroidJUnitRunner.buildRequest(AndroidJUnitRunner.java:650)
+	at androidx.test.runner.AndroidJUnitRunner.onStart(AndroidJUnitRunner.java:418)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2189)
+Caused by: java.lang.ClassNotFoundException: org.beesearch.app.MapMarkersTest
+	at java.lang.Class.classForName(Native Method)
+	at java.lang.Class.forName(Class.java:454)
+	at androidx.test.internal.runner.DirectTestLoader.doCreateRunner(DirectTestLoader.java:44)
+	... 5 more
+Caused by: java.lang.ClassNotFoundException: Didn't find class "org.beesearch.app.MapMarkersTest" on path: DexPathList[[zip file "/data/app/org.beesearch.app.dev.test-GuWQkQ0uBAPV1QJnVSGSqA==/base.apk", zip file "/data/app/org.beesearch.app.dev-1A0869MT9mUiSfqpxa_xSg==/base.apk"],nativeLibraryDirectories=[/data/app/org.beesearch.app.dev.test-GuWQkQ0uBAPV1QJnVSGSqA==/lib/x86_64, /data/app/org.beesearch.app.dev-1A0869MT9mUiSfqpxa_xSg==/lib/x86_64, /data/app/org.beesearch.app.dev.test-GuWQkQ0uBAPV1QJnVSGSqA==/base.apk!/lib/x86_64, /data/app/org.beesearch.app.dev-1A0869MT9mUiSfqpxa_xSg==/base.apk!/lib/x86_64, /system/lib64, /system/product/lib64]]
+	at dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:196)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:379)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:312)
+	... 8 more
+
+INSTRUMENTATION_STATUS: test=initializationError
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointSaveLifecycleTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stream=
+org.beesearch.app.ui.userpoints.UserPointSaveLifecycleTest:
+INSTRUMENTATION_STATUS: test=clearingViewModelDuringFinalizationNeverRemovesCommittedPhoto
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointSaveLifecycleTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=clearingViewModelDuringFinalizationNeverRemovesCommittedPhoto
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointSaveLifecycleTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=failedRoomSaveRestoresDraftAndRetryKeepsManagedPhoto
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointSaveLifecycleTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=failedRoomSaveRestoresDraftAndRetryKeepsManagedPhoto
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stream=
+org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest:
+INSTRUMENTATION_STATUS: test=offRemovesOverlayAndOnRestoresItWithNewSnapshot
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=offRemovesOverlayAndOnRestoresItWithNewSnapshot
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=styleReloadRestoresSourcesLayersAndSelectedFeature
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stack=java.lang.IllegalStateException: MapLibre style did not become fully loaded
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest.awaitStyle(UserPointMapOverlayNativeTest.kt:166)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest.styleReloadRestoresSourcesLayersAndSelectedFeature(UserPointMapOverlayNativeTest.kt:102)
+
+INSTRUMENTATION_STATUS: stream=
+Error in styleReloadRestoresSourcesLayersAndSelectedFeature(org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest):
+java.lang.IllegalStateException: MapLibre style did not become fully loaded
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest.awaitStyle(UserPointMapOverlayNativeTest.kt:166)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest.styleReloadRestoresSourcesLayersAndSelectedFeature(UserPointMapOverlayNativeTest.kt:102)
+
+INSTRUMENTATION_STATUS: test=styleReloadRestoresSourcesLayersAndSelectedFeature
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=90
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=visibleCurrentTerritoryPointsAndSelectedHaloReachNativeSources
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0

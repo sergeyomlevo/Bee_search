@@ -29,6 +29,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -68,6 +69,7 @@ internal fun CurrentTerritoryScreen(
     onCreateHollow: () -> Unit,
     onCreateLogHive: () -> Unit,
     onCreateUserPoint: () -> Unit = {},
+    onOpenUserPoint: (UUID, UUID) -> Unit = { _, _ -> },
     observationRepository: ObservationRepository,
     physicalObjectRepository: PhysicalObjectRepository,
     mapDataDisplayStore: MapDataDisplayStore,
@@ -108,6 +110,22 @@ internal fun CurrentTerritoryScreen(
     val mapDataState by mapDataViewModel.uiState.collectAsStateWithLifecycle()
 
     val application = LocalContext.current.applicationContext as BeeSearchApplication
+    val userPointsModel: org.beesearch.app.ui.userpoints.UserPointDisplayViewModel = viewModel(
+        factory = org.beesearch.app.ui.userpoints.UserPointDisplayViewModel.factory(application.container.userPointRepository),
+    )
+    val userPointsState by userPointsModel.state.collectAsStateWithLifecycle()
+    val currentUserPoints = if (userPointsState.territoryId == territory?.id) userPointsState
+        else org.beesearch.app.ui.userpoints.UserPointDisplayState(territoryId = territory?.id)
+    val userOverlay = androidx.compose.runtime.remember(currentUserPoints.points, currentUserPoints.selectedId, currentUserPoints.revision) {
+        org.beesearch.app.ui.userpoints.userPointOverlay(currentUserPoints)
+    }
+    var userOverlayPresentation by androidx.compose.runtime.remember(territory?.id) {
+        androidx.compose.runtime.mutableStateOf<OverlayPresentation?>(null)
+    }
+    LaunchedEffect(territory?.id) { userPointsModel.setTerritory(territory?.id) }
+    LaunchedEffect(mapCenterRequest?.requestId) {
+        if (mapCenterRequest != null) { mapDataViewModel.closePanel(); mapDataViewModel.closePreview() }
+    }
     val gpxImportViewModel: GpxImportViewModel = viewModel(
         factory = GpxImportViewModel.factory(application.container.gpxImportWorkflow),
     )
@@ -202,8 +220,18 @@ internal fun CurrentTerritoryScreen(
                     areaEditorRequest = areaEditorRequest,
                     onAreaEditorRequestHandled = onAreaEditorRequestHandled,
                     onCoverageSessionEnded = onCoverageEditFinished,
-                    runtimeOverlays = gpxOverlays,
-                    onOverlayPresentation = gpxDisplayViewModel::onPresentation,
+                    runtimeOverlays = gpxOverlays + listOfNotNull(userOverlay),
+                    onOverlayPresentation = { scope, status ->
+                        gpxDisplayViewModel.onPresentation(scope, status)
+                        if (scope == territory?.id) userOverlayPresentation = status[org.beesearch.app.ui.userpoints.USER_POINTS_OVERLAY_KEY]
+                    },
+                    userPoints = if (userOverlayPresentation?.result == OverlayResult.APPLIED &&
+                        userOverlayPresentation?.revision == userOverlay?.revision) currentUserPoints.points.filter { it.isVisible } else emptyList(),
+                    selectedUserPointId = currentUserPoints.selectedId,
+                    onOpenUserPoint = { point ->
+                        mapDataViewModel.closePanel(); mapDataViewModel.closePreview()
+                        onOpenUserPoint(point.territoryId, point.id)
+                    },
                     researchObjectMarkers = mapDataState.markers,
                     selectedResearchObjectId = mapDataState.selectedObjectId,
                     onSelectResearchObject = { marker -> mapDataViewModel.toggleSelection(marker.id) },
@@ -239,6 +267,11 @@ internal fun CurrentTerritoryScreen(
                 MapDataSurface(
                     state = mapDataState,
                     viewModel = mapDataViewModel,
+                    userPointsState = currentUserPoints,
+                    onOpenUserPoint = { id -> territory?.id?.let { onOpenUserPoint(it, id) } },
+                    onUserPointVisibility = userPointsModel::setVisible,
+                    onRetryUserPoints = userPointsModel::retryRead,
+                    onRetryUserPointVisibility = userPointsModel::retryVisibility,
                     gpxImportState = gpxImportState,
                     gpxDisplayState = currentGpxDisplayState,
                     onGpxVisibilityChange = gpxDisplayViewModel::setVisible,
@@ -290,6 +323,11 @@ internal fun MapDataSurface(
     viewModel: MapDataViewModel,
     gpxImportState: GpxImportUiState = GpxImportUiState.Idle,
     gpxDisplayState: GpxDisplayUiState = GpxDisplayUiState(),
+    userPointsState: org.beesearch.app.ui.userpoints.UserPointDisplayState = org.beesearch.app.ui.userpoints.UserPointDisplayState(),
+    onOpenUserPoint: (UUID) -> Unit = {},
+    onUserPointVisibility: (UUID, Boolean) -> Unit = { _, _ -> },
+    onRetryUserPoints: () -> Unit = {},
+    onRetryUserPointVisibility: (UUID) -> Unit = {},
     onGpxVisibilityChange: (UUID, Boolean) -> Unit = { _, _ -> },
     onDeleteGpx: (UUID) -> Unit = {},
     onRetryGpxDisplay: (UUID?) -> Unit = {},
@@ -311,6 +349,13 @@ internal fun MapDataSurface(
         onOpenType = viewModel::openTypeFilters,
         onCloseType = viewModel::closeTypeFilters,
         onDismiss = viewModel::closePanel,
+        onOpenUserPoints = viewModel::openUserPoints,
+        onCloseUserPoints = viewModel::closeUserPoints,
+        userPointsState = userPointsState,
+        onOpenUserPoint = onOpenUserPoint,
+        onUserPointVisibility = onUserPointVisibility,
+        onRetryUserPoints = onRetryUserPoints,
+        onRetryUserPointVisibility = onRetryUserPointVisibility,
         onOpenGpx = viewModel::openGpxTracks,
         onCloseGpx = viewModel::closeGpxTracks,
         gpxImportState = gpxImportState,

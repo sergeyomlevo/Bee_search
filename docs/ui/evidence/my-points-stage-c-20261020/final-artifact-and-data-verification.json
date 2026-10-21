@@ -1,0 +1,20 @@
+{
+  "serial": "emulator-5556",
+  "api": "29",
+  "fontScale": "1.7",
+  "local_apk_sha256": "e6e46373e15493b90e749fb92c670a8f292a3d3091bc62448829aa1adb2fe64b",
+  "installed_apk_sha256": "e6e46373e15493b90e749fb92c670a8f292a3d3091bc62448829aa1adb2fe64b",
+  "b_points_unchanged": 2,
+  "b_photos_metadata_and_bytes_unchanged": 4,
+  "c_fixture": {
+    "id": "d6ef20ff-83d3-42d9-8625-34c974519c2f",
+    "territory_id": "4f852a34-69e0-4f64-8de5-a88d1ee6f1f7",
+    "title": "C map marker",
+    "note": null,
+    "latitude": 56.83478352257674,
+    "longitude": 60.61100580507613,
+    "is_visible": 1,
+    "created_at": 1792525871128,
+    "updated_at": 1792525871128
+  }
+}

@@ -276,6 +276,7 @@ private fun BeeSearchApp(
                         repository = application.container.userPointRepository,
                         mediaStore = application.container.userPointMediaStore,
                         onBack = viewModel::openCurrentTerritory,
+                        onShowOnMap = viewModel::showUserPointOnMap,
                     )
                     is AppRoute.CreatePhysicalObject -> PhysicalObjectCreationRoute(
                         target = currentRoute.target,
@@ -373,6 +374,7 @@ private fun BeeSearchApp(
                         onCreateHollow = viewModel::createHollowFromChooser,
                         onCreateLogHive = viewModel::createLogHiveFromChooser,
                         onCreateUserPoint = viewModel::createUserPointFromChooser,
+                        onOpenUserPoint = viewModel::openUserPoint,
                         observationRepository = application.container.observationRepository,
                         physicalObjectRepository = application.container.physicalObjectRepository,
                         mapDataDisplayStore = application.container.mapDataDisplayStore,

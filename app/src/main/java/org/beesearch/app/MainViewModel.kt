@@ -831,6 +831,13 @@ internal class MainViewModel(
         clearFeedback()
     }
 
+    fun showUserPointOnMap(point: org.beesearch.app.domain.model.UserPoint) {
+        if (settings.value.currentTerritoryId != point.territoryId) return
+        _mapCenterRequest.value = MapCenterRequest(UUID.randomUUID(), MapTarget(point.latitude, point.longitude))
+        manualRoute.value = AppRoute.CurrentTerritory()
+        clearFeedback()
+    }
+
     fun closeUserPointEditor(target: org.beesearch.app.ui.userpoints.UserPointEditorTarget) {
         _physicalObjectLocationSelection.value = null
         manualRoute.value = target.pointId?.let { AppRoute.UserPointDetail(target.territoryId, it) }

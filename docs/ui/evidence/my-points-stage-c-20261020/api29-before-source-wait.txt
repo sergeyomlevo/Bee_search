@@ -1,0 +1,271 @@
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest:
+INSTRUMENTATION_STATUS: test=offRemovesOverlayAndOnRestoresItWithNewSnapshot
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=offRemovesOverlayAndOnRestoresItWithNewSnapshot
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=styleReloadRestoresSourcesLayersAndSelectedFeature
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=styleReloadRestoresSourcesLayersAndSelectedFeature
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=visibleCurrentTerritoryPointsAndSelectedHaloReachNativeSources
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=visibleCurrentTerritoryPointsAndSelectedHaloReachNativeSources
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=scopeAtoBtoARemovesForeignPointFromNativeSource
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: expected:<[1c66a094-de93-44da-9367-1211a37845a3]> but was:<[806ca7c7-a200-4c10-ae48-141e2fa1b8c2]>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest.scopeAtoBtoARemovesForeignPointFromNativeSource$lambda$17(UserPointMapOverlayNativeTest.kt:128)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest$$ExternalSyntheticLambda1.invoke(D8$$SyntheticClass:0)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest.onMain$lambda$27(UserPointMapOverlayNativeTest.kt:177)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest$$ExternalSyntheticLambda16.run(D8$$SyntheticClass:0)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:462)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2207)
+	at android.os.Handler.handleCallback(Handler.java:883)
+	at android.os.Handler.dispatchMessage(Handler.java:100)
+	at android.os.Looper.loop(Looper.java:214)
+	at android.app.ActivityThread.main(ActivityThread.java:7356)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:492)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:930)
+
+INSTRUMENTATION_STATUS: stream=
+Error in scopeAtoBtoARemovesForeignPointFromNativeSource(org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest):
+java.lang.AssertionError: expected:<[1c66a094-de93-44da-9367-1211a37845a3]> but was:<[806ca7c7-a200-4c10-ae48-141e2fa1b8c2]>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest.scopeAtoBtoARemovesForeignPointFromNativeSource$lambda$17(UserPointMapOverlayNativeTest.kt:128)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest$$ExternalSyntheticLambda1.invoke(D8$$SyntheticClass:0)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest.onMain$lambda$27(UserPointMapOverlayNativeTest.kt:177)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest$$ExternalSyntheticLambda16.run(D8$$SyntheticClass:0)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:462)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2207)
+	at android.os.Handler.handleCallback(Handler.java:883)
+	at android.os.Handler.dispatchMessage(Handler.java:100)
+	at android.os.Looper.loop(Looper.java:214)
+	at android.app.ActivityThread.main(ActivityThread.java:7356)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:492)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:930)
+
+INSTRUMENTATION_STATUS: test=scopeAtoBtoARemovesForeignPointFromNativeSource
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=org.beesearch.app.MapCenterTargetTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+org.beesearch.app.MapCenterTargetTest:
+INSTRUMENTATION_STATUS: test=targetRemainsAtExactViewportCenterWhenCameraCoordinatesChange
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.MapCenterTargetTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=targetRemainsAtExactViewportCenterWhenCameraCoordinatesChange
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.MapCenterTargetTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=gpsMarkerUsesProjectedScreenPositionIndependentlyOfMapStyle
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.MapCenterTargetTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=gpsMarkerUsesProjectedScreenPositionIndependentlyOfMapStyle
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+org.beesearch.app.ui.userpoints.UserPointListUiTest:
+INSTRUMENTATION_STATUS: test=writingDisablesOnlyTheAffectedSwitch
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=writingDisablesOnlyTheAffectedSwitch
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=longNamesScrollAndMixedVisibilityRowsReachTheBottom
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=longNamesScrollAndMixedVisibilityRowsReachTheBottom
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=titleAndSwitchAreIndependentTargets
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=titleAndSwitchAreIndependentTargets
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=listStateCanBeCapturedWithExistingMechanism
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=listStateCanBeCapturedWithExistingMechanism
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=loadingReadErrorAndEmptyHaveDistinctStates
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=loadingReadErrorAndEmptyHaveDistinctStates
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=12
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=emptyAndVisibilityErrorStatesCanBeCaptured
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointListUiTest
+INSTRUMENTATION_STATUS: current=12
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=emptyAndVisibilityErrorStatesCanBeCaptured
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointCardMapActionTest
+INSTRUMENTATION_STATUS: current=13
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+org.beesearch.app.ui.userpoints.UserPointCardMapActionTest:
+INSTRUMENTATION_STATUS: test=offFailureKeepsCardAndNoCameraThenRetryPersistsAndClosesOnce
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointCardMapActionTest
+INSTRUMENTATION_STATUS: current=13
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=offFailureKeepsCardAndNoCameraThenRetryPersistsAndClosesOnce
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointCardMapActionTest
+INSTRUMENTATION_STATUS: current=14
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=alreadyOnDoesNotWriteAndBackDoesNotMoveCamera
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.userpoints.UserPointCardMapActionTest
+INSTRUMENTATION_STATUS: current=14
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=alreadyOnDoesNotWriteAndBackDoesNotMoveCamera
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 117.384
+There was 1 failure:
+1) scopeAtoBtoARemovesForeignPointFromNativeSource(org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest)
+java.lang.AssertionError: expected:<[1c66a094-de93-44da-9367-1211a37845a3]> but was:<[806ca7c7-a200-4c10-ae48-141e2fa1b8c2]>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest.scopeAtoBtoARemovesForeignPointFromNativeSource$lambda$17(UserPointMapOverlayNativeTest.kt:128)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest$$ExternalSyntheticLambda1.invoke(D8$$SyntheticClass:0)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest.onMain$lambda$27(UserPointMapOverlayNativeTest.kt:177)
+	at org.beesearch.app.ui.userpoints.UserPointMapOverlayNativeTest$$ExternalSyntheticLambda16.run(D8$$SyntheticClass:0)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:462)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2207)
+	at android.os.Handler.handleCallback(Handler.java:883)
+	at android.os.Handler.dispatchMessage(Handler.java:100)
+	at android.os.Looper.loop(Looper.java:214)
+	at android.app.ActivityThread.main(ActivityThread.java:7356)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:492)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:930)
+
+FAILURES!!!
+Tests run: 14,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1

@@ -137,6 +137,9 @@ internal fun BeeMap(
     onCoverageSessionEnded: () -> Unit = {},
     runtimeOverlays: List<MapOverlay<org.maplibre.android.style.sources.Source, org.maplibre.android.style.layers.Layer>> = emptyList(),
     overlayScope: Any? = territoryId,
+    userPoints: List<org.beesearch.app.domain.model.UserPoint> = emptyList(),
+    selectedUserPointId: UUID? = null,
+    onOpenUserPoint: (org.beesearch.app.domain.model.UserPoint) -> Unit = {},
     onOverlaySessionReady: (MapLibreOverlaySession) -> Unit = {},
     onOverlayPresentation: (Any?, Map<String, OverlayPresentation>) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
@@ -877,6 +880,13 @@ internal fun BeeMap(
                     createAreaConfirmationVisible = false
                     areaNameBlank = false
                 },
+            )
+        }
+        if (mode == BeeMapMode.FIELD && !coverageSelectionActive && locationSelectionLabel == null) {
+            org.beesearch.app.ui.userpoints.UserPointMarkerTargets(
+                points = userPoints, map = map, mapView = mapView, cameraRevision = mapCameraRevision,
+                selectedId = selectedUserPointId, onOpen = onOpenUserPoint,
+                modifier = Modifier.fillMaxSize().zIndex(1.5f),
             )
         }
         // Unified data map: research objects of the current Territory, already filtered by the

@@ -18,6 +18,9 @@ import org.beesearch.app.domain.model.UserPoint
 import org.beesearch.app.domain.repository.UserPointRepository
 import org.beesearch.app.ui.media.openManagedPhoto
 import org.beesearch.app.ui.physicalobjects.PhysicalObjectMediaPreview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 @Composable
@@ -27,7 +30,15 @@ internal fun UserPointDetailRoute(
     repository: UserPointRepository,
     mediaStore: UserPointMediaStore,
     onBack: () -> Unit,
+    onShowOnMap: ((UserPoint) -> Unit)? = null,
 ) {
+    val displayModel: UserPointDisplayViewModel = viewModel(factory = UserPointDisplayViewModel.factory(repository))
+    val displayState by displayModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(territoryId) { displayModel.setTerritory(territoryId) }
+    val scope = rememberCoroutineScope()
+    val showOnMap: (() -> Unit)? = onShowOnMap?.let { callback -> { scope.launch {
+        displayModel.showOnMap(pointId)?.let(callback)
+    }; Unit } }
     var point by remember(territoryId, pointId) { mutableStateOf<UserPoint?>(null) }
     var loading by remember(territoryId, pointId) { mutableStateOf(true) }
     var error by remember(territoryId, pointId) { mutableStateOf<String?>(null) }
@@ -49,14 +60,21 @@ internal fun UserPointDetailRoute(
                 loading -> CircularProgressIndicator()
                 error != null -> { Text(error!!); Button(onClick = { retry++ }) { Text("Повторить") } }
                 point == null -> Text("Точка не найдена")
-                else -> UserPointCardBody(point!!, mediaStore)
+                else -> UserPointCardBody(point!!, mediaStore, showOnMap,
+                    showWorking = displayState.loading || pointId in displayState.writing,
+                    showError = if (pointId in displayState.writeErrors) "Не удалось сохранить видимость" else displayState.error,
+                    onRetry = if (displayState.error != null) displayModel::retryRead else showOnMap,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun UserPointCardBody(point: UserPoint, mediaStore: UserPointMediaStore) {
+private fun UserPointCardBody(
+    point: UserPoint, mediaStore: UserPointMediaStore, onShowOnMap: (() -> Unit)?,
+    showWorking: Boolean, showError: String?, onRetry: (() -> Unit)?,
+) {
     val context = LocalContext.current
     Text(point.title, style = MaterialTheme.typography.headlineSmall)
     point.note?.let { Text(it) }
@@ -77,6 +95,14 @@ private fun UserPointCardBody(point: UserPoint, mediaStore: UserPointMediaStore)
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Координаты", style = MaterialTheme.typography.titleMedium)
             Text(String.format(java.util.Locale.ROOT, "%.6f, %.6f", point.latitude, point.longitude))
+            if (onShowOnMap != null) {
+                OutlinedButton(onClick = onShowOnMap, enabled = !showWorking,
+                    modifier = Modifier.fillMaxWidth().testTag("user-point-show-on-map")) { Text("Показать на карте") }
+                if (showError != null) {
+                    Text(showError, color = MaterialTheme.colorScheme.error)
+                    onRetry?.let { retry -> TextButton(onClick = retry, enabled = !showWorking) { Text("Повторить") } }
+                }
+            }
         }
     }
 }

@@ -1,0 +1,72 @@
+{
+  "user_points": [
+    {
+      "id": "e50653af-1bb2-448a-bd6a-c454a3eefb64",
+      "territory_id": "4f852a34-69e0-4f64-8de5-a88d1ee6f1f7",
+      "title": "B20 field photon-Final qualificatio",
+      "note": "B20-note-retained",
+      "latitude": 56.83411833333332,
+      "longitude": 60.612343333333314,
+      "is_visible": 1,
+      "created_at": 1792515091384,
+      "updated_at": 1792515091384
+    },
+    {
+      "id": "ab5254c2-85c0-4050-b9cb-29185e6a2ad8",
+      "territory_id": "4f852a34-69e0-4f64-8de5-a88d1ee6f1f7",
+      "title": "B20-final-qualification",
+      "note": null,
+      "latitude": 56.83411833333332,
+      "longitude": 60.612343333333314,
+      "is_visible": 1,
+      "created_at": 1792515743381,
+      "updated_at": 1792515743381
+    }
+  ],
+  "user_point_photos": [
+    {
+      "id": "2ce6559c-f0ed-43d7-b348-9e477a85e837",
+      "user_point_id": "e50653af-1bb2-448a-bd6a-c454a3eefb64",
+      "relative_path": "user-point-media/e50653af-1bb2-448a-bd6a-c454a3eefb64/2ce6559c-f0ed-43d7-b348-9e477a85e837",
+      "original_file_name": "B20-landscape.png",
+      "mime_type": "image/png",
+      "byte_size": 9231,
+      "sha256": "1a4be9aa7d4dada67f74d23e21e3db6b084e4f5d7db869ee99c30b3c28bf7848",
+      "created_at": 1792514303028,
+      "actual_sha256": "1a4be9aa7d4dada67f74d23e21e3db6b084e4f5d7db869ee99c30b3c28bf7848"
+    },
+    {
+      "id": "4352d031-c0e3-416d-975b-e641c127b2b7",
+      "user_point_id": "e50653af-1bb2-448a-bd6a-c454a3eefb64",
+      "relative_path": "user-point-media/e50653af-1bb2-448a-bd6a-c454a3eefb64/4352d031-c0e3-416d-975b-e641c127b2b7",
+      "original_file_name": "B20-portrait.png",
+      "mime_type": "image/png",
+      "byte_size": 11257,
+      "sha256": "03bccea9581710fcc3258abf4f643fc786f16405fe868fbc6b91fe2032809a80",
+      "created_at": 1792514304270,
+      "actual_sha256": "03bccea9581710fcc3258abf4f643fc786f16405fe868fbc6b91fe2032809a80"
+    },
+    {
+      "id": "679ff1d3-7a5f-4e45-8da4-8544887a9eb0",
+      "user_point_id": "ab5254c2-85c0-4050-b9cb-29185e6a2ad8",
+      "relative_path": "user-point-media/ab5254c2-85c0-4050-b9cb-29185e6a2ad8/679ff1d3-7a5f-4e45-8da4-8544887a9eb0",
+      "original_file_name": "B20-landscape.png",
+      "mime_type": "image/png",
+      "byte_size": 9231,
+      "sha256": "1a4be9aa7d4dada67f74d23e21e3db6b084e4f5d7db869ee99c30b3c28bf7848",
+      "created_at": 1792515734921,
+      "actual_sha256": "1a4be9aa7d4dada67f74d23e21e3db6b084e4f5d7db869ee99c30b3c28bf7848"
+    },
+    {
+      "id": "b93a7493-3673-420a-8d2c-400e4b5e972d",
+      "user_point_id": "ab5254c2-85c0-4050-b9cb-29185e6a2ad8",
+      "relative_path": "user-point-media/ab5254c2-85c0-4050-b9cb-29185e6a2ad8/b93a7493-3673-420a-8d2c-400e4b5e972d",
+      "original_file_name": "B20-portrait.png",
+      "mime_type": "image/png",
+      "byte_size": 11257,
+      "sha256": "03bccea9581710fcc3258abf4f643fc786f16405fe868fbc6b91fe2032809a80",
+      "created_at": 1792515735549,
+      "actual_sha256": "03bccea9581710fcc3258abf4f643fc786f16405fe868fbc6b91fe2032809a80"
+    }
+  ]
+}

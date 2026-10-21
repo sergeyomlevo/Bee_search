@@ -2679,3 +2679,27 @@ Photo add/remove/edit uses the existing managed-copy and owner-aware cleanup
 patterns. Delete is scoped by Territory and point UUID and cannot delete external
 picker files. Unified Backup/Restore is later; Android Auto Backup is unchanged.
 Stage1/H05 remain OPEN.
+
+
+### D106 My points: Stage C display integration (2026-10-20)
+
+`UserPointDisplayViewModel` observes the current Territory through the existing
+`UserPointRepository`. Room `user_points.is_visible` remains the only visibility
+store; creation commits ON atomically with point/photo metadata. Switch writes
+are confirmed by repository readback before success is presented. Territory
+changes invalidate prior read/write continuations with an epoch; only current
+Territory snapshots may reach the list or map.
+
+The existing nested `MapDataPanel` owns the My points list. Independent title
+and switch targets open the existing B card or change visibility respectively.
+The card's composition owns the suspend show-on-map operation: hidden points
+persist ON before selection and the existing consumed `MapCenterRequest`.
+Back returns to the prior list/map context without issuing a camera request.
+
+The `user-points` declaration contributes fresh GeoJSON/CircleLayer resources
+to BeeMap's existing `MapLibreOverlaySession` and `MapOverlayRegistry`. The
+Registry restores them after a confirmed base-style change. Compose projection
+provides the same 48dp interaction boundary used by research markers, enabled
+only for an applied current revision. Research-object targets retain priority
+where targets overlap. This adds no map host, lifecycle, visibility store,
+schema change or media pipeline. Edit/delete remain separate Stage D work.

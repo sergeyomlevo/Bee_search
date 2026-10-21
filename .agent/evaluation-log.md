@@ -46,3 +46,13 @@ Recorded signals follow; routine successful reviews are intentionally absent.
 - Evidence reference: current-session /root/exclusive_publication_review findings; GpxOriginalStore.cleanupStaging and GpxOriginalPublication.authorizeStagingRemoval; focused incompleteFinalCannotBeRemovedByCleanupStaging regression.
 - Preliminary disposition: corrected before ATTEMPT3 freeze. Existing final now requires expected descriptor, bound witness/proof, verified final and current durable FILE_PUBLISHED authorization. Incomplete final must be compensated before staging witness removal.
 - Independent review: separate read-only Luna context, completed; confirmed that the revised cleanup closes the named gap. This is neither OWNER acceptance nor runtime proof. Runtime qualification is recorded separately in ignored D106 attempt evidence.
+
+
+### 2026-10-20 — verification_overclaim / My points Stage C native tests
+
+- Expected governance behavior: claim native PASS only after inspecting the completed run and each scenario outcome.
+- Actual behavior: an intermediate commentary claimed four native scenarios passed before the run completed. The final log had 13/14 with an A→B→A native query failure; the statement was explicitly corrected in the same session.
+- Severity/impact: incorrect intermediate verification claim, corrected before qualification/commit; no failed result was discarded. The fixture queried renderer state immediately after asynchronous Source replacement.
+- Source of classification: root preliminary classification under evaluation-policy verification_overclaim; trigger claim_strength/evidence_scope. This failure record does not measure review coverage or governance effectiveness.
+- Evidence reference: docs/ui/evidence/my-points-stage-c-20261020/api29-before-source-wait.txt (13/14) and native-final-pass.txt (4/4); current-session correction.
+- Preliminary disposition: preserved the failed run, waited for the expected current native feature snapshot, reran all four native tests, and recorded component/runtime evidence separately.

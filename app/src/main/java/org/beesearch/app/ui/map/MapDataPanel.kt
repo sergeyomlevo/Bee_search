@@ -87,6 +87,13 @@ internal fun MapDataPanel(
     onOpenType: (MapDataType) -> Unit,
     onCloseType: () -> Unit,
     onDismiss: () -> Unit,
+    onOpenUserPoints: () -> Unit = {},
+    onCloseUserPoints: () -> Unit = {},
+    userPointsState: org.beesearch.app.ui.userpoints.UserPointDisplayState = org.beesearch.app.ui.userpoints.UserPointDisplayState(),
+    onOpenUserPoint: (java.util.UUID) -> Unit = {},
+    onUserPointVisibility: (java.util.UUID, Boolean) -> Unit = { _, _ -> },
+    onRetryUserPoints: () -> Unit = {},
+    onRetryUserPointVisibility: (java.util.UUID) -> Unit = {},
     onOpenGpx: () -> Unit = {},
     onCloseGpx: () -> Unit = {},
     gpxDisplayState: GpxDisplayUiState = GpxDisplayUiState(),
@@ -127,7 +134,7 @@ internal fun MapDataPanel(
         // Back returns from the nested GPX page or a type screen before closing the panel; during an
         // import it starts the durable-result check instead of pretending the import was cancelled.
         BackHandler(
-            enabled = state.openedType != null || state.gpxOpen ||
+            enabled = state.openedType != null || state.gpxOpen || state.userPointsOpen ||
                 gpxDisplayOpen || gpxImportState !is GpxImportUiState.Idle,
         ) {
             when {
@@ -137,6 +144,7 @@ internal fun MapDataPanel(
                 gpxImportState !is GpxImportUiState.Idle -> onGpxResultClose()
                 gpxDisplayOpen -> gpxDisplayOpen = false
                 state.gpxOpen -> onCloseGpx()
+                state.userPointsOpen -> onCloseUserPoints()
                 else -> onCloseType()
             }
         }
@@ -151,6 +159,13 @@ internal fun MapDataPanel(
             onResetPeriod = onResetPeriod,
             onResetFilters = onResetFilters,
             onDismiss = onDismiss,
+            onOpenUserPoints = onOpenUserPoints,
+            onCloseUserPoints = onCloseUserPoints,
+            userPointsState = userPointsState,
+            onOpenUserPoint = onOpenUserPoint,
+            onUserPointVisibility = onUserPointVisibility,
+            onRetryUserPoints = onRetryUserPoints,
+            onRetryUserPointVisibility = onRetryUserPointVisibility,
             onOpenGpx = onOpenGpx,
             onCloseGpx = onCloseGpx,
             gpxDisplayOpen = gpxDisplayOpen,
@@ -189,6 +204,13 @@ internal fun MapDataPanelBody(
     onResetPeriod: (MapDataType) -> Unit,
     onResetFilters: () -> Unit,
     onDismiss: () -> Unit,
+    onOpenUserPoints: () -> Unit = {},
+    onCloseUserPoints: () -> Unit = {},
+    userPointsState: org.beesearch.app.ui.userpoints.UserPointDisplayState = org.beesearch.app.ui.userpoints.UserPointDisplayState(),
+    onOpenUserPoint: (java.util.UUID) -> Unit = {},
+    onUserPointVisibility: (java.util.UUID, Boolean) -> Unit = { _, _ -> },
+    onRetryUserPoints: () -> Unit = {},
+    onRetryUserPointVisibility: (java.util.UUID) -> Unit = {},
     onOpenGpx: () -> Unit = {},
     onCloseGpx: () -> Unit = {},
     gpxDisplayOpen: Boolean = false,
@@ -232,11 +254,17 @@ internal fun MapDataPanelBody(
             onShowTracks = onOpenGpxDisplay,
             modifier = modifier,
         )
+        state.userPointsOpen -> org.beesearch.app.ui.userpoints.UserPointListPage(
+            state = userPointsState, onBack = onCloseUserPoints, onOpen = onOpenUserPoint,
+            onToggle = onUserPointVisibility, onRetryRead = onRetryUserPoints,
+            onRetryVisibility = onRetryUserPointVisibility, modifier = modifier,
+        )
         openedType == null -> MapDataPanelContent(
             state = state,
             onVisibilityChange = onVisibilityChange,
             onOpenType = onOpenType,
             onResetFilters = onResetFilters,
+            onOpenUserPoints = onOpenUserPoints,
             onOpenGpx = onOpenGpx,
             onDismiss = onDismiss,
             modifier = modifier,
@@ -269,6 +297,7 @@ private fun MapDataPanelContent(
     onOpenType: (MapDataType) -> Unit,
     onResetFilters: () -> Unit,
     onOpenGpx: () -> Unit,
+    onOpenUserPoints: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -342,7 +371,7 @@ private fun MapDataPanelContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         GpxEntryRow(onClick = onOpenGpx)
-        UserPointsEntryRow()
+        UserPointsEntryRow(onClick = onOpenUserPoints)
     }
 }
 

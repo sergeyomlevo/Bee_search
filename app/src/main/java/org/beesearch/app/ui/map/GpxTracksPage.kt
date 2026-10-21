@@ -101,18 +101,18 @@ internal fun GpxEntryRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
     )
 }
 
-/** Reserved user map points entry; the future feature has no page or callback yet. */
+/** Independent user points use the existing nested map-data surface. */
 @Composable
-internal fun UserPointsEntryRow(modifier: Modifier = Modifier) {
+internal fun UserPointsEntryRow(modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
     GpxNavRow(
         kind = GpxGlyphKind.Pin,
         title = "Мои точки",
         subtitle = null,
-        enabled = false,
-        onClick = {},
+        enabled = true,
+        onClick = onClick,
         testTag = "user-points-row",
         modifier = modifier,
-        description = "Мои точки. Недоступно.",
+        description = "Мои точки",
     )
 }
 

@@ -1,0 +1,66 @@
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.map.MapDataWiringTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=4
+INSTRUMENTATION_STATUS: stream=
+org.beesearch.app.ui.map.MapDataWiringTest:
+INSTRUMENTATION_STATUS: test=recordRoundTripKeepsViewportFiltersAndSelectionButExcludedIdentityCannotReopen
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.map.MapDataWiringTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=4
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=recordRoundTripKeepsViewportFiltersAndSelectionButExcludedIdentityCannotReopen
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.map.MapSelectedObjectCardTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=4
+INSTRUMENTATION_STATUS: stream=
+org.beesearch.app.ui.map.MapSelectedObjectCardTest:
+INSTRUMENTATION_STATUS: test=cardRemainsReadableAtLargeFontScale
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.map.MapSelectedObjectCardTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=4
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=cardRemainsReadableAtLargeFontScale
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.map.MapSelectedObjectCardTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=4
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=switchingMarkerUpdatesLabelAndOpenIdentity
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.map.MapSelectedObjectCardTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=4
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=switchingMarkerUpdatesLabelAndOpenIdentity
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.map.MapSelectedObjectCardTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=4
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=openPassesExactMarkerForEveryResearchObjectTypeAndCloseIsDistinct
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.beesearch.app.ui.map.MapSelectedObjectCardTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=4
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=openPassesExactMarkerForEveryResearchObjectTypeAndCloseIsDistinct
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 26.309
+
+OK (4 tests)
+
+
+INSTRUMENTATION_CODE: -1
