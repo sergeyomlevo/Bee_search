@@ -1,5 +1,24 @@
 # Bee Search handoff
 
+## D106 My Points — CLOSED / ACCEPTED within tested scope (2026-10-22)
+
+D106 implementation history and final docs are integrated in local `main` by a
+fast-forward from `08f334c` to `52a457b` (45 commits; no merge commit, no push).
+`main` is therefore the current single working copy for D106/GPX/Stage0; the old
+task clone remains preserved. Samsung S25 Ultra targeted qualification passed
+within tested scope: DEV in-place update preserved signature/firstInstallTime and
+user data; VECTOR stayed VECTOR through card/«Показать на карте»/Back; the point
+centered under the red pointer; manual map movement kept the red pointer fixed;
+all user-point markers are the same graphite triangle with light outline and no
+amber halo; ONLINE/list/marker/repeated-card scenarios passed. Known limitation:
+full process restart returns the Activity-scoped basemap choice to ONLINE;
+optional future improvement, not a D106 blocker. NOT RUN: TalkBack, media cleanup
+after process death, ENOSPC/remaining fault paths, full basemap/territory matrix,
+sensor accuracy. GPX Samsung qualification reports are now included in `docs/`;
+GPX implementation is integrated but **Stage1/H05 remain OPEN**. Unified
+Backup/Restore is future work. D106 requires no further implementation without a
+new OWNER finding; no push.
+
 ## Latest qualification — My points Stage B PASS on emulator (2026-10-20)
 
 Targeted fixes complete on task/d106-stage0-overlay-registry, baseline8ebcf06.

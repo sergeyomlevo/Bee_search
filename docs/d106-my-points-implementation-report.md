@@ -122,13 +122,10 @@ No broader storage exposure, file movement or production fix was attempted.
 Runtime comparison used approved my-points-v1 PNG+MD (chooser, location, empty
 form and bottom actions); no mockup or acceptance contract was altered. Large
 font controls are reachable, but that does not establish composition acceptance.
-Evidence: [recovery metadata](ui/evidence/my-points-stage-b-20261020/recovery-metadata.json),
-[5-test XML](ui/evidence/my-points-stage-b-20261020/api29-five-results.xml),
-[empty form](ui/evidence/my-points-stage-b-20261020/runtime-create-empty.png),
-[bottom actions](ui/evidence/my-points-stage-b-20261020/runtime-create-bottom.png),
-[two photos](ui/evidence/my-points-stage-b-20261020/runtime-create-two-photos.png),
-[preview failure toast](ui/evidence/my-points-stage-b-20261020/runtime-photo-viewer.png),
-[Back to map](ui/evidence/my-points-stage-b-20261020/runtime-back-to-map.png).
+Evidence (local ignored, not committed): `docs/ui/evidence/my-points-stage-b-20261020/` —
+`recovery-metadata.json`, `api29-five-results.xml`, `runtime-create-empty.png`,
+`runtime-create-bottom.png`, `runtime-create-two-photos.png`,
+`runtime-photo-viewer.png`, `runtime-back-to-map.png`.
 Prior API37 XML, first failed API29 XML, baseline hashes and coldboot log retained
 alongside the screenshots. Earlier evidence files were preserved unchanged.
 
