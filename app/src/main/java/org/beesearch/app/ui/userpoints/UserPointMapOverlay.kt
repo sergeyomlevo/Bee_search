@@ -19,7 +19,6 @@ import org.beesearch.app.ui.map.*
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
-import org.maplibre.android.style.expressions.Expression.*
 import org.maplibre.android.style.layers.Layer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.SymbolLayer
@@ -42,22 +41,8 @@ internal fun userPointOverlay(state: UserPointDisplayState): MapOverlay<Source, 
         layers = listOf(
             OverlayLayerFactory("markers", "points") { layer, source ->
                 SymbolLayer(layer, source)
-                    .withFilter(eq(get("selected"), literal(false)))
                     .withProperties(
                         iconImage(USER_POINT_TRIANGLE_IMAGE),
-                        iconSize(1f),
-                        iconAnchor(Property.ICON_ANCHOR_CENTER),
-                        iconAllowOverlap(true),
-                        iconIgnorePlacement(true),
-                        iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_VIEWPORT),
-                        iconPitchAlignment(Property.ICON_PITCH_ALIGNMENT_VIEWPORT),
-                    )
-            },
-            OverlayLayerFactory("selection", "points") { layer, source ->
-                SymbolLayer(layer, source)
-                    .withFilter(eq(get("selected"), literal(true)))
-                    .withProperties(
-                        iconImage(USER_POINT_TRIANGLE_SELECTED_IMAGE),
                         iconSize(1f),
                         iconAnchor(Property.ICON_ANCHOR_CENTER),
                         iconAllowOverlap(true),

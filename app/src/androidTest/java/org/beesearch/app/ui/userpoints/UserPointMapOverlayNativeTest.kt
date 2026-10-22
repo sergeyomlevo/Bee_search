@@ -49,7 +49,7 @@ class UserPointMapOverlayNativeTest {
     private val foreign = UUID.randomUUID()
 
     @Test
-    fun visibleCurrentTerritoryPointsAndSelectedHaloReachNativeSources() {
+    fun visibleCurrentTerritoryPointsAndSelectionReachNativeSource() {
         val session = createSession()
         val state = state(territoryA, 1, point(first, territoryA, true), point(second, territoryA, true), point(foreign, territoryB, true), selected = first)
         val overlay = requireNotNull(userPointOverlay(state))
@@ -63,10 +63,9 @@ class UserPointMapOverlayNativeTest {
         assertEquals(setOf(true, false), features.map { it.getBooleanProperty("selected") }.toSet())
         onMain {
             val style = session.currentStyle!!
-            assertTrue(style.getLayer(MapOverlayRegistry.layerId(overlay.key, "selection")) is SymbolLayer)
             assertTrue(style.getLayer(MapOverlayRegistry.layerId(overlay.key, "markers")) is SymbolLayer)
+            assertNull(style.getLayer(MapOverlayRegistry.layerId(overlay.key, "selection")))
             assertTrue(style.getImage(USER_POINT_TRIANGLE_IMAGE) != null)
-            assertTrue(style.getImage(USER_POINT_TRIANGLE_SELECTED_IMAGE) != null)
             session.release()
         }
     }
@@ -112,10 +111,9 @@ class UserPointMapOverlayNativeTest {
         assertEquals(first.toString(), onMainValue { source(session, overlay).querySourceFeatures(Expression.all()).single().getStringProperty("id") })
         onMain {
             val style = session.currentStyle!!
-            assertTrue(style.getLayer(MapOverlayRegistry.layerId(overlay.key, "selection")) is SymbolLayer)
             assertTrue(style.getLayer(MapOverlayRegistry.layerId(overlay.key, "markers")) is SymbolLayer)
+            assertNull(style.getLayer(MapOverlayRegistry.layerId(overlay.key, "selection")))
             assertTrue(style.getImage(USER_POINT_TRIANGLE_IMAGE) != null)
-            assertTrue(style.getImage(USER_POINT_TRIANGLE_SELECTED_IMAGE) != null)
             session.release()
         }
     }

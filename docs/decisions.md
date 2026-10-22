@@ -4257,3 +4257,54 @@ Targeted implementation and runtime evidence are recorded in the
 [review correction report](d106-my-points-samsung-review-corrections.md).
 Stage1/H05 remain OPEN; no Samsung installation or TEST-S25-02 change is
 authorized by this decision.
+
+## D106 MyPoint show-on-map, basemap and uniform marker — OWNER decision, 2026-10-22
+
+**ACCEPTED — explicit OWNER refinement after the Samsung S25 Ultra check of
+2026-10-22.** This decision supersedes only the amber selected-halo requirement
+and selected-marker enlargement from the 2026-10-21 UI-correction decision; the
+rest of that decision, including the secondary chooser headings and the creation
+date, remains in force. Historical PNGs, reports and the earlier decision are not
+rewritten retroactively.
+
+The red central point is the standard Bee Search positioning pointer: it stays
+at the screen centre during manual map movement, defines the reference for the
+app's map actions and takes part in the existing distance/direction measurement.
+It is not a user-point marker and is not tied to the actual GPS position. It must
+not be hidden, removed or changed for this refinement; existing measurement
+behaviour is untouched.
+
+«Показать на карте» from a «Моя точка» card returns to the map, preserves the
+currently selected basemap, moves the camera to the point and places the
+user-point triangle at the screen centre under the red pointer. A subsequent
+manual map movement leaves the red pointer fixed and moves the triangle with its
+geographic position; the existing measurement remains available. A hidden point
+is persisted ON before the transition; a failed ON write reports an error and does
+not claim a successful transition. Normal list ON/OFF is unchanged. The selected
+basemap is one Activity-scoped state; leaving via a card or list must not reset it
+to ONLINE. The existing policy when the selected offline package is unavailable
+is preserved; no new automatic ONLINE fallback is introduced.
+
+All user-point markers have the same graphite upward triangle, thin light outline
+and size. Selected state may remain internal for navigation, hit testing, card
+opening and accessibility, but it must not add an amber halo, enlarge the marker,
+change its colour or add persistent highlighting; the former blue circle must not
+return. No deselect action is added. The existing 48 dp hit target, semantics,
+GPS indicator, research markers, GPX, photos, creation date and forms are
+unchanged.
+
+Static diagnosis and Samsung evidence point to the pre-existing local
+`remember { ONLINE }` basemap state inside `BeeMap`, which was destroyed when a
+card route replaced the map; this was present in parent `80f08e6` and is not
+claimed as a new regression of `a8d51cf`. The implementation hoists the choice to
+one Activity-scoped `MapBasemapViewModel`; `BeeMap` receives the selected value
+and a callback. No second basemap state, new MapLibre lifecycle,
+`MapOverlayRegistry` change or Room schema/migration is introduced. The new marker
+overlay has one SymbolLayer and one fixed style image.
+
+Technical evidence and limits:
+[show-on-map correction report](d106-my-points-show-on-map-correction.md).
+The emulator has no ready offline vector package, so the actual
+VECTOR→card→show-on-map→VECTOR rendering is NOT RUN; the basemap state is covered
+by a JVM regression test. The new build was not installed on Samsung and
+TEST-S25-02 was not changed. Stage1/H05 remain OPEN.

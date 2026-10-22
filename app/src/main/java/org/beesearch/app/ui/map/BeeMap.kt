@@ -105,6 +105,9 @@ internal fun BeeMap(
     onConfirmLocationSelection: (Double, Double) -> Unit = { _, _ -> },
     onCancelLocationSelection: () -> Unit = {},
     onOpenOfflineMaps: () -> Unit = {},
+    /** Single Activity-scoped choice; the host owns it so a card route cannot reset it. */
+    developerBasemap: DeveloperBasemap = DeveloperBasemap.ONLINE,
+    onDeveloperBasemapChange: (DeveloperBasemap) -> Unit = {},
     /**
      * The pending request to open the участки editor; [AreaEditorRequest.NO_REQUEST] means nothing is
      * pending.
@@ -187,7 +190,6 @@ internal fun BeeMap(
     var createAreaConfirmationVisible by remember { mutableStateOf(false) }
     var areaNameInput by remember { mutableStateOf("") }
     var areaNameBlank by remember { mutableStateOf(false) }
-    var developerBasemap by remember { mutableStateOf(DeveloperBasemap.ONLINE) }
     var mapCameraRevision by remember { mutableStateOf(0) }
     var coverageControlsHeightPx by remember { mutableStateOf(0) }
     val coverageCameraEdgePaddingPx = with(LocalDensity.current) { 16.dp.roundToPx() }
@@ -256,7 +258,7 @@ internal fun BeeMap(
                     developerBasemap == DeveloperBasemap.HYBRID) &&
                 packageAvailability !is MapPackageAvailability.Ready
             ) {
-                developerBasemap = DeveloperBasemap.ONLINE
+                onDeveloperBasemapChange(DeveloperBasemap.ONLINE)
             }
         }
     }
@@ -645,10 +647,10 @@ internal fun BeeMap(
                     DeveloperBasemap.SENTINEL -> "Спутник Sentinel"
                     DeveloperBasemap.HYBRID -> "Гибрид"
                 },
-                onSelectOnline = { developerBasemap = DeveloperBasemap.ONLINE },
+                onSelectOnline = { onDeveloperBasemapChange(DeveloperBasemap.ONLINE) },
                 onSelectVectorMap = {
                     if (packageAvailability is MapPackageAvailability.Ready) {
-                        developerBasemap = DeveloperBasemap.ACTIVE_VECTOR
+                        onDeveloperBasemapChange(DeveloperBasemap.ACTIVE_VECTOR)
                     } else {
                         onOpenOfflineMaps()
                     }
@@ -656,13 +658,13 @@ internal fun BeeMap(
                 devSentinelAvailable = sentinelProfile != null,
                 onSelectSentinel = {
                     if (sentinelProfile != null) {
-                        developerBasemap = DeveloperBasemap.SENTINEL
+                        onDeveloperBasemapChange(DeveloperBasemap.SENTINEL)
                     }
                 },
                 devHybridAvailable = hybridProfile != null,
                 onSelectHybrid = {
                     if (hybridProfile != null) {
-                        developerBasemap = DeveloperBasemap.HYBRID
+                        onDeveloperBasemapChange(DeveloperBasemap.HYBRID)
                     }
                 },
                 modifier = if (mode == BeeMapMode.FIELD && !coverageSelectionActive) {
@@ -931,17 +933,6 @@ internal fun BeeMap(
         }
         overlaySession?.requestStyle(profile)
     }
-}
-
-private enum class DeveloperBasemap {
-    ONLINE,
-    ACTIVE_VECTOR,
-
-    /** Temporary DEV-only Sentinel-2 raster package; never reachable outside the debug build. */
-    SENTINEL,
-
-    /** Temporary DEV-only Sentinel-2 raster with the offline vector overlay on top. */
-    HYBRID,
 }
 
 @Composable

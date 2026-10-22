@@ -108,6 +108,8 @@ internal fun CurrentTerritoryScreen(
         ),
     )
     val mapDataState by mapDataViewModel.uiState.collectAsStateWithLifecycle()
+    val mapBasemapModel: MapBasemapViewModel = viewModel()
+    val developerBasemap by mapBasemapModel.selected.collectAsStateWithLifecycle()
 
     val application = LocalContext.current.applicationContext as BeeSearchApplication
     val userPointsModel: org.beesearch.app.ui.userpoints.UserPointDisplayViewModel = viewModel(
@@ -217,6 +219,8 @@ internal fun CurrentTerritoryScreen(
                     onConfirmLocationSelection = onConfirmPhysicalObjectLocation,
                     onCancelLocationSelection = onCancelPhysicalObjectLocation,
                     onOpenOfflineMaps = onOpenOfflineMaps,
+                    developerBasemap = developerBasemap,
+                    onDeveloperBasemapChange = mapBasemapModel::select,
                     areaEditorRequest = areaEditorRequest,
                     onAreaEditorRequestHandled = onAreaEditorRequestHandled,
                     onCoverageSessionEnded = onCoverageEditFinished,

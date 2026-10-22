@@ -450,3 +450,21 @@ commit, no push. Stage1/H05 remain OPEN; next task is B mockup only.
   [the correction report](d106-my-points-samsung-review-corrections.md). New APK
   on Samsung NOT INSTALLED; TEST-S25-02 untouched; full basemap matrix/TalkBack/
   fault paths NOT RUN. Stage1/H05 remain OPEN; no push.
+
+- [x] **My points show-on-map/basemap/uniform marker, 2026-10-22:** diagnosed the
+  VECTOR→ONLINE reset to the pre-existing local `remember { ONLINE }` in `BeeMap`,
+  destroyed when a card route replaces the map (present in parent `80f08e6`; not
+  claimed as a new regression of `a8d51cf`). Hoisted the choice to one
+  Activity-scoped `MapBasemapViewModel`; `BeeMap` now receives the value/callback;
+  no second state or new MapLibre lifecycle. The red central pointer and
+  measurement are unchanged; «Показать на карте» still centers the point.
+  Selected user-point markers no longer add an amber halo, enlarge or change
+  colour: one SymbolLayer and one fixed graphite/light-outline image; internal
+  selected state, 48 dp hit target, semantics and card opening remain. Full
+  JVM1073/1073; all7 build/lint PASS; API29 targeted28/28 PASS. Actual
+  VECTOR→card→show-on-map→VECTOR rendering is NOT RUN because the emulator has no
+  ready offline vector package; the basemap choice is covered by a JVM regression
+  test. Online runtime screenshot is attached to
+  [the correction report](d106-my-points-show-on-map-correction.md). New APK on
+  Samsung NOT INSTALLED; TEST-S25-02 untouched; full basemap/TalkBack/fault
+  matrices NOT RUN. Stage1/H05 remain OPEN; no push.
