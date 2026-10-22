@@ -468,3 +468,19 @@ commit, no push. Stage1/H05 remain OPEN; next task is B mockup only.
   [the correction report](d106-my-points-show-on-map-correction.md). New APK on
   Samsung NOT INSTALLED; TEST-S25-02 untouched; full basemap/TalkBack/fault
   matrices NOT RUN. Stage1/H05 remain OPEN; no push.
+
+- [x] **D106 My points — CLOSED / ACCEPTED within tested scope, 2026-10-22:**
+  A–D implementation, post-Samsung UI corrections and the ca9d4e3 basemap/marker
+  correction are accepted. Samsung S25 Ultra in-place DEV update passed: same
+  signature/firstInstallTime, Room 17 data and photo/GPX/research/settings
+  preserved; VECTOR→card→«Показать на карте»→VECTOR, ONLINE→…→ONLINE, Back,
+  list/marker opening and centered red-pointer placement passed; all user-point
+  markers are the same graphite triangle with light outline and no amber halo.
+  Actual process restart resets the Activity-scoped basemap choice to ONLINE; this
+  is recorded as a known limitation, not a failure. Full Samsung qualification
+  report: [final report](d106-my-points-samsung-show-on-map-final.md); local
+  screenshots/backups remain in Git-ignored `build/evidence/`.
+  NOT RUN and still NOT PASS: TalkBack, media cleanup after process death, ENOSPC
+  and remaining failure paths, full basemap/territory matrix, sensor accuracy.
+  Stage1/H05 remain OPEN; unified Backup/Restore and optional restart basemap
+  persistence are separate future work.
